@@ -141,14 +141,16 @@ class _HomePageState extends State<HomePage> {
 
   Widget bottomNavBar() {
     final bottomInset = MediaQuery.of(context).padding.bottom;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final centerGap = screenWidth < 360 ? 38.0 : 48.0;
 
     return SizedBox(
-      height: 104 + bottomInset,
+      height: 100 + bottomInset,
       child: Stack(
         clipBehavior: Clip.none,
         children: [
           Positioned.fill(
-            top: 20,
+            top: 18,
             child: Container(
               decoration: BoxDecoration(
                 color: Colors.white,
@@ -179,7 +181,7 @@ class _HomePageState extends State<HomePage> {
                     ),
                     Expanded(
                       child: Padding(
-                        padding: const EdgeInsets.only(right: 8),
+                        padding: const EdgeInsets.only(right: 4),
                         child: _bottomItem(
                           index: 1,
                           icon: Icons.health_and_safety_rounded,
@@ -187,10 +189,10 @@ class _HomePageState extends State<HomePage> {
                         ),
                       ),
                     ),
-                    const SizedBox(width: 48), // Dedicated gap for center FAB
+                    SizedBox(width: centerGap), // Responsive gap for center Quick Hazard FAB
                     Expanded(
                       child: Padding(
-                        padding: const EdgeInsets.only(left: 8),
+                        padding: const EdgeInsets.only(left: 4),
                         child: _bottomItem(
                           index: 3,
                           icon: Icons.qr_code_scanner_rounded,
@@ -222,8 +224,8 @@ class _HomePageState extends State<HomePage> {
                   onTap: _openQuickHazard,
                   customBorder: const CircleBorder(),
                   child: Container(
-                    width: 64,
-                    height: 64,
+                    width: 62,
+                    height: 62,
                     padding: const EdgeInsets.all(2.5),
                     decoration: BoxDecoration(
                       color: Colors.white,
@@ -264,22 +266,28 @@ class _HomePageState extends State<HomePage> {
 
     return InkWell(
       onTap: () {
-        _pageCtrl.animateToPage(
-          index,
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeOutCubic,
-        );
+        if (_currentPage == index) return;
+        HapticFeedback.selectionClick();
+        if ((index - _currentPage).abs() > 1) {
+          _pageCtrl.jumpToPage(index);
+        } else {
+          _pageCtrl.animateToPage(
+            index,
+            duration: const Duration(milliseconds: 220),
+            curve: Curves.easeOutCubic,
+          );
+        }
       },
       borderRadius: BorderRadius.circular(16),
       child: Padding(
-        padding: const EdgeInsets.only(top: 8),
+        padding: const EdgeInsets.symmetric(vertical: 4),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             AnimatedContainer(
-              duration: const Duration(milliseconds: 250),
+              duration: const Duration(milliseconds: 200),
               padding:
-                  const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                  const EdgeInsets.symmetric(horizontal: 10, vertical: 3.5),
               decoration: BoxDecoration(
                 color: selected
                     ? const Color(0xFFCCFBF1).withValues(alpha: 0.6)
@@ -288,20 +296,22 @@ class _HomePageState extends State<HomePage> {
               ),
               child: Icon(
                 icon,
-                size: 24,
+                size: 23,
                 color: color,
               ),
             ),
-            const SizedBox(height: 3),
-            Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: color,
-                fontSize: 10.5,
-                fontWeight: selected ? FontWeight.w800 : FontWeight.w500,
-                letterSpacing: 0.1,
+            const SizedBox(height: 2),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                label,
+                maxLines: 1,
+                style: TextStyle(
+                  color: color,
+                  fontSize: 10.5,
+                  fontWeight: selected ? FontWeight.w800 : FontWeight.w500,
+                  letterSpacing: 0.1,
+                ),
               ),
             ),
           ],

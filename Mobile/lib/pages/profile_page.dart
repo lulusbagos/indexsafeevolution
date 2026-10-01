@@ -28,7 +28,10 @@ class ProfilePage extends StatefulWidget {
 }
 
 class _ProfilePageState extends State<ProfilePage>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
   final _scrollCtrl = ScrollController();
   final _api = ApiService();
   ProfileModel? _profile;
@@ -378,6 +381,7 @@ class _ProfilePageState extends State<ProfilePage>
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     final bottomClearance = 130.0 + MediaQuery.of(context).padding.bottom;
     final topPadding = MediaQuery.of(context).padding.top;
 
@@ -489,6 +493,8 @@ class _ProfilePageState extends State<ProfilePage>
   // Executive Corporate Header Banner & Avatar
   // Executive Corporate Header Banner & Avatar
   Widget _buildAnimatedHeaderCard() {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final avatarCenterGap = screenWidth < 360 ? 84.0 : 100.0;
     final dept = _profile?.depart ?? 'SHE / K3';
     final site = _profile?.lokker ?? 'SITE KALTIM';
     final rosterVal = _profile?.roster != null ? '${_profile!.roster}' : '5/2';
@@ -763,7 +769,7 @@ class _ProfilePageState extends State<ProfilePage>
                         ),
 
                         // Center Space Reserved for Overlapping Avatar
-                        const SizedBox(width: 104),
+                        SizedBox(width: avatarCenterGap),
 
                         // Right Wing: Roster & Klasifikasi Karyawan
                         Expanded(

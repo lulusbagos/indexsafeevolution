@@ -14,7 +14,11 @@ class SafetyUpdatesPage extends StatefulWidget {
   State<SafetyUpdatesPage> createState() => _SafetyUpdatesPageState();
 }
 
-class _SafetyUpdatesPageState extends State<SafetyUpdatesPage> {
+class _SafetyUpdatesPageState extends State<SafetyUpdatesPage>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
   static const _blue = Color(0xFF155EEF);
   final ApiService _api = ApiService();
   String _category = 'Semua';
@@ -224,6 +228,7 @@ class _SafetyUpdatesPageState extends State<SafetyUpdatesPage> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     final categories = <String>[
       'Semua',
       'Insiden', // Tab Insiden terhubung langsung ke /Incident/Index

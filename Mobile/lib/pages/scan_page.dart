@@ -14,7 +14,11 @@ class ScanPage extends StatefulWidget {
   State<ScanPage> createState() => _ScanPageState();
 }
 
-class _ScanPageState extends State<ScanPage> with WidgetsBindingObserver, SingleTickerProviderStateMixin {
+class _ScanPageState extends State<ScanPage>
+    with WidgetsBindingObserver, SingleTickerProviderStateMixin, AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
   late final MobileScannerController _controller;
   late final AnimationController _scanAnimCtrl;
   bool _isPermissionGranted = false;
@@ -135,6 +139,7 @@ class _ScanPageState extends State<ScanPage> with WidgetsBindingObserver, Single
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     if (_isCheckingPermission) {
       return const Scaffold(
         backgroundColor: Color(0xFF0F172A),
