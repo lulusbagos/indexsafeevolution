@@ -2,111 +2,390 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:permission_handler/permission_handler.dart';
+
 import '../services/api.dart';
+import '../widgets/ambient_background.dart';
 
 class ScanPage extends StatelessWidget {
   const ScanPage({super.key});
 
   @override
   Widget build(BuildContext context) {
+    const scanServices = [
+      _ScanServiceItem(
+        title: 'Mine Permit',
+        subtitle: 'Verifikasi ID & Akses K3',
+        icon: Icons.badge_rounded,
+        accentColor: Color(0xFF0D9488),
+        bgColor: Color(0xFFF0FDFA),
+        scanType: 'Mine Permit',
+      ),
+      _ScanServiceItem(
+        title: 'Absen Acara',
+        subtitle: 'Presensi Rapat & Briefing',
+        icon: Icons.event_available_rounded,
+        accentColor: Color(0xFFD97706),
+        bgColor: Color(0xFFFFFBEB),
+        scanType: 'Absen Acara',
+      ),
+      _ScanServiceItem(
+        title: 'P2H Sarana',
+        subtitle: 'Validasi Barcode Armada',
+        icon: Icons.car_repair_rounded,
+        accentColor: Color(0xFF2563EB),
+        bgColor: Color(0xFFEFF6FF),
+        scanType: 'P2H Unit & LV',
+      ),
+      _ScanServiceItem(
+        title: 'Tagging Lokasi',
+        subtitle: 'Validasi Titik Pantau',
+        icon: Icons.fmd_good_rounded,
+        accentColor: Color(0xFF7C3AED),
+        bgColor: Color(0xFFF5F3FF),
+        scanType: 'Lokasi & Area',
+      ),
+    ];
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F7FB),
-      body: SafeArea(
-        bottom: false,
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(20, 22, 20, 130),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Scan',
-                style: TextStyle(
-                  color: Color(0xFF101828),
-                  fontSize: 28,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-              const SizedBox(height: 6),
-              const Text(
-                'Pindai barcode atau QR code untuk layanan operasional.',
-                style: TextStyle(
-                  color: Color(0xFF667085),
-                  fontSize: 13,
-                  height: 1.35,
-                ),
-              ),
-              const SizedBox(height: 24),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(22),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF155EEF), Color(0xFF0B4ACB)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  borderRadius: BorderRadius.circular(24),
-                  boxShadow: const [
-                    BoxShadow(
-                      color: Color(0x33155EEF),
-                      blurRadius: 22,
-                      offset: Offset(0, 12),
+      backgroundColor: const Color(0xFFF8FAFC),
+      body: AmbientBackground(
+        child: SafeArea(
+          bottom: false,
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(
+              parent: BouncingScrollPhysics(),
+            ),
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 130),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // 1. EXECUTIVE HEADER BANNER (Consistent Corporate Theme)
+                _buildHeaderBanner(),
+
+                const SizedBox(height: 16),
+
+                // 2. QUICK CAMERA LAUNCHER CARD
+                _buildQuickScannerCard(context),
+
+                const SizedBox(height: 20),
+
+                // 3. SECTION TITLE
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 4),
+                  child: Text(
+                    'Kategori Pemindaian',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF0F172A),
+                      letterSpacing: -0.2,
                     ),
-                  ],
+                  ),
                 ),
-                child: const Column(
+
+                const SizedBox(height: 12),
+
+                // 4. CLEAN 2-COLUMN GRID (Identical to SAP, OHS, Performance Hub)
+                GridView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 2,
+                    crossAxisSpacing: 12,
+                    mainAxisSpacing: 12,
+                    mainAxisExtent: 136,
+                  ),
+                  itemCount: scanServices.length,
+                  itemBuilder: (context, index) {
+                    final item = scanServices[index];
+                    return _buildServiceCard(context, item);
+                  },
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Header Banner yang Simpel, Bersih, dan Profesional
+  Widget _buildHeaderBanner() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        gradient: const LinearGradient(
+          colors: [
+            Color(0xFF0F172A),
+            Color(0xFF1E3A8A),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x1F0F172A),
+            blurRadius: 14,
+            offset: Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.qr_code_scanner_rounded,
-                        color: Colors.white, size: 88),
-                    SizedBox(height: 14),
+                    Icon(Icons.shield_rounded, size: 12, color: Color(0xFF60A5FA)),
+                    SizedBox(width: 5),
                     Text(
-                      'Arahkan kamera ke kode',
+                      'PT INDEXIM COALINDO',
                       style: TextStyle(
                         color: Colors.white,
-                        fontSize: 18,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    SizedBox(height: 6),
-                    Text(
-                      'Pastikan kode terlihat jelas dan berada di dalam area pemindaian.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: Color(0xFFDCE6FF),
-                        fontSize: 12,
-                        height: 1.4,
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.3,
                       ),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(height: 26),
-              const Text(
-                'Pilih Jenis Scan',
-                style: TextStyle(
-                  color: Color(0xFF101828),
-                  fontSize: 17,
-                  fontWeight: FontWeight.w900,
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF059669).withValues(alpha: 0.25),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: const Color(0xFF34D399).withValues(alpha: 0.4),
+                  ),
                 ),
-              ),
-              const SizedBox(height: 12),
-              _ScanOptionCard(
-                icon: Icons.badge_rounded,
-                title: 'Mine Permit',
-                subtitle: 'Verifikasi mine permit pekerja dengan cepat.',
-                color: const Color(0xFF0F9F8F),
-                onTap: () => _openScanner(context, 'Mine Permit'),
-              ),
-              const SizedBox(height: 12),
-              _ScanOptionCard(
-                icon: Icons.event_available_rounded,
-                title: 'Absen Acara',
-                subtitle: 'Catat kehadiran peserta pada kegiatan perusahaan.',
-                color: const Color(0xFFF08A00),
-                onTap: () => _openScanner(context, 'Absen Acara'),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 7,
+                      height: 7,
+                      decoration: const BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Color(0xFF34D399),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    const Text(
+                      'Scanner Siap',
+                      style: TextStyle(
+                        color: Color(0xFFA7F3D0),
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
+          const SizedBox(height: 14),
+          const Text(
+            'Barcode & QR Scanner',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
+              letterSpacing: -0.3,
+            ),
+          ),
+          const SizedBox(height: 5),
+          Text(
+            'Pindai cepat kode Mine Permit, presensi kegiatan, dan validasi sarana operasional secara instan.',
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.82),
+              fontSize: 12,
+              height: 1.35,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Kartu Quick Scanner Interaktif
+  Widget _buildQuickScannerCard(BuildContext context) {
+    return _AnimatedPressable(
+      onTap: () => _openScanner(context, 'General Scan'),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: const Color(0xFFE2E8F0), width: 1.1),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x08000000),
+              blurRadius: 12,
+              offset: Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 52,
+              height: 52,
+              decoration: BoxDecoration(
+                color: const Color(0xFFEFF6FF),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: const Color(0xFFBFDBFE), width: 1.2),
+              ),
+              child: const Icon(
+                Icons.qr_code_scanner_rounded,
+                color: Color(0xFF2563EB),
+                size: 28,
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Mulai Pemindaian Cepat',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF0F172A),
+                      letterSpacing: -0.2,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    'Buka kamera untuk membaca QR code & barcode otomatis.',
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.blueGrey.shade600,
+                      height: 1.3,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: const Color(0xFF2563EB),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'Pindai',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  SizedBox(width: 4),
+                  Icon(Icons.arrow_forward_rounded, color: Colors.white, size: 14),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Kartu Modul Pemindaian (Identik dengan tema SAP & OHS)
+  Widget _buildServiceCard(BuildContext context, _ScanServiceItem item) {
+    return _AnimatedPressable(
+      onTap: () => _openScanner(context, item.scanType),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: const Color(0xFFE2E8F0), width: 1.1),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x06000000),
+              blurRadius: 10,
+              offset: Offset(0, 3),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: item.bgColor,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  padding: const EdgeInsets.all(8),
+                  child: Icon(
+                    item.icon,
+                    color: item.accentColor,
+                    size: 24,
+                  ),
+                ),
+                Icon(
+                  Icons.arrow_forward_ios_rounded,
+                  size: 13,
+                  color: Colors.grey.shade400,
+                ),
+              ],
+            ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  item.title,
+                  style: const TextStyle(
+                    fontSize: 14.5,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF0F172A),
+                    letterSpacing: -0.2,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  item.subtitle,
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.blueGrey.shade600,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ],
         ),
       ),
     );
@@ -123,12 +402,15 @@ class ScanPage extends StatelessWidget {
       await showDialog<void>(
         context: context,
         builder: (dialogContext) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
           icon: const Icon(Icons.camera_alt_outlined,
-              color: Color(0xFF155EEF), size: 36),
-          title: const Text('Izin Kamera Diperlukan'),
+              color: Color(0xFF1E3A8A), size: 36),
+          title: const Text('Izin Kamera Diperlukan',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17)),
           content: const Text(
-            'Izinkan akses kamera agar MBS SAP dapat memindai barcode atau QR code.',
+            'Izinkan akses kamera agar aplikasi dapat memindai barcode atau QR code.',
             textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 13, height: 1.4),
           ),
           actions: [
             TextButton(
@@ -137,6 +419,9 @@ class ScanPage extends StatelessWidget {
             ),
             if (permission.isPermanentlyDenied || permission.isRestricted)
               FilledButton(
+                style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xFF1E3A8A),
+                ),
                 onPressed: () async {
                   Navigator.pop(dialogContext);
                   await openAppSettings();
@@ -170,6 +455,10 @@ class ScanPage extends StatelessWidget {
       context: context,
       showDragHandle: true,
       isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
       builder: (sheetContext) => SafeArea(
         child: FutureBuilder(
           future: ApiService().scanQr(result.value, scanType: scanType),
@@ -201,69 +490,112 @@ class ScanPage extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   if (snapshot.connectionState == ConnectionState.waiting) ...[
+                    const SizedBox(height: 24),
+                    const CircularProgressIndicator(color: Color(0xFF1E3A8A)),
                     const SizedBox(height: 16),
-                    const CircularProgressIndicator(),
+                    const Text('Memverifikasi ke server...',
+                        style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
                     const SizedBox(height: 16),
-                    const Text('Memverifikasi ke server...'),
                   ] else ...[
                     Container(
-                      width: 58,
-                      height: 58,
+                      width: 56,
+                      height: 56,
                       decoration: BoxDecoration(
-                        color: isSuccess ? const Color(0xFFEAFBF3) : const Color(0xFFFEE4E2),
+                        color: isSuccess ? const Color(0xFFECFDF5) : const Color(0xFFFEF2F2),
                         shape: BoxShape.circle,
+                        border: Border.all(
+                          color: isSuccess ? const Color(0xFFA7F3D0) : const Color(0xFFFECACA),
+                          width: 1.5,
+                        ),
                       ),
                       child: Icon(
                         isSuccess ? Icons.check_circle_rounded : Icons.error_rounded,
-                        color: isSuccess ? const Color(0xFF12B76A) : const Color(0xFFD92D20),
-                        size: 38,
+                        color: isSuccess ? const Color(0xFF059669) : const Color(0xFFDC2626),
+                        size: 34,
                       ),
                     ),
-                    const SizedBox(height: 14),
+                    const SizedBox(height: 12),
                     Text(
                       message,
                       textAlign: TextAlign.center,
                       style: const TextStyle(
-                        color: Color(0xFF101828),
-                        fontSize: 18,
-                        fontWeight: FontWeight.w900,
+                        color: Color(0xFF0F172A),
+                        fontSize: 17,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.2,
                       ),
                     ),
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 4),
                     Text(
                       '$scanType • ${result.format}',
-                      style: const TextStyle(color: Color(0xFF667085), fontSize: 12),
+                      style: TextStyle(color: Colors.blueGrey.shade600, fontSize: 12),
                     ),
-                    const SizedBox(height: 14),
+                    const SizedBox(height: 16),
                     if (apiData != null && actionType == 'MinePermit') ...[
                       Container(
                         width: double.infinity,
-                        padding: const EdgeInsets.all(14),
+                        padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFF0FDF9),
-                          borderRadius: BorderRadius.circular(15),
-                          border: Border.all(color: const Color(0xFF99F6E0)),
+                          color: const Color(0xFFF8FAFC),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: const Color(0xFFE2E8F0)),
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
-                              apiData!['nama']?.toString() ?? '-',
-                              style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: Color(0xFF0F766E)),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    apiData!['nama']?.toString() ?? '-',
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w800,
+                                      fontSize: 15,
+                                      color: Color(0xFF0F172A),
+                                    ),
+                                  ),
+                                ),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+                                  decoration: BoxDecoration(
+                                    color: (apiData!['status_aktif'] == 'AKTIF')
+                                        ? const Color(0xFFECFDF5)
+                                        : const Color(0xFFFEF2F2),
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(
+                                      color: (apiData!['status_aktif'] == 'AKTIF')
+                                          ? const Color(0xFFA7F3D0)
+                                          : const Color(0xFFFECACA),
+                                    ),
+                                  ),
+                                  child: Text(
+                                    apiData!['status_aktif']?.toString() ?? 'NONAKTIF',
+                                    style: TextStyle(
+                                      color: (apiData!['status_aktif'] == 'AKTIF')
+                                          ? const Color(0xFF059669)
+                                          : const Color(0xFFDC2626),
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 11,
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
-                            const SizedBox(height: 4),
-                            Text('NIK: ${apiData!['nik']} • ${apiData!['jabatan']}'),
-                            Text('Perusahaan: ${apiData!['perusahaan']}'),
-                            const SizedBox(height: 8),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: (apiData!['status_aktif'] == 'AKTIF') ? const Color(0xFF12B76A) : const Color(0xFFF04438),
-                                borderRadius: BorderRadius.circular(8),
+                            const SizedBox(height: 6),
+                            Text(
+                              'NIK: ${apiData!['nik']} • ${apiData!['jabatan']}',
+                              style: TextStyle(
+                                color: Colors.blueGrey.shade700,
+                                fontSize: 12,
                               ),
-                              child: Text(
-                                apiData!['status_aktif']?.toString() ?? 'NONAKTIF',
-                                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              'Perusahaan: ${apiData!['perusahaan']}',
+                              style: TextStyle(
+                                color: Colors.blueGrey.shade600,
+                                fontSize: 11.5,
                               ),
                             ),
                           ],
@@ -272,29 +604,36 @@ class ScanPage extends StatelessWidget {
                     ] else ...[
                       Container(
                         width: double.infinity,
-                        padding: const EdgeInsets.all(16),
+                        padding: const EdgeInsets.all(14),
                         decoration: BoxDecoration(
                           color: const Color(0xFFF8FAFC),
-                          borderRadius: BorderRadius.circular(15),
-                          border: Border.all(color: const Color(0xFFE4E7EC)),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: const Color(0xFFE2E8F0)),
                         ),
                         child: SelectableText(
                           result.value,
                           textAlign: TextAlign.center,
                           style: const TextStyle(
-                            color: Color(0xFF344054),
-                            fontSize: 14,
-                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF1E293B),
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
                       ),
                     ],
                   ],
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 20),
                   Row(
                     children: [
                       Expanded(
                         child: OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            side: const BorderSide(color: Color(0xFFE2E8F0)),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
                           onPressed: () async {
                             await Clipboard.setData(
                               ClipboardData(text: result.value),
@@ -302,18 +641,27 @@ class ScanPage extends StatelessWidget {
                             if (!sheetContext.mounted) return;
                             ScaffoldMessenger.of(sheetContext).showSnackBar(
                               const SnackBar(
-                                  content: Text('Kode berhasil disalin.')),
+                                content: Text('Kode berhasil disalin.'),
+                                behavior: SnackBarBehavior.floating,
+                              ),
                             );
                           },
-                          icon: const Icon(Icons.copy_rounded),
-                          label: const Text('Salin'),
+                          icon: const Icon(Icons.copy_rounded, size: 16),
+                          label: const Text('Salin', style: TextStyle(fontWeight: FontWeight.bold)),
                         ),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
                         child: FilledButton(
+                          style: FilledButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            backgroundColor: const Color(0xFF0F172A),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
                           onPressed: () => Navigator.pop(sheetContext),
-                          child: const Text('Selesai'),
+                          child: const Text('Selesai', style: TextStyle(fontWeight: FontWeight.bold)),
                         ),
                       ),
                     ],
@@ -328,75 +676,69 @@ class ScanPage extends StatelessWidget {
   }
 }
 
-class _ScanOptionCard extends StatelessWidget {
-  const _ScanOptionCard({
-    required this.icon,
+class _ScanServiceItem {
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final Color accentColor;
+  final Color bgColor;
+  final String scanType;
+
+  const _ScanServiceItem({
     required this.title,
     required this.subtitle,
-    required this.color,
+    required this.icon,
+    required this.accentColor,
+    required this.bgColor,
+    required this.scanType,
+  });
+}
+
+/// Widget Interaktif: Animasi Bouncing Scale saat disentuh + Haptic Feedback
+class _AnimatedPressable extends StatefulWidget {
+  final Widget child;
+  final VoidCallback onTap;
+
+  const _AnimatedPressable({
+    required this.child,
     required this.onTap,
   });
 
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final Color color;
-  final VoidCallback onTap;
+  @override
+  State<_AnimatedPressable> createState() => _AnimatedPressableState();
+}
+
+class _AnimatedPressableState extends State<_AnimatedPressable> {
+  bool _isPressed = false;
+
+  void _onTapDown(TapDownDetails _) {
+    setState(() => _isPressed = true);
+    try {
+      HapticFeedback.lightImpact();
+    } catch (_) {}
+  }
+
+  void _onTapUp(TapUpDetails _) {
+    setState(() => _isPressed = false);
+    widget.onTap();
+  }
+
+  void _onTapCancel() {
+    setState(() => _isPressed = false);
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(18),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(18),
-        child: Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: const Color(0xFFEAECF0)),
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 50,
-                height: 50,
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: .1),
-                  borderRadius: BorderRadius.circular(15),
-                ),
-                child: Icon(icon, color: color, size: 27),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: const TextStyle(
-                        color: Color(0xFF101828),
-                        fontSize: 15,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      subtitle,
-                      style: const TextStyle(
-                        color: Color(0xFF667085),
-                        fontSize: 11,
-                        height: 1.3,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const Icon(Icons.chevron_right_rounded, color: Color(0xFF98A2B3)),
-            ],
-          ),
-        ),
+    return GestureDetector(
+      onTapDown: _onTapDown,
+      onTapUp: _onTapUp,
+      onTapCancel: _onTapCancel,
+      behavior: HitTestBehavior.opaque,
+      child: AnimatedScale(
+        scale: _isPressed ? 0.96 : 1.0,
+        duration: const Duration(milliseconds: 120),
+        curve: Curves.easeOutQuad,
+        child: widget.child,
       ),
     );
   }

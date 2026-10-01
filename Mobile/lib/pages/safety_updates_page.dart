@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import '../models/incident_news_model.dart';
 import '../services/api.dart';
 import '../services/preference.dart';
+import '../widgets/ambient_background.dart';
 
 class SafetyUpdatesPage extends StatefulWidget {
   const SafetyUpdatesPage({super.key});
@@ -235,56 +236,36 @@ class _SafetyUpdatesPageState extends State<SafetyUpdatesPage> {
     final heroItem = _currentHero;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F7FB),
-      body: SafeArea(
-        bottom: false,
-        child: RefreshIndicator(
-          onRefresh: _fetchIncidents,
-          color: _blue,
-          child: CustomScrollView(
-            slivers: [
-              SliverPadding(
-                padding: const EdgeInsets.fromLTRB(18, 18, 18, 8),
-                sliver: SliverToBoxAdapter(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Safety Updates',
-                            style: TextStyle(
-                              color: Color(0xFF101828),
-                              fontSize: 27,
-                              height: 1,
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: -.6,
-                            ),
-                          ),
-                          SizedBox(height: 6),
-                          Text(
-                            'Berita keselamatan, peringatan & informasi terkini',
-                            style: TextStyle(
-                              color: Color(0xFF64748B),
-                              fontSize: 12,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
+      backgroundColor: const Color(0xFFF8FAFC),
+      body: AmbientBackground(
+        child: SafeArea(
+          bottom: false,
+          child: RefreshIndicator(
+            onRefresh: _fetchIncidents,
+            color: _blue,
+            child: CustomScrollView(
+              slivers: [
+                SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
+                  sliver: SliverToBoxAdapter(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // 1. EXECUTIVE HEADER BANNER (Consistent Corporate Theme)
+                        _buildHeaderBanner(),
 
-                      // ==================== HERO BANNER (TERHUBUNG KE /Incident/Index) ====================
-                      _HeroUpdate(
-                        update: heroItem,
-                        isIncidentTab: _category == 'Insiden' || heroItem.isFromIncidentServer,
-                        onTap: () => _showUpdate(heroItem),
-                      ),
-                    ],
+                        const SizedBox(height: 16),
+
+                        // ==================== HERO BANNER (TERHUBUNG KE /Incident/Index) ====================
+                        _HeroUpdate(
+                          update: heroItem,
+                          isIncidentTab: _category == 'Insiden' || heroItem.isFromIncidentServer,
+                          onTap: () => _showUpdate(heroItem),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-              ),
 
               // Categories Horizontal List (dengan Tab Insiden)
               SliverToBoxAdapter(
@@ -398,6 +379,118 @@ class _SafetyUpdatesPageState extends State<SafetyUpdatesPage> {
             ],
           ),
         ),
+      ),
+    ),
+  );
+}
+
+  /// Header Banner yang Simpel & Profesional (Menyelaraskan tema dengan SAP, OHS, dan Performance Hub)
+  Widget _buildHeaderBanner() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        gradient: const LinearGradient(
+          colors: [
+            Color(0xFF0F172A),
+            Color(0xFF1E3A8A),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x1F0F172A),
+            blurRadius: 14,
+            offset: Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.shield_rounded, size: 12, color: Color(0xFF60A5FA)),
+                    SizedBox(width: 5),
+                    Text(
+                      'PT INDEXIM COALINDO',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.3,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF059669).withValues(alpha: 0.25),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: const Color(0xFF34D399).withValues(alpha: 0.4),
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 7,
+                      height: 7,
+                      decoration: const BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Color(0xFF34D399),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    const Text(
+                      'Live Feed',
+                      style: TextStyle(
+                        color: Color(0xFFA7F3D0),
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          const Text(
+            'Safety Updates & Warta K3',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
+              letterSpacing: -0.3,
+            ),
+          ),
+          const SizedBox(height: 5),
+          Text(
+            'Peringatan bahaya, informasi operasional tambang, bulletin keselamatan kerja, dan tindak lanjut insiden.',
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.82),
+              fontSize: 12,
+              height: 1.35,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -627,7 +720,7 @@ class _HeroUpdate extends StatelessWidget {
                 Image.network(
                   update.imageUrl!.startsWith('http')
                       ? update.imageUrl!
-                      : 'http://192.168.0.6:5200${update.imageUrl}',
+                      : '${ApiService().baseUrl}${update.imageUrl}',
                   fit: BoxFit.cover,
                   errorBuilder: (_, __, ___) => _buildHeroGradientBackground(),
                 )
@@ -794,7 +887,7 @@ class _UpdateCard extends StatelessWidget {
                       ? Image.network(
                           update.imageUrl!.startsWith('http')
                               ? update.imageUrl!
-                              : 'http://192.168.0.6:5200${update.imageUrl}',
+                              : '${ApiService().baseUrl}${update.imageUrl}',
                           fit: BoxFit.cover,
                           errorBuilder: (_, __, ___) => Icon(update.icon, color: update.color, size: 30),
                         )
