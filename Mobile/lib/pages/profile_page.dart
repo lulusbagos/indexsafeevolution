@@ -487,77 +487,373 @@ class _ProfilePageState extends State<ProfilePage>
 
   // Animated Banner & Overlapping Avatar
   // Executive Corporate Header Banner & Avatar
+  // Executive Corporate Header Banner & Avatar
   Widget _buildAnimatedHeaderCard() {
+    final dept = _profile?.depart ?? 'SHE / K3';
+    final site = _profile?.lokker ?? 'SITE KALTIM';
+    final rosterVal = _profile?.roster != null ? '${_profile!.roster}' : '5/2';
+    final statusKlasifikasi = _profile?.klasifikasi ?? 'KARYAWAN TETAP';
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 18),
       child: Stack(
         clipBehavior: Clip.none,
         alignment: Alignment.center,
         children: [
-          // Dignified Executive Banner
+          // Dignified Executive Mining Permit Banner
           Container(
-            height: 140,
+            height: 156,
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(22),
+              borderRadius: BorderRadius.circular(24),
               gradient: const LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
                 colors: [
-                  Color(0xFF0F172A),
-                  Color(0xFF1E3A8A),
+                  Color(0xFF090D16), // Deep obsidian
+                  Color(0xFF0F172A), // Slate 900
+                  Color(0xFF1E293B), // Slate 800
+                  Color(0xFF1E3A8A), // Executive Navy Blue
                 ],
+                stops: [0.0, 0.35, 0.72, 1.0],
               ),
-              boxShadow: const [
+              border: Border.all(
+                color: const Color(0xFF38BDF8).withValues(alpha: 0.25),
+                width: 1.2,
+              ),
+              boxShadow: [
                 BoxShadow(
-                  color: Color(0x1A0F172A),
-                  blurRadius: 18,
-                  offset: Offset(0, 8),
+                  color: const Color(0xFF0F172A).withValues(alpha: 0.35),
+                  blurRadius: 22,
+                  offset: const Offset(0, 10),
                 ),
               ],
             ),
-            child: Stack(
-              children: [
-                // PT INDEXIM COALINDO Badge on Top-Left
-                Positioned(
-                  top: 14,
-                  left: 16,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(24),
+              child: Stack(
+                children: [
+                  // 1. Subtle Architectural Watermark (Concentric Circles & Shield Graphic)
+                  Positioned(
+                    top: -40,
+                    right: -40,
+                    child: Container(
+                      width: 170,
+                      height: 170,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: const Color(0xFF38BDF8).withValues(alpha: 0.05),
+                          width: 28,
+                        ),
+                      ),
                     ),
-                    child: const Row(
-                      mainAxisSize: MainAxisSize.min,
+                  ),
+                  Positioned(
+                    bottom: -30,
+                    left: -30,
+                    child: Container(
+                      width: 130,
+                      height: 130,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: const Color(0xFF60A5FA).withValues(alpha: 0.04),
+                          width: 20,
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  // 2. Glowing Golden-Cyan Perimeter Accent Line on Top
+                  Positioned(
+                    top: 0,
+                    left: 24,
+                    right: 24,
+                    child: Container(
+                      height: 2,
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            Colors.transparent,
+                            const Color(0xFF38BDF8).withValues(alpha: 0.6),
+                            const Color(0xFFF59E0B).withValues(alpha: 0.7),
+                            Colors.transparent,
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  // 3. Top Row: Company Badge, Status Chip, & Refresh Action
+                  Positioned(
+                    top: 14,
+                    left: 16,
+                    right: 14,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
-                        Icon(Icons.shield_rounded, size: 12, color: Color(0xFF60A5FA)),
-                        SizedBox(width: 5),
-                        Text(
-                          'PT INDEXIM COALINDO',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 10,
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: 0.3,
+                        // PT INDEXIM COALINDO Official Shield Tag
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4.5),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.09),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: const Color(0xFF38BDF8).withValues(alpha: 0.3),
+                              width: 1.0,
+                            ),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.shield_rounded, size: 13, color: Color(0xFF38BDF8)),
+                              SizedBox(width: 6),
+                              Text(
+                                'PT INDEXIM COALINDO',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: 0.4,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+
+                        // Right Wing: Verified Status Pill & Refresh Action
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF065F46).withValues(alpha: 0.45),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: const Color(0xFF10B981).withValues(alpha: 0.6),
+                                  width: 1,
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Container(
+                                    width: 6,
+                                    height: 6,
+                                    decoration: const BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      color: Color(0xFF34D399),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Color(0xFF34D399),
+                                          blurRadius: 4,
+                                          spreadRadius: 1,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(width: 5),
+                                  const Text(
+                                    'SIMPER AKTIF',
+                                    style: TextStyle(
+                                      color: Color(0xFF6EE7B7),
+                                      fontSize: 9.5,
+                                      fontWeight: FontWeight.w800,
+                                      letterSpacing: 0.3,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Semantics(
+                              button: true,
+                              label: 'Segarkan data profil',
+                              child: InkWell(
+                                onTap: _fetchLatestProfile,
+                                borderRadius: BorderRadius.circular(18),
+                                child: Container(
+                                  width: 32,
+                                  height: 32,
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withValues(alpha: 0.1),
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                      color: Colors.white.withValues(alpha: 0.15),
+                                      width: 1,
+                                    ),
+                                  ),
+                                  child: const Icon(
+                                    Icons.refresh_rounded,
+                                    color: Colors.white,
+                                    size: 17,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // 4. Middle Content Row (Flanking the central avatar)
+                  Positioned(
+                    top: 54,
+                    left: 16,
+                    right: 16,
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Left Wing: Departemen & Site Location
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Text(
+                                'DEPARTEMEN',
+                                style: TextStyle(
+                                  fontSize: 8.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xFF94A3B8),
+                                  letterSpacing: 0.6,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                dept,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w800,
+                                  color: Colors.white,
+                                  letterSpacing: -0.1,
+                                ),
+                              ),
+                              const SizedBox(height: 3),
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(
+                                    Icons.location_on_rounded,
+                                    size: 11,
+                                    color: Color(0xFF38BDF8),
+                                  ),
+                                  const SizedBox(width: 3),
+                                  Flexible(
+                                    child: Text(
+                                      site,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        fontSize: 9.5,
+                                        fontWeight: FontWeight.w600,
+                                        color: Color(0xFFBAE6FD),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+
+                        // Center Space Reserved for Overlapping Avatar
+                        const SizedBox(width: 104),
+
+                        // Right Wing: Roster & Klasifikasi Karyawan
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Text(
+                                'STATUS ROSTER',
+                                style: TextStyle(
+                                  fontSize: 8.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xFF94A3B8),
+                                  letterSpacing: 0.6,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                'ROSTER $rosterVal',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w800,
+                                  color: Colors.white,
+                                  letterSpacing: -0.1,
+                                ),
+                              ),
+                              const SizedBox(height: 3),
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(
+                                    Icons.verified_rounded,
+                                    size: 11,
+                                    color: Color(0xFFFBBF24),
+                                  ),
+                                  const SizedBox(width: 3),
+                                  Flexible(
+                                    child: Text(
+                                      statusKlasifikasi,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        fontSize: 9.5,
+                                        fontWeight: FontWeight.w600,
+                                        color: Color(0xFFFDE68A),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
                           ),
                         ),
                       ],
                     ),
                   ),
-                ),
 
-                // Refresh Button on Top Right
-                Positioned(
-                  top: 8,
-                  right: 10,
-                  child: IconButton(
-                    icon: const Icon(Icons.refresh_rounded, color: Colors.white, size: 20),
-                    tooltip: 'Muat ulang data',
-                    onPressed: _fetchLatestProfile,
+                  // 5. Watermark Footer Indicator
+                  Positioned(
+                    bottom: 8,
+                    left: 18,
+                    right: 18,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'DIGITAL MINE ID',
+                          style: TextStyle(
+                            fontSize: 8,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 1.2,
+                            color: Colors.white.withValues(alpha: 0.25),
+                          ),
+                        ),
+                        Text(
+                          'SMK3 • ISO 45001',
+                          style: TextStyle(
+                            fontSize: 8,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 1.0,
+                            color: Colors.white.withValues(alpha: 0.25),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
 
@@ -571,11 +867,15 @@ class _ProfilePageState extends State<ProfilePage>
                 children: [
                   // Outer subtle border ring
                   Container(
-                    width: 102,
-                    height: 102,
+                    width: 104,
+                    height: 104,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: const Color(0xFF1E3A8A).withValues(alpha: 0.2),
+                      color: const Color(0xFF1E3A8A).withValues(alpha: 0.25),
+                      border: Border.all(
+                        color: const Color(0xFF38BDF8).withValues(alpha: 0.35),
+                        width: 1.5,
+                      ),
                     ),
                   ),
                   // White border ring
@@ -585,12 +885,12 @@ class _ProfilePageState extends State<ProfilePage>
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       color: Colors.white,
-                      border: Border.all(color: Colors.white, width: 3),
+                      border: Border.all(color: Colors.white, width: 3.5),
                       boxShadow: const [
                         BoxShadow(
-                          color: Color(0x1F000000),
-                          blurRadius: 12,
-                          offset: Offset(0, 4),
+                          color: Color(0x26000000),
+                          blurRadius: 14,
+                          offset: Offset(0, 5),
                         ),
                       ],
                     ),
@@ -636,7 +936,7 @@ class _ProfilePageState extends State<ProfilePage>
                       height: 30,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: const Color(0xFF2563EB),
+                        color: const Color(0xFF0284C7),
                         border: Border.all(color: Colors.white, width: 2),
                         boxShadow: const [
                           BoxShadow(
@@ -691,7 +991,7 @@ class _ProfilePageState extends State<ProfilePage>
     final nik = _profile?.noNik ?? '-';
 
     return Padding(
-      padding: const EdgeInsets.only(top: 36, left: 20, right: 20),
+      padding: const EdgeInsets.only(top: 52, left: 20, right: 20),
       child: Column(
         children: [
           Text(
@@ -709,9 +1009,10 @@ class _ProfilePageState extends State<ProfilePage>
             role,
             textAlign: TextAlign.center,
             style: const TextStyle(
-              fontSize: 13.5,
+              fontSize: 13,
               fontWeight: FontWeight.w700,
-              color: Color(0xFF7C3AED),
+              color: Color(0xFF0369A1),
+              letterSpacing: 0.2,
             ),
           ),
           const SizedBox(height: 6),
