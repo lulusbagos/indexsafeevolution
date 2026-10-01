@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../utils/links.dart';
 import '../../utils/routers.dart';
@@ -13,117 +14,117 @@ class ExtraPage extends StatefulWidget {
 }
 
 class _ExtraPageState extends State<ExtraPage> {
-  static const Map<String, ({Color bgTint, Color iconColor})> _menuColors = {
-    '/sap_achievement': (bgTint: Color(0xFFEFF6FF), iconColor: Color(0xFF2563EB)),
-    '/sap_league': (bgTint: Color(0xFFFFFBEB), iconColor: Color(0xFFD97706)),
-    '/sap_work_roster': (bgTint: Color(0xFFF0FDFA), iconColor: Color(0xFF0D9488)),
-    '/sap_quality': (bgTint: Color(0xFFF5F3FF), iconColor: Color(0xFF7C3AED)),
-    '/sap_action_plan': (bgTint: Color(0xFFFFF1F2), iconColor: Color(0xFFE11D48)),
-  };
-
   @override
   Widget build(BuildContext context) {
+    final achievement = listMenuExtra.firstWhere(
+      (m) => m.route == '/sap_achievement',
+      orElse: () => listMenuExtra[0],
+    );
+    final league = listMenuExtra.firstWhere(
+      (m) => m.route == '/sap_league',
+      orElse: () => listMenuExtra[1],
+    );
+    final roster = listMenuExtra.firstWhere(
+      (m) => m.route == '/sap_work_roster',
+      orElse: () => listMenuExtra[2],
+    );
+    final quality = listMenuExtra.firstWhere(
+      (m) => m.route == '/sap_quality',
+      orElse: () => listMenuExtra[3],
+    );
+    final actionPlan = listMenuExtra.firstWhere(
+      (m) => m.route == '/sap_action_plan',
+      orElse: () => listMenuExtra[4],
+    );
+
+    final menuItems = [
+      _PerformanceMenuItemData(
+        title: 'Pencapaian SAP',
+        subtitle: 'Target & Realisasi KPI',
+        image: achievement.image,
+        fallbackIcon: Icons.track_changes_rounded,
+        accentColor: const Color(0xFF2563EB),
+        bgColor: const Color(0xFFEFF6FF),
+        route: achievement.route,
+      ),
+      _PerformanceMenuItemData(
+        title: 'Klasemen League',
+        subtitle: 'Peringkat Kinerja Safety',
+        image: league.image,
+        fallbackIcon: Icons.emoji_events_rounded,
+        accentColor: const Color(0xFFD97706),
+        bgColor: const Color(0xFFFFFBEB),
+        route: league.route,
+      ),
+      _PerformanceMenuItemData(
+        title: 'Roster Kerja',
+        subtitle: 'Jadwal & Rotasi Kerja',
+        image: roster.image,
+        fallbackIcon: Icons.calendar_month_rounded,
+        accentColor: const Color(0xFF0D9488),
+        bgColor: const Color(0xFFF0FDFA),
+        route: roster.route,
+      ),
+      _PerformanceMenuItemData(
+        title: 'Kualitas SAP',
+        subtitle: 'Audit Mutu Pelaporan K3',
+        image: quality.image,
+        fallbackIcon: Icons.verified_rounded,
+        accentColor: const Color(0xFF7C3AED),
+        bgColor: const Color(0xFFF5F3FF),
+        route: quality.route,
+      ),
+      _PerformanceMenuItemData(
+        title: 'Action Tracker',
+        subtitle: 'Tindak Lanjut Temuan',
+        image: actionPlan.image,
+        fallbackIcon: Icons.assignment_turned_in_rounded,
+        accentColor: const Color(0xFFE11D48),
+        bgColor: const Color(0xFFFFF1F2),
+        route: actionPlan.route,
+      ),
+      const _PerformanceMenuItemData(
+        title: 'Informasi Insiden',
+        subtitle: 'Data & Pembelajaran K3',
+        image: '',
+        fallbackIcon: Icons.campaign_rounded,
+        accentColor: Color(0xFF0284C7),
+        bgColor: Color(0xFFF0F9FF),
+        route: '/sap_incident_information',
+      ),
+    ];
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       appBar: const TopBar(title: 'Performance Hub'),
       body: AmbientBackground(
         child: SingleChildScrollView(
-          physics: const BouncingScrollPhysics(),
-          padding: const EdgeInsets.fromLTRB(18, 16, 18, 28),
+          physics: const AlwaysScrollableScrollPhysics(
+            parent: BouncingScrollPhysics(),
+          ),
+          padding: const EdgeInsets.fromLTRB(16, 14, 16, 28),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // 1. HEADER BANNER (Unified Corporate Theme)
+              _buildHeaderBanner(),
+
+              const SizedBox(height: 16),
+
+              // 2. CLEAN 2-COLUMN GRID (Identical to SAP & OHS)
               GridView.builder(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
                 gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                   crossAxisCount: 2,
-                  crossAxisSpacing: 14,
-                  mainAxisSpacing: 14,
-                  childAspectRatio: 1.15,
+                  crossAxisSpacing: 12,
+                  mainAxisSpacing: 12,
+                  mainAxisExtent: 136,
                 ),
-                itemCount: listMenuExtra.length,
+                itemCount: menuItems.length,
                 itemBuilder: (context, index) {
-                  final item = listMenuExtra[index];
-                  final cleanTitle = item.title.replaceAll('\n', ' ');
-                  final colors = _menuColors[item.route] ??
-                      (bgTint: const Color(0xFFF1F5F9), iconColor: const Color(0xFF475569));
-
-                  return Material(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(18),
-                    elevation: 0,
-                    child: InkWell(
-                      onTap: () {
-                        if (item.route.isNotEmpty) {
-                          routePage(context, item.route, title: cleanTitle);
-                        }
-                      },
-                      borderRadius: BorderRadius.circular(18),
-                      splashColor: colors.bgTint,
-                      highlightColor: colors.bgTint.withValues(alpha: 0.5),
-                      child: Container(
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(18),
-                          border: Border.all(
-                            color: const Color(0xFFE2E8F0),
-                            width: 1,
-                          ),
-                          boxShadow: const [
-                            BoxShadow(
-                              color: Color(0x06000000),
-                              blurRadius: 10,
-                              offset: Offset(0, 4),
-                            ),
-                          ],
-                        ),
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Container(
-                              width: 54,
-                              height: 54,
-                              decoration: BoxDecoration(
-                                color: colors.bgTint,
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                              padding: const EdgeInsets.all(10),
-                              child: (item.image != null && item.image!.isNotEmpty)
-                                  ? Image.asset(
-                                      item.image!,
-                                      fit: BoxFit.contain,
-                                      errorBuilder: (_, __, ___) => Icon(
-                                        item.icon,
-                                        color: colors.iconColor,
-                                        size: 28,
-                                      ),
-                                    )
-                                  : Icon(
-                                      item.icon,
-                                      color: colors.iconColor,
-                                      size: 28,
-                                    ),
-                            ),
-                            const SizedBox(height: 10),
-                            Text(
-                              cleanTitle,
-                              textAlign: TextAlign.center,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w700,
-                                color: Color(0xFF1E293B),
-                                letterSpacing: -0.2,
-                                height: 1.2,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  );
+                  final item = menuItems[index];
+                  return _buildModuleCard(item);
                 },
               ),
             ],
@@ -132,4 +133,280 @@ class _ExtraPageState extends State<ExtraPage> {
       ),
     );
   }
+
+  /// Header Banner yang Simpel & Profesional
+  Widget _buildHeaderBanner() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        gradient: const LinearGradient(
+          colors: [
+            Color(0xFF0F172A),
+            Color(0xFF312E81),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x1F0F172A),
+            blurRadius: 14,
+            offset: Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.shield_rounded, size: 12, color: Color(0xFF818CF8)),
+                    SizedBox(width: 5),
+                    Text(
+                      'PT INDEXIM COALINDO',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.3,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF4F46E5).withValues(alpha: 0.25),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: const Color(0xFF818CF8).withValues(alpha: 0.4),
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 7,
+                      height: 7,
+                      decoration: const BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Color(0xFF818CF8),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    const Text(
+                      'Metrik Real-Time',
+                      style: TextStyle(
+                        color: Color(0xFFC7D2FE),
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          const Text(
+            'Performance Hub & Analytics',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
+              letterSpacing: -0.3,
+            ),
+          ),
+          const SizedBox(height: 5),
+          Text(
+            'Monitoring pencapaian KPI keselamatan kerja, klasemen tim, dan perbaikan berkelanjutan.',
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.82),
+              fontSize: 12,
+              height: 1.35,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Kartu Modul Bersih, Elegan, dan Proporsional (Identik dengan tema SAP)
+  Widget _buildModuleCard(_PerformanceMenuItemData item) {
+    return _AnimatedPressable(
+      onTap: () {
+        if (item.route.isNotEmpty) {
+          routePage(context, item.route, title: item.title);
+        }
+      },
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: const Color(0xFFE2E8F0), width: 1.1),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x06000000),
+              blurRadius: 10,
+              offset: Offset(0, 3),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: item.bgColor,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  padding: const EdgeInsets.all(8),
+                  child: item.image.isNotEmpty
+                      ? Image.asset(
+                          item.image,
+                          fit: BoxFit.contain,
+                          errorBuilder: (_, __, ___) => Icon(
+                            item.fallbackIcon,
+                            color: item.accentColor,
+                            size: 24,
+                          ),
+                        )
+                      : Icon(
+                          item.fallbackIcon,
+                          color: item.accentColor,
+                          size: 24,
+                        ),
+                ),
+                Icon(
+                  Icons.arrow_forward_ios_rounded,
+                  size: 13,
+                  color: Colors.grey.shade400,
+                ),
+              ],
+            ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  item.title,
+                  style: const TextStyle(
+                    fontSize: 14.5,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF0F172A),
+                    letterSpacing: -0.2,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  item.subtitle,
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.blueGrey.shade600,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
+
+class _PerformanceMenuItemData {
+  final String title;
+  final String subtitle;
+  final String image;
+  final IconData fallbackIcon;
+  final Color accentColor;
+  final Color bgColor;
+  final String route;
+
+  const _PerformanceMenuItemData({
+    required this.title,
+    required this.subtitle,
+    required this.image,
+    required this.fallbackIcon,
+    required this.accentColor,
+    required this.bgColor,
+    required this.route,
+  });
+}
+
+/// Widget Interaktif: Animasi Bouncing Scale saat disentuh + Haptic Feedback
+class _AnimatedPressable extends StatefulWidget {
+  final Widget child;
+  final VoidCallback onTap;
+
+  const _AnimatedPressable({
+    required this.child,
+    required this.onTap,
+  });
+
+  @override
+  State<_AnimatedPressable> createState() => _AnimatedPressableState();
+}
+
+class _AnimatedPressableState extends State<_AnimatedPressable> {
+  bool _isPressed = false;
+
+  void _onTapDown(TapDownDetails _) {
+    setState(() => _isPressed = true);
+    try {
+      HapticFeedback.lightImpact();
+    } catch (_) {}
+  }
+
+  void _onTapUp(TapUpDetails _) {
+    setState(() => _isPressed = false);
+    widget.onTap();
+  }
+
+  void _onTapCancel() {
+    setState(() => _isPressed = false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTapDown: _onTapDown,
+      onTapUp: _onTapUp,
+      onTapCancel: _onTapCancel,
+      behavior: HitTestBehavior.opaque,
+      child: AnimatedScale(
+        scale: _isPressed ? 0.96 : 1.0,
+        duration: const Duration(milliseconds: 120),
+        curve: Curves.easeOutQuad,
+        child: widget.child,
+      ),
+    );
+  }
+}
+
