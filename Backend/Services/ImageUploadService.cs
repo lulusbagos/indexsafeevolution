@@ -114,25 +114,54 @@ namespace Indexsafe.Api.Services
 
             savedUrl = $"/uploads/{category}/{monthFolder}/{uniqueFileName}";
 
-            // Mirror file to MBS_SAP web directory to keep both systems perfectly synchronized
+            // Mirror file to MBS_SAP web directory & C:\MinePermitFiles\MBS\profiles to keep both systems perfectly synchronized
             try
             {
-                var mbsRoot = @"D:\4. PROJECT\2. Web\MBS_SAP\wwwroot\uploads";
-                var mbsCategoryFolder = Path.Combine(mbsRoot, category, monthFolder);
-                if (!Directory.Exists(mbsCategoryFolder))
-                {
-                    Directory.CreateDirectory(mbsCategoryFolder);
-                }
                 var sourceFile = Path.Combine(uploadsFolder, uniqueFileName);
-                var destFile = Path.Combine(mbsCategoryFolder, uniqueFileName);
                 if (File.Exists(sourceFile))
                 {
+                    // If profiles category, ensure copies in C:\MinePermitFiles\MBS\profiles directly as well
+                    if (string.Equals(category, "profiles", StringComparison.OrdinalIgnoreCase))
+                    {
+                        var profilesRoot = @"C:\MinePermitFiles\MBS\profiles";
+                        if (!Directory.Exists(profilesRoot)) Directory.CreateDirectory(profilesRoot);
+
+                        var directProfilesFile = Path.Combine(profilesRoot, uniqueFileName);
+                        File.Copy(sourceFile, directProfilesFile, true);
+
+                        if (!string.IsNullOrEmpty(prefix))
+                        {
+                            var nikProfilesFile = Path.Combine(profilesRoot, $"{prefix}.jpg");
+                            File.Copy(sourceFile, nikProfilesFile, true);
+                        }
+                    }
+
+                    // Mirror to MBS_SAP Web wwwroot/uploads
+                    var mbsRoot = @"D:\4. PROJECT\2. Web\MBS_SAP\wwwroot\uploads";
+                    var mbsCategoryFolder = Path.Combine(mbsRoot, category, monthFolder);
+                    if (!Directory.Exists(mbsCategoryFolder))
+                    {
+                        Directory.CreateDirectory(mbsCategoryFolder);
+                    }
+                    var destFile = Path.Combine(mbsCategoryFolder, uniqueFileName);
                     File.Copy(sourceFile, destFile, true);
+
+                    if (string.Equals(category, "profiles", StringComparison.OrdinalIgnoreCase))
+                    {
+                        var mbsDirectProfiles = Path.Combine(mbsRoot, "profiles");
+                        if (!Directory.Exists(mbsDirectProfiles)) Directory.CreateDirectory(mbsDirectProfiles);
+
+                        File.Copy(sourceFile, Path.Combine(mbsDirectProfiles, uniqueFileName), true);
+                        if (!string.IsNullOrEmpty(prefix))
+                        {
+                            File.Copy(sourceFile, Path.Combine(mbsDirectProfiles, $"{prefix}.jpg"), true);
+                        }
+                    }
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[ImageUploadService] Mirror to MBS_SAP error: {ex.Message}");
+                Console.WriteLine($"[ImageUploadService] Mirror to MBS_SAP/Profiles error: {ex.Message}");
             }
 
             sw.Stop();

@@ -12,6 +12,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
 import '../models/link_model.dart';
+import '../models/profile_model.dart';
 import '../services/api.dart';
 import '../services/notification.dart';
 import '../services/preference.dart';
@@ -554,7 +555,7 @@ class DashboardPage extends StatefulWidget {
 }
 
 class _DashboardPageState extends State<DashboardPage> {
-  final _profile = PreferenceService.getProfile();
+  ProfileModel? get _profile => PreferenceService.getProfile();
   final _api = ApiService();
   ImageProvider? _profileImage;
   Timer? _safetyUpdateTimer;
@@ -578,6 +579,12 @@ class _DashboardPageState extends State<DashboardPage> {
   int _homePendingOfflineCount = 0;
   Position? _currentUserPosition;
 
+  void _onProfilePhotoNotifierChanged() {
+    if (!mounted) return;
+    _loadProfileImage();
+    setState(() {});
+  }
+
   Future<void> _checkHomePendingOffline() async {
     try {
       final count = await OfflineSyncService.instance.getPendingCount();
@@ -591,6 +598,7 @@ class _DashboardPageState extends State<DashboardPage> {
   void initState() {
     super.initState();
 
+    PreferenceService.profilePhotoNotifier.addListener(_onProfilePhotoNotifierChanged);
     _loadProfileImage();
     _fetchUnreadNotifCount();
     _checkSafetyUpdatesAndVibrate();
@@ -694,6 +702,7 @@ class _DashboardPageState extends State<DashboardPage> {
 
   @override
   void dispose() {
+    PreferenceService.profilePhotoNotifier.removeListener(_onProfilePhotoNotifierChanged);
     _safetyUpdateTimer?.cancel();
     _proximityTimer?.cancel();
     super.dispose();
@@ -1914,8 +1923,12 @@ class _DashboardPageState extends State<DashboardPage> {
 
   Future<void> _loadProfileImage() async {
     try {
-      final foto = _profile?.foto;
-      if (foto == null || foto.trim().isEmpty) return;
+      final curProfile = PreferenceService.getProfile();
+      final foto = curProfile?.foto;
+      if (foto == null || foto.trim().isEmpty) {
+        if (mounted) setState(() => _profileImage = null);
+        return;
+      }
 
       final file = File(foto);
       if (await file.exists()) {
@@ -1940,15 +1953,23 @@ class _DashboardPageState extends State<DashboardPage> {
         return;
       }
 
-      // 3. Remote URL support (full HTTP or relative /uploads)
+      // 3. Remote URL support (full HTTP or relative /uploads or /api/profile/photo)
       if (foto.startsWith('http')) {
         if (!mounted) return;
         setState(() => _profileImage = NetworkImage(foto));
         return;
       }
 
-      if (foto.startsWith('/uploads')) {
+      if (foto.startsWith('/uploads') || foto.startsWith('/api/')) {
         final serverUrl = '${_api.baseUrl}$foto';
+        if (!mounted) return;
+        setState(() => _profileImage = NetworkImage(serverUrl));
+        return;
+      }
+
+      // Fallback: If NIK is known, query endpoint from backend
+      if (curProfile?.noNik != null && curProfile!.noNik!.isNotEmpty && curProfile.noNik != '-') {
+        final serverUrl = '${_api.baseUrl}/api/profile/photo/${curProfile.noNik}';
         if (!mounted) return;
         setState(() => _profileImage = NetworkImage(serverUrl));
         return;
@@ -2124,9 +2145,12 @@ class _DashboardPageState extends State<DashboardPage> {
           'avatar_${_profile?.id ?? 0}_${DateTime.now().millisecondsSinceEpoch}.$ext';
       final permanentFile = await picked.copy('${appDir.path}/$fileName');
 
-      if (_profile != null) {
-        _profile!.foto = permanentFile.path;
-        PreferenceService.setProfile(_profile!);
+      final curProfile = PreferenceService.getProfile();
+      if (curProfile != null) {
+        curProfile.foto = permanentFile.path;
+        PreferenceService.setProfile(curProfile);
+      } else {
+        PreferenceService.setProfilePict(permanentFile.path);
       }
 
       if (!mounted) return;
@@ -2134,8 +2158,20 @@ class _DashboardPageState extends State<DashboardPage> {
         _profileImage = FileImage(permanentFile);
       });
 
-      _api.changeProfile(permanentFile).then((_) {
-        debugPrint('[Dashboard] Profile photo synced to backend');
+      _api.changeProfile(permanentFile).then((res) {
+        res.fold(
+          (err) => debugPrint('[Dashboard] Upload warning: $err'),
+          (data) {
+            final serverFoto = data['foto']?.toString() ?? data['url']?.toString();
+            if (serverFoto != null) {
+              final p = PreferenceService.getProfile();
+              if (p != null) {
+                p.foto = serverFoto;
+                PreferenceService.setProfile(p);
+              }
+            }
+          },
+        );
       }).catchError((_) {});
 
       SnackBarMsg.success(context, 'Foto profil berhasil diperbarui!');
@@ -2148,9 +2184,12 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   void _removeProfilePhoto() {
-    if (_profile != null) {
-      _profile!.foto = '';
-      PreferenceService.setProfile(_profile!);
+    final curProfile = PreferenceService.getProfile();
+    if (curProfile != null) {
+      curProfile.foto = '';
+      PreferenceService.setProfile(curProfile);
+    } else {
+      PreferenceService.setProfilePict('');
     }
     setState(() {
       _profileImage = null;

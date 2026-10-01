@@ -2,6 +2,8 @@ import 'dart:convert';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:flutter/foundation.dart';
+
 import '../models/auth_model.dart';
 import '../models/profile_model.dart';
 import '../utils/crypto_util.dart';
@@ -11,8 +13,17 @@ class PreferenceService {
       prefs ??= await SharedPreferences.getInstance();
   static SharedPreferences? prefs;
 
+  /// Reactive notifier to instantly sync profile picture changes between Home & Profile
+  static final ValueNotifier<String?> profilePhotoNotifier =
+      ValueNotifier<String?>(null);
+
   static Future<SharedPreferences> init() async {
     prefs = await _instance;
+    // Pre-populate notifier with stored profile photo
+    final p = getProfile();
+    if (p?.foto != null) {
+      profilePhotoNotifier.value = p!.foto;
+    }
     return prefs ?? await SharedPreferences.getInstance();
   }
 
@@ -24,6 +35,7 @@ class PreferenceService {
   static Future<void> setProfile(ProfileModel profile) async {
     final raw = jsonEncode(profile.toJson());
     await prefs?.setString('profileJson', CryptoUtil.encrypt(raw));
+    profilePhotoNotifier.value = profile.foto;
   }
 
   static Future<void> setProfilePict(String pict) async {
@@ -31,7 +43,13 @@ class PreferenceService {
     if (profile != null) {
       profile.foto = pict;
       await setProfile(profile);
+    } else {
+      profilePhotoNotifier.value = pict;
     }
+  }
+
+  static void notifyProfilePhotoChanged(String? foto) {
+    profilePhotoNotifier.value = foto;
   }
 
   static Future<void> setUserPassword(String user, String pswd) async {
@@ -127,6 +145,7 @@ class PreferenceService {
 
   static Future<void> removeProfile() async {
     await prefs?.remove('profileJson');
+    profilePhotoNotifier.value = null;
   }
 
   static AuthModel? getAuth() {

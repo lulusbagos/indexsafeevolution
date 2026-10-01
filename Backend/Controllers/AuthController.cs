@@ -632,25 +632,48 @@ namespace Indexsafe.Api.Controllers
         }
 
         [HttpPost("profile")]
-        [Authorize]
-        public async Task<IActionResult> UpdateProfilePhoto([FromForm] IFormFile? foto)
+        [HttpPost("profile/photo")]
+        [HttpPost("auth/profile")]
+        [HttpPost("auth/profile/photo")]
+        [HttpPost("account/update-profile-picture")]
+        [HttpPost("account/updateprofilepicture")]
+        public async Task<IActionResult> UpdateProfilePhoto(
+            [FromForm(Name = "foto")] IFormFile? foto,
+            [FromForm(Name = "photo")] IFormFile? photo,
+            [FromForm(Name = "file")] IFormFile? file,
+            [FromForm(Name = "nik")] string? nik,
+            [FromQuery(Name = "nik")] string? queryNik)
         {
-            var userNik = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            var userNik = User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                ?? User.FindFirst("nik")?.Value
+                ?? User.FindFirst("Nrp")?.Value
+                ?? nik
+                ?? queryNik;
+
             if (string.IsNullOrEmpty(userNik))
             {
-                return Unauthorized(new { message = "Sesi tidak valid." });
+                return Unauthorized(new { message = "Sesi atau NIK tidak valid." });
             }
 
-            if (foto == null || foto.Length == 0)
+            var uploadFile = foto ?? photo ?? file;
+            if (uploadFile == null || uploadFile.Length == 0)
             {
-                return BadRequest(new { message = "File foto tidak ditemukan." });
+                if (Request.Form.Files.Count > 0)
+                {
+                    uploadFile = Request.Form.Files[0];
+                }
             }
 
-            // Gunakan category "profiles" agar sinkron dengan MBS_SAP Web AccountController
-            var photoUrl = await _imageUploadService.UploadAndCompressImageAsync(foto, "profiles", userNik);
+            if (uploadFile == null || uploadFile.Length == 0)
+            {
+                return BadRequest(new { message = "File foto tidak ditemukan dalam permintaan." });
+            }
+
+            // Simpan ke C:\MinePermitFiles\MBS\profiles sesuai standar Web MBS_SAP & Mobile
+            var photoUrl = await _imageUploadService.UploadAndCompressImageAsync(uploadFile, "profiles", userNik);
             if (string.IsNullOrEmpty(photoUrl))
             {
-                return StatusCode(500, new { message = "Gagal memproses file foto." });
+                return StatusCode(500, new { message = "Gagal memproses dan mengompres file foto." });
             }
 
             var overridePwd = await _context.PasswordOverrides.FirstOrDefaultAsync(p => p.Nrp == userNik);
@@ -675,9 +698,74 @@ namespace Indexsafe.Api.Controllers
 
             return Ok(new
             {
-                message = "Foto profil berhasil diperbarui.",
-                foto = photoUrl
+                message = "Foto profil berhasil diperbarui dan disinkronkan ke C:\\MinePermitFiles\\MBS\\profiles.",
+                foto = photoUrl,
+                url = photoUrl,
+                path = photoUrl
             });
+        }
+
+        [HttpGet("profile/photo")]
+        [HttpGet("profile/photo/{nik}")]
+        [HttpGet("auth/profile/photo")]
+        [HttpGet("auth/profile/photo/{nik}")]
+        [AllowAnonymous]
+        public async Task<IActionResult> GetProfilePhoto(string? nik)
+        {
+            var userNik = nik
+                ?? User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                ?? User.FindFirst("nik")?.Value
+                ?? Request.Query["nik"].ToString();
+
+            if (string.IsNullOrEmpty(userNik))
+            {
+                return BadRequest(new { message = "NIK diperlukan." });
+            }
+
+            // 1. Cek dari database PasswordOverrides
+            var overridePwd = await _context.PasswordOverrides.FirstOrDefaultAsync(p => p.Nrp == userNik);
+            if (overridePwd != null && !string.IsNullOrWhiteSpace(overridePwd.ProfilePicture))
+            {
+                var cleanPath = overridePwd.ProfilePicture.TrimStart('/', '\\');
+                if (cleanPath.StartsWith("uploads/", StringComparison.OrdinalIgnoreCase))
+                {
+                    cleanPath = cleanPath.Substring(8);
+                }
+                var directFilePath = Path.Combine(@"C:\MinePermitFiles\MBS", cleanPath);
+                if (System.IO.File.Exists(directFilePath))
+                {
+                    return PhysicalFile(directFilePath, "image/jpeg");
+                }
+            }
+
+            // 2. Cek langsung file dengan nama {NIK}.jpg di C:\MinePermitFiles\MBS\profiles
+            var nikFile = Path.Combine(@"C:\MinePermitFiles\MBS\profiles", $"{userNik}.jpg");
+            if (System.IO.File.Exists(nikFile))
+            {
+                return PhysicalFile(nikFile, "image/jpeg");
+            }
+
+            // 3. Cari file yang diawali {NIK}_ di dalam C:\MinePermitFiles\MBS\profiles
+            if (Directory.Exists(@"C:\MinePermitFiles\MBS\profiles"))
+            {
+                var files = Directory.GetFiles(@"C:\MinePermitFiles\MBS\profiles", $"{userNik}*.*", SearchOption.AllDirectories);
+                if (files.Length > 0)
+                {
+                    return PhysicalFile(files[0], "image/jpeg");
+                }
+            }
+
+            // 4. Cari file di C:\MinePermitFiles\MBS\avatars
+            if (Directory.Exists(@"C:\MinePermitFiles\MBS\avatars"))
+            {
+                var files = Directory.GetFiles(@"C:\MinePermitFiles\MBS\avatars", $"{userNik}*.*", SearchOption.AllDirectories);
+                if (files.Length > 0)
+                {
+                    return PhysicalFile(files[0], "image/jpeg");
+                }
+            }
+
+            return NotFound(new { message = $"Foto profil untuk NIK {userNik} tidak ditemukan." });
         }
 
         [HttpPost("change-password")]

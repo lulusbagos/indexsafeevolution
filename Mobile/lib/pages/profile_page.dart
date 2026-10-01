@@ -52,12 +52,21 @@ class _ProfilePageState extends State<ProfilePage>
       duration: const Duration(seconds: 8),
     )..repeat(reverse: true);
 
+    PreferenceService.profilePhotoNotifier.addListener(_onProfilePhotoNotifierChanged);
     _loadProfilePhoto();
     _fetchLatestProfile();
   }
 
+  void _onProfilePhotoNotifierChanged() {
+    if (!mounted) return;
+    _profile = PreferenceService.getProfile();
+    _loadProfilePhoto();
+    setState(() {});
+  }
+
   @override
   void dispose() {
+    PreferenceService.profilePhotoNotifier.removeListener(_onProfilePhotoNotifierChanged);
     _animCtrl.dispose();
     _scrollCtrl.dispose();
     super.dispose();
@@ -84,8 +93,12 @@ class _ProfilePageState extends State<ProfilePage>
 
   Future<void> _loadProfilePhoto() async {
     try {
-      final foto = _profile?.foto;
-      if (foto == null || foto.trim().isEmpty) return;
+      final curProfile = PreferenceService.getProfile();
+      final foto = curProfile?.foto ?? _profile?.foto;
+      if (foto == null || foto.trim().isEmpty) {
+        if (mounted) setState(() => _image = null);
+        return;
+      }
 
       // 1. Direct local file check
       final file = File(foto);
@@ -111,8 +124,15 @@ class _ProfilePageState extends State<ProfilePage>
         return;
       }
 
-      if (foto.startsWith('/uploads')) {
+      if (foto.startsWith('/uploads') || foto.startsWith('/api/')) {
         final serverUrl = '${_api.baseUrl}$foto';
+        if (!mounted) return;
+        setState(() => _image = NetworkImage(serverUrl));
+        return;
+      }
+
+      if (curProfile?.noNik != null && curProfile!.noNik!.isNotEmpty && curProfile.noNik != '-') {
+        final serverUrl = '${_api.baseUrl}/api/profile/photo/${curProfile.noNik}';
         if (!mounted) return;
         setState(() => _image = NetworkImage(serverUrl));
         return;
@@ -252,9 +272,12 @@ class _ProfilePageState extends State<ProfilePage>
                   ),
                   onTap: () {
                     Navigator.pop(context);
-                    if (_profile != null) {
-                      _profile!.foto = '';
-                      PreferenceService.setProfile(_profile!);
+                    final curProfile = PreferenceService.getProfile();
+                    if (curProfile != null) {
+                      curProfile.foto = '';
+                      PreferenceService.setProfile(curProfile);
+                    } else {
+                      PreferenceService.setProfilePict('');
                     }
                     setState(() => _image = null);
                     SnackBarMsg.info(context, 'Foto profil dihapus.');
@@ -280,9 +303,12 @@ class _ProfilePageState extends State<ProfilePage>
       final permanentFile = await picked.copy('${appDir.path}/$fileName');
 
       // Update immediate local state
-      if (_profile != null) {
-        _profile!.foto = permanentFile.path;
-        PreferenceService.setProfile(_profile!);
+      final curProfile = PreferenceService.getProfile();
+      if (curProfile != null) {
+        curProfile.foto = permanentFile.path;
+        PreferenceService.setProfile(curProfile);
+      } else {
+        PreferenceService.setProfilePict(permanentFile.path);
       }
 
       if (!mounted) return;
@@ -303,10 +329,13 @@ class _ProfilePageState extends State<ProfilePage>
             }
           },
           (data) {
-            final serverFoto = data['foto']?.toString();
-            if (serverFoto != null && _profile != null) {
-              _profile!.foto = serverFoto;
-              PreferenceService.setProfile(_profile!);
+            final serverFoto = data['foto']?.toString() ?? data['url']?.toString();
+            if (serverFoto != null) {
+              final p = PreferenceService.getProfile();
+              if (p != null) {
+                p.foto = serverFoto;
+                PreferenceService.setProfile(p);
+              }
             }
             if (mounted) {
               SnackBarMsg.success(context,
