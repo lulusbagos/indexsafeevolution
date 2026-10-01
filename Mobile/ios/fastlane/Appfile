@@ -1,0 +1,2 @@
+app_identifier("id.icapps.indexsafeMobileNew") # bundle identifier
+apple_id("your@appleid.com") # replace with the team's Apple ID for metadata (not secret)

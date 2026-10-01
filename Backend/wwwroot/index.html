@@ -1,0 +1,960 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Indexsafe Evolution - Live Operations & Offline Sync Monitor</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-dark: #0b0f19;
+      --bg-surface: #111827;
+      --bg-card: rgba(17, 24, 39, 0.85);
+      --bg-card-hover: rgba(31, 41, 55, 0.85);
+      --border-color: rgba(75, 85, 99, 0.35);
+      --border-glow: rgba(14, 165, 233, 0.4);
+      --text-main: #f3f4f6;
+      --text-muted: #9ca3af;
+      --accent-cyan: #0ea5e9;
+      --accent-cyan-glow: rgba(14, 165, 233, 0.25);
+      --accent-emerald: #10b981;
+      --accent-amber: #f59e0b;
+      --accent-rose: #f43f5e;
+      --accent-indigo: #6366f1;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: 'Outfit', sans-serif;
+    }
+
+    body {
+      background-color: var(--bg-dark);
+      background-image: 
+        radial-gradient(at 0% 0%, rgba(14, 165, 233, 0.08) 0px, transparent 50%),
+        radial-gradient(at 100% 100%, rgba(99, 102, 241, 0.06) 0px, transparent 50%);
+      color: var(--text-main);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    .mono {
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    /* Container */
+    .container {
+      max-width: 1600px;
+      margin: 0 auto;
+      padding: 24px 32px;
+    }
+
+    /* Header */
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 24px;
+      border-bottom: 1px solid var(--border-color);
+      margin-bottom: 28px;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .brand-logo {
+      width: 48px;
+      height: 48px;
+      background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 20px rgba(14, 165, 233, 0.4);
+      font-weight: 800;
+      font-size: 24px;
+      color: #fff;
+    }
+
+    .brand-text h1 {
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .brand-text p {
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    .header-status {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      flex-wrap: wrap;
+    }
+
+    .badge-pulse {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 14px;
+      border-radius: 9999px;
+      font-size: 12px;
+      font-weight: 600;
+      background: rgba(16, 185, 129, 0.12);
+      border: 1px solid rgba(16, 185, 129, 0.35);
+      color: #34d399;
+    }
+
+    .pulse-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background-color: #10b981;
+      box-shadow: 0 0 10px #10b981;
+      animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(1.3); }
+    }
+
+    .btn-api {
+      background: rgba(14, 165, 233, 0.15);
+      color: #38bdf8;
+      border: 1px solid rgba(14, 165, 233, 0.35);
+      padding: 8px 18px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      text-decoration: none;
+      transition: all 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .btn-api:hover {
+      background: rgba(14, 165, 233, 0.25);
+      border-color: #38bdf8;
+      box-shadow: 0 0 16px rgba(14, 165, 233, 0.3);
+    }
+
+    /* KPI Stats Grid */
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 18px;
+      margin-bottom: 28px;
+    }
+
+    .kpi-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 14px;
+      padding: 20px;
+      backdrop-filter: blur(12px);
+      transition: transform 0.2s ease, border-color 0.2s ease;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .kpi-card:hover {
+      transform: translateY(-2px);
+      border-color: var(--border-glow);
+    }
+
+    .kpi-card::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 4px;
+      height: 100%;
+      background: var(--accent-cyan);
+    }
+
+    .kpi-card.emerald::after { background: var(--accent-emerald); }
+    .kpi-card.amber::after { background: var(--accent-amber); }
+    .kpi-card.rose::after { background: var(--accent-rose); }
+    .kpi-card.indigo::after { background: var(--accent-indigo); }
+
+    .kpi-title {
+      font-size: 13px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      font-weight: 600;
+      margin-bottom: 8px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .kpi-value {
+      font-size: 32px;
+      font-weight: 800;
+      letter-spacing: -1px;
+      color: #fff;
+    }
+
+    .kpi-subtitle {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 6px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    /* Controls & Actions */
+    .action-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+      gap: 14px;
+    }
+
+    .tabs {
+      display: flex;
+      gap: 8px;
+      background: rgba(31, 41, 55, 0.4);
+      padding: 4px;
+      border-radius: 10px;
+      border: 1px solid var(--border-color);
+    }
+
+    .tab-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      padding: 8px 18px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .tab-btn.active {
+      background: var(--accent-cyan);
+      color: #fff;
+      box-shadow: 0 0 12px var(--accent-cyan-glow);
+    }
+
+    .actions-right {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .btn-action {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-color);
+      color: var(--text-main);
+      padding: 8px 14px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s ease;
+    }
+
+    .btn-action:hover {
+      background: var(--bg-card-hover);
+      border-color: #6b7280;
+    }
+
+    .btn-simulate {
+      background: rgba(16, 185, 129, 0.15);
+      border-color: rgba(16, 185, 129, 0.35);
+      color: #34d399;
+    }
+    .btn-simulate:hover {
+      background: rgba(16, 185, 129, 0.25);
+      border-color: #34d399;
+    }
+
+    .search-input {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-color);
+      color: var(--text-main);
+      padding: 8px 14px;
+      border-radius: 8px;
+      font-size: 13px;
+      width: 240px;
+      outline: none;
+      transition: border-color 0.2s ease;
+    }
+    .search-input:focus {
+      border-color: var(--accent-cyan);
+    }
+
+    /* Tab Contents */
+    .tab-pane {
+      display: none;
+    }
+    .tab-pane.active {
+      display: block;
+    }
+
+    /* Table & Cards View */
+    .table-container {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 14px;
+      overflow: hidden;
+      backdrop-filter: blur(12px);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+      font-size: 13px;
+    }
+
+    thead {
+      background: rgba(31, 41, 55, 0.6);
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    th {
+      padding: 14px 18px;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-muted);
+      font-weight: 600;
+    }
+
+    td {
+      padding: 14px 18px;
+      border-bottom: 1px solid rgba(75, 85, 99, 0.2);
+      vertical-align: middle;
+    }
+
+    tbody tr {
+      transition: background 0.15s ease;
+    }
+    tbody tr:hover {
+      background: rgba(31, 41, 55, 0.5);
+    }
+
+    /* Badges */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+    }
+
+    .badge-offline {
+      background: rgba(245, 158, 11, 0.15);
+      border: 1px solid rgba(245, 158, 11, 0.4);
+      color: #fbbf24;
+    }
+
+    .badge-realtime {
+      background: rgba(16, 185, 129, 0.15);
+      border: 1px solid rgba(16, 185, 129, 0.4);
+      color: #34d399;
+    }
+
+    .badge-hazard { background: rgba(244, 63, 94, 0.15); color: #fb7185; border: 1px solid rgba(244, 63, 94, 0.3); }
+    .badge-inspection { background: rgba(14, 165, 233, 0.15); color: #38bdf8; border: 1px solid rgba(14, 165, 233, 0.3); }
+    .badge-p2h { background: rgba(234, 179, 8, 0.15); color: #facc15; border: 1px solid rgba(234, 179, 8, 0.3); }
+    .badge-action { background: rgba(168, 85, 247, 0.15); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.3); }
+    .badge-observation { background: rgba(20, 184, 166, 0.15); color: #2dd4bf; border: 1px solid rgba(20, 184, 166, 0.3); }
+    .badge-coaching { background: rgba(99, 102, 241, 0.15); color: #818cf8; border: 1px solid rgba(99, 102, 241, 0.3); }
+    .badge-safety { background: rgba(249, 115, 22, 0.15); color: #fb923c; border: 1px solid rgba(249, 115, 22, 0.3); }
+
+    .badge-gps {
+      background: rgba(56, 189, 248, 0.12);
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      color: #7dd3fc;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .badge-gps:hover {
+      background: rgba(56, 189, 248, 0.25);
+      border-color: #38bdf8;
+    }
+
+    /* Thumbnail */
+    .thumb-img {
+      width: 44px;
+      height: 44px;
+      border-radius: 8px;
+      object-fit: cover;
+      border: 1px solid var(--border-color);
+      cursor: pointer;
+      transition: transform 0.2s ease;
+    }
+    .thumb-img:hover {
+      transform: scale(1.1);
+      border-color: var(--accent-cyan);
+    }
+
+    /* Modal */
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0, 0, 0, 0.8);
+      backdrop-filter: blur(8px);
+      z-index: 9999;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .modal.active { display: flex; }
+    .modal-box {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-color);
+      border-radius: 16px;
+      max-width: 650px;
+      width: 100%;
+      padding: 24px;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.6);
+      position: relative;
+    }
+    .modal-close {
+      position: absolute;
+      top: 18px;
+      right: 18px;
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      font-size: 20px;
+      cursor: pointer;
+    }
+
+    /* Diagram Section */
+    .flow-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 14px;
+      padding: 24px;
+      margin-bottom: 24px;
+    }
+
+    .flow-steps {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin-top: 18px;
+    }
+
+    .step-item {
+      background: rgba(31, 41, 55, 0.5);
+      border: 1px solid var(--border-color);
+      border-radius: 10px;
+      padding: 16px;
+      position: relative;
+    }
+
+    .step-num {
+      width: 28px;
+      height: 28px;
+      background: var(--accent-cyan);
+      color: #fff;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      font-weight: 700;
+      margin-bottom: 12px;
+    }
+
+    .step-title {
+      font-weight: 700;
+      font-size: 14px;
+      margin-bottom: 6px;
+      color: #fff;
+    }
+
+    .step-desc {
+      font-size: 12px;
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+
+    /* Empty state */
+    .empty-state {
+      padding: 40px;
+      text-align: center;
+      color: var(--text-muted);
+    }
+
+    /* Footer */
+    footer {
+      margin-top: 40px;
+      padding-top: 20px;
+      border-top: 1px solid var(--border-color);
+      display: flex;
+      justify-content: space-between;
+      color: var(--text-muted);
+      font-size: 12px;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <!-- Top Header -->
+    <header>
+      <div class="brand">
+        <div class="brand-logo">⚡</div>
+        <div class="brand-text">
+          <h1>INDEXSAFE EVOLUTION <span class="badge badge-realtime">LIVE BACKEND</span></h1>
+          <p>Real-Time Operations & Offline Sync Monitor • SQL Server: <span class="mono" id="db-target">172.16.1.93 (DB_SAP)</span></p>
+        </div>
+      </div>
+
+      <div class="header-status">
+        <div class="badge-pulse">
+          <div class="pulse-dot"></div>
+          <span id="server-status">SERVER ACTIVE (PORT 5200)</span>
+        </div>
+        <span class="mono" id="clock" style="font-size: 13px; color: var(--text-muted);">--:--:-- WITA</span>
+        <a href="/scalar/v1" class="btn-api" target="_blank">
+          <span>📖 Scalar API Docs</span>
+        </a>
+      </div>
+    </header>
+
+    <!-- KPI Stats Cards -->
+    <div class="kpi-grid">
+      <div class="kpi-card">
+        <div class="kpi-title">
+          <span>Total Transaksi</span>
+          <span>📊</span>
+        </div>
+        <div class="kpi-value mono" id="kpi-total-tx">0</div>
+        <div class="kpi-subtitle">Termasuk sinkronisasi hari ini</div>
+      </div>
+
+      <div class="kpi-card amber">
+        <div class="kpi-title">
+          <span>Offline Outbox Synced</span>
+          <span>📡</span>
+        </div>
+        <div class="kpi-value mono" id="kpi-offline-sync">0</div>
+        <div class="kpi-subtitle">Data dibuat saat tanpa sinyal di pit</div>
+      </div>
+
+      <div class="kpi-card emerald">
+        <div class="kpi-title">
+          <span>Media Uploads</span>
+          <span>📸</span>
+        </div>
+        <div class="kpi-value mono" id="kpi-uploads">0</div>
+        <div class="kpi-subtitle"><span id="kpi-bandwidth-saved">0 MB</span> bandwidth dihemat (ImageSharp)</div>
+      </div>
+
+      <div class="kpi-card indigo">
+        <div class="kpi-title">
+          <span>GPS Pinpoint Mapped</span>
+          <span>📍</span>
+        </div>
+        <div class="kpi-value mono" id="kpi-gps">0</div>
+        <div class="kpi-subtitle">Koordinat pit latitude & longitude</div>
+      </div>
+
+      <div class="kpi-card rose">
+        <div class="kpi-title">
+          <span>Error / Konflik</span>
+          <span>⚠️</span>
+        </div>
+        <div class="kpi-value mono" id="kpi-errors">0</div>
+        <div class="kpi-subtitle" id="kpi-health-text">Status: 100% Sehat & Stabil</div>
+      </div>
+    </div>
+
+    <!-- Action Bar & Tabs -->
+    <div class="action-bar">
+      <div class="tabs">
+        <button class="tab-btn active" onclick="switchTab('tab-tx')">
+          <span>⚡ Live Transaksi</span>
+        </button>
+        <button class="tab-btn" onclick="switchTab('tab-uploads')">
+          <span>📸 Upload Media</span>
+        </button>
+        <button class="tab-btn" onclick="switchTab('tab-errors')">
+          <span>⚠️ Log Eror & Konflik</span>
+        </button>
+        <button class="tab-btn" onclick="switchTab('tab-offline-flow')">
+          <span>📡 Arsitektur Mode Offline</span>
+        </button>
+      </div>
+
+      <div class="actions-right">
+        <input type="text" id="search-box" class="search-input" placeholder="Cari NIK, Area, Temuan..." onkeyup="filterTable()">
+        <button class="btn-action btn-simulate" onclick="simulateSync('hazard')">
+          <span>+ Uji Sync Hazard</span>
+        </button>
+        <button class="btn-action" onclick="simulateSync('warning')">
+          <span>+ Uji Konflik</span>
+        </button>
+        <button class="btn-action" onclick="fetchData()">
+          <span>🔄 Refresh</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Tab 1: Live Transactions -->
+    <div id="tab-tx" class="tab-pane active">
+      <div class="table-container">
+        <table>
+          <thead>
+            <tr>
+              <th>Modul</th>
+              <th>Kode & ID</th>
+              <th>Mode Input</th>
+              <th>Pekerja & Perusahaan</th>
+              <th>Area & Lokasi</th>
+              <th>Koordinat GPS</th>
+              <th>Ringkasan Temuan</th>
+              <th>Foto Bukti</th>
+              <th>Waktu Inspeksi</th>
+            </tr>
+          </thead>
+          <tbody id="tx-tbody">
+            <tr>
+              <td colspan="9" class="empty-state">Memuat data transaksi dari server...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Tab 2: Uploads -->
+    <div id="tab-uploads" class="tab-pane">
+      <div class="table-container">
+        <table>
+          <thead>
+            <tr>
+              <th>Waktu</th>
+              <th>Nama File</th>
+              <th>Kategori</th>
+              <th>Ukuran Asli</th>
+              <th>Hasil Kompresi</th>
+              <th>Efisiensi</th>
+              <th>Durasi</th>
+              <th>Status</th>
+              <th>URL Penyimpanan</th>
+            </tr>
+          </thead>
+          <tbody id="uploads-tbody">
+            <tr>
+              <td colspan="9" class="empty-state">Belum ada file diunggah dalam sesi ini.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Tab 3: Errors & Exceptions -->
+    <div id="tab-errors" class="tab-pane">
+      <div class="table-container">
+        <table>
+          <thead>
+            <tr>
+              <th>Waktu</th>
+              <th>Severity</th>
+              <th>Modul & Endpoint</th>
+              <th>User NIK</th>
+              <th>Pesan Kesalahan</th>
+              <th>Diagnostik & Solusi Otomatis</th>
+            </tr>
+          </thead>
+          <tbody id="errors-tbody">
+            <tr>
+              <td colspan="6" class="empty-state" style="color: #34d399;">
+                ✅ Tidak ada eror atau konflik offline yang tercatat. Sistem beroperasi 100% normal.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Tab 4: Offline Architecture Flow -->
+    <div id="tab-offline-flow" class="tab-pane">
+      <div class="flow-card">
+        <h3 style="font-size: 18px; margin-bottom: 8px;">Alur Kerja & Pencegahan Kegagalan Mode Offline</h3>
+        <p style="color: var(--text-muted); font-size: 13px; line-height: 1.6;">
+          Area tambang memiliki banyak blind-spot tanpa jangkauan 4G/Wi-Fi. Backend Indexsafe Evolution menerapkan protokol sinkronisasi berbasis <strong>Outbox Pattern</strong> dengan jaminan data integrity sebagai berikut:
+        </p>
+
+        <div class="flow-steps">
+          <div class="step-item">
+            <div class="step-num">1</div>
+            <div class="step-title">Pencatatan Offline di Pit</div>
+            <div class="step-desc">
+              Pekerja mengisi form (Inspeksi/P2H/Hazard) dan memotret temuan. Data disimpan ke SQLite lokal (<code>isafe18.db</code>) dengan <code>sync_id = NULL</code>.
+            </div>
+          </div>
+
+          <div class="step-item">
+            <div class="step-num">2</div>
+            <div class="step-title">Perekaman GPS Satelit</div>
+            <div class="step-desc">
+              Koordinat GPS (lat, long, accuracy) diambil langsung via sensor satelit GNSS handphone tanpa memerlukan koneksi internet, lalu disematkan ke field lokasi.
+            </div>
+          </div>
+
+          <div class="step-item">
+            <div class="step-num">3</div>
+            <div class="step-title">Outbox Sweep (Background Sync)</div>
+            <div class="step-desc">
+              Saat HP mendeteksi koneksi Wi-Fi mess atau 4G, background job mengeksekusi <code>POST /api/tran/{name}</code> mengunggah baris transaksi lokal secara berurutan.
+            </div>
+          </div>
+
+          <div class="step-item">
+            <div class="step-num">4</div>
+            <div class="step-title">Idempotency & Anti-Duplikasi</div>
+            <div class="step-desc">
+              Jika sinyal timbul-tenggelam menyebabkan mobile melakukan retry berkali-kali, backend mengecek <code>client_uuid</code> / duplikat payload dan mengembalikan Server ID yang sama tanpa double-insert.
+            </div>
+          </div>
+
+          <div class="step-item">
+            <div class="step-num">5</div>
+            <div class="step-title">Detail & Action Plan Auto-Link</div>
+            <div class="step-desc">
+              Setelah header mendapat Server ID (misal: <code>8801</code>), detail checklist di-upload dengan <code>ref_id = 8801</code>, dan Action Plan otomatis dibuka untuk ditindaklanjuti oleh PJA.
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <div>INDEXSAFE EVOLUTION © 2026 • Mining Safety Management System (K3 / HSE)</div>
+      <div>Multi-Tenant Enterprise Architecture • PT Indexim Coalindo</div>
+    </footer>
+  </div>
+
+  <!-- Image Lightbox Modal -->
+  <div id="image-modal" class="modal" onclick="closeModal()">
+    <div class="modal-box" onclick="event.stopPropagation()">
+      <button class="modal-close" onclick="closeModal()">✕</button>
+      <h3 id="modal-title" style="margin-bottom: 14px; font-size: 16px;">Foto Bukti Lapangan</h3>
+      <img id="modal-img" src="" alt="Bukti" style="width: 100%; max-height: 480px; object-fit: contain; border-radius: 8px; border: 1px solid var(--border-color);">
+      <div id="modal-caption" style="margin-top: 10px; font-size: 13px; color: var(--text-muted);"></div>
+    </div>
+  </div>
+
+  <script>
+    // Clock
+    function updateClock() {
+      const now = new Date();
+      document.getElementById('clock').textContent = now.toLocaleTimeString('id-ID') + ' WITA';
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    // Tab Switcher
+    function switchTab(tabId) {
+      document.querySelectorAll('.tab-pane').forEach(el => el.classList.remove('active'));
+      document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+      document.getElementById(tabId).classList.add('active');
+      event.currentTarget.classList.add('active');
+    }
+
+    // Modal
+    function openImage(url, title, caption) {
+      document.getElementById('modal-img').src = url;
+      document.getElementById('modal-title').textContent = title || 'Foto Bukti Lapangan';
+      document.getElementById('modal-caption').textContent = caption || '';
+      document.getElementById('image-modal').classList.add('active');
+    }
+    function closeModal() {
+      document.getElementById('image-modal').classList.remove('active');
+    }
+
+    // Open GPS location in Google Maps
+    function openGps(lat, lng) {
+      const url = `https://www.google.com/maps?q=${lat},${lng}`;
+      window.open(url, '_blank');
+    }
+
+    // Fetch live monitoring data
+    async function fetchData() {
+      try {
+        const res = await fetch('/api/system/monitor');
+        if (!res.ok) return;
+        const data = await res.json();
+
+        // Stats
+        document.getElementById('kpi-total-tx').textContent = data.stats.totalTransactionsToday || 0;
+        document.getElementById('kpi-offline-sync').textContent = data.stats.totalOfflineSyncs || 0;
+        document.getElementById('kpi-uploads').textContent = data.stats.totalMediaUploads || 0;
+        document.getElementById('kpi-bandwidth-saved').textContent = data.stats.bandwidthSavedMb + ' MB';
+        document.getElementById('kpi-gps').textContent = data.stats.totalGpsMapped || 0;
+        document.getElementById('kpi-errors').textContent = data.stats.totalErrors || 0;
+        
+        if (data.stats.totalErrors > 0) {
+          document.getElementById('kpi-health-text').textContent = `${data.stats.totalErrors} isu/konflik tercatat`;
+          document.getElementById('kpi-health-text').style.color = '#fb7185';
+        } else {
+          document.getElementById('kpi-health-text').textContent = 'Status: 100% Sehat & Stabil';
+          document.getElementById('kpi-health-text').style.color = '#34d399';
+        }
+
+        // Render Transactions Table
+        const txTbody = document.getElementById('tx-tbody');
+        if (data.transactions && data.transactions.length > 0) {
+          txTbody.innerHTML = data.transactions.map(t => {
+            const typeClass = 'badge-' + (t.type || 'hazard').toLowerCase();
+            const sourceBadge = t.source && t.source.toLowerCase().includes('offline') 
+              ? '<span class="badge badge-offline">📡 OFFLINE SYNC</span>' 
+              : '<span class="badge badge-realtime">⚡ REALTIME</span>';
+
+            const gpsDisplay = t.hasGps 
+              ? `<span class="badge badge-gps" onclick="openGps(${t.latitude}, ${t.longitude})" title="Klik untuk lihat di peta">📍 ${t.latitude.toFixed(5)}, ${t.longitude.toFixed(5)}</span>`
+              : `<span style="color: #6b7280; font-size: 11px;">-</span>`;
+
+            const photoDisplay = t.hasPhoto && t.photoUrl
+              ? `<img src="${t.photoUrl}" class="thumb-img" onclick="openImage('${t.photoUrl}', '${t.type}: ${t.code}', '${escapeHtml(t.summary)}')" alt="Thumb">`
+              : `<span style="color: #6b7280; font-size: 11px;">Tidak ada</span>`;
+
+            const dateStr = t.inspectionDate ? t.inspectionDate.substring(0, 10) : '-';
+
+            return `
+              <tr>
+                <td><span class="badge ${typeClass}">${t.type}</span></td>
+                <td class="mono" style="font-weight: 600; color: #38bdf8;">${t.code || ('ID:' + t.serverId)}</td>
+                <td>${sourceBadge}</td>
+                <td>
+                  <div style="font-weight: 600;">${escapeHtml(t.nama || t.nik)}</div>
+                  <div style="font-size: 11px; color: var(--text-muted);">${escapeHtml(t.perusahaan || 'PT INDEXIM COALINDO')}</div>
+                </td>
+                <td>
+                  <div style="font-weight: 500;">${escapeHtml(t.area)}</div>
+                  <div style="font-size: 11px; color: var(--text-muted);">${escapeHtml(t.lokasi)}</div>
+                </td>
+                <td>${gpsDisplay}</td>
+                <td style="max-width: 280px; line-height: 1.4;">
+                  <div>${escapeHtml(t.summary)}</div>
+                  <div style="font-size: 11px; color: var(--text-muted);">${escapeHtml(t.detilLokasi || '')}</div>
+                </td>
+                <td>${photoDisplay}</td>
+                <td class="mono" style="font-size: 12px; color: var(--text-muted);">${dateStr}</td>
+              </tr>
+            `;
+          }).join('');
+        } else {
+          txTbody.innerHTML = `<tr><td colspan="9" class="empty-state">Belum ada transaksi tercatat.</td></tr>`;
+        }
+
+        // Render Uploads Table
+        const upTbody = document.getElementById('uploads-tbody');
+        if (data.uploads && data.uploads.length > 0) {
+          upTbody.innerHTML = data.uploads.map(u => `
+            <tr>
+              <td class="mono" style="font-size: 12px; color: var(--text-muted);">${(u.timestamp || '').substring(11, 19)}</td>
+              <td class="mono" style="font-weight: 600;">${escapeHtml(u.fileName)}</td>
+              <td><span class="badge badge-hazard">${u.category}</span></td>
+              <td class="mono">${u.originalSizeKb} KB</td>
+              <td class="mono" style="color: #34d399; font-weight: 600;">${u.compressedSizeKb} KB</td>
+              <td><span class="badge badge-realtime">${u.savedPercent}% HEMAT</span></td>
+              <td class="mono">${u.durationMs} ms</td>
+              <td><span class="badge badge-realtime">${u.status}</span></td>
+              <td class="mono" style="font-size: 11px; color: var(--accent-cyan);"><a href="${u.savedUrl}" target="_blank" style="color: inherit;">${u.savedUrl}</a></td>
+            </tr>
+          `).join('');
+        }
+
+        // Render Errors Table
+        const errTbody = document.getElementById('errors-tbody');
+        if (data.errors && data.errors.length > 0) {
+          errTbody.innerHTML = data.errors.map(e => `
+            <tr>
+              <td class="mono" style="font-size: 12px; color: var(--text-muted);">${(e.timestamp || '').substring(11, 19)}</td>
+              <td><span class="badge ${e.severity === 'ERROR' ? 'badge-hazard' : 'badge-offline'}">${e.severity}</span></td>
+              <td class="mono" style="font-weight: 600; color: #f43f5e;">${escapeHtml(e.endpoint)}</td>
+              <td class="mono">${escapeHtml(e.userNik || '-')}</td>
+              <td style="color: #fca5a5; font-weight: 500;">${escapeHtml(e.errorMessage)}</td>
+              <td style="font-size: 12px; color: #93c5fd; background: rgba(59, 130, 246, 0.08); padding: 8px; border-radius: 6px;">
+                💡 ${escapeHtml(e.suggestedFix || 'Cek koneksi SQL Server DB_SAP.')}
+              </td>
+            </tr>
+          `).join('');
+        }
+      } catch (err) {
+        console.error('Fetch monitoring error:', err);
+      }
+    }
+
+    // Filter table by search term
+    function filterTable() {
+      const filter = document.getElementById('search-box').value.toLowerCase();
+      const rows = document.querySelectorAll('#tx-tbody tr');
+      rows.forEach(r => {
+        const text = r.textContent.toLowerCase();
+        r.style.display = text.includes(filter) ? '' : 'none';
+      });
+    }
+
+    // Simulate Sync Actions
+    async function simulateSync(type) {
+      try {
+        if (type === 'warning') {
+          await fetch('/api/system/test-sync?module=hazard&simulateError=true', { method: 'POST' });
+        } else {
+          await fetch('/api/system/test-sync?module=' + type, { method: 'POST' });
+        }
+        await fetchData();
+      } catch (e) {
+        alert('Gagal mengirim simulasi: ' + e);
+      }
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str).replace(/[&<>"']/g, m => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+      }[m]));
+    }
+
+    // Initial fetch and auto-poll every 2.5 seconds
+    fetchData();
+    setInterval(fetchData, 2500);
+  </script>
+</body>
+</html>

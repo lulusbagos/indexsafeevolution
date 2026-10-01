@@ -1,0 +1,36 @@
+default_platform(:ios)
+
+platform :ios do
+  desc "Upload built IPA to TestFlight using App Store Connect API key"
+  lane :upload_to_testflight do
+    # Prefer using environment variables in CI to avoid committing secrets.
+    # Provide either:
+    # - ASC_KEY_PATH -> path to the .p8 key file, or
+    # - ASC_KEY (base64-encoded .p8 content), ASC_KEY_ID and ASC_ISSUER_ID
+
+    api_key = nil
+    if ENV['ASC_KEY_PATH'] && File.exist?(ENV['ASC_KEY_PATH'])
+      api_key = app_store_connect_api_key(
+        key_id: ENV['ASC_KEY_ID'],
+        issuer_id: ENV['ASC_ISSUER_ID'],
+        key_filepath: ENV['ASC_KEY_PATH']
+      )
+    elsif ENV['ASC_KEY'] && ENV['ASC_KEY_ID'] && ENV['ASC_ISSUER_ID']
+      require 'base64'
+      tmp_key = File.join(Dir.pwd, 'fastlane', "AuthKey_#{ENV['ASC_KEY_ID']}.p8")
+      File.open(tmp_key, 'wb') do |f|
+        f.write(Base64.decode64(ENV['ASC_KEY']))
+      end
+      api_key = app_store_connect_api_key(
+        key_id: ENV['ASC_KEY_ID'],
+        issuer_id: ENV['ASC_ISSUER_ID'],
+        key_filepath: tmp_key
+      )
+    else
+      UI.user_error!("Missing App Store Connect API key. Set ASC_KEY_PATH or ASC_KEY + ASC_KEY_ID + ASC_ISSUER_ID")
+    end
+
+    ipa_path = ENV['IPA_PATH'] || "build/Runner-ipa/Runner.ipa"
+    upload_to_testflight(ipa: ipa_path, api_key: api_key)
+  end
+end
