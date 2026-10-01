@@ -208,20 +208,44 @@ class _SapPageState extends State<SapPage> {
             physics: const AlwaysScrollableScrollPhysics(
               parent: BouncingScrollPhysics(),
             ),
-            padding: const EdgeInsets.fromLTRB(16, 14, 16, 28),
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // 1. SIMPLE & PROFESSIONAL HEADER BANNER
-                _buildHeaderBanner(hasPending),
-
-                // 2. ALERT SYNC HANYA JIKA ADA DATA PENDING
+                // 1. ALERT SYNC HANYA JIKA ADA DATA PENDING
                 if (hasPending) ...[
-                  const SizedBox(height: 12),
                   _buildPendingAlertBar(),
+                  const SizedBox(height: 16),
                 ],
 
-                const SizedBox(height: 16),
+                // 2. SECTION HEADER (Clean Native Enterprise Title)
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 4),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Modul Akuntabilitas K3',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF0F172A),
+                          letterSpacing: -0.3,
+                        ),
+                      ),
+                      Text(
+                        '6 Modul Aktif',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF2563EB),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 12),
 
                 // 3. CLEAN 2-COLUMN GRID OF SAP MODULES
                 GridView.builder(
@@ -247,153 +271,37 @@ class _SapPageState extends State<SapPage> {
     );
   }
 
-  /// Header Banner yang Simpel & Profesional (Tanpa Nested Card Berlebihan)
-  Widget _buildHeaderBanner(bool hasPending) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(20),
-        gradient: const LinearGradient(
-          colors: [
-            Color(0xFF0F172A),
-            Color(0xFF1E3A8A),
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x1F0F172A),
-            blurRadius: 14,
-            offset: Offset(0, 6),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
-                ),
-                child: const Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.shield_rounded, size: 12, color: Color(0xFF60A5FA)),
-                    SizedBox(width: 5),
-                    Text(
-                      'PT INDEXIM COALINDO',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 10.5,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 0.3,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              InkWell(
-                onTap: hasPending ? _openPendingSyncPage : null,
-                borderRadius: BorderRadius.circular(16),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: hasPending
-                        ? const Color(0xFFD97706).withValues(alpha: 0.25)
-                        : const Color(0xFF059669).withValues(alpha: 0.25),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: hasPending
-                          ? const Color(0xFFFBBF24).withValues(alpha: 0.4)
-                          : const Color(0xFF34D399).withValues(alpha: 0.4),
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        width: 7,
-                        height: 7,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: hasPending
-                              ? const Color(0xFFFBBF24)
-                              : const Color(0xFF34D399),
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        hasPending ? '$_pendingCount Tersimpan' : 'Tersinkron',
-                        style: TextStyle(
-                          color: hasPending
-                              ? const Color(0xFFFDE68A)
-                              : const Color(0xFFA7F3D0),
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          const Text(
-            'Safety Accountability Program (SAP)',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 18,
-              fontWeight: FontWeight.w800,
-              letterSpacing: -0.3,
-            ),
-          ),
-          const SizedBox(height: 5),
-          Text(
-            'Pilih modul keselamatan kerja di bawah ini untuk memulai pelaporan atau inspeksi.',
-            style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.8),
-              fontSize: 12,
-              height: 1.35,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+
 
   /// Baris Notifikasi Pending Data Ringkas & Bersih
   Widget _buildPendingAlertBar() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      decoration: BoxDecoration(
-        color: const Color(0xFFFFFBEB),
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: _openPendingSyncPage,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFFDE68A), width: 1.2),
-      ),
-      child: Row(
-        children: [
-          const Icon(Icons.cloud_upload_outlined,
-              color: Color(0xFFD97706), size: 19),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              '$_pendingCount data lokal siap disinkronkan',
-              style: const TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: Color(0xFF92400E),
-              ),
-            ),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+            color: const Color(0xFFFFFBEB),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: const Color(0xFFFDE68A), width: 1.2),
           ),
+          child: Row(
+            children: [
+              const Icon(Icons.cloud_upload_outlined,
+                  color: Color(0xFFD97706), size: 19),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  '$_pendingCount data lokal siap disinkronkan',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF92400E),
+                  ),
+                ),
+              ),
           TextButton(
             onPressed: _isSyncing ? null : _syncNow,
             style: TextButton.styleFrom(
@@ -422,7 +330,9 @@ class _SapPageState extends State<SapPage> {
           ),
         ],
       ),
-    );
+    ),
+  ),
+);
   }
 
   /// Kartu Modul Bersih, Elegan, dan Proporsional

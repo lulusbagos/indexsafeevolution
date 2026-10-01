@@ -59,160 +59,114 @@ class ScanPage extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // 1. EXECUTIVE HEADER BANNER (Consistent Corporate Theme)
-                _buildHeaderBanner(),
+              // 1. TOP HEADER TITLE
+              _buildTopHeader(),
 
-                const SizedBox(height: 16),
+              const SizedBox(height: 16),
 
-                // 2. QUICK CAMERA LAUNCHER CARD
-                _buildQuickScannerCard(context),
+              // 2. HERO SCANNER VIEWFINDER CARD
+              _buildQuickScannerCard(context),
 
-                const SizedBox(height: 20),
+              const SizedBox(height: 24),
 
-                // 3. SECTION TITLE
-                const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 4),
-                  child: Text(
-                    'Kategori Pemindaian',
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w800,
-                      color: Color(0xFF0F172A),
-                      letterSpacing: -0.2,
-                    ),
+              // 3. SECTION TITLE
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 4),
+                child: Text(
+                  'Kategori Pemindaian',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF0F172A),
+                    letterSpacing: -0.2,
                   ),
-                ),
-
-                const SizedBox(height: 12),
-
-                // 4. CLEAN 2-COLUMN GRID (Identical to SAP, OHS, Performance Hub)
-                GridView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2,
-                    crossAxisSpacing: 12,
-                    mainAxisSpacing: 12,
-                    mainAxisExtent: 136,
-                  ),
-                  itemCount: scanServices.length,
-                  itemBuilder: (context, index) {
-                    final item = scanServices[index];
-                    return _buildServiceCard(context, item);
-                  },
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  /// Header Banner yang Simpel, Bersih, dan Profesional
-  Widget _buildHeaderBanner() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(20),
-        gradient: const LinearGradient(
-          colors: [
-            Color(0xFF0F172A),
-            Color(0xFF1E3A8A),
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x1F0F172A),
-            blurRadius: 14,
-            offset: Offset(0, 6),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
-                ),
-                child: const Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.shield_rounded, size: 12, color: Color(0xFF60A5FA)),
-                    SizedBox(width: 5),
-                    Text(
-                      'PT INDEXIM COALINDO',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 10.5,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 0.3,
-                      ),
-                    ),
-                  ],
                 ),
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF059669).withValues(alpha: 0.25),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    color: const Color(0xFF34D399).withValues(alpha: 0.4),
-                  ),
+
+              const SizedBox(height: 12),
+
+              // 4. CLEAN 2-COLUMN GRID (Identical to SAP, OHS, Performance Hub)
+              GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                  crossAxisSpacing: 12,
+                  mainAxisSpacing: 12,
+                  mainAxisExtent: 136,
                 ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: 7,
-                      height: 7,
-                      decoration: const BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: Color(0xFF34D399),
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    const Text(
-                      'Scanner Siap',
-                      style: TextStyle(
-                        color: Color(0xFFA7F3D0),
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
+                itemCount: scanServices.length,
+                itemBuilder: (context, index) {
+                  final item = scanServices[index];
+                  return _buildServiceCard(context, item);
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+  /// Header Bersih & Status Kamera
+  Widget _buildTopHeader() {
+    return Padding(
+      padding: const EdgeInsets.only(top: 4, bottom: 2),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          const Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Pemindai Barcode & QR',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFF0F172A),
+                  letterSpacing: -0.4,
+                ),
+              ),
+              SizedBox(height: 2),
+              Text(
+                'Arahkan kamera ke kode untuk validasi instan',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                  color: Color(0xFF64748B),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 14),
-          const Text(
-            'Barcode & QR Scanner',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 18,
-              fontWeight: FontWeight.w800,
-              letterSpacing: -0.3,
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF0FDF4),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: const Color(0xFFBBF7D0)),
             ),
-          ),
-          const SizedBox(height: 5),
-          Text(
-            'Pindai cepat kode Mine Permit, presensi kegiatan, dan validasi sarana operasional secara instan.',
-            style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.82),
-              fontSize: 12,
-              height: 1.35,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 7,
+                  height: 7,
+                  decoration: const BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Color(0xFF16A34A),
+                  ),
+                ),
+                const SizedBox(width: 6),
+                const Text(
+                  'Kamera Siap',
+                  style: TextStyle(
+                    color: Color(0xFF15803D),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
             ),
           ),
         ],
@@ -220,88 +174,92 @@ class ScanPage extends StatelessWidget {
     );
   }
 
-  /// Kartu Quick Scanner Interaktif
+  /// Kartu Quick Scanner Viewfinder Interaktif
   Widget _buildQuickScannerCard(BuildContext context) {
     return _AnimatedPressable(
       onTap: () => _openScanner(context, 'General Scan'),
       child: Container(
         width: double.infinity,
-        padding: const EdgeInsets.all(18),
+        padding: const EdgeInsets.all(22),
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: const Color(0xFFE2E8F0), width: 1.1),
+          color: const Color(0xFF0F172A),
+          borderRadius: BorderRadius.circular(22),
           boxShadow: const [
             BoxShadow(
-              color: Color(0x08000000),
-              blurRadius: 12,
-              offset: Offset(0, 4),
+              color: Color(0x1F0F172A),
+              blurRadius: 18,
+              offset: Offset(0, 8),
             ),
           ],
         ),
-        child: Row(
+        child: Column(
           children: [
+            // Center Viewfinder Graphic
             Container(
-              width: 52,
-              height: 52,
+              width: 86,
+              height: 86,
               decoration: BoxDecoration(
-                color: const Color(0xFFEFF6FF),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: const Color(0xFFBFDBFE), width: 1.2),
+                color: Colors.white.withValues(alpha: 0.06),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: const Color(0xFF38BDF8).withValues(alpha: 0.5),
+                  width: 1.5,
+                ),
               ),
-              child: const Icon(
-                Icons.qr_code_scanner_rounded,
-                color: Color(0xFF2563EB),
-                size: 28,
-              ),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Mulai Pemindaian Cepat',
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w800,
-                      color: Color(0xFF0F172A),
-                      letterSpacing: -0.2,
-                    ),
-                  ),
-                  const SizedBox(height: 3),
-                  Text(
-                    'Buka kamera untuk membaca QR code & barcode otomatis.',
-                    style: TextStyle(
-                      fontSize: 11.5,
-                      fontWeight: FontWeight.w500,
-                      color: Colors.blueGrey.shade600,
-                      height: 1.3,
-                    ),
-                  ),
-                ],
+              child: const Center(
+                child: Icon(
+                  Icons.qr_code_scanner_rounded,
+                  color: Color(0xFF38BDF8),
+                  size: 44,
+                ),
               ),
             ),
-            const SizedBox(width: 8),
+            const SizedBox(height: 16),
+            const Text(
+              'Ketuk untuk Membuka Pemindai',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                letterSpacing: -0.2,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Mendukung QR Code, Code 128, EAN, dan DataMatrix',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.65),
+                fontSize: 12,
+              ),
+            ),
+            const SizedBox(height: 16),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
               decoration: BoxDecoration(
                 color: const Color(0xFF2563EB),
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(14),
+                boxShadow: const [
+                  BoxShadow(
+                    color: Color(0x3D2563EB),
+                    blurRadius: 10,
+                    offset: Offset(0, 4),
+                  ),
+                ],
               ),
               child: const Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  Icon(Icons.camera_alt_rounded, color: Colors.white, size: 16),
+                  SizedBox(width: 8),
                   Text(
-                    'Pindai',
+                    'Aktifkan Kamera',
                     style: TextStyle(
                       color: Colors.white,
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
-                  SizedBox(width: 4),
-                  Icon(Icons.arrow_forward_rounded, color: Colors.white, size: 14),
                 ],
               ),
             ),

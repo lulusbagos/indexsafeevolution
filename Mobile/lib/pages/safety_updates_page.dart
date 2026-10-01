@@ -251,10 +251,10 @@ class _SafetyUpdatesPageState extends State<SafetyUpdatesPage> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // 1. EXECUTIVE HEADER BANNER (Consistent Corporate Theme)
-                        _buildHeaderBanner(),
+                        // 1. TOP HEADER
+                        _buildTopHeader(),
 
-                        const SizedBox(height: 16),
+                        const SizedBox(height: 14),
 
                         // ==================== HERO BANNER (TERHUBUNG KE /Incident/Index) ====================
                         _HeroUpdate(
@@ -384,110 +384,59 @@ class _SafetyUpdatesPageState extends State<SafetyUpdatesPage> {
   );
 }
 
-  /// Header Banner yang Simpel & Profesional (Menyelaraskan tema dengan SAP, OHS, dan Performance Hub)
-  Widget _buildHeaderBanner() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(20),
-        gradient: const LinearGradient(
-          colors: [
-            Color(0xFF0F172A),
-            Color(0xFF1E3A8A),
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x1F0F172A),
-            blurRadius: 14,
-            offset: Offset(0, 6),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+  /// Header Bersih & Aksi Refresh Feed
+  Widget _buildTopHeader() {
+    return Padding(
+      padding: const EdgeInsets.only(top: 4, bottom: 2),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          const Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
-                ),
-                child: const Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.shield_rounded, size: 12, color: Color(0xFF60A5FA)),
-                    SizedBox(width: 5),
-                    Text(
-                      'PT INDEXIM COALINDO',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 10.5,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 0.3,
-                      ),
-                    ),
-                  ],
+              Text(
+                'Safety Updates',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFF0F172A),
+                  letterSpacing: -0.4,
                 ),
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF059669).withValues(alpha: 0.25),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    color: const Color(0xFF34D399).withValues(alpha: 0.4),
-                  ),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: 7,
-                      height: 7,
-                      decoration: const BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: Color(0xFF34D399),
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    const Text(
-                      'Live Feed',
-                      style: TextStyle(
-                        color: Color(0xFFA7F3D0),
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
+              SizedBox(height: 2),
+              Text(
+                'Warta K3 & Buletin Operasional Tambang',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                  color: Color(0xFF64748B),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 14),
-          const Text(
-            'Safety Updates & Warta K3',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 18,
-              fontWeight: FontWeight.w800,
-              letterSpacing: -0.3,
-            ),
-          ),
-          const SizedBox(height: 5),
-          Text(
-            'Peringatan bahaya, informasi operasional tambang, bulletin keselamatan kerja, dan tindak lanjut insiden.',
-            style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.82),
-              fontSize: 12,
-              height: 1.35,
+          IconButton(
+            onPressed: () {
+              HapticFeedback.selectionClick();
+              _fetchIncidents();
+            },
+            tooltip: 'Segarkan Feed',
+            icon: _isLoadingIncidents
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2.2),
+                  )
+                : const Icon(
+                    Icons.refresh_rounded,
+                    color: Color(0xFF1E3A8A),
+                    size: 22,
+                  ),
+            style: IconButton.styleFrom(
+              backgroundColor: Colors.white,
+              side: const BorderSide(color: Color(0xFFE2E8F0)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
             ),
           ),
         ],

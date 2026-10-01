@@ -357,57 +357,8 @@ class _ProfilePageState extends State<ProfilePage>
       body: Stack(
         children: [
           // 1. Animated Ambient Aurora Background
-          Positioned.fill(
-            child: AnimatedBuilder(
-              animation: _animCtrl,
-              builder: (context, child) {
-                final val = _animCtrl.value;
-                return Stack(
-                  children: [
-                    // Shifting ambient glow orb 1 (Violet)
-                    Positioned(
-                      top: -60 + (val * 40),
-                      left: -50 + (val * 30),
-                      child: Container(
-                        width: 260,
-                        height: 260,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: const Color(0xFFA855F7).withValues(alpha: 0.18),
-                        ),
-                      ),
-                    ),
-                    // Shifting ambient glow orb 2 (Rose/Pink)
-                    Positioned(
-                      top: 40 - (val * 30),
-                      right: -60 + (val * 40),
-                      child: Container(
-                        width: 280,
-                        height: 280,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: const Color(0xFFF43F5E).withValues(alpha: 0.16),
-                        ),
-                      ),
-                    ),
-                    // Ambient glow orb 3 (Cyan/Emerald)
-                    Positioned(
-                      top: 240 + (val * 20),
-                      left: 20 - (val * 30),
-                      child: Container(
-                        width: 220,
-                        height: 220,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: const Color(0xFF06B6D4).withValues(alpha: 0.08),
-                        ),
-                      ),
-                    ),
-                  ],
-                );
-              },
-            ),
-          ),
+          // 1. Clean Professional Canvas Background
+          Container(color: const Color(0xFFF8FAFC)),
 
           // 2. Main Scrollable Content with Pull-To-Refresh
           RefreshIndicator(
@@ -506,231 +457,193 @@ class _ProfilePageState extends State<ProfilePage>
   }
 
   // Animated Banner & Overlapping Avatar
+  // Executive Corporate Header Banner & Avatar
   Widget _buildAnimatedHeaderCard() {
-    return AnimatedBuilder(
-      animation: _animCtrl,
-      builder: (context, child) {
-        final val = _animCtrl.value;
-        return Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 18),
-          child: Stack(
-            clipBehavior: Clip.none,
-            alignment: Alignment.center,
-            children: [
-              // Vibrant Animated Gradient Banner
-              Container(
-                height: 150,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(28),
-                  gradient: LinearGradient(
-                    begin: Alignment(-1.0 + (val * 0.4), -1.0),
-                    end: Alignment(1.0 - (val * 0.4), 1.0),
-                    colors: const [
-                      Color(0xFF7C3AED), // Vivid Royal Violet
-                      Color(0xFFA855F7), // Purple
-                      Color(0xFFE11D48), // Rose
-                      Color(0xFFF43F5E), // Coral Red
-                    ],
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFFA855F7).withValues(alpha: 0.32),
-                      blurRadius: 24,
-                      offset: const Offset(0, 12),
-                    ),
-                  ],
-                ),
-                child: Stack(
-                  children: [
-                    // Subtle geometric rings
-                    Positioned(
-                      top: -30,
-                      right: -20,
-                      child: Container(
-                        width: 140,
-                        height: 140,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: Colors.white.withValues(alpha: 0.15),
-                            width: 2,
-                          ),
-                        ),
-                      ),
-                    ),
-                    Positioned(
-                      bottom: -25,
-                      left: -20,
-                      child: Container(
-                        width: 110,
-                        height: 110,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: Colors.white.withValues(alpha: 0.12),
-                            width: 1.5,
-                          ),
-                        ),
-                      ),
-                    ),
-                    // Header Title & Sync Indicator
-                    Positioned(
-                      top: 18,
-                      left: 0,
-                      right: 0,
-                      child: Center(
-                        child: Text(
-                          'PROFIL SAYA',
-                          style: TextStyle(
-                            fontSize: 14.5,
-                            fontWeight: FontWeight.w900,
-                            color: Colors.white.withValues(alpha: 0.95),
-                            letterSpacing: 1.5,
-                            shadows: [
-                              Shadow(
-                                color: Colors.black.withValues(alpha: 0.25),
-                                blurRadius: 4,
-                                offset: const Offset(0, 1),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                    // Refresh Button on Top Right
-                    Positioned(
-                      top: 12,
-                      right: 14,
-                      child: IconButton(
-                        icon: const Icon(Icons.refresh_rounded, color: Colors.white, size: 22),
-                        tooltip: 'Muat ulang data',
-                        onPressed: _fetchLatestProfile,
-                      ),
-                    ),
-                  ],
-                ),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 18),
+      child: Stack(
+        clipBehavior: Clip.none,
+        alignment: Alignment.center,
+        children: [
+          // Dignified Executive Banner
+          Container(
+            height: 140,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(22),
+              gradient: const LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Color(0xFF0F172A),
+                  Color(0xFF1E3A8A),
+                ],
               ),
+              boxShadow: const [
+                BoxShadow(
+                  color: Color(0x1A0F172A),
+                  blurRadius: 18,
+                  offset: Offset(0, 8),
+                ),
+              ],
+            ),
+            child: Stack(
+              children: [
+                // PT INDEXIM COALINDO Badge on Top-Left
+                Positioned(
+                  top: 14,
+                  left: 16,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.shield_rounded, size: 12, color: Color(0xFF60A5FA)),
+                        SizedBox(width: 5),
+                        Text(
+                          'PT INDEXIM COALINDO',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.3,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
 
-              // Overlapping Avatar with Camera Badge
-              Positioned(
-                bottom: -46,
-                child: GestureDetector(
-                  onTap: _showPhotoSourceSheet,
-                  child: Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      // Gradient ring
-                      Container(
-                        width: 104,
-                        height: 104,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          gradient: const LinearGradient(
-                            colors: [
-                              Color(0xFFA855F7),
-                              Color(0xFFF43F5E),
-                            ],
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: const Color(0xFFA855F7).withValues(alpha: 0.35),
-                              blurRadius: 18,
-                              offset: const Offset(0, 6),
-                            ),
-                          ],
+                // Refresh Button on Top Right
+                Positioned(
+                  top: 8,
+                  right: 10,
+                  child: IconButton(
+                    icon: const Icon(Icons.refresh_rounded, color: Colors.white, size: 20),
+                    tooltip: 'Muat ulang data',
+                    onPressed: _fetchLatestProfile,
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // Overlapping Avatar with Camera Edit Badge
+          Positioned(
+            bottom: -46,
+            child: GestureDetector(
+              onTap: _showPhotoSourceSheet,
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  // Outer subtle border ring
+                  Container(
+                    width: 102,
+                    height: 102,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: const Color(0xFF1E3A8A).withValues(alpha: 0.2),
+                    ),
+                  ),
+                  // White border ring
+                  Container(
+                    width: 96,
+                    height: 96,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Colors.white,
+                      border: Border.all(color: Colors.white, width: 3),
+                      boxShadow: const [
+                        BoxShadow(
+                          color: Color(0x1F000000),
+                          blurRadius: 12,
+                          offset: Offset(0, 4),
                         ),
+                      ],
+                    ),
+                    child: ClipOval(
+                      child: _image != null
+                          ? Image(
+                              image: _image!,
+                              fit: BoxFit.cover,
+                              width: 96,
+                              height: 96,
+                              errorBuilder: (context, error, stackTrace) =>
+                                  _buildInitialsFallback(),
+                            )
+                          : _buildInitialsFallback(),
+                    ),
+                  ),
+                  // Uploading spinner overlay
+                  if (_isUploadingPhoto)
+                    Container(
+                      width: 96,
+                      height: 96,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.black.withValues(alpha: 0.45),
                       ),
-                      // White border ring
-                      Container(
-                        width: 98,
-                        height: 98,
-                        decoration: const BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: Colors.white,
-                        ),
-                        child: ClipOval(
-                          child: _image != null
-                              ? Image(
-                                  image: _image!,
-                                  fit: BoxFit.cover,
-                                  width: 98,
-                                  height: 98,
-                                  errorBuilder: (context, error, stackTrace) =>
-                                      _buildInitialsFallback(),
-                                )
-                              : _buildInitialsFallback(),
-                        ),
-                      ),
-                      // Uploading spinner overlay
-                      if (_isUploadingPhoto)
-                        Container(
-                          width: 98,
-                          height: 98,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: Colors.black.withValues(alpha: 0.45),
-                          ),
-                          child: const Center(
-                            child: SizedBox(
-                              width: 26,
-                              height: 26,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2.5,
-                                color: Colors.white,
-                              ),
-                            ),
-                          ),
-                        ),
-                      // Camera Icon Badge
-                      Positioned(
-                        bottom: 2,
-                        right: 2,
-                        child: Container(
-                          width: 32,
-                          height: 32,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            gradient: const LinearGradient(
-                              colors: [Color(0xFF9333EA), Color(0xFFA855F7)],
-                            ),
-                            border: Border.all(color: Colors.white, width: 2.5),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.18),
-                                blurRadius: 6,
-                                offset: const Offset(0, 2),
-                              ),
-                            ],
-                          ),
-                          child: const Icon(
-                            Icons.camera_alt_rounded,
-                            size: 15,
+                      child: const Center(
+                        child: SizedBox(
+                          width: 24,
+                          height: 24,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2.5,
                             color: Colors.white,
                           ),
                         ),
                       ),
-                    ],
+                    ),
+                  // Camera Icon Badge
+                  Positioned(
+                    bottom: 2,
+                    right: 2,
+                    child: Container(
+                      width: 30,
+                      height: 30,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: const Color(0xFF2563EB),
+                        border: Border.all(color: Colors.white, width: 2),
+                        boxShadow: const [
+                          BoxShadow(
+                            color: Color(0x26000000),
+                            blurRadius: 5,
+                            offset: Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: const Icon(
+                        Icons.camera_alt_rounded,
+                        size: 14,
+                        color: Colors.white,
+                      ),
+                    ),
                   ),
-                ),
+                ],
               ),
-            ],
+            ),
           ),
-        );
-      },
+        ],
+      ),
     );
   }
 
   Widget _buildInitialsFallback() {
     final initials = _getInitials(_profile?.namaLengkap);
     return Container(
-      color: const Color(0xFFF3E8FF),
+      color: const Color(0xFFEFF6FF),
       alignment: Alignment.center,
       child: Text(
         initials,
         style: const TextStyle(
-          fontSize: 32,
+          fontSize: 30,
           fontWeight: FontWeight.w900,
-          color: Color(0xFF7C3AED),
+          color: Color(0xFF1E3A8A),
           letterSpacing: 1.2,
         ),
       ),
