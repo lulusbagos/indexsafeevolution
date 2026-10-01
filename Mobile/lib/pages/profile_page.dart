@@ -28,7 +28,7 @@ class ProfilePage extends StatefulWidget {
 }
 
 class _ProfilePageState extends State<ProfilePage>
-    with SingleTickerProviderStateMixin, AutomaticKeepAliveClientMixin {
+    with AutomaticKeepAliveClientMixin {
   @override
   bool get wantKeepAlive => true;
 
@@ -41,7 +41,6 @@ class _ProfilePageState extends State<ProfilePage>
   bool _isBackgroundSyncEnabled = false;
   bool _isPowerSaverEnabled = true;
   bool _isAutoNotifEnabled = false;
-  late AnimationController _animCtrl;
 
   @override
   void initState() {
@@ -50,10 +49,6 @@ class _ProfilePageState extends State<ProfilePage>
     _isBackgroundSyncEnabled = PreferenceService.isBackgroundSyncEnabled();
     _isPowerSaverEnabled = PreferenceService.isPowerSaverEnabled();
     _isAutoNotifEnabled = PreferenceService.isAutoNotifEnabled();
-    _animCtrl = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 8),
-    )..repeat(reverse: true);
 
     PreferenceService.profilePhotoNotifier.addListener(_onProfilePhotoNotifierChanged);
     _loadProfilePhoto();
@@ -70,7 +65,6 @@ class _ProfilePageState extends State<ProfilePage>
   @override
   void dispose() {
     PreferenceService.profilePhotoNotifier.removeListener(_onProfilePhotoNotifierChanged);
-    _animCtrl.dispose();
     _scrollCtrl.dispose();
     super.dispose();
   }
@@ -509,7 +503,7 @@ class _ProfilePageState extends State<ProfilePage>
         clipBehavior: Clip.none,
         alignment: Alignment.center,
         children: [
-          // Dignified Executive Mining Permit Banner
+          // Colorful Vibrant Digital Mine ID Header Banner (Tanpa Animasi)
           Container(
             height: 156,
             decoration: BoxDecoration(
@@ -518,20 +512,16 @@ class _ProfilePageState extends State<ProfilePage>
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
                 colors: [
-                  Color(0xFF090D16), // Deep obsidian
-                  Color(0xFF0F172A), // Slate 900
-                  Color(0xFF1E293B), // Slate 800
-                  Color(0xFF1E3A8A), // Executive Navy Blue
+                  Color(0xFF4338CA), // Deep Indigo
+                  Color(0xFF7C3AED), // Vibrant Royal Violet
+                  Color(0xFFC026D3), // Vibrant Fuchsia
+                  Color(0xFFE11D48), // Vibrant Rose/Red
                 ],
-                stops: [0.0, 0.35, 0.72, 1.0],
-              ),
-              border: Border.all(
-                color: const Color(0xFF38BDF8).withValues(alpha: 0.25),
-                width: 1.2,
+                stops: [0.0, 0.32, 0.68, 1.0],
               ),
               boxShadow: [
                 BoxShadow(
-                  color: const Color(0xFF0F172A).withValues(alpha: 0.35),
+                  color: const Color(0xFF7C3AED).withValues(alpha: 0.35),
                   blurRadius: 22,
                   offset: const Offset(0, 10),
                 ),
@@ -541,39 +531,33 @@ class _ProfilePageState extends State<ProfilePage>
               borderRadius: BorderRadius.circular(24),
               child: Stack(
                 children: [
-                  // 1. Subtle Architectural Watermark (Concentric Circles & Shield Graphic)
+                  // 1. Translucent Ambient Glass Circles (Original Colorful Style)
                   Positioned(
-                    top: -40,
-                    right: -40,
+                    top: -45,
+                    right: -30,
                     child: Container(
-                      width: 170,
-                      height: 170,
+                      width: 175,
+                      height: 175,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        border: Border.all(
-                          color: const Color(0xFF38BDF8).withValues(alpha: 0.05),
-                          width: 28,
-                        ),
+                        color: Colors.white.withValues(alpha: 0.14),
                       ),
                     ),
                   ),
                   Positioned(
-                    bottom: -30,
-                    left: -30,
+                    bottom: -35,
+                    left: -25,
                     child: Container(
-                      width: 130,
-                      height: 130,
+                      width: 135,
+                      height: 135,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        border: Border.all(
-                          color: const Color(0xFF60A5FA).withValues(alpha: 0.04),
-                          width: 20,
-                        ),
+                        color: Colors.white.withValues(alpha: 0.10),
                       ),
                     ),
                   ),
 
-                  // 2. Glowing Golden-Cyan Perimeter Accent Line on Top
+                  // 2. Crisp White-Golden Perimeter Accent Line on Top
                   Positioned(
                     top: 0,
                     left: 24,
@@ -584,8 +568,8 @@ class _ProfilePageState extends State<ProfilePage>
                         gradient: LinearGradient(
                           colors: [
                             Colors.transparent,
-                            const Color(0xFF38BDF8).withValues(alpha: 0.6),
-                            const Color(0xFFF59E0B).withValues(alpha: 0.7),
+                            Colors.white.withValues(alpha: 0.65),
+                            const Color(0xFFFDE047).withValues(alpha: 0.8),
                             Colors.transparent,
                           ],
                         ),
@@ -607,17 +591,17 @@ class _ProfilePageState extends State<ProfilePage>
                           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4.5),
                           constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.48),
                           decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.09),
+                            color: Colors.white.withValues(alpha: 0.18),
                             borderRadius: BorderRadius.circular(20),
                             border: Border.all(
-                              color: const Color(0xFF38BDF8).withValues(alpha: 0.3),
+                              color: Colors.white.withValues(alpha: 0.35),
                               width: 1.0,
                             ),
                           ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              const Icon(Icons.shield_rounded, size: 13, color: Color(0xFF38BDF8)),
+                              const Icon(Icons.shield_rounded, size: 13, color: Colors.white),
                               const SizedBox(width: 6),
                               Flexible(
                                 child: Text(
@@ -643,10 +627,10 @@ class _ProfilePageState extends State<ProfilePage>
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
                               decoration: BoxDecoration(
-                                color: const Color(0xFF065F46).withValues(alpha: 0.45),
+                                color: Colors.black.withValues(alpha: 0.22),
                                 borderRadius: BorderRadius.circular(12),
                                 border: Border.all(
-                                  color: const Color(0xFF10B981).withValues(alpha: 0.6),
+                                  color: Colors.white.withValues(alpha: 0.35),
                                   width: 1,
                                 ),
                               ),
@@ -658,10 +642,10 @@ class _ProfilePageState extends State<ProfilePage>
                                     height: 6,
                                     decoration: const BoxDecoration(
                                       shape: BoxShape.circle,
-                                      color: Color(0xFF34D399),
+                                      color: Color(0xFF4ADE80),
                                       boxShadow: [
                                         BoxShadow(
-                                          color: Color(0xFF34D399),
+                                          color: Color(0xFF4ADE80),
                                           blurRadius: 4,
                                           spreadRadius: 1,
                                         ),
@@ -672,7 +656,7 @@ class _ProfilePageState extends State<ProfilePage>
                                   const Text(
                                     'SIMPER AKTIF',
                                     style: TextStyle(
-                                      color: Color(0xFF6EE7B7),
+                                      color: Colors.white,
                                       fontSize: 9.5,
                                       fontWeight: FontWeight.w800,
                                       letterSpacing: 0.3,
@@ -692,10 +676,10 @@ class _ProfilePageState extends State<ProfilePage>
                                   width: 32,
                                   height: 32,
                                   decoration: BoxDecoration(
-                                    color: Colors.white.withValues(alpha: 0.1),
+                                    color: Colors.white.withValues(alpha: 0.18),
                                     shape: BoxShape.circle,
                                     border: Border.all(
-                                      color: Colors.white.withValues(alpha: 0.15),
+                                      color: Colors.white.withValues(alpha: 0.35),
                                       width: 1,
                                     ),
                                   ),
@@ -727,12 +711,12 @@ class _ProfilePageState extends State<ProfilePage>
                             crossAxisAlignment: CrossAxisAlignment.start,
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              const Text(
+                              Text(
                                 'DEPARTEMEN',
                                 style: TextStyle(
                                   fontSize: 8.5,
                                   fontWeight: FontWeight.w700,
-                                  color: Color(0xFF94A3B8),
+                                  color: Colors.white.withValues(alpha: 0.78),
                                   letterSpacing: 0.6,
                                 ),
                               ),
@@ -755,7 +739,7 @@ class _ProfilePageState extends State<ProfilePage>
                                   const Icon(
                                     Icons.location_on_rounded,
                                     size: 11,
-                                    color: Color(0xFF38BDF8),
+                                    color: Colors.white,
                                   ),
                                   const SizedBox(width: 3),
                                   Flexible(
@@ -763,10 +747,10 @@ class _ProfilePageState extends State<ProfilePage>
                                       site,
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(
+                                      style: TextStyle(
                                         fontSize: 9.5,
                                         fontWeight: FontWeight.w600,
-                                        color: Color(0xFFBAE6FD),
+                                        color: Colors.white.withValues(alpha: 0.92),
                                       ),
                                     ),
                                   ),
@@ -785,12 +769,12 @@ class _ProfilePageState extends State<ProfilePage>
                             crossAxisAlignment: CrossAxisAlignment.end,
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              const Text(
+                              Text(
                                 'STATUS ROSTER',
                                 style: TextStyle(
                                   fontSize: 8.5,
                                   fontWeight: FontWeight.w700,
-                                  color: Color(0xFF94A3B8),
+                                  color: Colors.white.withValues(alpha: 0.78),
                                   letterSpacing: 0.6,
                                 ),
                               ),
@@ -813,7 +797,7 @@ class _ProfilePageState extends State<ProfilePage>
                                   const Icon(
                                     Icons.verified_rounded,
                                     size: 11,
-                                    color: Color(0xFFFBBF24),
+                                    color: Color(0xFFFDE047),
                                   ),
                                   const SizedBox(width: 3),
                                   Flexible(
@@ -821,10 +805,10 @@ class _ProfilePageState extends State<ProfilePage>
                                       statusKlasifikasi,
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(
+                                      style: TextStyle(
                                         fontSize: 9.5,
                                         fontWeight: FontWeight.w600,
-                                        color: Color(0xFFFDE68A),
+                                        color: Colors.white.withValues(alpha: 0.95),
                                       ),
                                     ),
                                   ),
@@ -851,7 +835,7 @@ class _ProfilePageState extends State<ProfilePage>
                             fontSize: 8,
                             fontWeight: FontWeight.w800,
                             letterSpacing: 1.2,
-                            color: Colors.white.withValues(alpha: 0.25),
+                            color: Colors.white.withValues(alpha: 0.35),
                           ),
                         ),
                         Text(
@@ -860,7 +844,7 @@ class _ProfilePageState extends State<ProfilePage>
                             fontSize: 8,
                             fontWeight: FontWeight.w800,
                             letterSpacing: 1.0,
-                            color: Colors.white.withValues(alpha: 0.25),
+                            color: Colors.white.withValues(alpha: 0.35),
                           ),
                         ),
                       ],
@@ -885,9 +869,9 @@ class _ProfilePageState extends State<ProfilePage>
                     height: 104,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: const Color(0xFF1E3A8A).withValues(alpha: 0.25),
+                      color: Colors.white.withValues(alpha: 0.28),
                       border: Border.all(
-                        color: const Color(0xFF38BDF8).withValues(alpha: 0.35),
+                        color: Colors.white.withValues(alpha: 0.45),
                         width: 1.5,
                       ),
                     ),
@@ -950,7 +934,7 @@ class _ProfilePageState extends State<ProfilePage>
                       height: 30,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: const Color(0xFF0284C7),
+                        color: const Color(0xFF7C3AED),
                         border: Border.all(color: Colors.white, width: 2),
                         boxShadow: const [
                           BoxShadow(
