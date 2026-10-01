@@ -2357,7 +2357,7 @@ class _DashboardPageState extends State<DashboardPage>
                                   child: Text(
                                     (_profile?.posisi != null && _profile!.posisi!.trim().isNotEmpty)
                                         ? _profile!.posisi!.trim()
-                                        : (_profile?.depart ?? 'PT Indexim Coalindo'),
+                                        : (_profile?.depart ?? (_profile?.company ?? 'Karyawan Indexsafe')),
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                     style: TextStyle(
@@ -4217,10 +4217,10 @@ class _DashboardPageState extends State<DashboardPage>
             ],
           ),
           const SizedBox(height: 4),
-          const Text(
-            'PT INDEXIM COALINDO © 2026 • Keselamatan Adalah Prioritas',
+          Text(
+            '${_profile?.company ?? 'PT INDEXIM COALINDO'} © 2026 • Keselamatan Adalah Prioritas',
             textAlign: TextAlign.center,
-            style: TextStyle(
+            style: const TextStyle(
               fontSize: 10,
               fontWeight: FontWeight.w500,
               color: Color(0xFF94A3B8),

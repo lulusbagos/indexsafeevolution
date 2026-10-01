@@ -495,6 +495,9 @@ class _ProfilePageState extends State<ProfilePage>
   Widget _buildAnimatedHeaderCard() {
     final screenWidth = MediaQuery.of(context).size.width;
     final avatarCenterGap = screenWidth < 360 ? 84.0 : 100.0;
+    final companyName = (_profile?.company != null && _profile!.company!.trim().isNotEmpty)
+        ? _profile!.company!.trim().toUpperCase()
+        : 'PT INDEXIM COALINDO';
     final dept = _profile?.depart ?? 'SHE / K3';
     final site = _profile?.lokker ?? 'SITE KALTIM';
     final rosterVal = _profile?.roster != null ? '${_profile!.roster}' : '5/2';
@@ -599,9 +602,10 @@ class _ProfilePageState extends State<ProfilePage>
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
-                        // PT INDEXIM COALINDO Official Shield Tag
+                        // Official Company Shield Tag
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4.5),
+                          constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.48),
                           decoration: BoxDecoration(
                             color: Colors.white.withValues(alpha: 0.09),
                             borderRadius: BorderRadius.circular(20),
@@ -610,18 +614,22 @@ class _ProfilePageState extends State<ProfilePage>
                               width: 1.0,
                             ),
                           ),
-                          child: const Row(
+                          child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Icon(Icons.shield_rounded, size: 13, color: Color(0xFF38BDF8)),
-                              SizedBox(width: 6),
-                              Text(
-                                'PT INDEXIM COALINDO',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w800,
-                                  letterSpacing: 0.4,
+                              const Icon(Icons.shield_rounded, size: 13, color: Color(0xFF38BDF8)),
+                              const SizedBox(width: 6),
+                              Flexible(
+                                child: Text(
+                                  companyName,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: 0.4,
+                                  ),
                                 ),
                               ),
                             ],
@@ -1025,6 +1033,7 @@ class _ProfilePageState extends State<ProfilePage>
           // Company Badge
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+            constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.85),
             decoration: BoxDecoration(
               color: const Color(0xFFF0FDFA),
               borderRadius: BorderRadius.circular(20),
@@ -1039,15 +1048,19 @@ class _ProfilePageState extends State<ProfilePage>
                   color: Color(0xFF0D9488),
                 ),
                 const SizedBox(width: 6),
-                Text(
-                  (_profile?.company != null &&
-                          _profile!.company!.trim().isNotEmpty)
-                      ? _profile!.company!.trim()
-                      : 'PT Indexim Coalindo',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w800,
-                    color: Color(0xFF0D9488),
+                Flexible(
+                  child: Text(
+                    (_profile?.company != null &&
+                            _profile!.company!.trim().isNotEmpty)
+                        ? _profile!.company!.trim()
+                        : 'Perusahaan Karyawan',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF0D9488),
+                    ),
                   ),
                 ),
               ],
@@ -1737,7 +1750,9 @@ class _ProfilePageState extends State<ProfilePage>
 
   // Informasi Karyawan Card
   Widget _buildEmployeeInfoCard() {
-    final company = _profile?.company ?? 'PT INDEXIM COALINDO';
+    final company = (_profile?.company != null && _profile!.company!.trim().isNotEmpty)
+        ? _profile!.company!.trim()
+        : 'Perusahaan Karyawan';
     final depart = _profile?.depart ?? 'GENERAL';
     final position = _profile?.posisi ?? 'FOREMAN/OFFICER';
     final email = _profile?.emailPribadi ??
