@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../models/link_model.dart';
 import '../../utils/links.dart';
 import '../../utils/routers.dart';
 import '../../widgets/ambient_background.dart';
@@ -14,86 +15,94 @@ class OhsPage extends StatefulWidget {
 }
 
 class _OhsPageState extends State<OhsPage> {
+  LinkMenuModel _findMenuItem(String route) {
+    return listMenuOhs1.firstWhere(
+      (m) => m.route == route,
+      orElse: () => LinkMenuModel(
+          title: '', icon: Icons.widgets_rounded, image: '', route: route, opacity: 1),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final inspection = listMenuOhs1.firstWhere(
-      (m) => m.route == '/inspection',
-      orElse: () => listMenuOhs1[0],
-    );
-    final daily = listMenuOhs1.firstWhere(
-      (m) => m.route == '/daily_inspection',
-      orElse: () => listMenuOhs1[1],
-    );
-    final p5m = listMenuOhs1.firstWhere(
-      (m) => m.route == '/p5m',
-      orElse: () => listMenuOhs1[2],
-    );
-    final simama = listMenuOhs1.firstWhere(
-      (m) => m.route == '/simama',
-      orElse: () => listMenuOhs1[3],
-    );
-    final p2h = listMenuOhs1.firstWhere(
-      (m) => m.route == '/p2h',
-      orElse: () => listMenuOhs1[4],
-    );
-    final dpa = listMenuOhs1.firstWhere(
-      (m) => m.route == '/dpa',
-      orElse: () => listMenuOhs1[5],
-    );
+    final inspection = _findMenuItem('/inspection');
+    final daily = _findMenuItem('/daily_inspection');
+    final p5m = _findMenuItem('/p5m');
+    final simama = _findMenuItem('/simama');
+    final p2h = _findMenuItem('/p2h');
+    final dpa = _findMenuItem('/dpa');
 
-    final menuItems = [
-      _OhsMenuItemData(
+    final groupInspection = [
+      _OhsFioriItemData(
         title: 'Management Inspection',
         subtitle: 'Inspeksi Manajemen K3',
+        description: 'Pemeriksaan kepatuhan standar K3 tingkat pimpinan dan pengawas operasional tambang.',
+        tag: 'AUDIT MANAJEMEN',
+        tagColor: const Color(0xFF0284C7),
+        tagBgColor: const Color(0xFFF0F9FF),
         image: inspection.image,
         fallbackIcon: Icons.manage_search_sharp,
-        accentColor: const Color(0xFF0284C7),
-        bgColor: const Color(0xFFF0F9FF),
         route: inspection.route,
       ),
-      _OhsMenuItemData(
+      _OhsFioriItemData(
         title: 'Daily Inspection',
-        subtitle: 'Inspeksi Rutin Harian',
+        subtitle: 'Inspeksi Rutin Lapangan',
+        description: 'Pemeriksaan berkala kondisi fisik area kerja, jalur hauling, dan fasilitas tambang.',
+        tag: 'INSPEKSI RUTIN',
+        tagColor: const Color(0xFF0D9488),
+        tagBgColor: const Color(0xFFF0FDFA),
         image: daily.image,
         fallbackIcon: Icons.fact_check_rounded,
-        accentColor: const Color(0xFF0D9488),
-        bgColor: const Color(0xFFF0FDFA),
         route: daily.route,
       ),
-      _OhsMenuItemData(
+    ];
+
+    final groupPersonnel = [
+      _OhsFioriItemData(
         title: 'Fit to Work P5M',
         subtitle: 'Kesiapan & Briefing 5M',
+        description: 'Deklarasi kebugaran jasmani, tensi, dan evaluasi kesiapan kerja sebelum memulai tugas.',
+        tag: 'PRA-SHIFT 5M',
+        tagColor: const Color(0xFF059669),
+        tagBgColor: const Color(0xFFECFDF5),
         image: p5m.image,
         fallbackIcon: Icons.health_and_safety_rounded,
-        accentColor: const Color(0xFF059669),
-        bgColor: const Color(0xFFECFDF5),
         route: p5m.route,
       ),
-      _OhsMenuItemData(
+      _OhsFioriItemData(
         title: 'SiMaMa',
         subtitle: 'Monitoring Shift Malam',
+        description: 'Monitoring kesiapan masuk kerja malam dan manajemen risiko pencegahan fatigue.',
+        tag: 'SHIFT MALAM',
+        tagColor: const Color(0xFF4F46E5),
+        tagBgColor: const Color(0xFFEEF2FF),
         image: simama.image,
         fallbackIcon: Icons.nightlight_round,
-        accentColor: const Color(0xFF6366F1),
-        bgColor: const Color(0xFFEEF2FF),
         route: simama.route,
       ),
-      _OhsMenuItemData(
+    ];
+
+    final groupVehicle = [
+      _OhsFioriItemData(
         title: 'P2H Unit & LV',
         subtitle: 'Pemeriksaan Harian Sarana',
+        description: 'Pemeriksaan dan pencatatan pra-operasional sarana kendaraan / LV sebelum dioperasikan.',
+        tag: 'PEMERIKSAAN HARIAN',
+        tagColor: const Color(0xFFD97706),
+        tagBgColor: const Color(0xFFFFFBEB),
         image: p2h.image,
         fallbackIcon: Icons.car_repair_rounded,
-        accentColor: const Color(0xFFD97706),
-        bgColor: const Color(0xFFFFFBEB),
         route: p2h.route,
       ),
-      _OhsMenuItemData(
-        title: 'Driver Assessment',
-        subtitle: 'Evaluasi Pengemudi (DPA)',
-        image: dpa.image,
+      _OhsFioriItemData(
+        title: 'Driver Assessment (DPA)',
+        subtitle: 'Otorisasi Mengemudi K3',
+        description: 'Verifikasi kelayakan berkendara, evaluasi kompetensi driver, dan otorisasi sarana tambang.',
+        tag: 'OTORISASI DRIVER',
+        tagColor: const Color(0xFF7C3AED),
+        tagBgColor: const Color(0xFFF5F3FF),
+        image: dpa.image.isNotEmpty ? dpa.image : 'assets/icons/ohs-06.png',
         fallbackIcon: Icons.drive_eta_rounded,
-        accentColor: const Color(0xFF7C3AED),
-        bgColor: const Color(0xFFF5F3FF),
         route: dpa.route,
       ),
     ];
@@ -106,54 +115,33 @@ class _OhsPageState extends State<OhsPage> {
           physics: const AlwaysScrollableScrollPhysics(
             parent: BouncingScrollPhysics(),
           ),
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
+          padding: const EdgeInsets.fromLTRB(16, 14, 16, 32),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // 1. SECTION HEADER (Clean Native Enterprise Title)
-              const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 4),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'Program K3 & Inspeksi',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w800,
-                        color: Color(0xFF0F172A),
-                        letterSpacing: -0.3,
-                      ),
-                    ),
-                    Text(
-                      '6 Modul Aktif',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFF0D9488),
-                      ),
-                    ),
-                  ],
-                ),
+              // 1. DOMAIN 1: PENGAWASAN & AUDIT LAPANGAN
+              _buildDomainSection(
+                domainTitle: 'Pengawasan & Audit Lapangan',
+                domainCount: '2 Modul',
+                items: groupInspection,
               ),
 
-              const SizedBox(height: 12),
+              const SizedBox(height: 20),
 
-              // 2. CLEAN 2-COLUMN GRID
-              GridView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 2,
-                  crossAxisSpacing: 12,
-                  mainAxisSpacing: 12,
-                  mainAxisExtent: 136,
-                ),
-                itemCount: menuItems.length,
-                itemBuilder: (context, index) {
-                  final item = menuItems[index];
-                  return _buildModuleCard(item);
-                },
+              // 2. DOMAIN 2: KESIAPAN PERSONEL & SHIFT
+              _buildDomainSection(
+                domainTitle: 'Kesiapan Mandiri & Shift Kerja',
+                domainCount: '2 Modul',
+                items: groupPersonnel,
+              ),
+
+              const SizedBox(height: 20),
+
+              // 3. DOMAIN 3: KELAIKAN SARANA & DRIVER
+              _buildDomainSection(
+                domainTitle: 'Kelaikan Armada & Otorisasi',
+                domainCount: '2 Modul',
+                items: groupVehicle,
               ),
             ],
           ),
@@ -162,10 +150,56 @@ class _OhsPageState extends State<OhsPage> {
     );
   }
 
+  /// Section Header & List of Fiori Tiles
+  Widget _buildDomainSection({
+    required String domainTitle,
+    required String domainCount,
+    required List<_OhsFioriItemData> items,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                domainTitle,
+                style: const TextStyle(
+                  fontSize: 14.5,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFF0F172A),
+                  letterSpacing: -0.2,
+                ),
+              ),
+              Text(
+                domainCount,
+                style: TextStyle(
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.blueGrey.shade500,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 8),
+        ListView.separated(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: items.length,
+          separatorBuilder: (_, __) => const SizedBox(height: 10),
+          itemBuilder: (context, index) {
+            return _buildFioriWorklistCard(items[index]);
+          },
+        ),
+      ],
+    );
+  }
 
-
-  /// Kartu Modul Bersih, Elegan, dan Proporsional (Identik dengan tema SAP)
-  Widget _buildModuleCard(_OhsMenuItemData item) {
+  /// Authentic SAP Fiori Enterprise Worklist Card
+  Widget _buildFioriWorklistCard(_OhsFioriItemData item) {
     return _AnimatedPressable(
       onTap: () {
         if (item.route.isNotEmpty) {
@@ -176,81 +210,105 @@ class _OhsPageState extends State<OhsPage> {
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(18),
+          borderRadius: BorderRadius.circular(16),
           border: Border.all(color: const Color(0xFFE2E8F0), width: 1.1),
           boxShadow: const [
             BoxShadow(
-              color: Color(0x06000000),
-              blurRadius: 10,
-              offset: Offset(0, 3),
+              color: Color(0x050F172A),
+              blurRadius: 8,
+              offset: Offset(0, 2),
             ),
           ],
         ),
-        child: Column(
+        child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: item.bgColor,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  padding: const EdgeInsets.all(8),
-                  child: item.image.isNotEmpty
-                      ? Image.asset(
-                          item.image,
-                          fit: BoxFit.contain,
-                          errorBuilder: (_, __, ___) => Icon(
-                            item.fallbackIcon,
-                            color: item.accentColor,
-                            size: 24,
-                          ),
-                        )
-                      : Icon(
-                          item.fallbackIcon,
-                          color: item.accentColor,
-                          size: 24,
-                        ),
-                ),
-                Icon(
-                  Icons.arrow_forward_ios_rounded,
-                  size: 13,
-                  color: Colors.grey.shade400,
-                ),
-              ],
+            // Leading Icon Container
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+              ),
+              padding: const EdgeInsets.all(8),
+              child: item.image.isNotEmpty
+                  ? Image.asset(
+                      item.image,
+                      fit: BoxFit.contain,
+                      errorBuilder: (_, __, ___) => Icon(
+                        item.fallbackIcon,
+                        color: const Color(0xFF0D9488),
+                        size: 26,
+                      ),
+                    )
+                  : Icon(
+                      item.fallbackIcon,
+                      color: const Color(0xFF0D9488),
+                      size: 26,
+                    ),
             ),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  item.title,
-                  style: const TextStyle(
-                    fontSize: 14.5,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFF0F172A),
-                    letterSpacing: -0.2,
+            const SizedBox(width: 14),
+
+            // Center Content
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: item.tagBgColor,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          item.tag,
+                          style: TextStyle(
+                            color: item.tagColor,
+                            fontSize: 9,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 0.3,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  item.subtitle,
-                  style: TextStyle(
-                    fontSize: 11.5,
-                    fontWeight: FontWeight.w500,
-                    color: Colors.blueGrey.shade600,
+                  const SizedBox(height: 5),
+                  Text(
+                    item.title,
+                    style: const TextStyle(
+                      fontSize: 15.5,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF0F172A),
+                      letterSpacing: -0.2,
+                    ),
                   ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
+                  const SizedBox(height: 3),
+                  Text(
+                    item.description,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.blueGrey.shade600,
+                      height: 1.35,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // Trailing Chevron Indicator
+            const SizedBox(width: 8),
+            Padding(
+              padding: const EdgeInsets.only(top: 14),
+              child: Icon(
+                Icons.arrow_forward_ios_rounded,
+                size: 14,
+                color: Colors.grey.shade400,
+              ),
             ),
           ],
         ),
@@ -259,22 +317,26 @@ class _OhsPageState extends State<OhsPage> {
   }
 }
 
-class _OhsMenuItemData {
+class _OhsFioriItemData {
   final String title;
   final String subtitle;
+  final String description;
+  final String tag;
+  final Color tagColor;
+  final Color tagBgColor;
   final String image;
   final IconData fallbackIcon;
-  final Color accentColor;
-  final Color bgColor;
   final String route;
 
-  const _OhsMenuItemData({
+  const _OhsFioriItemData({
     required this.title,
     required this.subtitle,
+    required this.description,
+    required this.tag,
+    required this.tagColor,
+    required this.tagBgColor,
     required this.image,
     required this.fallbackIcon,
-    required this.accentColor,
-    required this.bgColor,
     required this.route,
   });
 }
@@ -320,7 +382,7 @@ class _AnimatedPressableState extends State<_AnimatedPressable> {
       onTapCancel: _onTapCancel,
       behavior: HitTestBehavior.opaque,
       child: AnimatedScale(
-        scale: _isPressed ? 0.96 : 1.0,
+        scale: _isPressed ? 0.97 : 1.0,
         duration: const Duration(milliseconds: 120),
         curve: Curves.easeOutQuad,
         child: widget.child,
@@ -328,4 +390,3 @@ class _AnimatedPressableState extends State<_AnimatedPressable> {
     );
   }
 }
-

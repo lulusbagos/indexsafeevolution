@@ -1,345 +1,417 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 import '../services/api.dart';
-import '../widgets/ambient_background.dart';
 
-class ScanPage extends StatelessWidget {
+class ScanPage extends StatefulWidget {
   const ScanPage({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    const scanServices = [
-      _ScanServiceItem(
-        title: 'Mine Permit',
-        subtitle: 'Verifikasi ID & Akses K3',
-        icon: Icons.badge_rounded,
-        accentColor: Color(0xFF0D9488),
-        bgColor: Color(0xFFF0FDFA),
-        scanType: 'Mine Permit',
-      ),
-      _ScanServiceItem(
-        title: 'Absen Acara',
-        subtitle: 'Presensi Rapat & Briefing',
-        icon: Icons.event_available_rounded,
-        accentColor: Color(0xFFD97706),
-        bgColor: Color(0xFFFFFBEB),
-        scanType: 'Absen Acara',
-      ),
-      _ScanServiceItem(
-        title: 'P2H Sarana',
-        subtitle: 'Validasi Barcode Armada',
-        icon: Icons.car_repair_rounded,
-        accentColor: Color(0xFF2563EB),
-        bgColor: Color(0xFFEFF6FF),
-        scanType: 'P2H Unit & LV',
-      ),
-      _ScanServiceItem(
-        title: 'Tagging Lokasi',
-        subtitle: 'Validasi Titik Pantau',
-        icon: Icons.fmd_good_rounded,
-        accentColor: Color(0xFF7C3AED),
-        bgColor: Color(0xFFF5F3FF),
-        scanType: 'Lokasi & Area',
-      ),
-    ];
-
-    return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
-      body: AmbientBackground(
-        child: SafeArea(
-          bottom: false,
-          child: SingleChildScrollView(
-            physics: const AlwaysScrollableScrollPhysics(
-              parent: BouncingScrollPhysics(),
-            ),
-            padding: const EdgeInsets.fromLTRB(16, 14, 16, 130),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-              // 1. TOP HEADER TITLE
-              _buildTopHeader(),
-
-              const SizedBox(height: 16),
-
-              // 2. HERO SCANNER VIEWFINDER CARD
-              _buildQuickScannerCard(context),
-
-              const SizedBox(height: 24),
-
-              // 3. SECTION TITLE
-              const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 4),
-                child: Text(
-                  'Kategori Pemindaian',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFF0F172A),
-                    letterSpacing: -0.2,
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 12),
-
-              // 4. CLEAN 2-COLUMN GRID (Identical to SAP, OHS, Performance Hub)
-              GridView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 2,
-                  crossAxisSpacing: 12,
-                  mainAxisSpacing: 12,
-                  mainAxisExtent: 136,
-                ),
-                itemCount: scanServices.length,
-                itemBuilder: (context, index) {
-                  final item = scanServices[index];
-                  return _buildServiceCard(context, item);
-                },
-              ),
-            ],
-          ),
-        ),
-      ),
-    ),
-  );
+  State<ScanPage> createState() => _ScanPageState();
 }
 
-  /// Header Bersih & Status Kamera
-  Widget _buildTopHeader() {
-    return Padding(
-      padding: const EdgeInsets.only(top: 4, bottom: 2),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+class _ScanPageState extends State<ScanPage> with WidgetsBindingObserver, SingleTickerProviderStateMixin {
+  late final MobileScannerController _controller;
+  late final AnimationController _scanAnimCtrl;
+  bool _isPermissionGranted = false;
+  bool _isCheckingPermission = true;
+  bool _isProcessing = false;
+  String _selectedCategory = 'Semua';
+  double _zoomScale = 0.0;
+  double _zoomAtGestureStart = 0.0;
+
+  final List<String> _categories = const [
+    'Semua',
+    'Mine Permit',
+    'Absen Acara',
+    'P2H Sarana',
+    'Tagging Lokasi',
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+
+    _controller = MobileScannerController(
+      detectionSpeed: DetectionSpeed.noDuplicates,
+      facing: CameraFacing.back,
+      torchEnabled: false,
+      formats: const [
+        BarcodeFormat.qrCode,
+        BarcodeFormat.code128,
+        BarcodeFormat.code39,
+        BarcodeFormat.code93,
+        BarcodeFormat.ean13,
+        BarcodeFormat.ean8,
+        BarcodeFormat.dataMatrix,
+        BarcodeFormat.pdf417,
+      ],
+    );
+
+    _scanAnimCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2000),
+    )..repeat(reverse: true);
+
+    _checkPermission();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (!_isPermissionGranted) return;
+    if (state == AppLifecycleState.resumed) {
+      _controller.start();
+    } else if (state == AppLifecycleState.inactive || state == AppLifecycleState.paused) {
+      _controller.stop();
+    }
+  }
+
+  Future<void> _checkPermission() async {
+    final status = await Permission.camera.status;
+    if (mounted) {
+      setState(() {
+        _isPermissionGranted = status.isGranted;
+        _isCheckingPermission = false;
+      });
+    }
+  }
+
+  Future<void> _requestPermission() async {
+    final status = await Permission.camera.request();
+    if (mounted) {
+      setState(() {
+        _isPermissionGranted = status.isGranted;
+      });
+      if (status.isPermanentlyDenied) {
+        await openAppSettings();
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _scanAnimCtrl.dispose();
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> _onDetect(BarcodeCapture capture) async {
+    if (_isProcessing) return;
+
+    for (final barcode in capture.barcodes) {
+      final value = barcode.rawValue?.trim();
+      if (value == null || value.isEmpty) continue;
+
+      setState(() => _isProcessing = true);
+      try {
+        await HapticFeedback.heavyImpact();
+      } catch (_) {}
+
+      await _controller.stop();
+
+      if (!mounted) return;
+
+      final scanResult = _ScanResult(
+        value: value,
+        format: barcode.format.name.toUpperCase(),
+      );
+
+      final scanType = _selectedCategory == 'Semua' ? 'General Scan' : _selectedCategory;
+      await _showScanResult(context, scanType, scanResult);
+
+      if (mounted) {
+        setState(() => _isProcessing = false);
+        await _controller.start();
+      }
+      return;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_isCheckingPermission) {
+      return const Scaffold(
+        backgroundColor: Color(0xFF0F172A),
+        body: Center(
+          child: CircularProgressIndicator(color: Colors.white),
+        ),
+      );
+    }
+
+    if (!_isPermissionGranted) {
+      return _buildPermissionView();
+    }
+
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: Stack(
+        fit: StackFit.expand,
         children: [
-          const Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Pemindai Barcode & QR',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w800,
-                  color: Color(0xFF0F172A),
-                  letterSpacing: -0.4,
-                ),
-              ),
-              SizedBox(height: 2),
-              Text(
-                'Arahkan kamera ke kode untuk validasi instan',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
-                  color: Color(0xFF64748B),
-                ),
-              ),
-            ],
+          // 1. Live Camera Preview with Pinch-to-Zoom
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onScaleStart: (_) {
+              _zoomAtGestureStart = _zoomScale;
+            },
+            onScaleUpdate: (details) {
+              final newZoom = (_zoomAtGestureStart + (details.scale - 1.0) * 0.5)
+                  .clamp(0.0, 1.0);
+              setState(() => _zoomScale = newZoom);
+              _controller.setZoomScale(newZoom);
+            },
+            child: MobileScanner(
+              controller: _controller,
+              onDetect: _onDetect,
+            ),
           ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF0FDF4),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: const Color(0xFFBBF7D0)),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 7,
-                  height: 7,
-                  decoration: const BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: Color(0xFF16A34A),
-                  ),
-                ),
-                const SizedBox(width: 6),
-                const Text(
-                  'Kamera Siap',
-                  style: TextStyle(
-                    color: Color(0xFF15803D),
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ],
-            ),
+
+          // 2. High-Tech Industrial Reticle & Viewfinder Cutout
+          _buildReticleOverlay(),
+
+          // 3. Top Floating Enterprise Header & Controls
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: _buildTopHeader(),
+          ),
+
+          // 4. Bottom Category Selector & Context Info
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 110, // Memberikan ruang di atas BottomNav
+            child: _buildBottomControls(),
           ),
         ],
       ),
     );
   }
 
-  /// Kartu Quick Scanner Viewfinder Interaktif
-  Widget _buildQuickScannerCard(BuildContext context) {
-    return _AnimatedPressable(
-      onTap: () => _openScanner(context, 'General Scan'),
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(22),
-        decoration: BoxDecoration(
-          color: const Color(0xFF0F172A),
-          borderRadius: BorderRadius.circular(22),
-          boxShadow: const [
-            BoxShadow(
-              color: Color(0x1F0F172A),
-              blurRadius: 18,
-              offset: Offset(0, 8),
-            ),
-          ],
+  /// Tampilan ketika izin kamera belum diberikan
+  Widget _buildPermissionView() {
+    return Scaffold(
+      backgroundColor: const Color(0xFF0F172A),
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 28),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 80,
+                height: 80,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.08),
+                  shape: BoxShape.circle,
+                  border: Border.all(color: const Color(0xFF38BDF8), width: 1.5),
+                ),
+                child: const Icon(
+                  Icons.camera_alt_outlined,
+                  color: Color(0xFF38BDF8),
+                  size: 40,
+                ),
+              ),
+              const SizedBox(height: 24),
+              const Text(
+                'Izin Kamera Diperlukan',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -0.3,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                'Aplikasi membutuhkan izin kamera untuk memindai barcode Mine Permit, presensi kegiatan briefing, dan validasi unit sarana operasional di lapangan.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.75),
+                  fontSize: 13,
+                  height: 1.5,
+                ),
+              ),
+              const SizedBox(height: 28),
+              FilledButton.icon(
+                style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xFF2563EB),
+                  padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
+                onPressed: _requestPermission,
+                icon: const Icon(Icons.lock_open_rounded, size: 18),
+                label: const Text(
+                  'Aktifkan Akses Kamera',
+                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+                ),
+              ),
+            ],
+          ),
         ),
-        child: Column(
+      ),
+    );
+  }
+
+  /// Reticle Viewfinder & Animasi Laser Scanning
+  Widget _buildReticleOverlay() {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final boxSize = math.min(constraints.maxWidth * 0.76, 280.0);
+        return Stack(
+          alignment: Alignment.center,
           children: [
-            // Center Viewfinder Graphic
+            // Darkened vignette background with center transparent hole
             Container(
-              width: 86,
-              height: 86,
+              color: Colors.black.withValues(alpha: 0.45),
+            ),
+            Container(
+              width: boxSize,
+              height: boxSize,
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.06),
-                borderRadius: BorderRadius.circular(20),
+                color: Colors.transparent,
+                borderRadius: BorderRadius.circular(24),
                 border: Border.all(
-                  color: const Color(0xFF38BDF8).withValues(alpha: 0.5),
+                  color: Colors.white.withValues(alpha: 0.25),
                   width: 1.5,
                 ),
               ),
-              child: const Center(
-                child: Icon(
-                  Icons.qr_code_scanner_rounded,
-                  color: Color(0xFF38BDF8),
-                  size: 44,
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              'Ketuk untuk Membuka Pemindai',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 16,
-                fontWeight: FontWeight.w700,
-                letterSpacing: -0.2,
-              ),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              'Mendukung QR Code, Code 128, EAN, dan DataMatrix',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.65),
-                fontSize: 12,
-              ),
-            ),
-            const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-              decoration: BoxDecoration(
-                color: const Color(0xFF2563EB),
-                borderRadius: BorderRadius.circular(14),
-                boxShadow: const [
-                  BoxShadow(
-                    color: Color(0x3D2563EB),
-                    blurRadius: 10,
-                    offset: Offset(0, 4),
+              child: Stack(
+                children: [
+                  // 4 Corner Brackets
+                  Positioned(top: 0, left: 0, child: _buildCornerBracket(top: true, left: true)),
+                  Positioned(top: 0, right: 0, child: _buildCornerBracket(top: true, left: false)),
+                  Positioned(bottom: 0, left: 0, child: _buildCornerBracket(top: false, left: true)),
+                  Positioned(bottom: 0, right: 0, child: _buildCornerBracket(top: false, left: false)),
+
+                  // Animated Scanning Laser Bar
+                  AnimatedBuilder(
+                    animation: _scanAnimCtrl,
+                    builder: (context, child) {
+                      return Positioned(
+                        top: _scanAnimCtrl.value * (boxSize - 4),
+                        left: 12,
+                        right: 12,
+                        child: Container(
+                          height: 2.5,
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              colors: [
+                                Colors.transparent,
+                                Color(0xFF38BDF8),
+                                Color(0xFF60A5FA),
+                                Colors.transparent,
+                              ],
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: const Color(0xFF38BDF8).withValues(alpha: 0.8),
+                                blurRadius: 8,
+                                spreadRadius: 1,
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
                   ),
                 ],
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildCornerBracket({required bool top, required bool left}) {
+    const size = 26.0;
+    const thickness = 3.5;
+    const color = Color(0xFF38BDF8);
+
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        border: Border(
+          top: top ? const BorderSide(color: color, width: thickness) : BorderSide.none,
+          bottom: !top ? const BorderSide(color: color, width: thickness) : BorderSide.none,
+          left: left ? const BorderSide(color: color, width: thickness) : BorderSide.none,
+          right: !left ? const BorderSide(color: color, width: thickness) : BorderSide.none,
+        ),
+        borderRadius: BorderRadius.only(
+          topLeft: top && left ? const Radius.circular(16) : Radius.zero,
+          topRight: top && !left ? const Radius.circular(16) : Radius.zero,
+          bottomLeft: !top && left ? const Radius.circular(16) : Radius.zero,
+          bottomRight: !top && !left ? const Radius.circular(16) : Radius.zero,
+        ),
+      ),
+    );
+  }
+
+  /// Top Bar: Title & Quick Torch / Switch Controls
+  Widget _buildTopHeader() {
+    return SafeArea(
+      bottom: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(18, 10, 18, 0),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            // Corporate Title Pill
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+              decoration: BoxDecoration(
+                color: Colors.black.withValues(alpha: 0.6),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
               ),
               child: const Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.camera_alt_rounded, color: Colors.white, size: 16),
+                  Icon(Icons.qr_code_scanner_rounded, color: Color(0xFF38BDF8), size: 16),
                   SizedBox(width: 8),
                   Text(
-                    'Aktifkan Kamera',
+                    'SafeScan Enterprise',
                     style: TextStyle(
                       color: Colors.white,
                       fontSize: 13,
                       fontWeight: FontWeight.w700,
+                      letterSpacing: 0.2,
                     ),
                   ),
                 ],
               ),
             ),
-          ],
-        ),
-      ),
-    );
-  }
 
-  /// Kartu Modul Pemindaian (Identik dengan tema SAP & OHS)
-  Widget _buildServiceCard(BuildContext context, _ScanServiceItem item) {
-    return _AnimatedPressable(
-      onTap: () => _openScanner(context, item.scanType),
-      child: Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: const Color(0xFFE2E8F0), width: 1.1),
-          boxShadow: const [
-            BoxShadow(
-              color: Color(0x06000000),
-              blurRadius: 10,
-              offset: Offset(0, 3),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
+            // Controls: Torch & Camera Switch
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: item.bgColor,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  padding: const EdgeInsets.all(8),
-                  child: Icon(
-                    item.icon,
-                    color: item.accentColor,
-                    size: 24,
-                  ),
-                ),
-                Icon(
-                  Icons.arrow_forward_ios_rounded,
-                  size: 13,
-                  color: Colors.grey.shade400,
-                ),
-              ],
-            ),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(
-                  item.title,
-                  style: const TextStyle(
-                    fontSize: 14.5,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFF0F172A),
-                    letterSpacing: -0.2,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                _buildCircleButton(
+                  icon: Icons.flash_on_rounded,
+                  tooltip: 'Flash',
+                  onTap: () {
+                    HapticFeedback.lightImpact();
+                    _controller.toggleTorch();
+                  },
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  item.subtitle,
-                  style: TextStyle(
-                    fontSize: 11.5,
-                    fontWeight: FontWeight.w500,
-                    color: Colors.blueGrey.shade600,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                const SizedBox(width: 10),
+                _buildCircleButton(
+                  icon: Icons.cameraswitch_rounded,
+                  tooltip: 'Ganti Kamera',
+                  onTap: () {
+                    HapticFeedback.lightImpact();
+                    _controller.switchCamera();
+                  },
                 ),
               ],
             ),
@@ -349,59 +421,103 @@ class ScanPage extends StatelessWidget {
     );
   }
 
-  Future<void> _openScanner(BuildContext context, String scanType) async {
-    var permission = await Permission.camera.status;
-    if (!permission.isGranted) {
-      permission = await Permission.camera.request();
-    }
-
-    if (!permission.isGranted) {
-      if (!context.mounted) return;
-      await showDialog<void>(
-        context: context,
-        builder: (dialogContext) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-          icon: const Icon(Icons.camera_alt_outlined,
-              color: Color(0xFF1E3A8A), size: 36),
-          title: const Text('Izin Kamera Diperlukan',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17)),
-          content: const Text(
-            'Izinkan akses kamera agar aplikasi dapat memindai barcode atau QR code.',
-            textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 13, height: 1.4),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: const Text('Nanti'),
-            ),
-            if (permission.isPermanentlyDenied || permission.isRestricted)
-              FilledButton(
-                style: FilledButton.styleFrom(
-                  backgroundColor: const Color(0xFF1E3A8A),
-                ),
-                onPressed: () async {
-                  Navigator.pop(dialogContext);
-                  await openAppSettings();
-                },
-                child: const Text('Buka Pengaturan'),
-              ),
-          ],
-        ),
-      );
-      return;
-    }
-
-    if (!context.mounted) return;
-    final result = await Navigator.push<_ScanResult>(
-      context,
-      MaterialPageRoute(
-        fullscreenDialog: true,
-        builder: (_) => _BarcodeScannerPage(scanType: scanType),
+  Widget _buildCircleButton({
+    required IconData icon,
+    required String tooltip,
+    required VoidCallback onTap,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.6),
+        shape: BoxShape.circle,
+        border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
+      ),
+      child: IconButton(
+        icon: Icon(icon, color: Colors.white, size: 20),
+        tooltip: tooltip,
+        onPressed: onTap,
+        visualDensity: VisualDensity.compact,
       ),
     );
-    if (result == null || !context.mounted) return;
-    await _showScanResult(context, scanType, result);
+  }
+
+  /// Bottom Category Chips & Operational Instruction
+  Widget _buildBottomControls() {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // Horizontal Operational Category Filter
+        SizedBox(
+          height: 38,
+          child: ListView.separated(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            scrollDirection: Axis.horizontal,
+            itemCount: _categories.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 8),
+            itemBuilder: (context, index) {
+              final cat = _categories[index];
+              final isSelected = cat == _selectedCategory;
+
+              return ChoiceChip(
+                label: Text(cat),
+                selected: isSelected,
+                showCheckmark: false,
+                onSelected: (_) {
+                  HapticFeedback.selectionClick();
+                  setState(() => _selectedCategory = cat);
+                },
+                backgroundColor: Colors.black.withValues(alpha: 0.5),
+                selectedColor: const Color(0xFF2563EB),
+                labelStyle: TextStyle(
+                  color: isSelected ? Colors.white : Colors.white.withValues(alpha: 0.8),
+                  fontSize: 12,
+                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                ),
+                side: BorderSide(
+                  color: isSelected ? const Color(0xFF60A5FA) : Colors.white.withValues(alpha: 0.15),
+                ),
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+              );
+            },
+          ),
+        ),
+
+        const SizedBox(height: 12),
+
+        // Contextual Mining Field Instruction
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 32),
+          child: Text(
+            _getCategoryInstruction(),
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.85),
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+              height: 1.35,
+              shadows: const [
+                Shadow(color: Colors.black, blurRadius: 6),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  String _getCategoryInstruction() {
+    switch (_selectedCategory) {
+      case 'Mine Permit':
+        return 'Arahkan kamera ke QR Code Mine Permit untuk validasi izin & status K3 karyawan.';
+      case 'Absen Acara':
+        return 'Pindai barcode/QR presensi briefing 5M, toolbox meeting, atau pelatihan.';
+      case 'P2H Sarana':
+        return 'Pindai stiker barcode unit armada atau LV untuk validasi kelaikan operasional.';
+      case 'Tagging Lokasi':
+        return 'Pindai plat QR titik pantau keselamatan di area kerja tambang.';
+      default:
+        return 'Arahkan kamera ke barcode atau QR code untuk pemindaian instan.';
+    }
   }
 
   Future<void> _showScanResult(
@@ -451,8 +567,10 @@ class ScanPage extends StatelessWidget {
                     const SizedBox(height: 24),
                     const CircularProgressIndicator(color: Color(0xFF1E3A8A)),
                     const SizedBox(height: 16),
-                    const Text('Memverifikasi ke server...',
-                        style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                    const Text(
+                      'Memverifikasi ke server...',
+                      style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                    ),
                     const SizedBox(height: 16),
                   ] else ...[
                     Container(
@@ -630,243 +748,6 @@ class ScanPage extends StatelessWidget {
           },
         ),
       ),
-    );
-  }
-}
-
-class _ScanServiceItem {
-  final String title;
-  final String subtitle;
-  final IconData icon;
-  final Color accentColor;
-  final Color bgColor;
-  final String scanType;
-
-  const _ScanServiceItem({
-    required this.title,
-    required this.subtitle,
-    required this.icon,
-    required this.accentColor,
-    required this.bgColor,
-    required this.scanType,
-  });
-}
-
-/// Widget Interaktif: Animasi Bouncing Scale saat disentuh + Haptic Feedback
-class _AnimatedPressable extends StatefulWidget {
-  final Widget child;
-  final VoidCallback onTap;
-
-  const _AnimatedPressable({
-    required this.child,
-    required this.onTap,
-  });
-
-  @override
-  State<_AnimatedPressable> createState() => _AnimatedPressableState();
-}
-
-class _AnimatedPressableState extends State<_AnimatedPressable> {
-  bool _isPressed = false;
-
-  void _onTapDown(TapDownDetails _) {
-    setState(() => _isPressed = true);
-    try {
-      HapticFeedback.lightImpact();
-    } catch (_) {}
-  }
-
-  void _onTapUp(TapUpDetails _) {
-    setState(() => _isPressed = false);
-    widget.onTap();
-  }
-
-  void _onTapCancel() {
-    setState(() => _isPressed = false);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTapDown: _onTapDown,
-      onTapUp: _onTapUp,
-      onTapCancel: _onTapCancel,
-      behavior: HitTestBehavior.opaque,
-      child: AnimatedScale(
-        scale: _isPressed ? 0.96 : 1.0,
-        duration: const Duration(milliseconds: 120),
-        curve: Curves.easeOutQuad,
-        child: widget.child,
-      ),
-    );
-  }
-}
-
-class _BarcodeScannerPage extends StatefulWidget {
-  const _BarcodeScannerPage({required this.scanType});
-
-  final String scanType;
-
-  @override
-  State<_BarcodeScannerPage> createState() => _BarcodeScannerPageState();
-}
-
-class _BarcodeScannerPageState extends State<_BarcodeScannerPage> {
-  late final MobileScannerController _controller;
-  bool _returningResult = false;
-  double _zoomAtGestureStart = 0;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = MobileScannerController(
-      detectionSpeed: DetectionSpeed.noDuplicates,
-      facing: CameraFacing.back,
-      torchEnabled: false,
-      formats: const [
-        BarcodeFormat.qrCode,
-        BarcodeFormat.code128,
-        BarcodeFormat.code39,
-        BarcodeFormat.code93,
-        BarcodeFormat.ean13,
-        BarcodeFormat.ean8,
-        BarcodeFormat.upcA,
-        BarcodeFormat.upcE,
-        BarcodeFormat.dataMatrix,
-        BarcodeFormat.pdf417,
-        BarcodeFormat.aztec,
-        BarcodeFormat.codabar,
-        BarcodeFormat.itf14,
-      ],
-    );
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  Future<void> _onDetect(BarcodeCapture capture) async {
-    if (_returningResult) return;
-    for (final barcode in capture.barcodes) {
-      final value = barcode.rawValue?.trim();
-      if (value == null || value.isEmpty) continue;
-      _returningResult = true;
-      await _controller.stop();
-      if (!mounted) return;
-      Navigator.pop(
-        context,
-        _ScanResult(value: value, format: barcode.format.name.toUpperCase()),
-      );
-      return;
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.black,
-      body: Stack(
-        fit: StackFit.expand,
-        children: [
-          GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onScaleStart: (_) {
-              _zoomAtGestureStart = _controller.value.zoomScale;
-            },
-            onScaleUpdate: (details) {
-              final zoom = (_zoomAtGestureStart + (details.scale - 1) * .5)
-                  .clamp(0.0, 1.0);
-              _controller.setZoomScale(zoom);
-            },
-            child: MobileScanner(controller: _controller, onDetect: _onDetect),
-          ),
-          SafeArea(
-            child: Column(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 10),
-                  child: Row(
-                    children: [
-                      _ScannerButton(
-                        icon: Icons.close_rounded,
-                        tooltip: 'Tutup',
-                        onPressed: () => Navigator.pop(context),
-                      ),
-                      Expanded(
-                        child: Text(
-                          'Scan ${widget.scanType}',
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 17,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                      ),
-                      _ScannerButton(
-                        icon: Icons.flash_on_rounded,
-                        tooltip: 'Lampu flash',
-                        onPressed: _controller.toggleTorch,
-                      ),
-                    ],
-                  ),
-                ),
-                const Spacer(),
-                const Padding(
-                  padding: EdgeInsets.fromLTRB(28, 0, 28, 42),
-                  child: Text(
-                    'Arahkan kamera ke barcode atau QR code. Cubit layar untuk memperbesar atau memperkecil.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 13,
-                      height: 1.4,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-      floatingActionButton: SafeArea(
-        child: FloatingActionButton.small(
-          heroTag: 'switch-scanner-camera',
-          backgroundColor: Colors.white,
-          foregroundColor: const Color(0xFF101828),
-          onPressed: _controller.switchCamera,
-          tooltip: 'Ganti kamera',
-          child: const Icon(Icons.cameraswitch_rounded),
-        ),
-      ),
-    );
-  }
-}
-
-class _ScannerButton extends StatelessWidget {
-  const _ScannerButton({
-    required this.icon,
-    required this.tooltip,
-    required this.onPressed,
-  });
-
-  final IconData icon;
-  final String tooltip;
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    return IconButton.filled(
-      style: IconButton.styleFrom(
-        backgroundColor: Colors.black.withValues(alpha: .42),
-        foregroundColor: Colors.white,
-      ),
-      onPressed: onPressed,
-      tooltip: tooltip,
-      icon: Icon(icon),
     );
   }
 }
