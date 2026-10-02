@@ -117,6 +117,7 @@ namespace Indexsafe.Api.Data
             {
                 entity.ToTable("tbl_t_incident_news");
                 entity.Property(e => e.IsBanner).HasColumnName("is_banner");
+                entity.Property(e => e.IsUpdate).HasColumnName("is_update");
                 entity.Property(e => e.BannerUrutan).HasColumnName("banner_urutan");
                 entity.Property(e => e.Tags).HasColumnName("tags");
             });
