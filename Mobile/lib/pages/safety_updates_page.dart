@@ -25,69 +25,6 @@ class _SafetyUpdatesPageState extends State<SafetyUpdatesPage>
   bool _isLoadingIncidents = false;
   List<IncidentNewsModel> _rawIncidents = [];
 
-  final List<_SafetyUpdate> _staticUpdates = const [
-    _SafetyUpdate(
-      category: 'Safety Alert',
-      label: 'URGENT',
-      title: 'Perubahan Jalur Hauling KM 18 – KM 22',
-      summary:
-          'Mulai berlaku 1 Oktober 2026. Seluruh operator wajib mengikuti jalur terbaru untuk meningkatkan keselamatan di area kerja.',
-      date: '30 Sep 2026',
-      time: '10:30',
-      views: '1.2K',
-      image: 'assets/images/header-home.png',
-      color: Color(0xFFEF4444),
-      icon: Icons.warning_amber_rounded,
-      location: 'Hauling Road KM 18',
-      reporter: 'Traffic Management HSE',
-    ),
-    _SafetyUpdate(
-      category: 'Announcement',
-      label: 'IMPORTANT',
-      title: 'Inspeksi Gabungan Area Workshop',
-      summary:
-          'Inspeksi gabungan akan dilaksanakan pada 3–5 Oktober 2026. Pastikan area kerja dalam kondisi siap dan aman.',
-      date: '29 Sep 2026',
-      time: '16:20',
-      views: '856',
-      image: 'assets/images/info2.jpg',
-      color: Color(0xFF2563EB),
-      icon: Icons.campaign_rounded,
-      location: 'Central Workshop',
-      reporter: 'Divisi K3 & Operasional',
-    ),
-    _SafetyUpdate(
-      category: 'MBS Update',
-      label: 'INFO',
-      title: 'SAP League September 2026 Result',
-      summary:
-          'Berikut hasil SAP League bulan September 2026. Terus tingkatkan komitmen dan kualitas pelaporan keselamatan.',
-      date: '28 Sep 2026',
-      time: '09:15',
-      views: '642',
-      image: 'assets/images/logo-mbs.png',
-      color: Color(0xFF16A34A),
-      icon: Icons.verified_rounded,
-      location: 'Seluruh Departemen',
-      reporter: 'Safety Analytics Team',
-    ),
-    _SafetyUpdate(
-      category: 'Safety Campaign',
-      label: 'INFO',
-      title: 'World First Aid Day 2026',
-      summary:
-          'Mari tingkatkan kesadaran pertolongan pertama di tempat kerja. Cek jadwal kegiatan dan materi kampanye.',
-      date: '27 Sep 2026',
-      time: '14:45',
-      views: '509',
-      image: 'assets/images/quick-hazard.png',
-      color: Color(0xFF7C3AED),
-      icon: Icons.health_and_safety_rounded,
-      location: 'Medical Center',
-      reporter: 'Health & Paramedic Team',
-    ),
-  ];
-
   @override
   void initState() {
     super.initState();
@@ -96,7 +33,7 @@ class _SafetyUpdatesPageState extends State<SafetyUpdatesPage>
 
   Future<void> _fetchIncidents() async {
     setState(() => _isLoadingIncidents = true);
-    final res = await _api.getIncidents(limit: 20);
+    final res = await _api.getIncidents(limit: 30);
     res.fold(
       (err) {
         if (mounted) setState(() => _isLoadingIncidents = false);
@@ -107,7 +44,6 @@ class _SafetyUpdatesPageState extends State<SafetyUpdatesPage>
           if (incidents.isNotEmpty) {
             final latest = incidents.first;
             if (lastSeen > 0 && latest.id > lastSeen) {
-              // HP BERGETAR KETIKA ADA SAFETY UPDATE TERBARU!
               try {
                 for (int i = 0; i < 3; i++) {
                   await HapticFeedback.heavyImpact();
@@ -126,7 +62,7 @@ class _SafetyUpdatesPageState extends State<SafetyUpdatesPage>
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
-                            'Safety Update Terbaru Masuk: ${latest.judul}',
+                            'Safety Update Terbaru: ${latest.judul}',
                             style: const TextStyle(fontWeight: FontWeight.w700),
                           ),
                         ),
@@ -151,7 +87,6 @@ class _SafetyUpdatesPageState extends State<SafetyUpdatesPage>
       },
     );
   }
-
 
   List<_SafetyUpdate> get _incidentUpdates {
     return _rawIncidents.map((inc) {
@@ -189,6 +124,7 @@ class _SafetyUpdatesPageState extends State<SafetyUpdatesPage>
       return _SafetyUpdate(
         id: inc.id,
         category: 'Insiden',
+        rawCategory: inc.kategori,
         label: inc.kategori.toUpperCase(),
         title: inc.judul,
         summary: inc.konten,
@@ -207,23 +143,83 @@ class _SafetyUpdatesPageState extends State<SafetyUpdatesPage>
   }
 
   List<_SafetyUpdate> get _visibleUpdates {
-    if (_category == 'Insiden') {
+    if (_category == 'Semua') {
       return _incidentUpdates;
     }
-    if (_category == 'Semua') {
-      return [..._incidentUpdates, ..._staticUpdates];
-    }
-    return _staticUpdates.where((item) => item.category == _category).toList();
+    final target = _category.toLowerCase().trim();
+    return _incidentUpdates.where((item) {
+      final lbl = item.label.toLowerCase().trim();
+      final raw = item.rawCategory.toLowerCase().trim();
+      return lbl == target || raw == target || lbl.contains(target) || raw.contains(target);
+    }).toList();
   }
 
-  _SafetyUpdate get _currentHero {
-    if (_category == 'Insiden' && _incidentUpdates.isNotEmpty) {
-      return _incidentUpdates.first;
+  _SafetyUpdate? get _currentHero {
+    if (_visibleUpdates.isNotEmpty) {
+      return _visibleUpdates.first;
     }
     if (_incidentUpdates.isNotEmpty) {
       return _incidentUpdates.first;
     }
-    return _staticUpdates.first;
+    return null;
+  }
+
+  Widget _buildStandbyHero() {
+    return Container(
+      height: 180,
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFF0F172A), Color(0xFF1E293B)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF0F172A).withValues(alpha: 0.18),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: const Color(0xFF16A34A).withValues(alpha: 0.2),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: const Color(0xFF16A34A).withValues(alpha: 0.4)),
+            ),
+            child: const Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.shield_rounded, color: Color(0xFF22C55E), size: 14),
+                SizedBox(width: 5),
+                Text(
+                  'SAFETY FLASH • LIVE MONITORING',
+                  style: TextStyle(color: Color(0xFF22C55E), fontSize: 10.5, fontWeight: FontWeight.w800),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          const Text(
+            'Laporan & Pemantauan Insiden',
+            style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900),
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            'Seluruh data terintegrasi real-time dengan database SAP & HSE pusat.',
+            style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -231,11 +227,12 @@ class _SafetyUpdatesPageState extends State<SafetyUpdatesPage>
     super.build(context);
     final categories = <String>[
       'Semua',
-      'Insiden', // Tab Insiden terhubung langsung ke /Incident/Index
-      'Safety Alert',
-      'Announcement',
-      'MBS Update',
-      'Safety Campaign',
+      'Near Miss',
+      'Property Damage',
+      'First Aid Injury',
+      'Kebakaran',
+      'Medical Treatment Injury',
+      'Fatality',
     ];
 
     final heroItem = _currentHero;
@@ -261,18 +258,21 @@ class _SafetyUpdatesPageState extends State<SafetyUpdatesPage>
 
                         const SizedBox(height: 14),
 
-                        // ==================== HERO BANNER (TERHUBUNG KE /Incident/Index) ====================
-                        _HeroUpdate(
-                          update: heroItem,
-                          isIncidentTab: _category == 'Insiden' || heroItem.isFromIncidentServer,
-                          onTap: () => _showUpdate(heroItem),
-                        ),
+                        // ==================== HERO BANNER ====================
+                        if (heroItem != null)
+                          _HeroUpdate(
+                            update: heroItem,
+                            isIncidentTab: true,
+                            onTap: () => _showUpdate(heroItem),
+                          )
+                        else
+                          _buildStandbyHero(),
                       ],
                     ),
                   ),
                 ),
 
-              // Categories Horizontal List (dengan Tab Insiden)
+              // Categories Horizontal List (Incident Categories)
               SliverToBoxAdapter(
                 child: SizedBox(
                   height: 48,
@@ -284,32 +284,27 @@ class _SafetyUpdatesPageState extends State<SafetyUpdatesPage>
                     itemBuilder: (context, index) {
                       final category = categories[index];
                       final selected = category == _category;
-                      final isIncident = category == 'Insiden';
 
                       return ChoiceChip(
-                        avatar: isIncident
-                            ? Icon(
-                                Icons.warning_rounded,
-                                size: 15,
+                        avatar: category == 'Semua'
+                            ? null
+                            : Icon(
+                                Icons.warning_amber_rounded,
+                                size: 14,
                                 color: selected ? Colors.white : const Color(0xFFEF4444),
-                              )
-                            : null,
+                              ),
                         label: Text(category),
                         selected: selected,
                         showCheckmark: false,
                         side: BorderSide(
-                          color: selected
-                              ? (isIncident ? const Color(0xFFDC2626) : _blue)
-                              : (isIncident ? const Color(0xFFFECACA) : const Color(0xFFE4EAF2)),
-                          width: isIncident ? 1.4 : 1,
+                          color: selected ? _blue : const Color(0xFFE4EAF2),
+                          width: selected ? 1.4 : 1,
                         ),
-                        backgroundColor: isIncident ? const Color(0xFFFEF2F2) : Colors.white,
-                        selectedColor: isIncident ? const Color(0xFFDC2626) : _blue,
+                        backgroundColor: Colors.white,
+                        selectedColor: _blue,
                         labelStyle: TextStyle(
-                          color: selected
-                              ? Colors.white
-                              : (isIncident ? const Color(0xFFB91C1C) : const Color(0xFF475467)),
-                          fontSize: 11,
+                          color: selected ? Colors.white : const Color(0xFF475467),
+                          fontSize: 11.5,
                           fontWeight: FontWeight.w700,
                         ),
                         padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -330,9 +325,9 @@ class _SafetyUpdatesPageState extends State<SafetyUpdatesPage>
                   child: Row(
                     children: [
                       Text(
-                        _category == 'Insiden'
-                            ? 'Laporan Insiden'
-                            : 'Update Terbaru',
+                        _category == 'Semua'
+                            ? 'Laporan Insiden Terbaru'
+                            : 'Insiden: $_category',
                         style: const TextStyle(
                           color: Color(0xFF101828),
                           fontSize: 17,
@@ -843,9 +838,13 @@ class _UpdateCard extends StatelessWidget {
                               ? update.imageUrl!
                               : '${ApiService().baseUrl}${update.imageUrl}',
                           fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => Icon(update.icon, color: update.color, size: 30),
+                          errorBuilder: (_, __, ___) => Center(
+                            child: Icon(update.icon, color: update.color, size: 30),
+                          ),
                         )
-                      : Image.asset(update.image, fit: BoxFit.cover),
+                      : Center(
+                          child: Icon(update.icon, color: update.color, size: 32),
+                        ),
                 ),
               ),
               const SizedBox(width: 12),
@@ -965,6 +964,7 @@ class _SafetyUpdate {
   const _SafetyUpdate({
     this.id,
     required this.category,
+    this.rawCategory = '',
     required this.label,
     required this.title,
     required this.summary,
@@ -982,6 +982,7 @@ class _SafetyUpdate {
 
   final int? id;
   final String category;
+  final String rawCategory;
   final String label;
   final String title;
   final String summary;

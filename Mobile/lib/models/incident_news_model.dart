@@ -9,6 +9,9 @@ class IncidentNewsModel {
   final String kategori;
   final String dibuatOleh;
   final DateTime? createdAt;
+  final bool isBanner;
+  final int bannerUrutan;
+  final String? tags;
 
   IncidentNewsModel({
     required this.id,
@@ -21,6 +24,9 @@ class IncidentNewsModel {
     required this.kategori,
     required this.dibuatOleh,
     this.createdAt,
+    this.isBanner = false,
+    this.bannerUrutan = 0,
+    this.tags,
   });
 
   factory IncidentNewsModel.fromJson(Map<String, dynamic> json) {
@@ -30,6 +36,11 @@ class IncidentNewsModel {
       dt = DateTime.tryParse(tglStr);
     }
 
+    final isBannerRaw = json['is_banner'];
+    final bool isBanner = isBannerRaw is bool
+        ? isBannerRaw
+        : (isBannerRaw?.toString() == '1' || isBannerRaw?.toString().toLowerCase() == 'true');
+
     return IncidentNewsModel(
       id: (json['id'] as num?)?.toInt() ?? 0,
       judul: json['judul']?.toString() ?? '',
@@ -38,9 +49,12 @@ class IncidentNewsModel {
       lokasi: json['lokasi']?.toString() ?? 'Area Operasional',
       tanggalKejadian: dt,
       rawTanggal: tglStr,
-      kategori: json['kategori']?.toString() ?? 'Safety Alert',
+      kategori: json['kategori']?.toString() ?? 'Near Miss',
       dibuatOleh: json['dibuat_oleh']?.toString() ?? 'HSE Team',
       createdAt: dt,
+      isBanner: isBanner,
+      bannerUrutan: (json['banner_urutan'] as num?)?.toInt() ?? 0,
+      tags: json['tags']?.toString(),
     );
   }
 
@@ -55,6 +69,9 @@ class IncidentNewsModel {
       'kategori': kategori,
       'dibuat_oleh': dibuatOleh,
       'created_at': rawTanggal,
+      'is_banner': isBanner,
+      'banner_urutan': bannerUrutan,
+      'tags': tags,
     };
   }
 }

@@ -436,14 +436,82 @@ class ApiService {
     }
   }
 
-  Future<Either<Map, List<IncidentNewsModel>>> getIncidents({int limit = 20, String? category}) async {
+  Future<Either<Map, List<IncidentNewsModel>>> getIncidents({
+    int limit = 30,
+    String? category,
+    String? search,
+  }) async {
     try {
       dio.options.headers['Authorization'] = 'Bearer $getToken';
       final params = <String, dynamic>{'limit': limit};
-      if (category != null && category.isNotEmpty) {
+      if (category != null && category.isNotEmpty && category != 'Semua') {
         params['category'] = category;
       }
-      var res = await dio.get('/incidents', queryParameters: params);
+      if (search != null && search.isNotEmpty) {
+        params['search'] = search;
+      }
+
+      Response res;
+      try {
+        res = await dio.get('/incidents', queryParameters: params);
+      } on DioException catch (dioErr) {
+        if (dioErr.type == DioExceptionType.connectionTimeout ||
+            dioErr.type == DioExceptionType.connectionError ||
+            dioErr.response?.statusCode == 404) {
+          final fallbackHost = baseUrl.contains('192.168.0.6')
+              ? 'http://127.0.0.1:5200'
+              : 'http://192.168.0.6:5200';
+          final fallbackDio = Dio(BaseOptions(
+            baseUrl: '$fallbackHost/api',
+            headers: dio.options.headers,
+            connectTimeout: const Duration(seconds: 4),
+            receiveTimeout: const Duration(seconds: 6),
+          ));
+          res = await fallbackDio.get('/incidents', queryParameters: params);
+        } else {
+          rethrow;
+        }
+      }
+
+      if (res.data is Map && res.data['data'] is List) {
+        final list = (res.data['data'] as List)
+            .map((item) => IncidentNewsModel.fromJson(Map<String, dynamic>.from(item as Map)))
+            .toList();
+        return Right(list);
+      }
+      return const Right([]);
+    } on DioException catch (err) {
+      return Left(errorHandler(err));
+    }
+  }
+
+  Future<Either<Map, List<IncidentNewsModel>>> getHomeBanners({int limit = 5}) async {
+    try {
+      dio.options.headers['Authorization'] = 'Bearer $getToken';
+      final params = <String, dynamic>{'limit': limit};
+
+      Response res;
+      try {
+        res = await dio.get('/incidents/banners', queryParameters: params);
+      } on DioException catch (dioErr) {
+        if (dioErr.type == DioExceptionType.connectionTimeout ||
+            dioErr.type == DioExceptionType.connectionError ||
+            dioErr.response?.statusCode == 404) {
+          final fallbackHost = baseUrl.contains('192.168.0.6')
+              ? 'http://127.0.0.1:5200'
+              : 'http://192.168.0.6:5200';
+          final fallbackDio = Dio(BaseOptions(
+            baseUrl: '$fallbackHost/api',
+            headers: dio.options.headers,
+            connectTimeout: const Duration(seconds: 4),
+            receiveTimeout: const Duration(seconds: 6),
+          ));
+          res = await fallbackDio.get('/incidents/banners', queryParameters: params);
+        } else {
+          rethrow;
+        }
+      }
+
       if (res.data is Map && res.data['data'] is List) {
         final list = (res.data['data'] as List)
             .map((item) => IncidentNewsModel.fromJson(Map<String, dynamic>.from(item as Map)))
@@ -459,7 +527,28 @@ class ApiService {
   Future<Either<Map, IncidentNewsModel>> getLatestIncident() async {
     try {
       dio.options.headers['Authorization'] = 'Bearer $getToken';
-      var res = await dio.get('/incidents/latest');
+      Response res;
+      try {
+        res = await dio.get('/incidents/latest');
+      } on DioException catch (dioErr) {
+        if (dioErr.type == DioExceptionType.connectionTimeout ||
+            dioErr.type == DioExceptionType.connectionError ||
+            dioErr.response?.statusCode == 404) {
+          final fallbackHost = baseUrl.contains('192.168.0.6')
+              ? 'http://127.0.0.1:5200'
+              : 'http://192.168.0.6:5200';
+          final fallbackDio = Dio(BaseOptions(
+            baseUrl: '$fallbackHost/api',
+            headers: dio.options.headers,
+            connectTimeout: const Duration(seconds: 4),
+            receiveTimeout: const Duration(seconds: 6),
+          ));
+          res = await fallbackDio.get('/incidents/latest');
+        } else {
+          rethrow;
+        }
+      }
+
       if (res.data is Map && res.data['data'] is Map) {
         return Right(IncidentNewsModel.fromJson(
             Map<String, dynamic>.from(res.data['data'] as Map)));

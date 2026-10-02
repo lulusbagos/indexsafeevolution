@@ -38,6 +38,13 @@ namespace Indexsafe.Api.Models
 
         public bool IsPublished { get; set; } = true;
 
+        public bool IsBanner { get; set; } = false;
+
+        public int BannerUrutan { get; set; } = 0;
+
+        [MaxLength(250)]
+        public string? Tags { get; set; }
+
         public DateTime CreatedAt { get; set; } = DateTime.Now;
 
         public DateTime? UpdatedAt { get; set; }

@@ -113,8 +113,13 @@ namespace Indexsafe.Api.Data
             modelBuilder.Entity<MasterArea>()
                 .ToTable("tbl_m_area_utama");
 
-            modelBuilder.Entity<IncidentNews>()
-                .ToTable("tbl_t_incident_news");
+            modelBuilder.Entity<IncidentNews>(entity =>
+            {
+                entity.ToTable("tbl_t_incident_news");
+                entity.Property(e => e.IsBanner).HasColumnName("is_banner");
+                entity.Property(e => e.BannerUrutan).HasColumnName("banner_urutan");
+                entity.Property(e => e.Tags).HasColumnName("tags");
+            });
 
             modelBuilder.Entity<AttendanceEvent>()
                 .ToTable("tbl_t_attendance_event");

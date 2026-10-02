@@ -25,6 +25,8 @@ import 'menu/extra_page.dart';
 import 'menu/ohs_page.dart';
 import 'menu/sap_page.dart';
 import 'notif_page.dart';
+import 'safety_updates_page.dart';
+import '../models/incident_news_model.dart';
 import '../services/offline_sync_service.dart';
 import '../services/security_check_service.dart';
 import 'sync/pending_sync_page.dart';
@@ -583,6 +585,12 @@ class _DashboardPageState extends State<DashboardPage>
   int _homePendingOfflineCount = 0;
   Position? _currentUserPosition;
 
+  List<IncidentNewsModel> _homeBanners = [];
+  bool _isLoadingBanners = false;
+  int _currentBannerIndex = 0;
+  final PageController _bannerController = PageController();
+  Timer? _bannerTimer;
+
   void _onProfilePhotoNotifierChanged() {
     if (!mounted) return;
     _loadProfileImage();
@@ -598,6 +606,41 @@ class _DashboardPageState extends State<DashboardPage>
     } catch (_) {}
   }
 
+  Future<void> _fetchHomeBanners() async {
+    if (_isLoadingBanners) return;
+    _isLoadingBanners = true;
+    final res = await _api.getHomeBanners(limit: 5);
+    if (!mounted) return;
+    res.fold(
+      (err) {
+        if (mounted) setState(() => _isLoadingBanners = false);
+      },
+      (banners) {
+        if (mounted) {
+          setState(() {
+            _homeBanners = banners;
+            _isLoadingBanners = false;
+          });
+          _startBannerTimer();
+        }
+      },
+    );
+  }
+
+  void _startBannerTimer() {
+    _bannerTimer?.cancel();
+    if (_homeBanners.length <= 1) return;
+    _bannerTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+      if (!mounted || !_bannerController.hasClients) return;
+      final next = (_currentBannerIndex + 1) % _homeBanners.length;
+      _bannerController.animateToPage(
+        next,
+        duration: const Duration(milliseconds: 550),
+        curve: Curves.easeInOutCubic,
+      );
+    });
+  }
+
   @override
   void initState() {
     super.initState();
@@ -608,6 +651,7 @@ class _DashboardPageState extends State<DashboardPage>
     _checkSafetyUpdatesAndVibrate();
     _fetchSafeMapData();
     _checkHomePendingOffline();
+    _fetchHomeBanners();
 
     final isPowerSaver = PreferenceService.isPowerSaverEnabled();
     final isAutoNotif = PreferenceService.isAutoNotifEnabled();
@@ -706,6 +750,8 @@ class _DashboardPageState extends State<DashboardPage>
 
   @override
   void dispose() {
+    _bannerTimer?.cancel();
+    _bannerController.dispose();
     PreferenceService.profilePhotoNotifier.removeListener(_onProfilePhotoNotifierChanged);
     _safetyUpdateTimer?.cancel();
     _proximityTimer?.cancel();
@@ -2533,31 +2579,8 @@ class _DashboardPageState extends State<DashboardPage>
                 ),
               ),
 
-            // 3. Featured Banner (Safety First)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
-              child: Container(
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(18),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFF0284C7).withValues(alpha: 0.16),
-                      blurRadius: 16,
-                      offset: const Offset(0, 5),
-                    ),
-                  ],
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(18),
-                  child: Image.asset(
-                    'assets/images/header-home.png',
-                    width: double.infinity,
-                    fit: BoxFit.cover,
-                  ),
-                ),
-              ),
-            ),
+            // 3. Featured Banner (Dynamic Incident Flash & Safety First)
+            _buildHomeBannerSection(),
 
             // 3.5 Banner Antrian Data Belum Sinkron (Offline Outbox)
             if (_homePendingOfflineCount > 0)
@@ -4227,6 +4250,289 @@ class _DashboardPageState extends State<DashboardPage>
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  // Incident & Safety Banner Carousel on Home
+  Widget _buildHomeBannerSection() {
+    if (_homeBanners.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
+        child: Container(
+          width: double.infinity,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(18),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF0284C7).withValues(alpha: 0.16),
+                blurRadius: 16,
+                offset: const Offset(0, 5),
+              ),
+            ],
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(18),
+            child: Image.asset(
+              'assets/images/header-home.png',
+              width: double.infinity,
+              fit: BoxFit.cover,
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
+      child: Column(
+        children: [
+          Container(
+            height: 148,
+            width: double.infinity,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(18),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF0F172A).withValues(alpha: 0.18),
+                  blurRadius: 14,
+                  offset: const Offset(0, 5),
+                ),
+              ],
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(18),
+              child: PageView.builder(
+                controller: _bannerController,
+                itemCount: _homeBanners.length,
+                onPageChanged: (idx) {
+                  setState(() => _currentBannerIndex = idx);
+                },
+                itemBuilder: (context, index) {
+                  final banner = _homeBanners[index];
+                  return _buildBannerSlide(banner);
+                },
+              ),
+            ),
+          ),
+          if (_homeBanners.length > 1) ...[
+            const SizedBox(height: 8),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: List.generate(_homeBanners.length, (idx) {
+                final isCurrent = idx == _currentBannerIndex;
+                return AnimatedContainer(
+                  duration: const Duration(milliseconds: 300),
+                  margin: const EdgeInsets.symmetric(horizontal: 3),
+                  width: isCurrent ? 20 : 6,
+                  height: 5,
+                  decoration: BoxDecoration(
+                    color: isCurrent ? const Color(0xFF155EEF) : const Color(0xFFCBD5E1),
+                    borderRadius: BorderRadius.circular(99),
+                  ),
+                );
+              }),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBannerSlide(IncidentNewsModel banner) {
+    Color catColor = const Color(0xFFEF4444);
+    final cat = banner.kategori.toLowerCase();
+    if (cat.contains('near miss')) {
+      catColor = const Color(0xFFD97706);
+    } else if (cat.contains('property')) {
+      catColor = const Color(0xFFEA580C);
+    } else if (cat.contains('first aid')) {
+      catColor = const Color(0xFF0D9488);
+    } else if (cat.contains('fire') || cat.contains('kebakaran')) {
+      catColor = const Color(0xFFDC2626);
+    }
+
+    final hasImage = banner.gambarUrl != null && banner.gambarUrl!.isNotEmpty;
+    final imgUrl = hasImage
+        ? (banner.gambarUrl!.startsWith('http')
+            ? banner.gambarUrl!
+            : '${_api.baseUrl}${banner.gambarUrl}')
+        : null;
+
+    return Material(
+      color: const Color(0xFF0F172A),
+      child: InkWell(
+        onTap: () {
+          HapticFeedback.selectionClick();
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const SafetyUpdatesPage()),
+          );
+        },
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            // Background image / gradient
+            if (imgUrl != null)
+              Image.network(
+                imgUrl,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => _buildBannerFallbackBg(catColor),
+              )
+            else
+              _buildBannerFallbackBg(catColor),
+
+            // Vignette gradient
+            DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.black.withValues(alpha: 0.15),
+                    Colors.black.withValues(alpha: 0.88),
+                  ],
+                  stops: const [0.2, 1.0],
+                ),
+              ),
+            ),
+
+            // Content
+            Padding(
+              padding: const EdgeInsets.all(14),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
+                        decoration: BoxDecoration(
+                          color: catColor,
+                          borderRadius: BorderRadius.circular(6),
+                          boxShadow: [
+                            BoxShadow(
+                              color: catColor.withValues(alpha: 0.4),
+                              blurRadius: 6,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.warning_amber_rounded, size: 12, color: Colors.white),
+                            const SizedBox(width: 4),
+                            Text(
+                              banner.kategori.toUpperCase(),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 9.5,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 0.4,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Spacer(),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.18),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.arrow_forward_rounded, size: 11, color: Colors.white),
+                            SizedBox(width: 3),
+                            Text(
+                              'Lihat Detail',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 9.5,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        banner.judul,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 14.5,
+                          fontWeight: FontWeight.w900,
+                          height: 1.2,
+                          letterSpacing: -0.2,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          const Icon(Icons.location_on_rounded, size: 11, color: Color(0xFFEF4444)),
+                          const SizedBox(width: 3),
+                          Expanded(
+                            child: Text(
+                              banner.lokasi,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: Color(0xFFCBD5E1),
+                                fontSize: 10,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                          if (banner.rawTanggal != null && banner.rawTanggal!.isNotEmpty) ...[
+                            const SizedBox(width: 6),
+                            const Text('•', style: TextStyle(color: Colors.white38, fontSize: 10)),
+                            const SizedBox(width: 6),
+                            Text(
+                              banner.rawTanggal!.split(' ').first,
+                              style: const TextStyle(
+                                color: Color(0xFF94A3B8),
+                                fontSize: 9.5,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBannerFallbackBg(Color accent) {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            accent.withValues(alpha: 0.8),
+            const Color(0xFF0F172A),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+      ),
+      child: Center(
+        child: Icon(Icons.shield_outlined, size: 60, color: Colors.white.withValues(alpha: 0.1)),
       ),
     );
   }
