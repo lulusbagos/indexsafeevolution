@@ -640,6 +640,8 @@ namespace Indexsafe.Api.Controllers
                     profile.HasPermit = permitData.HasPermit;
                     profile.PermitNomor = permitData.PermitNomor;
                     profile.PermitStatus = permitData.PermitStatus;
+                    profile.IsPermitPrinted = permitData.IsPermitPrinted;
+                    profile.RawPermitStatus = permitData.RawPermitStatus;
                     profile.PermitLastExpired = permitData.LastExpired;
                     profile.PermitBerakhirKerja = permitData.BerakhirKerja;
                     profile.IsPermitActive = permitData.IsPermitActive;
@@ -647,6 +649,8 @@ namespace Indexsafe.Api.Controllers
                     profile.HasSimper = permitData.HasSimper;
                     profile.SimperNomor = permitData.SimperNomor;
                     profile.SimperStatus = permitData.SimperStatus;
+                    profile.IsSimperPrinted = permitData.IsSimperPrinted;
+                    profile.RawSimperStatus = permitData.RawSimperStatus;
                     profile.JenisSimper = permitData.JenisSimper;
                     profile.SimperExpiredDate = permitData.SimperExpiredDate;
                     profile.SimperMasaBerlaku = permitData.MasaBerlaku;

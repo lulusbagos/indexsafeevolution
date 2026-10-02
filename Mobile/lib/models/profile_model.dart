@@ -94,12 +94,16 @@ class ProfileModel {
   bool? hasPermit;
   String? permitNomor;
   String? permitStatus;
+  bool? isPermitPrinted;
+  String? rawPermitStatus;
   String? permitLastExpired;
   String? permitBerakhirKerja;
   bool? isPermitActive;
   bool? hasSimper;
   String? simperNomor;
   String? simperStatus;
+  bool? isSimperPrinted;
+  String? rawSimperStatus;
   String? jenisSimper;
   String? simperExpiredDate;
   String? simperMasaBerlaku;
@@ -201,12 +205,16 @@ class ProfileModel {
     this.hasPermit,
     this.permitNomor,
     this.permitStatus,
+    this.isPermitPrinted,
+    this.rawPermitStatus,
     this.permitLastExpired,
     this.permitBerakhirKerja,
     this.isPermitActive,
     this.hasSimper,
     this.simperNomor,
     this.simperStatus,
+    this.isSimperPrinted,
+    this.rawSimperStatus,
     this.jenisSimper,
     this.simperExpiredDate,
     this.simperMasaBerlaku,
@@ -310,6 +318,8 @@ class ProfileModel {
     hasPermit = json['has_permit'] == true;
     permitNomor = json['permit_nomor'];
     permitStatus = json['permit_status'];
+    isPermitPrinted = json['is_permit_printed'] == true;
+    rawPermitStatus = json['raw_permit_status'];
     permitLastExpired = json['permit_last_expired'];
     permitBerakhirKerja = json['permit_berakhir_kerja'];
     isPermitActive = json['is_permit_active'] == true;
@@ -317,6 +327,8 @@ class ProfileModel {
     hasSimper = json['has_simper'] == true;
     simperNomor = json['simper_nomor'];
     simperStatus = json['simper_status'];
+    isSimperPrinted = json['is_simper_printed'] == true;
+    rawSimperStatus = json['raw_simper_status'];
     jenisSimper = json['jenis_simper'];
     simperExpiredDate = json['simper_expired_date'];
     simperMasaBerlaku = json['simper_masa_berlaku'];
@@ -420,12 +432,16 @@ class ProfileModel {
     data['has_permit'] = hasPermit;
     data['permit_nomor'] = permitNomor;
     data['permit_status'] = permitStatus;
+    data['is_permit_printed'] = isPermitPrinted;
+    data['raw_permit_status'] = rawPermitStatus;
     data['permit_last_expired'] = permitLastExpired;
     data['permit_berakhir_kerja'] = permitBerakhirKerja;
     data['is_permit_active'] = isPermitActive;
     data['has_simper'] = hasSimper;
     data['simper_nomor'] = simperNomor;
     data['simper_status'] = simperStatus;
+    data['is_simper_printed'] = isSimperPrinted;
+    data['raw_simper_status'] = rawSimperStatus;
     data['jenis_simper'] = jenisSimper;
     data['simper_expired_date'] = simperExpiredDate;
     data['simper_masa_berlaku'] = simperMasaBerlaku;

@@ -288,6 +288,12 @@ namespace Indexsafe.Api.DTOs
         [JsonPropertyName("permit_berakhir_kerja")]
         public string? PermitBerakhirKerja { get; set; }
 
+        [JsonPropertyName("is_permit_printed")]
+        public bool IsPermitPrinted { get; set; }
+
+        [JsonPropertyName("raw_permit_status")]
+        public string? RawPermitStatus { get; set; }
+
         [JsonPropertyName("is_permit_active")]
         public bool IsPermitActive { get; set; }
 
@@ -299,6 +305,12 @@ namespace Indexsafe.Api.DTOs
 
         [JsonPropertyName("simper_status")]
         public string? SimperStatus { get; set; }
+
+        [JsonPropertyName("is_simper_printed")]
+        public bool IsSimperPrinted { get; set; }
+
+        [JsonPropertyName("raw_simper_status")]
+        public string? RawSimperStatus { get; set; }
 
         [JsonPropertyName("jenis_simper")]
         public string? JenisSimper { get; set; }

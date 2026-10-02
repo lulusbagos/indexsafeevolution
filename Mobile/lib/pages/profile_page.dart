@@ -513,26 +513,39 @@ class _ProfilePageState extends State<ProfilePage>
     final kategori = _profile?.kategoriPengawas?.trim() ?? '';
 
     // Status chip SIMPER / Mine Permit dari Database BIMA
+    // Sesuai aturan: jika sudah print -> AKTIF / PRINTED, jika belum print -> PROSES PENGAJUAN
     String statusChipText = 'STATUS AKTIF';
     Color statusChipDotColor = const Color(0xFF4ADE80);
 
+    final isSimperPrinted = _profile?.isSimperPrinted == true ||
+        (_profile?.simperStatus != null &&
+            (_profile!.simperStatus!.toUpperCase().contains('PRINT') ||
+                _profile!.simperStatus!.toUpperCase() == 'AKTIF' ||
+                _profile!.simperStatus!.toUpperCase() == 'ACTIVE'));
+
+    final isPermitPrinted = _profile?.isPermitPrinted == true ||
+        (_profile?.permitStatus != null &&
+            (_profile!.permitStatus!.toUpperCase().contains('PRINT') ||
+                _profile!.permitStatus!.toUpperCase() == 'AKTIF' ||
+                _profile!.permitStatus!.toUpperCase() == 'ACTIVE'));
+
     if (_profile?.hasSimper == true) {
-      if (_profile?.isSimperActive == true) {
+      if (isSimperPrinted && _profile?.isSimperActive == true) {
         statusChipText = 'SIMPER AKTIF';
         statusChipDotColor = const Color(0xFF4ADE80);
-      } else if (_profile?.simperStatus == 'WAITING') {
-        statusChipText = 'SIMPER WAITING';
-        statusChipDotColor = const Color(0xFFFBBF24);
-      } else {
-        statusChipText = 'SIMPER ${_profile?.simperStatus ?? "OFF"}';
-        statusChipDotColor = const Color(0xFFF87171);
-      }
-    } else if (_profile?.hasPermit == true) {
-      if (_profile?.isPermitActive == true) {
+      } else if (isPermitPrinted && _profile?.isPermitActive == true) {
         statusChipText = 'PERMIT AKTIF';
         statusChipDotColor = const Color(0xFF4ADE80);
       } else {
-        statusChipText = 'PERMIT ${_profile?.permitStatus ?? "TERDAFTAR"}';
+        statusChipText = 'PROSES PENGAJUAN';
+        statusChipDotColor = const Color(0xFFFBBF24);
+      }
+    } else if (_profile?.hasPermit == true) {
+      if (isPermitPrinted && _profile?.isPermitActive == true) {
+        statusChipText = 'PERMIT AKTIF';
+        statusChipDotColor = const Color(0xFF4ADE80);
+      } else {
+        statusChipText = 'PROSES PENGAJUAN';
         statusChipDotColor = const Color(0xFFFBBF24);
       }
     }
@@ -1785,20 +1798,24 @@ class _ProfilePageState extends State<ProfilePage>
   // Kartu Mine Permit & SIMPER (BIMA PostgreSQL)
   Widget _buildPermitSimperCard() {
     final permitNo = _profile?.permitNomor ?? '-';
-    final permitStatus = _profile?.permitStatus ?? '-';
     final rawPermitExp = _profile?.permitLastExpired ?? _profile?.permitBerakhirKerja;
     final permitExp = _formatDateShort(rawPermitExp);
-    final isPermitActive = _profile?.isPermitActive == true;
+    final isPermitPrinted = _profile?.isPermitPrinted == true ||
+        ((_profile?.permitStatus ?? '').toUpperCase().contains('PRINT'));
+    final permitDisplayStatus = isPermitPrinted ? 'PRINTED' : 'PROSES PENGAJUAN';
+    final isPermitActive = isPermitPrinted && _profile?.isPermitActive == true;
 
     final hasSimper = _profile?.hasSimper == true;
     final simperNo = _profile?.simperNomor ?? '-';
-    final simperStatus = _profile?.simperStatus ?? '-';
     final simperJenis = _profile?.jenisSimper ?? '-';
     final rawSimperExp = _profile?.simperExpiredDate ?? _profile?.simperMasaBerlaku;
     final simperExp = _formatDateShort(rawSimperExp);
     final simperJenisSim = _profile?.simperJenisSim;
     final simperNomorSim = _profile?.simperNomorSim;
-    final isSimperActive = _profile?.isSimperActive == true;
+    final isSimperPrinted = _profile?.isSimperPrinted == true ||
+        ((_profile?.simperStatus ?? '').toUpperCase().contains('PRINT'));
+    final simperDisplayStatus = isSimperPrinted ? 'PRINTED' : 'PROSES PENGAJUAN';
+    final isSimperActive = isSimperPrinted && _profile?.isSimperActive == true;
 
     return Container(
       decoration: BoxDecoration(
@@ -1910,17 +1927,17 @@ class _ProfilePageState extends State<ProfilePage>
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2.5),
                         decoration: BoxDecoration(
-                          color: isPermitActive
+                          color: isPermitPrinted
                               ? const Color(0xFFDCFCE7)
                               : const Color(0xFFFEF3C7),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Text(
-                          permitStatus.toUpperCase(),
+                          permitDisplayStatus,
                           style: TextStyle(
                             fontSize: 9.5,
                             fontWeight: FontWeight.w800,
-                            color: isPermitActive
+                            color: isPermitPrinted
                                 ? const Color(0xFF15803D)
                                 : const Color(0xFFB45309),
                           ),
@@ -2026,19 +2043,19 @@ class _ProfilePageState extends State<ProfilePage>
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2.5),
                           decoration: BoxDecoration(
-                            color: isSimperActive
+                            color: isSimperPrinted
                                 ? const Color(0xFFDCFCE7)
-                                : (simperStatus == 'WAITING' ? const Color(0xFFFEF3C7) : const Color(0xFFFEE2E2)),
+                                : const Color(0xFFFEF3C7),
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Text(
-                            simperStatus.toUpperCase(),
+                            simperDisplayStatus,
                             style: TextStyle(
                               fontSize: 9.5,
                               fontWeight: FontWeight.w800,
-                              color: isSimperActive
+                              color: isSimperPrinted
                                   ? const Color(0xFF15803D)
-                                  : (simperStatus == 'WAITING' ? const Color(0xFFB45309) : const Color(0xFFDC2626)),
+                                  : const Color(0xFFB45309),
                             ),
                           ),
                         ),
