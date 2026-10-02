@@ -198,15 +198,14 @@ namespace Indexsafe.Api.Services
             {
                 try
                 {
-                    // 1. Ambil data TERBARU dari public.tb_permit berdasarkan NIK
-                    // Dipastikan mengambil data paling baru (ORDER BY COALESCE(updated_at, created_at, tanggal) DESC, id DESC)
+                    // 1. Ambil data TERBARU dari public.tb_permit berdasarkan NIK (ORDER BY id DESC)
                     const string sqlPermit = @"
                         SELECT id, nomor, status, pengajuan, akses_lokasi, mulai_kerja, berakhir_kerja, last_expired, tercetak, waktu_tercetak, created_at, updated_at
                         FROM public.tb_permit
                         WHERE TRIM(nik) = @nikClean 
                            OR TRIM(employee_id) = @nikClean
                            OR (@nikNoZero <> '' AND (TRIM(nik) = @nikNoZero OR TRIM(employee_id) = @nikNoZero))
-                        ORDER BY COALESCE(updated_at, created_at, tanggal) DESC, id DESC
+                        ORDER BY id DESC
                         LIMIT 1;";
 
                     long? permitId = null;
@@ -246,11 +245,30 @@ namespace Indexsafe.Api.Services
                                 permitLastExpired = ParseDateFlexible(val);
                             }
 
-                            // Logika Status: Sesuai instruksi, jika status sudah print -> PRINTED, kalau belum print -> PROSES PENGAJUAN
+                            // Logika Status: Jika tercetak > 0 atau waktu_tercetak ada atau status PRINTED -> PRINTED
                             string rawPermitStatus = reader.IsDBNull(reader.GetOrdinal("status")) ? "" : reader.GetValue(reader.GetOrdinal("status"))?.ToString()?.Trim() ?? "";
+                            bool hasTercetak = false;
+                            try
+                            {
+                                if (!reader.IsDBNull(reader.GetOrdinal("tercetak")))
+                                {
+                                    hasTercetak = Convert.ToInt32(reader.GetValue(reader.GetOrdinal("tercetak"))) > 0;
+                                }
+                            }
+                            catch { }
+                            try
+                            {
+                                if (!hasTercetak && !reader.IsDBNull(reader.GetOrdinal("waktu_tercetak")))
+                                {
+                                    hasTercetak = true;
+                                }
+                            }
+                            catch { }
+
                             bool isPermitPrinted = rawPermitStatus.Equals("PRINTED", StringComparison.OrdinalIgnoreCase)
                                                 || rawPermitStatus.Equals("PRINT", StringComparison.OrdinalIgnoreCase)
-                                                || rawPermitStatus.Contains("PRINT", StringComparison.OrdinalIgnoreCase);
+                                                || rawPermitStatus.Contains("PRINT", StringComparison.OrdinalIgnoreCase)
+                                                || hasTercetak;
 
                             result.IsPermitPrinted = isPermitPrinted;
                             result.RawPermitStatus = rawPermitStatus;
@@ -259,21 +277,26 @@ namespace Indexsafe.Api.Services
                             var maxPermitDate = permitBerakhir ?? permitLastExpired;
                             if (permitLastExpired.HasValue && permitBerakhir.HasValue)
                             {
-                                maxPermitDate = permitLastExpired.Value > permitBerakhir.Value ? permitLastExpired : permitBerakhir;
+                                maxPermitDate = permitBerakhir.Value > permitLastExpired.Value ? permitBerakhir : permitLastExpired;
+                            }
+
+                            // Pastikan BerakhirKerja membawa tanggal aktif terbaru (misal: 2027-08-18)
+                            if (maxPermitDate.HasValue)
+                            {
+                                result.BerakhirKerja = maxPermitDate.Value.ToString("yyyy-MM-dd");
                             }
 
                             result.IsPermitActive = isPermitPrinted && (maxPermitDate == null || maxPermitDate.Value.Date >= DateTime.Today);
                         }
                     }
 
-                    // 2. Ambil data TERBARU dari public.tb_simper berdasarkan permit_id atau NIK
-                    // Dipastikan mengambil data paling baru (ORDER BY COALESCE(updated_at, created_at, tanggal) DESC, id DESC)
+                    // 2. Ambil data TERBARU dari public.tb_simper berdasarkan permit_id atau NIK (ORDER BY id DESC)
                     const string sqlSimper = @"
                         SELECT id, permit_id, nomor, status, jenis_simper, jenis_sim, nomor_sim, expired_date, masa_berlaku, masa_berlaku_sio, kacamata, printed_at, printed_count, created_at, updated_at
                         FROM public.tb_simper
                         WHERE (employee_id IS NOT NULL AND (TRIM(employee_id) = @nikClean OR (@nikNoZero <> '' AND TRIM(employee_id) = @nikNoZero)))
                            OR (@permitId IS NOT NULL AND permit_id = @permitId)
-                        ORDER BY COALESCE(updated_at, created_at, tanggal) DESC, id DESC
+                        ORDER BY id DESC
                         LIMIT 1;";
 
                     await using (var cmdSimper = new NpgsqlCommand(sqlSimper, activeConn))
@@ -319,15 +342,47 @@ namespace Indexsafe.Api.Services
                                 result.MasaBerlakuSio = reader.GetValue(reader.GetOrdinal("masa_berlaku_sio"))?.ToString();
                             }
 
-                            // Logika Status SIMPER: Sesuai instruksi, jika status sudah print -> PRINTED, kalau belum print -> PROSES PENGAJUAN
+                            // Logika Status SIMPER: Jika printed_count > 0 atau printed_at ada atau status PRINTED -> PRINTED
                             string rawSimperStatus = reader.IsDBNull(reader.GetOrdinal("status")) ? "" : reader.GetValue(reader.GetOrdinal("status"))?.ToString()?.Trim() ?? "";
+                            bool hasPrinted = false;
+                            try
+                            {
+                                if (!reader.IsDBNull(reader.GetOrdinal("printed_count")))
+                                {
+                                    hasPrinted = Convert.ToInt32(reader.GetValue(reader.GetOrdinal("printed_count"))) > 0;
+                                }
+                            }
+                            catch { }
+                            try
+                            {
+                                if (!hasPrinted && !reader.IsDBNull(reader.GetOrdinal("printed_at")))
+                                {
+                                    hasPrinted = true;
+                                }
+                            }
+                            catch { }
+
                             bool isSimperPrinted = rawSimperStatus.Equals("PRINTED", StringComparison.OrdinalIgnoreCase)
                                                 || rawSimperStatus.Equals("PRINT", StringComparison.OrdinalIgnoreCase)
-                                                || rawSimperStatus.Contains("PRINT", StringComparison.OrdinalIgnoreCase);
+                                                || rawSimperStatus.Contains("PRINT", StringComparison.OrdinalIgnoreCase)
+                                                || hasPrinted;
 
                             result.IsSimperPrinted = isSimperPrinted;
                             result.RawSimperStatus = rawSimperStatus;
                             result.SimperStatus = isSimperPrinted ? "PRINTED" : "PROSES PENGAJUAN";
+
+                            // Jika permit sudah diperpanjang ke masa berlaku baru, sinkronkan expired_date SIMPER ke permit baru
+                            var maxPermitDateVal = permitBerakhir ?? permitLastExpired;
+                            if (permitLastExpired.HasValue && permitBerakhir.HasValue)
+                            {
+                                maxPermitDateVal = permitBerakhir.Value > permitLastExpired.Value ? permitBerakhir : permitLastExpired;
+                            }
+
+                            if (maxPermitDateVal.HasValue && (!simperExp.HasValue || simperExp.Value < maxPermitDateVal.Value))
+                            {
+                                simperExp = maxPermitDateVal.Value;
+                                result.SimperExpiredDate = maxPermitDateVal.Value.ToString("yyyy-MM-dd");
+                            }
 
                             var maxSimperDate = simperMasaBerlaku ?? simperExp;
                             if (simperExp.HasValue && simperMasaBerlaku.HasValue)

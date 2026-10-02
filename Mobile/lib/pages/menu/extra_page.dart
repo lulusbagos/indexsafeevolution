@@ -364,11 +364,6 @@ class _AnimatedPressableState extends State<_AnimatedPressable> {
     } catch (_) {}
   }
 
-  void _onTapUp(TapUpDetails _) {
-    setState(() => _isPressed = false);
-    widget.onTap();
-  }
-
   void _onTapCancel() {
     setState(() => _isPressed = false);
   }
@@ -377,8 +372,11 @@ class _AnimatedPressableState extends State<_AnimatedPressable> {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTapDown: _onTapDown,
-      onTapUp: _onTapUp,
       onTapCancel: _onTapCancel,
+      onTap: () {
+        setState(() => _isPressed = false);
+        widget.onTap();
+      },
       behavior: HitTestBehavior.opaque,
       child: AnimatedScale(
         scale: _isPressed ? 0.97 : 1.0,

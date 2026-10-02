@@ -653,7 +653,7 @@ class _DashboardPageState extends State<DashboardPage>
     if (!mounted) return;
 
     final primaryUrl = rawUrl.startsWith('http') ? rawUrl : '${_api.baseUrl}$rawUrl';
-    final fallbackHost = _api.baseUrl.contains('192.168.0.6') ? 'http://127.0.0.1:5200' : 'http://192.168.0.6:5200';
+    final fallbackHost = _api.baseUrl.contains('192.168.0.6') ? 'http://127.0.0.1:5200' : _api.baseUrl;
     final fallbackUrl = rawUrl.startsWith('http') ? rawUrl : '$fallbackHost$rawUrl';
 
     showDialog(

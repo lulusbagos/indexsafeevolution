@@ -1,13 +1,12 @@
 import 'package:flutter/material.dart';
 
-import '../../utils/enums.dart';
-import '../history/option_page.dart';
+import 'hazard_hub_page.dart';
 
 class HazardPage extends StatelessWidget {
   const HazardPage({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return const OptionPage(Module.hazard);
+    return const HazardHubPage();
   }
 }

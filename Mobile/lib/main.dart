@@ -30,6 +30,7 @@ class MyApp extends StatelessWidget {
         FocusScope.of(context).requestFocus(FocusNode());
       },
       child: MaterialApp(
+        debugShowCheckedModeBanner: false,
         navigatorKey: rootNavigatorKey,
         title: 'IndexSafe Evolution',
         theme: ThemeData(

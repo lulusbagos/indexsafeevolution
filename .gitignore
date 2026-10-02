@@ -54,3 +54,6 @@ Desktop.ini
 *.sln.docstates
 .vs/
 _ReSharper*/
+
+# Temporary / Scratch scripts
+*.py

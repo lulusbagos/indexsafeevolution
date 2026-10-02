@@ -9,7 +9,7 @@ import '../services/api.dart';
 import '../services/preference.dart';
 import '../utils/globals.dart' as globals;
 import 'dashboard_page.dart';
-import 'hazard/hazard_form_page.dart';
+import 'hazard/hazard_create_page.dart';
 import 'profile_page.dart';
 import 'safety_updates_page.dart';
 import 'scan_page.dart';
@@ -323,7 +323,7 @@ class _HomePageState extends State<HomePage> {
   void _openQuickHazard() {
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (context) => const HazardFormPage()),
+      MaterialPageRoute(builder: (context) => const HazardCreatePage()),
     );
   }
 }

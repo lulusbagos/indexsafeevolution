@@ -1798,7 +1798,15 @@ class _ProfilePageState extends State<ProfilePage>
   // Kartu Mine Permit & SIMPER (BIMA PostgreSQL)
   Widget _buildPermitSimperCard() {
     final permitNo = _profile?.permitNomor ?? '-';
-    final rawPermitExp = _profile?.permitLastExpired ?? _profile?.permitBerakhirKerja;
+    // Ambil tanggal masa berlaku terbaru (prioritaskan berakhir_kerja/next_expired daripada last_expired)
+    String? rawPermitExp = _profile?.permitBerakhirKerja ?? _profile?.permitLastExpired;
+    if (_profile?.permitBerakhirKerja != null && _profile?.permitLastExpired != null) {
+      final dtBerakhir = DateTime.tryParse(_profile!.permitBerakhirKerja!.replaceAll('/', '-'));
+      final dtLast = DateTime.tryParse(_profile!.permitLastExpired!.replaceAll('/', '-'));
+      if (dtBerakhir != null && dtLast != null) {
+        rawPermitExp = dtBerakhir.isAfter(dtLast) ? _profile!.permitBerakhirKerja : _profile!.permitLastExpired;
+      }
+    }
     final permitExp = _formatDateShort(rawPermitExp);
     final isPermitPrinted = _profile?.isPermitPrinted == true ||
         ((_profile?.permitStatus ?? '').toUpperCase().contains('PRINT'));
@@ -1808,7 +1816,15 @@ class _ProfilePageState extends State<ProfilePage>
     final hasSimper = _profile?.hasSimper == true;
     final simperNo = _profile?.simperNomor ?? '-';
     final simperJenis = _profile?.jenisSimper ?? '-';
-    final rawSimperExp = _profile?.simperExpiredDate ?? _profile?.simperMasaBerlaku;
+    // Ambil masa berlaku SIMPER terbaru: sinkronkan dengan perpanjangan permit aktif
+    String? rawSimperExp = _profile?.simperExpiredDate ?? _profile?.simperMasaBerlaku;
+    if (rawPermitExp != null && rawSimperExp != null) {
+      final dtSimper = DateTime.tryParse(rawSimperExp.replaceAll('/', '-'));
+      final dtPermit = DateTime.tryParse(rawPermitExp.replaceAll('/', '-'));
+      if (dtSimper != null && dtPermit != null && dtPermit.isAfter(dtSimper)) {
+        rawSimperExp = rawPermitExp;
+      }
+    }
     final simperExp = _formatDateShort(rawSimperExp);
     final simperJenisSim = _profile?.simperJenisSim;
     final simperNomorSim = _profile?.simperNomorSim;
@@ -1864,30 +1880,6 @@ class _ProfilePageState extends State<ProfilePage>
                       ),
                     ),
                   ],
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF0FDF4),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: const Color(0xFFBBF7D0)),
-                  ),
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.cloud_done_rounded, size: 11, color: Color(0xFF16A34A)),
-                      SizedBox(width: 4),
-                      Text(
-                        'DATABASE BIMA',
-                        style: TextStyle(
-                          fontSize: 9.5,
-                          fontWeight: FontWeight.w800,
-                          color: Color(0xFF16A34A),
-                          letterSpacing: 0.4,
-                        ),
-                      ),
-                    ],
-                  ),
                 ),
               ],
             ),

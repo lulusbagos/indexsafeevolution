@@ -13,7 +13,31 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.IdentityModel.Tokens;
 using Scalar.AspNetCore;
 
-var builder = WebApplication.CreateBuilder(args);
+var builder = WebApplication.CreateBuilder(new WebApplicationOptions
+{
+    Args = args,
+    ContentRootPath = AppContext.BaseDirectory
+});
+
+// Configure Kestrel to listen on 0.0.0.0 and port 7071 (or from config)
+var configuredUrl = builder.Configuration["Urls"];
+int port = 7071;
+if (!string.IsNullOrEmpty(configuredUrl) && Uri.TryCreate(configuredUrl.Split(';')[0], UriKind.Absolute, out var parsedUri))
+{
+    port = parsedUri.Port;
+}
+else if (builder.Environment.IsDevelopment())
+{
+    port = 5200;
+}
+
+builder.WebHost.ConfigureKestrel(serverOptions =>
+{
+    serverOptions.AddServerHeader = false;
+    serverOptions.Limits.MaxRequestBodySize = 52428800; // 50 MB
+    serverOptions.Listen(System.Net.IPAddress.Any, port);
+});
+
 
 // 1. Connection string & SQL Server DbContext
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");

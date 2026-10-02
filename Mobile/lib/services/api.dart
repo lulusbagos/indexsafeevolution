@@ -14,8 +14,9 @@ import '../models/profile_model.dart';
 class ApiService {
   // LOCAL = http://127.0.0.1:5200 (USB adb reverse or local network)
   // LAN = http://192.168.0.6:5200
-  // PROD = https://apiis.icapps.id
-  final baseUrl = 'http://192.168.0.6:5200';
+  // PROD = https://indexsafeevolution.indexim.id
+  final baseUrl = 'https://indexsafeevolution.indexim.id';
+  bool get isLocalDev => baseUrl.contains('192.168.0.6') || baseUrl.contains('127.0.0.1');
   final company = 'IC';
   late Dio dio;
 
@@ -120,7 +121,7 @@ class ApiService {
             dioErr.type == DioExceptionType.unknown) {
           final fallbackHost = baseUrl.contains('192.168.0.6')
               ? 'http://127.0.0.1:5200'
-              : 'http://192.168.0.6:5200';
+              : baseUrl;
           final fallbackDio = Dio(BaseOptions(
             baseUrl: '$fallbackHost/api',
             headers: dio.options.headers,
@@ -167,7 +168,7 @@ class ApiService {
             dioErr.type == DioExceptionType.unknown) {
           final fallbackHost = baseUrl.contains('192.168.0.6')
               ? 'http://127.0.0.1:5200'
-              : 'http://192.168.0.6:5200';
+              : baseUrl;
           final fallbackDio = Dio(BaseOptions(
             baseUrl: '$fallbackHost/api',
             headers: dio.options.headers,
@@ -460,7 +461,7 @@ class ApiService {
             dioErr.response?.statusCode == 404) {
           final fallbackHost = baseUrl.contains('192.168.0.6')
               ? 'http://127.0.0.1:5200'
-              : 'http://192.168.0.6:5200';
+              : baseUrl;
           final fallbackDio = Dio(BaseOptions(
             baseUrl: '$fallbackHost/api',
             headers: dio.options.headers,
@@ -499,7 +500,7 @@ class ApiService {
             dioErr.response?.statusCode == 404) {
           final fallbackHost = baseUrl.contains('192.168.0.6')
               ? 'http://127.0.0.1:5200'
-              : 'http://192.168.0.6:5200';
+              : baseUrl;
           final fallbackDio = Dio(BaseOptions(
             baseUrl: '$fallbackHost/api',
             headers: dio.options.headers,
@@ -535,7 +536,7 @@ class ApiService {
             dioErr.response?.statusCode == 404) {
           final fallbackHost = baseUrl.contains('192.168.0.6')
               ? 'http://127.0.0.1:5200'
-              : 'http://192.168.0.6:5200';
+              : baseUrl;
           final fallbackDio = Dio(BaseOptions(
             baseUrl: '$fallbackHost/api',
             headers: dio.options.headers,
@@ -575,7 +576,7 @@ class ApiService {
             dioErr.response?.statusCode == 404) {
           final fallbackHost = baseUrl.contains('192.168.0.6')
               ? 'http://127.0.0.1:5200'
-              : 'http://192.168.0.6:5200';
+              : baseUrl;
           final fallbackDio = Dio(BaseOptions(
             baseUrl: '$fallbackHost/api',
             headers: dio.options.headers,
@@ -672,7 +673,7 @@ class ApiService {
             dioErr.response?.statusCode == 404) {
           final fallbackHost = baseUrl.contains('192.168.0.6')
               ? 'http://127.0.0.1:5200'
-              : 'http://192.168.0.6:5200';
+              : baseUrl;
           final fallbackDio = Dio(BaseOptions(
             baseUrl: fallbackHost,
             headers: dio.options.headers,
@@ -725,7 +726,7 @@ class ApiService {
             dioErr.response?.statusCode == 404) {
           final fallbackHost = baseUrl.contains('192.168.0.6')
               ? 'http://127.0.0.1:5200'
-              : 'http://192.168.0.6:5200';
+              : baseUrl;
           final fallbackDio = Dio(BaseOptions(
             baseUrl: fallbackHost,
             headers: dio.options.headers,
@@ -740,6 +741,291 @@ class ApiService {
         return Right(Map<String, dynamic>.from(res.data as Map));
       }
       return const Right({});
+    } on DioException catch (err) {
+      return Left(errorHandler(err));
+    }
+  }
+
+  Future<Either<Map, Map<String, dynamic>>> getHazardHub({
+    String? filter,
+    String? search,
+  }) async {
+    try {
+      if (_token != null && _token!.isNotEmpty) {
+        dio.options.headers['Authorization'] = 'Bearer $getToken';
+      }
+      final params = <String, dynamic>{};
+      if (filter != null && filter.isNotEmpty) params['filter'] = filter;
+      if (search != null && search.isNotEmpty) params['search'] = search;
+
+      Response res;
+      try {
+        res = await dio.get('/hazard/hub', queryParameters: params);
+      } on DioException catch (dioErr) {
+        if (dioErr.type == DioExceptionType.connectionTimeout ||
+            dioErr.type == DioExceptionType.connectionError ||
+            dioErr.type == DioExceptionType.unknown ||
+            dioErr.response?.statusCode == 404) {
+          final fallbackHost = baseUrl.contains('192.168.0.6')
+              ? 'http://127.0.0.1:5200/api'
+              : '$baseUrl/api';
+          final fallbackDio = Dio(BaseOptions(
+            baseUrl: fallbackHost,
+            headers: dio.options.headers,
+            connectTimeout: const Duration(seconds: 4),
+          ));
+          res = await fallbackDio.get('/hazard/hub', queryParameters: params);
+        } else {
+          rethrow;
+        }
+      }
+
+      if (res.data is Map) {
+        return Right(Map<String, dynamic>.from(res.data as Map));
+      }
+      return const Right({});
+    } on DioException catch (err) {
+      return Left(errorHandler(err));
+    }
+  }
+
+  Future<Either<Map, Map<String, dynamic>>> createHazardReport(
+    Map<String, dynamic> fields, {
+    File? fotoTemuan,
+    File? fotoPerbaikan,
+  }) async {
+    try {
+      if (_token != null && _token!.isNotEmpty) {
+        dio.options.headers['Authorization'] = 'Bearer $getToken';
+      }
+      var formData = FormData.fromMap(fields);
+
+      if (fotoTemuan != null && await fotoTemuan.exists()) {
+        formData.files.add(MapEntry(
+          'foto_temuan',
+          await MultipartFile.fromFile(fotoTemuan.path),
+        ));
+      }
+      if (fotoPerbaikan != null && await fotoPerbaikan.exists()) {
+        formData.files.add(MapEntry(
+          'foto_perbaikan',
+          await MultipartFile.fromFile(fotoPerbaikan.path),
+        ));
+      }
+
+      Response res;
+      try {
+        res = await dio.post('/hazard/create', data: formData);
+      } on DioException catch (dioErr) {
+        if (dioErr.type == DioExceptionType.connectionTimeout ||
+            dioErr.type == DioExceptionType.connectionError ||
+            dioErr.type == DioExceptionType.unknown ||
+            dioErr.response?.statusCode == 404) {
+          final fallbackHost = baseUrl.contains('192.168.0.6')
+              ? 'http://127.0.0.1:5200/api'
+              : '$baseUrl/api';
+          final fallbackDio = Dio(BaseOptions(
+            baseUrl: fallbackHost,
+            headers: dio.options.headers,
+            connectTimeout: const Duration(seconds: 6),
+          ));
+          res = await fallbackDio.post('/hazard/create', data: formData);
+        } else {
+          rethrow;
+        }
+      }
+
+      if (res.data is Map) {
+        return Right(Map<String, dynamic>.from(res.data as Map));
+      }
+      return const Right({});
+    } on DioException catch (err) {
+      return Left(errorHandler(err));
+    }
+  }
+
+  Future<Either<Map, Map<String, dynamic>>> closeHazardDirect(
+    int id,
+    String tindakanPerbaikan, {
+    String? closeMode,
+    File? fotoPerbaikan,
+  }) async {
+    try {
+      if (_token != null && _token!.isNotEmpty) {
+        dio.options.headers['Authorization'] = 'Bearer $getToken';
+      }
+      var formDataMap = <String, dynamic>{
+        'id': id.toString(),
+        'tindakan_perbaikan': tindakanPerbaikan,
+        'perbaikan': tindakanPerbaikan,
+        'close_note': tindakanPerbaikan,
+      };
+      if (closeMode != null && closeMode.isNotEmpty) {
+        formDataMap['close_mode'] = closeMode;
+      }
+      var formData = FormData.fromMap(formDataMap);
+
+      if (fotoPerbaikan != null && await fotoPerbaikan.exists()) {
+        formData.files.add(MapEntry(
+          'foto_perbaikan',
+          await MultipartFile.fromFile(fotoPerbaikan.path),
+        ));
+      }
+
+      Response res;
+      try {
+        res = await dio.post('/hazard/close', data: formData);
+      } on DioException catch (dioErr) {
+        if (dioErr.type == DioExceptionType.connectionTimeout ||
+            dioErr.type == DioExceptionType.connectionError ||
+            dioErr.type == DioExceptionType.unknown ||
+            dioErr.response?.statusCode == 404) {
+          final fallbackHost = baseUrl.contains('192.168.0.6')
+              ? 'http://127.0.0.1:5200/api'
+              : '$baseUrl/api';
+          final fallbackDio = Dio(BaseOptions(
+            baseUrl: fallbackHost,
+            headers: dio.options.headers,
+            connectTimeout: const Duration(seconds: 6),
+          ));
+          res = await fallbackDio.post('/hazard/close', data: formData);
+        } else {
+          rethrow;
+        }
+      }
+
+      if (res.data is Map) {
+        return Right(Map<String, dynamic>.from(res.data as Map));
+      }
+      return const Right({});
+    } on DioException catch (err) {
+      return Left(errorHandler(err));
+    }
+  }
+
+  Future<Either<Map, Map<String, dynamic>>> reassignHazardPja(
+    int id,
+    String newNik,
+    String newNama,
+    String newDept,
+    String keterangan,
+  ) async {
+    try {
+      if (_token != null && _token!.isNotEmpty) {
+        dio.options.headers['Authorization'] = 'Bearer $getToken';
+      }
+      final payload = {
+        'id': id,
+        'newNik': newNik,
+        'newNama': newNama,
+        'newDepartemen': newDept,
+        'keterangan': keterangan,
+      };
+
+      Response res;
+      try {
+        res = await dio.post('/hazard/reassign', data: jsonEncode(payload));
+      } on DioException catch (dioErr) {
+        if (dioErr.type == DioExceptionType.connectionTimeout ||
+            dioErr.type == DioExceptionType.connectionError ||
+            dioErr.type == DioExceptionType.unknown ||
+            dioErr.response?.statusCode == 404) {
+          final fallbackHost = baseUrl.contains('192.168.0.6')
+              ? 'http://127.0.0.1:5200/api'
+              : '$baseUrl/api';
+          final fallbackDio = Dio(BaseOptions(
+            baseUrl: fallbackHost,
+            headers: dio.options.headers,
+            connectTimeout: const Duration(seconds: 6),
+          ));
+          res = await fallbackDio.post('/hazard/reassign', data: jsonEncode(payload));
+        } else {
+          rethrow;
+        }
+      }
+
+      if (res.data is Map) {
+        return Right(Map<String, dynamic>.from(res.data as Map));
+      }
+      return const Right({});
+    } on DioException catch (err) {
+      return Left(errorHandler(err));
+    }
+  }
+
+  Future<Either<Map, Map<String, dynamic>>> deleteHazardDirect(int id) async {
+    try {
+      if (_token != null && _token!.isNotEmpty) {
+        dio.options.headers['Authorization'] = 'Bearer $getToken';
+      }
+
+      Response res;
+      try {
+        res = await dio.delete('/hazard/$id');
+      } on DioException catch (dioErr) {
+        if (dioErr.type == DioExceptionType.connectionTimeout ||
+            dioErr.type == DioExceptionType.connectionError ||
+            dioErr.type == DioExceptionType.unknown ||
+            dioErr.response?.statusCode == 404) {
+          final fallbackHost = baseUrl.contains('192.168.0.6')
+              ? 'http://127.0.0.1:5200/api'
+              : '$baseUrl/api';
+          final fallbackDio = Dio(BaseOptions(
+            baseUrl: fallbackHost,
+            headers: dio.options.headers,
+            connectTimeout: const Duration(seconds: 4),
+          ));
+          res = await fallbackDio.delete('/hazard/$id');
+        } else {
+          rethrow;
+        }
+      }
+
+      if (res.data is Map) {
+        return Right(Map<String, dynamic>.from(res.data as Map));
+      }
+      return const Right({});
+    } on DioException catch (err) {
+      return Left(errorHandler(err));
+    }
+  }
+
+  Future<Either<Map, List<Map<String, dynamic>>>> searchPja(String query) async {
+    try {
+      if (_token != null && _token!.isNotEmpty) {
+        dio.options.headers['Authorization'] = 'Bearer $getToken';
+      }
+      final params = {'q': query};
+
+      Response res;
+      try {
+        res = await dio.get('/hazard/search-pja', queryParameters: params);
+      } on DioException catch (dioErr) {
+        if (dioErr.type == DioExceptionType.connectionTimeout ||
+            dioErr.type == DioExceptionType.connectionError ||
+            dioErr.type == DioExceptionType.unknown ||
+            dioErr.response?.statusCode == 404) {
+          final fallbackHost = baseUrl.contains('192.168.0.6')
+              ? 'http://127.0.0.1:5200/api'
+              : '$baseUrl/api';
+          final fallbackDio = Dio(BaseOptions(
+            baseUrl: fallbackHost,
+            headers: dio.options.headers,
+            connectTimeout: const Duration(seconds: 4),
+          ));
+          res = await fallbackDio.get('/hazard/search-pja', queryParameters: params);
+        } else {
+          rethrow;
+        }
+      }
+
+      if (res.data is Map && (res.data as Map)['data'] is List) {
+        final list = ((res.data as Map)['data'] as List)
+            .map((e) => Map<String, dynamic>.from(e as Map))
+            .toList();
+        return Right(list);
+      }
+      return const Right([]);
     } on DioException catch (err) {
       return Left(errorHandler(err));
     }
