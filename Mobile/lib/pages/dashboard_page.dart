@@ -4342,7 +4342,9 @@ class _DashboardPageState extends State<DashboardPage>
   Widget _buildBannerSlide(IncidentNewsModel banner) {
     Color catColor = const Color(0xFFEF4444);
     final cat = banner.kategori.toLowerCase();
-    if (cat.contains('near miss')) {
+    if (cat.contains('banner') || cat.contains('informasi')) {
+      catColor = const Color(0xFF0284C7);
+    } else if (cat.contains('near miss')) {
       catColor = const Color(0xFFD97706);
     } else if (cat.contains('property')) {
       catColor = const Color(0xFFEA580C);
@@ -4350,6 +4352,10 @@ class _DashboardPageState extends State<DashboardPage>
       catColor = const Color(0xFF0D9488);
     } else if (cat.contains('fire') || cat.contains('kebakaran')) {
       catColor = const Color(0xFFDC2626);
+    } else if (cat.contains('fatal')) {
+      catColor = const Color(0xFF991B1B);
+    } else if (cat.contains('medical')) {
+      catColor = const Color(0xFF7C3AED);
     }
 
     final hasImage = banner.gambarUrl != null && banner.gambarUrl!.isNotEmpty;
@@ -4422,7 +4428,13 @@ class _DashboardPageState extends State<DashboardPage>
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Icon(Icons.warning_amber_rounded, size: 12, color: Colors.white),
+                            Icon(
+                              (cat.contains('banner') || cat.contains('informasi'))
+                                  ? Icons.campaign_rounded
+                                  : Icons.warning_amber_rounded,
+                              size: 12,
+                              color: Colors.white,
+                            ),
                             const SizedBox(width: 4),
                             Text(
                               banner.kategori.toUpperCase(),
@@ -4436,6 +4448,41 @@ class _DashboardPageState extends State<DashboardPage>
                           ],
                         ),
                       ),
+                      if (_homeBanners.isNotEmpty && banner.id == _homeBanners.first.id) ...[
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3.5),
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              colors: [Color(0xFFEF4444), Color(0xFFF97316)],
+                            ),
+                            borderRadius: BorderRadius.circular(6),
+                            boxShadow: [
+                              BoxShadow(
+                                color: const Color(0xFFEF4444).withValues(alpha: 0.5),
+                                blurRadius: 6,
+                                offset: const Offset(0, 1),
+                              ),
+                            ],
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.local_fire_department_rounded, size: 11, color: Colors.white),
+                              SizedBox(width: 3),
+                              Text(
+                                'TERBARU',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 9.5,
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: 0.4,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                       const Spacer(),
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),

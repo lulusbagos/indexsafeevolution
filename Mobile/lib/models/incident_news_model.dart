@@ -10,6 +10,7 @@ class IncidentNewsModel {
   final String dibuatOleh;
   final DateTime? createdAt;
   final bool isBanner;
+  final bool isUpdate;
   final int bannerUrutan;
   final String? tags;
 
@@ -25,6 +26,7 @@ class IncidentNewsModel {
     required this.dibuatOleh,
     this.createdAt,
     this.isBanner = false,
+    this.isUpdate = true,
     this.bannerUrutan = 0,
     this.tags,
   });
@@ -41,6 +43,11 @@ class IncidentNewsModel {
         ? isBannerRaw
         : (isBannerRaw?.toString() == '1' || isBannerRaw?.toString().toLowerCase() == 'true');
 
+    final isUpdateRaw = json['is_update'];
+    final bool isUpdate = isUpdateRaw is bool
+        ? isUpdateRaw
+        : (isUpdateRaw == null || isUpdateRaw.toString() == '1' || isUpdateRaw.toString().toLowerCase() == 'true');
+
     return IncidentNewsModel(
       id: (json['id'] as num?)?.toInt() ?? 0,
       judul: json['judul']?.toString() ?? '',
@@ -53,6 +60,7 @@ class IncidentNewsModel {
       dibuatOleh: json['dibuat_oleh']?.toString() ?? 'HSE Team',
       createdAt: dt,
       isBanner: isBanner,
+      isUpdate: isUpdate,
       bannerUrutan: (json['banner_urutan'] as num?)?.toInt() ?? 0,
       tags: json['tags']?.toString(),
     );

@@ -46,6 +46,10 @@ namespace Indexsafe.Api.Controllers
                         BEGIN
                             ALTER TABLE tbl_t_incident_news ADD is_banner BIT NOT NULL DEFAULT 0;
                         END
+                        IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('tbl_t_incident_news') AND name = 'is_update')
+                        BEGIN
+                            ALTER TABLE tbl_t_incident_news ADD is_update BIT NOT NULL DEFAULT 1;
+                        END
                         IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('tbl_t_incident_news') AND name = 'banner_urutan')
                         BEGIN
                             ALTER TABLE tbl_t_incident_news ADD banner_urutan INT NOT NULL DEFAULT 0;
@@ -70,13 +74,19 @@ namespace Indexsafe.Api.Controllers
             [FromQuery] int limit = 30,
             [FromQuery] string? category = null,
             [FromQuery] string? search = null,
-            [FromQuery] bool? is_banner = null)
+            [FromQuery] bool? is_banner = null,
+            [FromQuery] bool? is_update = null)
         {
             var query = _context.IncidentNewsList.Where(i => i.IsPublished);
 
             if (is_banner.HasValue)
             {
                 query = query.Where(i => i.IsBanner == is_banner.Value);
+            }
+
+            if (is_update.HasValue)
+            {
+                query = query.Where(i => i.IsUpdate == is_update.Value);
             }
 
             if (!string.IsNullOrWhiteSpace(category) && !string.Equals(category, "Semua", StringComparison.OrdinalIgnoreCase))
@@ -92,6 +102,7 @@ namespace Indexsafe.Api.Controllers
 
             var incidents = await query
                 .OrderByDescending(i => i.TanggalKejadian ?? i.CreatedAt)
+                .ThenByDescending(i => i.Id)
                 .Take(limit)
                 .ToListAsync();
 
@@ -198,6 +209,7 @@ namespace Indexsafe.Api.Controllers
                 NikPembuat = string.IsNullOrWhiteSpace(form.NikPembuat) ? "HSE001" : form.NikPembuat.Trim(),
                 IsPublished = form.IsPublished ?? true,
                 IsBanner = form.IsBanner ?? false,
+                IsUpdate = form.IsUpdate ?? true,
                 BannerUrutan = form.BannerUrutan ?? 0,
                 Tags = form.Tags,
                 CreatedAt = DateTime.Now
@@ -237,6 +249,7 @@ namespace Indexsafe.Api.Controllers
             if (form.PerusahaanId.HasValue) incident.PerusahaanId = form.PerusahaanId.Value;
             if (form.IsPublished.HasValue) incident.IsPublished = form.IsPublished.Value;
             if (form.IsBanner.HasValue) incident.IsBanner = form.IsBanner.Value;
+            if (form.IsUpdate.HasValue) incident.IsUpdate = form.IsUpdate.Value;
             if (form.BannerUrutan.HasValue) incident.BannerUrutan = form.BannerUrutan.Value;
             if (form.Tags != null) incident.Tags = form.Tags;
 
@@ -353,6 +366,7 @@ namespace Indexsafe.Api.Controllers
                 nik_pembuat = i.NikPembuat,
                 is_published = i.IsPublished,
                 is_banner = i.IsBanner,
+                is_update = i.IsUpdate,
                 banner_urutan = i.BannerUrutan,
                 tags = i.Tags,
                 created_at = i.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss")
@@ -373,6 +387,7 @@ namespace Indexsafe.Api.Controllers
         public string? NikPembuat { get; set; }
         public bool? IsPublished { get; set; }
         public bool? IsBanner { get; set; }
+        public bool? IsUpdate { get; set; }
         public int? BannerUrutan { get; set; }
         public string? Tags { get; set; }
     }

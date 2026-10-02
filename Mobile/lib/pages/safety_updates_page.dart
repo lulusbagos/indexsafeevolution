@@ -90,11 +90,15 @@ class _SafetyUpdatesPageState extends State<SafetyUpdatesPage>
 
   List<_SafetyUpdate> get _incidentUpdates {
     return _rawIncidents.map((inc) {
+      final isNewest = _rawIncidents.isNotEmpty && inc.id == _rawIncidents.first.id;
       Color catColor = const Color(0xFFEF4444);
       IconData catIcon = Icons.warning_amber_rounded;
       final cat = inc.kategori.toLowerCase();
 
-      if (cat.contains('near miss')) {
+      if (cat.contains('banner') || cat.contains('informasi')) {
+        catColor = const Color(0xFF0284C7);
+        catIcon = Icons.campaign_rounded;
+      } else if (cat.contains('near miss')) {
         catColor = const Color(0xFFD97706);
         catIcon = Icons.report_problem_rounded;
       } else if (cat.contains('property')) {
@@ -123,7 +127,7 @@ class _SafetyUpdatesPageState extends State<SafetyUpdatesPage>
 
       return _SafetyUpdate(
         id: inc.id,
-        category: 'Insiden',
+        category: cat.contains('banner') ? 'Informasi' : 'Insiden',
         rawCategory: inc.kategori,
         label: inc.kategori.toUpperCase(),
         title: inc.judul,
@@ -138,6 +142,7 @@ class _SafetyUpdatesPageState extends State<SafetyUpdatesPage>
         location: inc.lokasi,
         reporter: inc.dibuatOleh,
         isFromIncidentServer: true,
+        isLatest: isNewest,
       );
     }).toList();
   }
@@ -227,6 +232,7 @@ class _SafetyUpdatesPageState extends State<SafetyUpdatesPage>
     super.build(context);
     final categories = <String>[
       'Semua',
+      'Banner Informasi',
       'Near Miss',
       'Property Damage',
       'First Aid Injury',
@@ -700,6 +706,41 @@ class _HeroUpdate extends StatelessWidget {
                     Row(
                       children: [
                         _CategoryBadge(update: update, light: true),
+                        if (update.isLatest) ...[
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
+                            decoration: BoxDecoration(
+                              gradient: const LinearGradient(
+                                colors: [Color(0xFFEF4444), Color(0xFFF97316)],
+                              ),
+                              borderRadius: BorderRadius.circular(7),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: const Color(0xFFEF4444).withValues(alpha: 0.5),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.local_fire_department_rounded, color: Colors.white, size: 12),
+                                SizedBox(width: 3),
+                                Text(
+                                  'TERBARU',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 9.5,
+                                    fontWeight: FontWeight.w900,
+                                    letterSpacing: 0.5,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                     const Spacer(),
@@ -852,7 +893,46 @@ class _UpdateCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _CategoryBadge(update: update),
+                    Row(
+                      children: [
+                        _CategoryBadge(update: update),
+                        if (update.isLatest) ...[
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              gradient: const LinearGradient(
+                                colors: [Color(0xFFEF4444), Color(0xFFF97316)],
+                              ),
+                              borderRadius: BorderRadius.circular(6),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: const Color(0xFFEF4444).withValues(alpha: 0.35),
+                                  blurRadius: 6,
+                                  offset: const Offset(0, 1),
+                                ),
+                              ],
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.local_fire_department_rounded, color: Colors.white, size: 10),
+                                SizedBox(width: 2),
+                                Text(
+                                  'TERBARU',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 8.5,
+                                    fontWeight: FontWeight.w900,
+                                    letterSpacing: 0.3,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
                     const SizedBox(height: 5),
                     Text(
                       update.title,
@@ -978,6 +1058,7 @@ class _SafetyUpdate {
     this.location,
     this.reporter,
     this.isFromIncidentServer = false,
+    this.isLatest = false,
   });
 
   final int? id;
@@ -996,4 +1077,5 @@ class _SafetyUpdate {
   final String? location;
   final String? reporter;
   final bool isFromIncidentServer;
+  final bool isLatest;
 }

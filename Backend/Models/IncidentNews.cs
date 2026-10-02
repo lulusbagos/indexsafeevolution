@@ -40,6 +40,8 @@ namespace Indexsafe.Api.Models
 
         public bool IsBanner { get; set; } = false;
 
+        public bool IsUpdate { get; set; } = true;
+
         public int BannerUrutan { get; set; } = 0;
 
         [MaxLength(250)]
