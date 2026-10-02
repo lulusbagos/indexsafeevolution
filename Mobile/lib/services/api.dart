@@ -524,6 +524,45 @@ class ApiService {
     }
   }
 
+  Future<Either<Map, Map<String, dynamic>?>> getPopupAd() async {
+    try {
+      Response res;
+      try {
+        res = await dio.get('/ads/popup');
+      } on DioException catch (dioErr) {
+        if (dioErr.type == DioExceptionType.connectionTimeout ||
+            dioErr.type == DioExceptionType.connectionError ||
+            dioErr.response?.statusCode == 404) {
+          final fallbackHost = baseUrl.contains('192.168.0.6')
+              ? 'http://127.0.0.1:5200'
+              : 'http://192.168.0.6:5200';
+          final fallbackDio = Dio(BaseOptions(
+            baseUrl: '$fallbackHost/api',
+            headers: dio.options.headers,
+            connectTimeout: const Duration(seconds: 4),
+            receiveTimeout: const Duration(seconds: 6),
+          ));
+          res = await fallbackDio.get('/ads/popup');
+        } else {
+          rethrow;
+        }
+      }
+
+      if (res.data is Map) {
+        final data = res.data as Map;
+        final hasAd = data['has_ad'] == true;
+        if (hasAd && data['data'] != null && data['data'] is Map) {
+          return Right(Map<String, dynamic>.from(data['data'] as Map));
+        }
+      }
+      return const Right(null);
+    } on DioException catch (err) {
+      return Left(errorHandler(err));
+    } catch (_) {
+      return const Right(null);
+    }
+  }
+
   Future<Either<Map, IncidentNewsModel>> getLatestIncident() async {
     try {
       dio.options.headers['Authorization'] = 'Bearer $getToken';

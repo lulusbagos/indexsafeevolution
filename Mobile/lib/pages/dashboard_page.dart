@@ -627,6 +627,171 @@ class _DashboardPageState extends State<DashboardPage>
     );
   }
 
+  static bool _hasShownPopupAdSession = false;
+
+  Future<void> _checkAndShowPopupAd({bool force = false}) async {
+    if (_hasShownPopupAdSession && !force) return;
+    try {
+      final res = await _api.getPopupAd();
+      if (!mounted) return;
+      res.fold(
+        (_) {},
+        (data) {
+          if (data != null && data['imageUrl'] != null && mounted && (!_hasShownPopupAdSession || force)) {
+            _hasShownPopupAdSession = true;
+            final String rawUrl = data['imageUrl'].toString();
+            if (rawUrl.isNotEmpty) {
+              _showPopupAdDialog(rawUrl, data['fileName']?.toString());
+            }
+          }
+        },
+      );
+    } catch (_) {}
+  }
+
+  void _showPopupAdDialog(String rawUrl, String? fileName) {
+    if (!mounted) return;
+
+    final primaryUrl = rawUrl.startsWith('http') ? rawUrl : '${_api.baseUrl}$rawUrl';
+    final fallbackHost = _api.baseUrl.contains('192.168.0.6') ? 'http://127.0.0.1:5200' : 'http://192.168.0.6:5200';
+    final fallbackUrl = rawUrl.startsWith('http') ? rawUrl : '$fallbackHost$rawUrl';
+
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      barrierColor: Colors.black.withValues(alpha: 0.78),
+      builder: (ctx) {
+        return Center(
+          child: SingleChildScrollView(
+            child: Material(
+              color: Colors.transparent,
+              child: Container(
+                constraints: BoxConstraints(
+                  maxWidth: MediaQuery.of(ctx).size.width * 0.90,
+                  maxHeight: MediaQuery.of(ctx).size.height * 0.82,
+                ),
+                margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Top close button
+                    Align(
+                      alignment: Alignment.topRight,
+                      child: Container(
+                        margin: const EdgeInsets.only(bottom: 8),
+                        child: Material(
+                          color: Colors.black.withValues(alpha: 0.65),
+                          shape: const CircleBorder(),
+                          child: InkWell(
+                            customBorder: const CircleBorder(),
+                            onTap: () {
+                              HapticFeedback.lightImpact();
+                              Navigator.of(ctx).pop();
+                            },
+                            child: const Padding(
+                              padding: EdgeInsets.all(8.0),
+                              child: Icon(Icons.close_rounded, color: Colors.white, size: 22),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    // Image Card Container
+                    Flexible(
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(20),
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF0F172A),
+                            borderRadius: BorderRadius.circular(20),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.5),
+                                blurRadius: 24,
+                                spreadRadius: 4,
+                                offset: const Offset(0, 10),
+                              ),
+                            ],
+                          ),
+                          child: Image.network(
+                            primaryUrl,
+                            fit: BoxFit.contain,
+                            loadingBuilder: (context, child, loadingProgress) {
+                              if (loadingProgress == null) return child;
+                              return Container(
+                                height: 320,
+                                alignment: Alignment.center,
+                                child: const CircularProgressIndicator(
+                                  valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF0284C7)),
+                                  strokeWidth: 3,
+                                ),
+                              );
+                            },
+                            errorBuilder: (context, error, stackTrace) {
+                              return Image.network(
+                                fallbackUrl,
+                                fit: BoxFit.contain,
+                                errorBuilder: (_, __, ___) => Container(
+                                  padding: const EdgeInsets.all(24),
+                                  color: const Color(0xFF1E293B),
+                                  child: const Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(Icons.broken_image_rounded, color: Colors.white54, size: 48),
+                                      SizedBox(height: 12),
+                                      Text(
+                                        'Gagal memuat iklan',
+                                        style: TextStyle(color: Colors.white70, fontSize: 14),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    // Bottom "Tutup" Button
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        icon: const Icon(Icons.close_rounded, size: 18),
+                        label: const Text(
+                          'Tutup',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.3,
+                          ),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.white.withValues(alpha: 0.18),
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          padding: const EdgeInsets.symmetric(vertical: 13),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            side: BorderSide(color: Colors.white.withValues(alpha: 0.3), width: 1.2),
+                          ),
+                        ),
+                        onPressed: () {
+                          HapticFeedback.lightImpact();
+                          Navigator.of(ctx).pop();
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   void _startBannerTimer() {
     _bannerTimer?.cancel();
     if (_homeBanners.length <= 1) return;
@@ -652,6 +817,12 @@ class _DashboardPageState extends State<DashboardPage>
     _fetchSafeMapData();
     _checkHomePendingOffline();
     _fetchHomeBanners();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Future.delayed(const Duration(milliseconds: 650), () {
+        if (mounted) _checkAndShowPopupAd();
+      });
+    });
 
     final isPowerSaver = PreferenceService.isPowerSaverEnabled();
     final isAutoNotif = PreferenceService.isAutoNotifEnabled();
