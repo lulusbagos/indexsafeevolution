@@ -492,10 +492,16 @@ class _ProfilePageState extends State<ProfilePage>
     final companyName = (_profile?.company != null && _profile!.company!.trim().isNotEmpty)
         ? _profile!.company!.trim().toUpperCase()
         : 'PT INDEXIM COALINDO';
-    final dept = _profile?.depart ?? 'SHE / K3';
-    final site = _profile?.lokker ?? 'SITE KALTIM';
-    final rosterVal = _profile?.roster != null ? '${_profile!.roster}' : '5/2';
-    final statusKlasifikasi = _profile?.klasifikasi ?? 'KARYAWAN TETAP';
+    final dept = (_profile?.depart != null && _profile!.depart!.trim().isNotEmpty)
+        ? _profile!.depart!.trim().toUpperCase()
+        : '-';
+    final posisi = (_profile?.posisi != null && _profile!.posisi!.trim().isNotEmpty)
+        ? _profile!.posisi!.trim().toUpperCase()
+        : '-';
+    final nik = (_profile?.noNik != null && _profile!.noNik!.trim().isNotEmpty)
+        ? _profile!.noNik!.trim()
+        : '-';
+    final kategori = _profile?.kategoriPengawas?.trim() ?? '';
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 18),
@@ -503,7 +509,7 @@ class _ProfilePageState extends State<ProfilePage>
         clipBehavior: Clip.none,
         alignment: Alignment.center,
         children: [
-          // Colorful Vibrant Digital Mine ID Header Banner (Tanpa Animasi)
+          // Colorful Vibrant Header Banner (Tanpa Animasi, Data 100% dari DB)
           Container(
             height: 156,
             decoration: BoxDecoration(
@@ -531,7 +537,7 @@ class _ProfilePageState extends State<ProfilePage>
               borderRadius: BorderRadius.circular(24),
               child: Stack(
                 children: [
-                  // 1. Translucent Ambient Glass Circles (Original Colorful Style)
+                  // 1. Translucent Ambient Glass Circles
                   Positioned(
                     top: -45,
                     right: -30,
@@ -577,7 +583,7 @@ class _ProfilePageState extends State<ProfilePage>
                     ),
                   ),
 
-                  // 3. Top Row: Company Badge, Status Chip, & Refresh Action
+                  // 3. Top Row: Perusahaan Badge, Status Aktif (DB), & Refresh Action
                   Positioned(
                     top: 14,
                     left: 16,
@@ -586,7 +592,7 @@ class _ProfilePageState extends State<ProfilePage>
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
-                        // Official Company Shield Tag
+                        // Official Company Tag (dari DB)
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4.5),
                           constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.48),
@@ -601,7 +607,7 @@ class _ProfilePageState extends State<ProfilePage>
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              const Icon(Icons.shield_rounded, size: 13, color: Colors.white),
+                              const Icon(Icons.business_rounded, size: 13, color: Colors.white),
                               const SizedBox(width: 6),
                               Flexible(
                                 child: Text(
@@ -620,7 +626,7 @@ class _ProfilePageState extends State<ProfilePage>
                           ),
                         ),
 
-                        // Right Wing: Verified Status Pill & Refresh Action
+                        // Right Wing: Status Karyawan Aktif (dari DB) & Refresh Action
                         Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
@@ -654,7 +660,7 @@ class _ProfilePageState extends State<ProfilePage>
                                   ),
                                   const SizedBox(width: 5),
                                   const Text(
-                                    'SIMPER AKTIF',
+                                    'STATUS AKTIF',
                                     style: TextStyle(
                                       color: Colors.white,
                                       fontSize: 9.5,
@@ -699,13 +705,13 @@ class _ProfilePageState extends State<ProfilePage>
 
                   // 4. Middle Content Row (Flanking the central avatar)
                   Positioned(
-                    top: 54,
+                    top: 56,
                     left: 16,
                     right: 16,
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Left Wing: Departemen & Site Location
+                        // Left Wing: Departemen & Kategori Pengawas (100% dari DB)
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -732,30 +738,32 @@ class _ProfilePageState extends State<ProfilePage>
                                   letterSpacing: -0.1,
                                 ),
                               ),
-                              const SizedBox(height: 3),
-                              Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  const Icon(
-                                    Icons.location_on_rounded,
-                                    size: 11,
-                                    color: Colors.white,
-                                  ),
-                                  const SizedBox(width: 3),
-                                  Flexible(
-                                    child: Text(
-                                      site,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: TextStyle(
-                                        fontSize: 9.5,
-                                        fontWeight: FontWeight.w600,
-                                        color: Colors.white.withValues(alpha: 0.92),
+                              if (kategori.isNotEmpty) ...[
+                                const SizedBox(height: 3),
+                                Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(
+                                      Icons.shield_outlined,
+                                      size: 11,
+                                      color: Color(0xFFFDE047),
+                                    ),
+                                    const SizedBox(width: 3),
+                                    Flexible(
+                                      child: Text(
+                                        kategori,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                          fontSize: 9.0,
+                                          fontWeight: FontWeight.w600,
+                                          color: Colors.white.withValues(alpha: 0.95),
+                                        ),
                                       ),
                                     ),
-                                  ),
-                                ],
-                              ),
+                                  ],
+                                ),
+                              ],
                             ],
                           ),
                         ),
@@ -763,14 +771,14 @@ class _ProfilePageState extends State<ProfilePage>
                         // Center Space Reserved for Overlapping Avatar
                         SizedBox(width: avatarCenterGap),
 
-                        // Right Wing: Roster & Klasifikasi Karyawan
+                        // Right Wing: Jabatan & NIK (100% dari DB)
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.end,
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Text(
-                                'STATUS ROSTER',
+                                'JABATAN',
                                 style: TextStyle(
                                   fontSize: 8.5,
                                   fontWeight: FontWeight.w700,
@@ -780,7 +788,7 @@ class _ProfilePageState extends State<ProfilePage>
                               ),
                               const SizedBox(height: 2),
                               Text(
-                                'ROSTER $rosterVal',
+                                posisi,
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(
@@ -794,19 +802,19 @@ class _ProfilePageState extends State<ProfilePage>
                               Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  const Icon(
-                                    Icons.verified_rounded,
+                                  Icon(
+                                    Icons.badge_outlined,
                                     size: 11,
-                                    color: Color(0xFFFDE047),
+                                    color: Colors.white.withValues(alpha: 0.9),
                                   ),
                                   const SizedBox(width: 3),
                                   Flexible(
                                     child: Text(
-                                      statusKlasifikasi,
+                                      'NIK: $nik',
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
                                       style: TextStyle(
-                                        fontSize: 9.5,
+                                        fontSize: 9.0,
                                         fontWeight: FontWeight.w600,
                                         color: Colors.white.withValues(alpha: 0.95),
                                       ),
@@ -815,36 +823,6 @@ class _ProfilePageState extends State<ProfilePage>
                                 ],
                               ),
                             ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  // 5. Watermark Footer Indicator
-                  Positioned(
-                    bottom: 8,
-                    left: 18,
-                    right: 18,
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          'DIGITAL MINE ID',
-                          style: TextStyle(
-                            fontSize: 8,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: 1.2,
-                            color: Colors.white.withValues(alpha: 0.35),
-                          ),
-                        ),
-                        Text(
-                          'SMK3 • ISO 45001',
-                          style: TextStyle(
-                            fontSize: 8,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: 1.0,
-                            color: Colors.white.withValues(alpha: 0.35),
                           ),
                         ),
                       ],
