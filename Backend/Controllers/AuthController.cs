@@ -23,17 +23,20 @@ namespace Indexsafe.Api.Controllers
         private readonly JwtService _jwtService;
         private readonly ImageUploadService _imageUploadService;
         private readonly CompanyHierarchyService _companyHierarchyService;
+        private readonly PermitService _permitService;
 
         public AuthController(
             AppDbContext context,
             JwtService jwtService,
             ImageUploadService imageUploadService,
-            CompanyHierarchyService companyHierarchyService)
+            CompanyHierarchyService companyHierarchyService,
+            PermitService permitService)
         {
             _context = context;
             _jwtService = jwtService;
             _imageUploadService = imageUploadService;
             _companyHierarchyService = companyHierarchyService;
+            _permitService = permitService;
         }
 
         [HttpPost("login")]
@@ -628,7 +631,54 @@ namespace Indexsafe.Api.Controllers
                 UserEmpCompanyTotalCount = userEmpCompanyTotalCount
             };
 
+            // Ambil data SIMPER & Permit terbaru dari PostgreSQL BIMA
+            try
+            {
+                var permitData = await _permitService.GetLatestPermitSimperAsync(userNik);
+                if (permitData != null)
+                {
+                    profile.HasPermit = permitData.HasPermit;
+                    profile.PermitNomor = permitData.PermitNomor;
+                    profile.PermitStatus = permitData.PermitStatus;
+                    profile.PermitLastExpired = permitData.LastExpired;
+                    profile.PermitBerakhirKerja = permitData.BerakhirKerja;
+                    profile.IsPermitActive = permitData.IsPermitActive;
+
+                    profile.HasSimper = permitData.HasSimper;
+                    profile.SimperNomor = permitData.SimperNomor;
+                    profile.SimperStatus = permitData.SimperStatus;
+                    profile.JenisSimper = permitData.JenisSimper;
+                    profile.SimperExpiredDate = permitData.SimperExpiredDate;
+                    profile.SimperMasaBerlaku = permitData.MasaBerlaku;
+                    profile.SimperJenisSim = permitData.JenisSim;
+                    profile.SimperNomorSim = permitData.NomorSim;
+                    profile.IsSimperActive = permitData.IsSimperActive;
+                }
+            }
+            catch
+            {
+                // Fallback graceful jika database BIMA tidak merespon
+            }
+
             return Ok(profile);
+        }
+
+        [HttpGet("profile/permit-simper/{nik?}")]
+        [HttpGet("permit-simper/{nik?}")]
+        [AllowAnonymous]
+        public async Task<IActionResult> GetPermitSimper(string? nik)
+        {
+            var userNik = !string.IsNullOrEmpty(nik)
+                ? nik
+                : User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? User.Identity?.Name ?? string.Empty;
+
+            if (string.IsNullOrEmpty(userNik))
+            {
+                return BadRequest(new { message = "NIK tidak valid." });
+            }
+
+            var data = await _permitService.GetLatestPermitSimperAsync(userNik);
+            return Ok(data);
         }
 
         [HttpPost("profile")]

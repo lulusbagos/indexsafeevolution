@@ -436,6 +436,14 @@ class _ProfilePageState extends State<ProfilePage>
                     child: _buildEmployeeInfoCard(),
                   ),
 
+                  const SizedBox(height: 18),
+
+                  // Mine Permit & SIMPER Card (BIMA PostgreSQL)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 18),
+                    child: _buildPermitSimperCard(),
+                  ),
+
                   const SizedBox(height: 16),
 
                   // Grouped Cards: Keamanan & Preferensi
@@ -501,7 +509,33 @@ class _ProfilePageState extends State<ProfilePage>
     final nik = (_profile?.noNik != null && _profile!.noNik!.trim().isNotEmpty)
         ? _profile!.noNik!.trim()
         : '-';
+    final permitNo = _profile?.permitNomor?.trim();
     final kategori = _profile?.kategoriPengawas?.trim() ?? '';
+
+    // Status chip SIMPER / Mine Permit dari Database BIMA
+    String statusChipText = 'STATUS AKTIF';
+    Color statusChipDotColor = const Color(0xFF4ADE80);
+
+    if (_profile?.hasSimper == true) {
+      if (_profile?.isSimperActive == true) {
+        statusChipText = 'SIMPER AKTIF';
+        statusChipDotColor = const Color(0xFF4ADE80);
+      } else if (_profile?.simperStatus == 'WAITING') {
+        statusChipText = 'SIMPER WAITING';
+        statusChipDotColor = const Color(0xFFFBBF24);
+      } else {
+        statusChipText = 'SIMPER ${_profile?.simperStatus ?? "OFF"}';
+        statusChipDotColor = const Color(0xFFF87171);
+      }
+    } else if (_profile?.hasPermit == true) {
+      if (_profile?.isPermitActive == true) {
+        statusChipText = 'PERMIT AKTIF';
+        statusChipDotColor = const Color(0xFF4ADE80);
+      } else {
+        statusChipText = 'PERMIT ${_profile?.permitStatus ?? "TERDAFTAR"}';
+        statusChipDotColor = const Color(0xFFFBBF24);
+      }
+    }
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 18),
@@ -626,7 +660,7 @@ class _ProfilePageState extends State<ProfilePage>
                           ),
                         ),
 
-                        // Right Wing: Status Karyawan Aktif (dari DB) & Refresh Action
+                        // Right Wing: Status Karyawan / SIMPER (dari BIMA PostgreSQL) & Refresh Action
                         Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
@@ -646,12 +680,12 @@ class _ProfilePageState extends State<ProfilePage>
                                   Container(
                                     width: 6,
                                     height: 6,
-                                    decoration: const BoxDecoration(
+                                    decoration: BoxDecoration(
                                       shape: BoxShape.circle,
-                                      color: Color(0xFF4ADE80),
+                                      color: statusChipDotColor,
                                       boxShadow: [
                                         BoxShadow(
-                                          color: Color(0xFF4ADE80),
+                                          color: statusChipDotColor,
                                           blurRadius: 4,
                                           spreadRadius: 1,
                                         ),
@@ -659,9 +693,9 @@ class _ProfilePageState extends State<ProfilePage>
                                     ),
                                   ),
                                   const SizedBox(width: 5),
-                                  const Text(
-                                    'STATUS AKTIF',
-                                    style: TextStyle(
+                                  Text(
+                                    statusChipText,
+                                    style: const TextStyle(
                                       color: Colors.white,
                                       fontSize: 9.5,
                                       fontWeight: FontWeight.w800,
@@ -738,7 +772,32 @@ class _ProfilePageState extends State<ProfilePage>
                                   letterSpacing: -0.1,
                                 ),
                               ),
-                              if (kategori.isNotEmpty) ...[
+                              if (permitNo != null && permitNo.isNotEmpty) ...[
+                                const SizedBox(height: 3),
+                                Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(
+                                      Icons.card_membership_rounded,
+                                      size: 11,
+                                      color: Color(0xFFFDE047),
+                                    ),
+                                    const SizedBox(width: 3),
+                                    Flexible(
+                                      child: Text(
+                                        permitNo,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                          fontSize: 9.0,
+                                          fontWeight: FontWeight.w600,
+                                          color: Colors.white.withValues(alpha: 0.95),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ] else if (kategori.isNotEmpty) ...[
                                 const SizedBox(height: 3),
                                 Row(
                                   mainAxisSize: MainAxisSize.min,
@@ -1705,6 +1764,344 @@ class _ProfilePageState extends State<ProfilePage>
               letterSpacing: 0.4,
             ),
           ),
+        ],
+      ),
+    );
+  }
+
+  // Helper untuk format tanggal singkat tanpa jam
+  String _formatDateShort(String? raw) {
+    if (raw == null || raw.isEmpty || raw == '-') return '-';
+    var trimmed = raw.trim();
+    if (trimmed.contains(' ')) {
+      return trimmed.split(' ')[0];
+    }
+    if (trimmed.contains('T')) {
+      return trimmed.split('T')[0];
+    }
+    return trimmed;
+  }
+
+  // Kartu Mine Permit & SIMPER (BIMA PostgreSQL)
+  Widget _buildPermitSimperCard() {
+    final permitNo = _profile?.permitNomor ?? '-';
+    final permitStatus = _profile?.permitStatus ?? '-';
+    final rawPermitExp = _profile?.permitLastExpired ?? _profile?.permitBerakhirKerja;
+    final permitExp = _formatDateShort(rawPermitExp);
+    final isPermitActive = _profile?.isPermitActive == true;
+
+    final hasSimper = _profile?.hasSimper == true;
+    final simperNo = _profile?.simperNomor ?? '-';
+    final simperStatus = _profile?.simperStatus ?? '-';
+    final simperJenis = _profile?.jenisSimper ?? '-';
+    final rawSimperExp = _profile?.simperExpiredDate ?? _profile?.simperMasaBerlaku;
+    final simperExp = _formatDateShort(rawSimperExp);
+    final simperJenisSim = _profile?.simperJenisSim;
+    final simperNomorSim = _profile?.simperNomorSim;
+    final isSimperActive = _profile?.isSimperActive == true;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: const Color(0xFFF1F5F9)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(left: 18, right: 18, top: 16, bottom: 12),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 28,
+                      height: 28,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEFF6FF),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(
+                        Icons.verified_user_rounded,
+                        color: Color(0xFF2563EB),
+                        size: 16,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    const Text(
+                      'MINE PERMIT & SIMPER',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF0F172A),
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ],
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF0FDF4),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: const Color(0xFFBBF7D0)),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.cloud_done_rounded, size: 11, color: Color(0xFF16A34A)),
+                      SizedBox(width: 4),
+                      Text(
+                        'DATABASE BIMA',
+                        style: TextStyle(
+                          fontSize: 9.5,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF16A34A),
+                          letterSpacing: 0.4,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1, color: Color(0xFFF1F5F9)),
+
+          // Section 1: Mine Permit Details
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Row(
+                        children: [
+                          Icon(Icons.badge_rounded, size: 16, color: Color(0xFF0284C7)),
+                          SizedBox(width: 6),
+                          Text(
+                            'Mine Permit',
+                            style: TextStyle(
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w800,
+                              color: Color(0xFF0F172A),
+                            ),
+                          ),
+                        ],
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2.5),
+                        decoration: BoxDecoration(
+                          color: isPermitActive
+                              ? const Color(0xFFDCFCE7)
+                              : const Color(0xFFFEF3C7),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          permitStatus.toUpperCase(),
+                          style: TextStyle(
+                            fontSize: 9.5,
+                            fontWeight: FontWeight.w800,
+                            color: isPermitActive
+                                ? const Color(0xFF15803D)
+                                : const Color(0xFFB45309),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Nomor Permit',
+                              style: TextStyle(fontSize: 10.5, color: Colors.grey.shade500, fontWeight: FontWeight.w600),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              permitNo,
+                              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF1E293B)),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Text(
+                              'Masa Berlaku',
+                              style: TextStyle(fontSize: 10.5, color: Colors.grey.shade500, fontWeight: FontWeight.w600),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              permitExp,
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color: isPermitActive ? const Color(0xFF1E293B) : const Color(0xFFDC2626),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          // Section 2: SIMPER Details
+          if (hasSimper)
+            Padding(
+              padding: const EdgeInsets.only(left: 16, right: 16, bottom: 16),
+              child: Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            const Icon(Icons.directions_car_rounded, size: 16, color: Color(0xFF7C3AED)),
+                            const SizedBox(width: 6),
+                            const Text(
+                              'SIMPER',
+                              style: TextStyle(
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w800,
+                                color: Color(0xFF0F172A),
+                              ),
+                            ),
+                            if (simperJenis != '-') ...[
+                              const SizedBox(width: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFEDE9FE),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  simperJenis,
+                                  style: const TextStyle(
+                                    fontSize: 8.5,
+                                    fontWeight: FontWeight.w700,
+                                    color: Color(0xFF6D28D9),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2.5),
+                          decoration: BoxDecoration(
+                            color: isSimperActive
+                                ? const Color(0xFFDCFCE7)
+                                : (simperStatus == 'WAITING' ? const Color(0xFFFEF3C7) : const Color(0xFFFEE2E2)),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            simperStatus.toUpperCase(),
+                            style: TextStyle(
+                              fontSize: 9.5,
+                              fontWeight: FontWeight.w800,
+                              color: isSimperActive
+                                  ? const Color(0xFF15803D)
+                                  : (simperStatus == 'WAITING' ? const Color(0xFFB45309) : const Color(0xFFDC2626)),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Nomor SIMPER',
+                                style: TextStyle(fontSize: 10.5, color: Colors.grey.shade500, fontWeight: FontWeight.w600),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                simperNo,
+                                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF1E293B)),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              Text(
+                                'Masa Berlaku',
+                                style: TextStyle(fontSize: 10.5, color: Colors.grey.shade500, fontWeight: FontWeight.w600),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                simperExp,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  color: isSimperActive ? const Color(0xFF1E293B) : const Color(0xFFDC2626),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (simperJenisSim != null && simperJenisSim.isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Icon(Icons.badge_outlined, size: 12, color: Colors.grey.shade500),
+                          const SizedBox(width: 4),
+                          Text(
+                            'SIM $simperJenisSim${(simperNomorSim != null && simperNomorSim.isNotEmpty) ? ' • $simperNomorSim' : ''}',
+                            style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w600, color: Colors.grey.shade700),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
         ],
       ),
     );

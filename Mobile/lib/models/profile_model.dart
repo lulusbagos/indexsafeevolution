@@ -90,6 +90,23 @@ class ProfileModel {
   int? userEmpCompanyRank;
   int? userEmpCompanyTotalCount;
 
+  // BIMA PostgreSQL Data
+  bool? hasPermit;
+  String? permitNomor;
+  String? permitStatus;
+  String? permitLastExpired;
+  String? permitBerakhirKerja;
+  bool? isPermitActive;
+  bool? hasSimper;
+  String? simperNomor;
+  String? simperStatus;
+  String? jenisSimper;
+  String? simperExpiredDate;
+  String? simperMasaBerlaku;
+  String? simperJenisSim;
+  String? simperNomorSim;
+  bool? isSimperActive;
+
   ProfileModel({
     this.id,
     this.noAcr,
@@ -181,6 +198,21 @@ class ProfileModel {
     this.userEmpDeptTotalCount,
     this.userEmpCompanyRank,
     this.userEmpCompanyTotalCount,
+    this.hasPermit,
+    this.permitNomor,
+    this.permitStatus,
+    this.permitLastExpired,
+    this.permitBerakhirKerja,
+    this.isPermitActive,
+    this.hasSimper,
+    this.simperNomor,
+    this.simperStatus,
+    this.jenisSimper,
+    this.simperExpiredDate,
+    this.simperMasaBerlaku,
+    this.simperJenisSim,
+    this.simperNomorSim,
+    this.isSimperActive,
   });
 
   ProfileModel.fromJson(Map<String, dynamic> json) {
@@ -274,6 +306,23 @@ class ProfileModel {
     userEmpDeptTotalCount = json['user_emp_dept_total_count'] != null ? (json['user_emp_dept_total_count'] as num).toInt() : 5;
     userEmpCompanyRank = json['user_emp_company_rank'] != null ? (json['user_emp_company_rank'] as num).toInt() : null;
     userEmpCompanyTotalCount = json['user_emp_company_total_count'] != null ? (json['user_emp_company_total_count'] as num).toInt() : null;
+
+    hasPermit = json['has_permit'] == true;
+    permitNomor = json['permit_nomor'];
+    permitStatus = json['permit_status'];
+    permitLastExpired = json['permit_last_expired'];
+    permitBerakhirKerja = json['permit_berakhir_kerja'];
+    isPermitActive = json['is_permit_active'] == true;
+
+    hasSimper = json['has_simper'] == true;
+    simperNomor = json['simper_nomor'];
+    simperStatus = json['simper_status'];
+    jenisSimper = json['jenis_simper'];
+    simperExpiredDate = json['simper_expired_date'];
+    simperMasaBerlaku = json['simper_masa_berlaku'];
+    simperJenisSim = json['simper_jenis_sim'];
+    simperNomorSim = json['simper_nomor_sim'];
+    isSimperActive = json['is_simper_active'] == true;
   }
 
   Map<String, dynamic> toJson() {
@@ -368,6 +417,21 @@ class ProfileModel {
     data['user_emp_dept_total_count'] = userEmpDeptTotalCount;
     data['user_emp_company_rank'] = userEmpCompanyRank;
     data['user_emp_company_total_count'] = userEmpCompanyTotalCount;
+    data['has_permit'] = hasPermit;
+    data['permit_nomor'] = permitNomor;
+    data['permit_status'] = permitStatus;
+    data['permit_last_expired'] = permitLastExpired;
+    data['permit_berakhir_kerja'] = permitBerakhirKerja;
+    data['is_permit_active'] = isPermitActive;
+    data['has_simper'] = hasSimper;
+    data['simper_nomor'] = simperNomor;
+    data['simper_status'] = simperStatus;
+    data['jenis_simper'] = jenisSimper;
+    data['simper_expired_date'] = simperExpiredDate;
+    data['simper_masa_berlaku'] = simperMasaBerlaku;
+    data['simper_jenis_sim'] = simperJenisSim;
+    data['simper_nomor_sim'] = simperNomorSim;
+    data['is_simper_active'] = isSimperActive;
     return data;
   }
 }

@@ -271,6 +271,52 @@ namespace Indexsafe.Api.DTOs
 
         [JsonPropertyName("user_emp_company_total_count")]
         public int? UserEmpCompanyTotalCount { get; set; }
+
+        // BIMA PostgreSQL (tb_permit & tb_simper)
+        [JsonPropertyName("has_permit")]
+        public bool HasPermit { get; set; }
+
+        [JsonPropertyName("permit_nomor")]
+        public string? PermitNomor { get; set; }
+
+        [JsonPropertyName("permit_status")]
+        public string? PermitStatus { get; set; }
+
+        [JsonPropertyName("permit_last_expired")]
+        public string? PermitLastExpired { get; set; }
+
+        [JsonPropertyName("permit_berakhir_kerja")]
+        public string? PermitBerakhirKerja { get; set; }
+
+        [JsonPropertyName("is_permit_active")]
+        public bool IsPermitActive { get; set; }
+
+        [JsonPropertyName("has_simper")]
+        public bool HasSimper { get; set; }
+
+        [JsonPropertyName("simper_nomor")]
+        public string? SimperNomor { get; set; }
+
+        [JsonPropertyName("simper_status")]
+        public string? SimperStatus { get; set; }
+
+        [JsonPropertyName("jenis_simper")]
+        public string? JenisSimper { get; set; }
+
+        [JsonPropertyName("simper_expired_date")]
+        public string? SimperExpiredDate { get; set; }
+
+        [JsonPropertyName("simper_masa_berlaku")]
+        public string? SimperMasaBerlaku { get; set; }
+
+        [JsonPropertyName("simper_jenis_sim")]
+        public string? SimperJenisSim { get; set; }
+
+        [JsonPropertyName("simper_nomor_sim")]
+        public string? SimperNomorSim { get; set; }
+
+        [JsonPropertyName("is_simper_active")]
+        public bool IsSimperActive { get; set; }
     }
 
     public class ResetPasswordRequest

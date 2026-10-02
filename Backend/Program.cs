@@ -56,6 +56,7 @@ builder.Services.AddSingleton<SyncMonitorService>();
 builder.Services.AddScoped<CompanyHierarchyService>();
 builder.Services.AddScoped<JwtService>();
 builder.Services.AddSingleton<ImageUploadService>();
+builder.Services.AddScoped<PermitService>();
 
 // 4. Controllers & JSON settings
 builder.Services.AddControllers()
