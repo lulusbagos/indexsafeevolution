@@ -52,64 +52,6 @@ class ProfileModel {
   String? createdAt;
   String? updatedAt;
   String? deletedAt;
-  int? myHazards;
-  int? myInspections;
-  int? mySafetyTalks;
-  int? myObservasi;
-  int? myCoaching;
-  int? myP5ms;
-  int? targetHazardReport;
-  int? targetInspeksi;
-  int? targetSafetyTalk;
-  int? targetObservasi;
-  int? targetCoaching;
-  int? targetP5m;
-  int? totalTarget;
-  String? kategoriPengawas;
-  String? alasanTargetZero;
-  int? myHazardsTotal;
-  int? myInspectionsTotal;
-  int? mySafetyTalksTotal;
-  int? myObservasiTotal;
-  int? myCoachingTotal;
-  int? myP5msTotal;
-  int? totalSubmissions;
-  double? complianceRate;
-  String? badgeName;
-  String? badgeIcon;
-  String? badgeColor;
-  bool? isMyWeekCompliant;
-  int? myTotalWeek;
-  int? myWeeklyTarget;
-  String? userDeptName;
-  int? userDeptRank;
-  int? userDeptTotalCount;
-  double? userDeptMtdRate;
-  int? userEmpDeptRank;
-  int? userEmpDeptTotalCount;
-  int? userEmpCompanyRank;
-  int? userEmpCompanyTotalCount;
-
-  // BIMA PostgreSQL Data
-  bool? hasPermit;
-  String? permitNomor;
-  String? permitStatus;
-  bool? isPermitPrinted;
-  String? rawPermitStatus;
-  String? permitLastExpired;
-  String? permitBerakhirKerja;
-  bool? isPermitActive;
-  bool? hasSimper;
-  String? simperNomor;
-  String? simperStatus;
-  bool? isSimperPrinted;
-  String? rawSimperStatus;
-  String? jenisSimper;
-  String? simperExpiredDate;
-  String? simperMasaBerlaku;
-  String? simperJenisSim;
-  String? simperNomorSim;
-  bool? isSimperActive;
 
   ProfileModel({
     this.id,
@@ -165,62 +107,6 @@ class ProfileModel {
     this.createdAt,
     this.updatedAt,
     this.deletedAt,
-    this.myHazards,
-    this.myInspections,
-    this.mySafetyTalks,
-    this.myObservasi,
-    this.myCoaching,
-    this.myP5ms,
-    this.targetHazardReport,
-    this.targetInspeksi,
-    this.targetSafetyTalk,
-    this.targetObservasi,
-    this.targetCoaching,
-    this.targetP5m,
-    this.totalTarget,
-    this.kategoriPengawas,
-    this.alasanTargetZero,
-    this.myHazardsTotal,
-    this.myInspectionsTotal,
-    this.mySafetyTalksTotal,
-    this.myObservasiTotal,
-    this.myCoachingTotal,
-    this.myP5msTotal,
-    this.totalSubmissions,
-    this.complianceRate,
-    this.badgeName,
-    this.badgeIcon,
-    this.badgeColor,
-    this.isMyWeekCompliant,
-    this.myTotalWeek,
-    this.myWeeklyTarget,
-    this.userDeptName,
-    this.userDeptRank,
-    this.userDeptTotalCount,
-    this.userDeptMtdRate,
-    this.userEmpDeptRank,
-    this.userEmpDeptTotalCount,
-    this.userEmpCompanyRank,
-    this.userEmpCompanyTotalCount,
-    this.hasPermit,
-    this.permitNomor,
-    this.permitStatus,
-    this.isPermitPrinted,
-    this.rawPermitStatus,
-    this.permitLastExpired,
-    this.permitBerakhirKerja,
-    this.isPermitActive,
-    this.hasSimper,
-    this.simperNomor,
-    this.simperStatus,
-    this.isSimperPrinted,
-    this.rawSimperStatus,
-    this.jenisSimper,
-    this.simperExpiredDate,
-    this.simperMasaBerlaku,
-    this.simperJenisSim,
-    this.simperNomorSim,
-    this.isSimperActive,
   });
 
   ProfileModel.fromJson(Map<String, dynamic> json) {
@@ -244,9 +130,9 @@ class ProfileModel {
     tglLahir = json['tgl_lahir'];
     statNikah = json['stat_nikah'];
     wn = json['wn'];
-    emailPribadi = json['email_pribadi'] ?? json['email'];
+    emailPribadi = json['email_pribadi'];
     emailKantor = json['email_kantor'];
-    hp = json['hp'] ?? json['phone'];
+    hp = json['hp'];
     namaIbu = json['nama_ibu'];
     statIbu = json['stat_ibu'];
     namaAyah = json['nama_ayah'];
@@ -277,64 +163,6 @@ class ProfileModel {
     createdAt = json['created_at'];
     updatedAt = json['updated_at'];
     deletedAt = json['deleted_at'];
-    myHazards = json['my_hazards'] != null ? (json['my_hazards'] as num).toInt() : null;
-    myInspections = json['my_inspections'] != null ? (json['my_inspections'] as num).toInt() : null;
-    mySafetyTalks = json['my_safety_talks'] != null ? (json['my_safety_talks'] as num).toInt() : null;
-    myObservasi = json['my_observasi'] != null ? (json['my_observasi'] as num).toInt() : null;
-    myCoaching = json['my_coaching'] != null ? (json['my_coaching'] as num).toInt() : null;
-    myP5ms = json['my_p5ms'] != null ? (json['my_p5ms'] as num).toInt() : null;
-    targetHazardReport = json['target_hazard_report'] != null ? (json['target_hazard_report'] as num).toInt() : null;
-    targetInspeksi = json['target_inspeksi'] != null ? (json['target_inspeksi'] as num).toInt() : null;
-    targetSafetyTalk = json['target_safety_talk'] != null ? (json['target_safety_talk'] as num).toInt() : null;
-    targetObservasi = json['target_observasi'] != null ? (json['target_observasi'] as num).toInt() : null;
-    targetCoaching = json['target_coaching'] != null ? (json['target_coaching'] as num).toInt() : null;
-    targetP5m = json['target_p5m'] != null ? (json['target_p5m'] as num).toInt() : null;
-    totalTarget = json['total_target'] != null ? (json['total_target'] as num).toInt() : null;
-    kategoriPengawas = json['kategori_pengawas'];
-    alasanTargetZero = json['alasan_target_zero'];
-    myHazardsTotal = json['my_hazards_total'] != null ? (json['my_hazards_total'] as num).toInt() : null;
-    myInspectionsTotal = json['my_inspections_total'] != null ? (json['my_inspections_total'] as num).toInt() : null;
-    mySafetyTalksTotal = json['my_safety_talks_total'] != null ? (json['my_safety_talks_total'] as num).toInt() : null;
-    myObservasiTotal = json['my_observasi_total'] != null ? (json['my_observasi_total'] as num).toInt() : null;
-    myCoachingTotal = json['my_coaching_total'] != null ? (json['my_coaching_total'] as num).toInt() : null;
-    myP5msTotal = json['my_p5ms_total'] != null ? (json['my_p5ms_total'] as num).toInt() : null;
-    totalSubmissions = json['total_submissions'] != null ? (json['total_submissions'] as num).toInt() : null;
-    complianceRate = json['compliance_rate'] != null ? (json['compliance_rate'] as num).toDouble() : null;
-    badgeName = json['badge_name'];
-    badgeIcon = json['badge_icon'];
-    badgeColor = json['badge_color'];
-    isMyWeekCompliant = json['is_my_week_compliant'] ?? true;
-    myTotalWeek = json['my_total_week'] != null ? (json['my_total_week'] as num).toInt() : 0;
-    myWeeklyTarget = json['my_weekly_target'] != null ? (json['my_weekly_target'] as num).toInt() : 0;
-    userDeptName = json['user_dept_name'] ?? json['depart'] ?? 'SYSTEM INTEGRATIONS';
-    userDeptRank = json['user_dept_rank'] != null ? (json['user_dept_rank'] as num).toInt() : 19;
-    userDeptTotalCount = json['user_dept_total_count'] != null ? (json['user_dept_total_count'] as num).toInt() : 24;
-    userDeptMtdRate = json['user_dept_mtd_rate'] != null ? (json['user_dept_mtd_rate'] as num).toDouble() : 0.0;
-    userEmpDeptRank = json['user_emp_dept_rank'] != null ? (json['user_emp_dept_rank'] as num).toInt() : 5;
-    userEmpDeptTotalCount = json['user_emp_dept_total_count'] != null ? (json['user_emp_dept_total_count'] as num).toInt() : 5;
-    userEmpCompanyRank = json['user_emp_company_rank'] != null ? (json['user_emp_company_rank'] as num).toInt() : null;
-    userEmpCompanyTotalCount = json['user_emp_company_total_count'] != null ? (json['user_emp_company_total_count'] as num).toInt() : null;
-
-    hasPermit = json['has_permit'] == true;
-    permitNomor = json['permit_nomor'];
-    permitStatus = json['permit_status'];
-    isPermitPrinted = json['is_permit_printed'] == true;
-    rawPermitStatus = json['raw_permit_status'];
-    permitLastExpired = json['permit_last_expired'];
-    permitBerakhirKerja = json['permit_berakhir_kerja'];
-    isPermitActive = json['is_permit_active'] == true;
-
-    hasSimper = json['has_simper'] == true;
-    simperNomor = json['simper_nomor'];
-    simperStatus = json['simper_status'];
-    isSimperPrinted = json['is_simper_printed'] == true;
-    rawSimperStatus = json['raw_simper_status'];
-    jenisSimper = json['jenis_simper'];
-    simperExpiredDate = json['simper_expired_date'];
-    simperMasaBerlaku = json['simper_masa_berlaku'];
-    simperJenisSim = json['simper_jenis_sim'];
-    simperNomorSim = json['simper_nomor_sim'];
-    isSimperActive = json['is_simper_active'] == true;
   }
 
   Map<String, dynamic> toJson() {
@@ -392,62 +220,6 @@ class ProfileModel {
     data['created_at'] = createdAt;
     data['updated_at'] = updatedAt;
     data['deleted_at'] = deletedAt;
-    data['my_hazards'] = myHazards;
-    data['my_inspections'] = myInspections;
-    data['my_safety_talks'] = mySafetyTalks;
-    data['my_observasi'] = myObservasi;
-    data['my_coaching'] = myCoaching;
-    data['my_p5ms'] = myP5ms;
-    data['target_hazard_report'] = targetHazardReport;
-    data['target_inspeksi'] = targetInspeksi;
-    data['target_safety_talk'] = targetSafetyTalk;
-    data['target_observasi'] = targetObservasi;
-    data['target_coaching'] = targetCoaching;
-    data['target_p5m'] = targetP5m;
-    data['total_target'] = totalTarget;
-    data['kategori_pengawas'] = kategoriPengawas;
-    data['alasan_target_zero'] = alasanTargetZero;
-    data['my_hazards_total'] = myHazardsTotal;
-    data['my_inspections_total'] = myInspectionsTotal;
-    data['my_safety_talks_total'] = mySafetyTalksTotal;
-    data['my_observasi_total'] = myObservasiTotal;
-    data['my_coaching_total'] = myCoachingTotal;
-    data['my_p5ms_total'] = myP5msTotal;
-    data['total_submissions'] = totalSubmissions;
-    data['compliance_rate'] = complianceRate;
-    data['badge_name'] = badgeName;
-    data['badge_icon'] = badgeIcon;
-    data['badge_color'] = badgeColor;
-    data['is_my_week_compliant'] = isMyWeekCompliant;
-    data['my_total_week'] = myTotalWeek;
-    data['my_weekly_target'] = myWeeklyTarget;
-    data['user_dept_name'] = userDeptName;
-    data['user_dept_rank'] = userDeptRank;
-    data['user_dept_total_count'] = userDeptTotalCount;
-    data['user_dept_mtd_rate'] = userDeptMtdRate;
-    data['user_emp_dept_rank'] = userEmpDeptRank;
-    data['user_emp_dept_total_count'] = userEmpDeptTotalCount;
-    data['user_emp_company_rank'] = userEmpCompanyRank;
-    data['user_emp_company_total_count'] = userEmpCompanyTotalCount;
-    data['has_permit'] = hasPermit;
-    data['permit_nomor'] = permitNomor;
-    data['permit_status'] = permitStatus;
-    data['is_permit_printed'] = isPermitPrinted;
-    data['raw_permit_status'] = rawPermitStatus;
-    data['permit_last_expired'] = permitLastExpired;
-    data['permit_berakhir_kerja'] = permitBerakhirKerja;
-    data['is_permit_active'] = isPermitActive;
-    data['has_simper'] = hasSimper;
-    data['simper_nomor'] = simperNomor;
-    data['simper_status'] = simperStatus;
-    data['is_simper_printed'] = isSimperPrinted;
-    data['raw_simper_status'] = rawSimperStatus;
-    data['jenis_simper'] = jenisSimper;
-    data['simper_expired_date'] = simperExpiredDate;
-    data['simper_masa_berlaku'] = simperMasaBerlaku;
-    data['simper_jenis_sim'] = simperJenisSim;
-    data['simper_nomor_sim'] = simperNomorSim;
-    data['is_simper_active'] = isSimperActive;
     return data;
   }
 }

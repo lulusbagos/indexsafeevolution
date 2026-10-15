@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../pages/bbs/bbs_page.dart';
+import '../pages/ci_assessment/ci_page.dart';
 import '../pages/coaching/coaching_form_page.dart';
 import '../pages/coaching/coaching_page.dart';
 import '../pages/coming_soon_page.dart';
@@ -26,6 +28,22 @@ import '../pages/simama/simama_page.dart';
 import 'enums.dart';
 
 void routePage(BuildContext ctx, String route, {String? title}) {
+  if (route == '/ci_assessment') {
+    Navigator.push(
+      ctx,
+      MaterialPageRoute(
+        builder: (context) => const CiAssessmentPage(),
+      ),
+    );
+  }
+  if (route == '/bbs') {
+    Navigator.push(
+      ctx,
+      MaterialPageRoute(
+        builder: (context) => const BbsPage(),
+      ),
+    );
+  }
   if (route == '/sap_report') {
     Navigator.push(
       ctx,

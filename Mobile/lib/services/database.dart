@@ -21,8 +21,27 @@ class DatabaseService {
   _initDatabase() async {
     var dbPath = await getDatabasesPath();
     var path = join(dbPath, 'isafe18.db');
-    return await openDatabase(path, version: 1, onCreate: _onCreate);
+    return await openDatabase(
+      path,
+      version: 2,
+      onCreate: _onCreate,
+      onUpgrade: _onUpgrade,
+    );
   }
+
+  Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) await _createOfflineSyncJobsTable(db);
+  }
+
+  Future<void> _createOfflineSyncJobsTable(Database db) => db.execute('''
+    CREATE TABLE IF NOT EXISTS offline_sync_jobs (
+      `id` TEXT PRIMARY KEY,
+      `feature` TEXT NOT NULL,
+      `local_id` TEXT NOT NULL,
+      `payload` TEXT NOT NULL,
+      `created_at` TEXT NOT NULL
+    );
+  ''');
 
   /// Hapus total database SQLite lokal (isafe18.db) untuk persiapan sinkronisasi ulang
   Future<void> clearDatabase() async {
@@ -696,6 +715,8 @@ class DatabaseService {
 			`deleted_at` TEXT
 		);
 		''');
+
+    await _createOfflineSyncJobsTable(db);
   }
 
   Future close() async {

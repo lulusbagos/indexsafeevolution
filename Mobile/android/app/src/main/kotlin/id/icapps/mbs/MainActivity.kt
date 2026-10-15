@@ -1,4 +1,4 @@
-package id.icapps.indexsafe
+package id.icapps.mbs
 
 import android.os.Build
 import android.os.Bundle

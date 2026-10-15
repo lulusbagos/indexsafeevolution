@@ -12,11 +12,12 @@ import '../models/notification_item_model.dart';
 import '../models/profile_model.dart';
 
 class ApiService {
-  // LOCAL = http://127.0.0.1:5200 (USB adb reverse or local network)
-  // LAN = http://192.168.0.6:5200
+  // Hotspot Tethering Laptop = http://192.168.137.1:5200
+  // Wi-Fi Kantor / LAN = http://192.168.130.236:5200
+  // USB ADB Reverse = http://127.0.0.1:5200
   // PROD = https://indexsafeevolution.indexim.id
-  final baseUrl = 'https://indexsafeevolution.indexim.id';
-  bool get isLocalDev => baseUrl.contains('192.168.0.6') || baseUrl.contains('127.0.0.1');
+  final baseUrl = 'http://192.168.137.1:5200';
+  bool get isLocalDev => baseUrl.contains('192.168.') || baseUrl.contains('127.0.0.1');
   final company = 'IC';
   late Dio dio;
 
@@ -119,7 +120,7 @@ class ApiService {
             dioErr.type == DioExceptionType.sendTimeout ||
             dioErr.type == DioExceptionType.receiveTimeout ||
             dioErr.type == DioExceptionType.unknown) {
-          final fallbackHost = baseUrl.contains('192.168.0.6')
+          final fallbackHost = baseUrl.contains('192.168.')
               ? 'http://127.0.0.1:5200'
               : baseUrl;
           final fallbackDio = Dio(BaseOptions(
@@ -166,7 +167,7 @@ class ApiService {
         if (dioErr.type == DioExceptionType.connectionTimeout ||
             dioErr.type == DioExceptionType.connectionError ||
             dioErr.type == DioExceptionType.unknown) {
-          final fallbackHost = baseUrl.contains('192.168.0.6')
+          final fallbackHost = baseUrl.contains('192.168.')
               ? 'http://127.0.0.1:5200'
               : baseUrl;
           final fallbackDio = Dio(BaseOptions(
@@ -459,7 +460,7 @@ class ApiService {
         if (dioErr.type == DioExceptionType.connectionTimeout ||
             dioErr.type == DioExceptionType.connectionError ||
             dioErr.response?.statusCode == 404) {
-          final fallbackHost = baseUrl.contains('192.168.0.6')
+          final fallbackHost = baseUrl.contains('192.168.')
               ? 'http://127.0.0.1:5200'
               : baseUrl;
           final fallbackDio = Dio(BaseOptions(
@@ -498,7 +499,7 @@ class ApiService {
         if (dioErr.type == DioExceptionType.connectionTimeout ||
             dioErr.type == DioExceptionType.connectionError ||
             dioErr.response?.statusCode == 404) {
-          final fallbackHost = baseUrl.contains('192.168.0.6')
+          final fallbackHost = baseUrl.contains('192.168.')
               ? 'http://127.0.0.1:5200'
               : baseUrl;
           final fallbackDio = Dio(BaseOptions(
@@ -534,7 +535,7 @@ class ApiService {
         if (dioErr.type == DioExceptionType.connectionTimeout ||
             dioErr.type == DioExceptionType.connectionError ||
             dioErr.response?.statusCode == 404) {
-          final fallbackHost = baseUrl.contains('192.168.0.6')
+          final fallbackHost = baseUrl.contains('192.168.')
               ? 'http://127.0.0.1:5200'
               : baseUrl;
           final fallbackDio = Dio(BaseOptions(
@@ -574,7 +575,7 @@ class ApiService {
         if (dioErr.type == DioExceptionType.connectionTimeout ||
             dioErr.type == DioExceptionType.connectionError ||
             dioErr.response?.statusCode == 404) {
-          final fallbackHost = baseUrl.contains('192.168.0.6')
+          final fallbackHost = baseUrl.contains('192.168.')
               ? 'http://127.0.0.1:5200'
               : baseUrl;
           final fallbackDio = Dio(BaseOptions(
@@ -671,7 +672,7 @@ class ApiService {
             dioErr.type == DioExceptionType.connectionError ||
             dioErr.type == DioExceptionType.unknown ||
             dioErr.response?.statusCode == 404) {
-          final fallbackHost = baseUrl.contains('192.168.0.6')
+          final fallbackHost = baseUrl.contains('192.168.')
               ? 'http://127.0.0.1:5200'
               : baseUrl;
           final fallbackDio = Dio(BaseOptions(
@@ -724,7 +725,7 @@ class ApiService {
             dioErr.type == DioExceptionType.connectionError ||
             dioErr.type == DioExceptionType.unknown ||
             dioErr.response?.statusCode == 404) {
-          final fallbackHost = baseUrl.contains('192.168.0.6')
+          final fallbackHost = baseUrl.contains('192.168.')
               ? 'http://127.0.0.1:5200'
               : baseUrl;
           final fallbackDio = Dio(BaseOptions(
@@ -766,7 +767,7 @@ class ApiService {
             dioErr.type == DioExceptionType.connectionError ||
             dioErr.type == DioExceptionType.unknown ||
             dioErr.response?.statusCode == 404) {
-          final fallbackHost = baseUrl.contains('192.168.0.6')
+          final fallbackHost = baseUrl.contains('192.168.')
               ? 'http://127.0.0.1:5200/api'
               : '$baseUrl/api';
           final fallbackDio = Dio(BaseOptions(
@@ -821,7 +822,7 @@ class ApiService {
             dioErr.type == DioExceptionType.connectionError ||
             dioErr.type == DioExceptionType.unknown ||
             dioErr.response?.statusCode == 404) {
-          final fallbackHost = baseUrl.contains('192.168.0.6')
+          final fallbackHost = baseUrl.contains('192.168.')
               ? 'http://127.0.0.1:5200/api'
               : '$baseUrl/api';
           final fallbackDio = Dio(BaseOptions(
@@ -880,7 +881,7 @@ class ApiService {
             dioErr.type == DioExceptionType.connectionError ||
             dioErr.type == DioExceptionType.unknown ||
             dioErr.response?.statusCode == 404) {
-          final fallbackHost = baseUrl.contains('192.168.0.6')
+          final fallbackHost = baseUrl.contains('192.168.')
               ? 'http://127.0.0.1:5200/api'
               : '$baseUrl/api';
           final fallbackDio = Dio(BaseOptions(
@@ -930,7 +931,7 @@ class ApiService {
             dioErr.type == DioExceptionType.connectionError ||
             dioErr.type == DioExceptionType.unknown ||
             dioErr.response?.statusCode == 404) {
-          final fallbackHost = baseUrl.contains('192.168.0.6')
+          final fallbackHost = baseUrl.contains('192.168.')
               ? 'http://127.0.0.1:5200/api'
               : '$baseUrl/api';
           final fallbackDio = Dio(BaseOptions(
@@ -967,7 +968,7 @@ class ApiService {
             dioErr.type == DioExceptionType.connectionError ||
             dioErr.type == DioExceptionType.unknown ||
             dioErr.response?.statusCode == 404) {
-          final fallbackHost = baseUrl.contains('192.168.0.6')
+          final fallbackHost = baseUrl.contains('192.168.')
               ? 'http://127.0.0.1:5200/api'
               : '$baseUrl/api';
           final fallbackDio = Dio(BaseOptions(
@@ -1005,7 +1006,7 @@ class ApiService {
             dioErr.type == DioExceptionType.connectionError ||
             dioErr.type == DioExceptionType.unknown ||
             dioErr.response?.statusCode == 404) {
-          final fallbackHost = baseUrl.contains('192.168.0.6')
+          final fallbackHost = baseUrl.contains('192.168.')
               ? 'http://127.0.0.1:5200/api'
               : '$baseUrl/api';
           final fallbackDio = Dio(BaseOptions(
@@ -1026,6 +1027,100 @@ class ApiService {
         return Right(list);
       }
       return const Right([]);
+    } on DioException catch (err) {
+      return Left(errorHandler(err));
+    }
+  }
+
+  Future<Either<Map, List<Map<String, dynamic>>>> getSafeMapHazardPoints({
+    int days = 30,
+    bool onlyOpen = true,
+    double? lat,
+    double? lon,
+  }) async {
+    try {
+      if (_token != null && _token!.isNotEmpty) {
+        dio.options.headers['Authorization'] = 'Bearer $getToken';
+      }
+
+      final params = <String, dynamic>{
+        'days': days,
+        'onlyOpen': onlyOpen,
+      };
+      if (lat != null && lon != null) {
+        params['userLat'] = lat;
+        params['userLon'] = lon;
+      }
+
+      Response res;
+      try {
+        res = await dio.get('/performance/safemap', queryParameters: params);
+      } on DioException catch (dioErr) {
+        if (dioErr.type == DioExceptionType.connectionTimeout ||
+            dioErr.type == DioExceptionType.connectionError ||
+            dioErr.type == DioExceptionType.unknown ||
+            dioErr.response?.statusCode == 404) {
+          final fallbackHost = baseUrl.contains('192.168.')
+              ? 'http://127.0.0.1:5200/api'
+              : '$baseUrl/api';
+          final fallbackDio = Dio(BaseOptions(
+            baseUrl: fallbackHost,
+            headers: dio.options.headers,
+            connectTimeout: const Duration(seconds: 6),
+          ));
+          res = await fallbackDio.get('/performance/safemap', queryParameters: params);
+        } else {
+          rethrow;
+        }
+      }
+
+      if (res.data is Map) {
+        final dataMap = res.data['data'];
+        if (dataMap is Map && dataMap['hazardPoints'] is List) {
+          final list = (dataMap['hazardPoints'] as List)
+              .map((e) => Map<String, dynamic>.from(e as Map))
+              .toList();
+          return Right(list);
+        }
+      }
+      return const Right([]);
+    } on DioException catch (err) {
+      return Left(errorHandler(err));
+    }
+  }
+
+  Future<Either<Map, Map<String, dynamic>>> getHazardDetailById(int id) async {
+    try {
+      if (_token != null && _token!.isNotEmpty) {
+        dio.options.headers['Authorization'] = 'Bearer $getToken';
+      }
+
+      Response res;
+      try {
+        res = await dio.get('/performance/safemap/hazard/$id');
+      } on DioException catch (dioErr) {
+        if (dioErr.type == DioExceptionType.connectionTimeout ||
+            dioErr.type == DioExceptionType.connectionError ||
+            dioErr.type == DioExceptionType.unknown ||
+            dioErr.response?.statusCode == 404) {
+          final fallbackHost = baseUrl.contains('192.168.')
+              ? 'http://127.0.0.1:5200/api'
+              : '$baseUrl/api';
+          final fallbackDio = Dio(BaseOptions(
+            baseUrl: fallbackHost,
+            headers: dio.options.headers,
+            connectTimeout: const Duration(seconds: 6),
+          ));
+          res = await fallbackDio.get('/performance/safemap/hazard/$id');
+        } else {
+          rethrow;
+        }
+      }
+
+      if (res.data is Map && res.data['data'] is Map) {
+        return Right(Map<String, dynamic>.from(res.data['data'] as Map));
+      }
+      return const Right({});
     } on DioException catch (err) {
       return Left(errorHandler(err));
     }

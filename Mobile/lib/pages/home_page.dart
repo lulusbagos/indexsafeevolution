@@ -9,7 +9,7 @@ import '../services/api.dart';
 import '../services/preference.dart';
 import '../utils/globals.dart' as globals;
 import 'dashboard_page.dart';
-import 'hazard/hazard_create_page.dart';
+import 'hazard/hazard_form_page.dart';
 import 'profile_page.dart';
 import 'safety_updates_page.dart';
 import 'scan_page.dart';
@@ -140,36 +140,27 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget bottomNavBar() {
-    final bottomInset = MediaQuery.of(context).padding.bottom;
-    final screenWidth = MediaQuery.of(context).size.width;
-    final centerGap = screenWidth < 360 ? 38.0 : 48.0;
-
     return SizedBox(
-      height: 100 + bottomInset,
+      height: 122,
       child: Stack(
         clipBehavior: Clip.none,
         children: [
           Positioned.fill(
-            top: 18,
+            top: 27,
             child: Container(
               decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius:
-                    const BorderRadius.vertical(top: Radius.circular(28)),
-                border: const Border(
-                  top: BorderSide(color: Color(0xFFE2E8F0), width: 1.0),
-                ),
-                boxShadow: [
+                color:
+                    Theme.of(context).bottomAppBarTheme.color ?? Colors.white,
+                boxShadow: const [
                   BoxShadow(
-                    color: const Color(0xFF0F172A).withValues(alpha: 0.06),
-                    blurRadius: 24,
-                    offset: const Offset(0, -6),
+                    color: Color(0x1A0F172A),
+                    blurRadius: 18,
+                    offset: Offset(0, -4),
                   ),
                 ],
               ),
               child: SafeArea(
                 top: false,
-                bottom: true,
                 child: Row(
                   children: [
                     Expanded(
@@ -180,19 +171,18 @@ class _HomePageState extends State<HomePage> {
                       ),
                     ),
                     Expanded(
-                      child: Padding(
-                        padding: const EdgeInsets.only(right: 4),
+                      child: Transform.translate(
+                        offset: const Offset(-8, 0),
                         child: _bottomItem(
                           index: 1,
                           icon: Icons.health_and_safety_rounded,
-                          label: 'Updates',
+                          label: 'Safety Updates',
                         ),
                       ),
                     ),
-                    SizedBox(width: centerGap), // Responsive gap for center Quick Hazard FAB
                     Expanded(
-                      child: Padding(
-                        padding: const EdgeInsets.only(left: 4),
+                      child: Transform.translate(
+                        offset: const Offset(8, 0),
                         child: _bottomItem(
                           index: 3,
                           icon: Icons.qr_code_scanner_rounded,
@@ -224,19 +214,18 @@ class _HomePageState extends State<HomePage> {
                   onTap: _openQuickHazard,
                   customBorder: const CircleBorder(),
                   child: Container(
-                    width: 62,
-                    height: 62,
-                    padding: const EdgeInsets.all(2.5),
+                    width: 70,
+                    height: 70,
+                    padding: const EdgeInsets.all(3),
                     decoration: BoxDecoration(
                       color: Colors.white,
                       shape: BoxShape.circle,
                       border: Border.all(color: Colors.white, width: 3),
-                      boxShadow: [
+                      boxShadow: const [
                         BoxShadow(
-                          color:
-                              const Color(0xFF0284C7).withValues(alpha: 0.28),
+                          color: Color(0x401D4ED8),
                           blurRadius: 16,
-                          offset: const Offset(0, 5),
+                          offset: Offset(0, 7),
                         ),
                       ],
                     ),
@@ -261,57 +250,32 @@ class _HomePageState extends State<HomePage> {
   }) {
     final selected = _currentPage == index;
     final color = selected
-        ? const Color(0xFF0D9488) // Brand Teal
-        : const Color(0xFF64748B);
+        ? Theme.of(context).colorScheme.primary
+        : const Color(0xFF667085);
 
     return InkWell(
       onTap: () {
-        if (_currentPage == index) return;
-        HapticFeedback.selectionClick();
-        if ((index - _currentPage).abs() > 1) {
-          _pageCtrl.jumpToPage(index);
-        } else {
-          _pageCtrl.animateToPage(
-            index,
-            duration: const Duration(milliseconds: 220),
-            curve: Curves.easeOutCubic,
-          );
-        }
+        _pageCtrl.animateToPage(
+          index,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOutCubic,
+        );
       },
-      borderRadius: BorderRadius.circular(16),
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 4),
+        padding: const EdgeInsets.only(top: 10),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 10, vertical: 3.5),
-              decoration: BoxDecoration(
-                color: selected
-                    ? const Color(0xFFCCFBF1).withValues(alpha: 0.6)
-                    : Colors.transparent,
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: Icon(
-                icon,
-                size: 23,
+            Icon(icon, size: 27, color: color),
+            const SizedBox(height: 4),
+            Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
                 color: color,
-              ),
-            ),
-            const SizedBox(height: 2),
-            FittedBox(
-              fit: BoxFit.scaleDown,
-              child: Text(
-                label,
-                maxLines: 1,
-                style: TextStyle(
-                  color: color,
-                  fontSize: 10.5,
-                  fontWeight: selected ? FontWeight.w800 : FontWeight.w500,
-                  letterSpacing: 0.1,
-                ),
+                fontSize: 10,
+                fontWeight: selected ? FontWeight.w800 : FontWeight.w500,
               ),
             ),
           ],
@@ -323,7 +287,7 @@ class _HomePageState extends State<HomePage> {
   void _openQuickHazard() {
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (context) => const HazardCreatePage()),
+      MaterialPageRoute(builder: (context) => const HazardFormPage()),
     );
   }
 }

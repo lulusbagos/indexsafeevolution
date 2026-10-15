@@ -113,10 +113,8 @@ class _InspeksiCheckitemPageState extends State<InspeksiCheckitemPage> {
                     ],
                     if (_isCustomRadio) ...[
                       const SizedBox(height: 18),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        alignment: WrapAlignment.center,
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: _customOptions.map((option) {
                           return ChoiceChip(
                             selected: widget.checkList.remark == option,
@@ -133,10 +131,8 @@ class _InspeksiCheckitemPageState extends State<InspeksiCheckitemPage> {
                     ],
                     if (!_isFreeText && !_isCustomRadio) ...[
                       const SizedBox(height: 18),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        alignment: WrapAlignment.center,
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           ChoiceChip(
                             selected: widget.checkList.yesno == 1,
@@ -311,10 +307,8 @@ class _InspeksiCheckitemPageState extends State<InspeksiCheckitemPage> {
                               widget.checkList.remark != '')
                           ? true
                           : false,
-                      child: Wrap(
-                        spacing: 10,
-                        runSpacing: 8,
-                        alignment: WrapAlignment.center,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           ChoiceChip(
                             selected: widget.checkList.repair == 1,

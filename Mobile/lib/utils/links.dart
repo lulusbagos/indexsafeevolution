@@ -74,6 +74,20 @@ List<LinkMenuModel> listMenuSap = <LinkMenuModel>[
     route: '/coaching',
     opacity: 1,
   ),
+  LinkMenuModel(
+    title: 'BBS',
+    icon: Icons.groups_2_rounded,
+    image: '',
+    route: '/bbs',
+    opacity: 1,
+  ),
+  LinkMenuModel(
+    title: 'Index\nCondition',
+    icon: Icons.analytics_rounded,
+    image: '',
+    route: '/ci_assessment',
+    opacity: 1,
+  ),
 ];
 
 List<LinkMenuModel> listMenuOhs1 = <LinkMenuModel>[
@@ -136,6 +150,13 @@ List<LinkMenuModel> listMenuExtra = <LinkMenuModel>[
     icon: Icons.emoji_events_rounded,
     image: '',
     route: '/sap_league',
+    opacity: 1,
+  ),
+  LinkMenuModel(
+    title: 'Informasi\nInsiden',
+    icon: Icons.newspaper_rounded,
+    image: '',
+    route: '/sap_incident_information',
     opacity: 1,
   ),
   LinkMenuModel(

@@ -695,5 +695,55 @@ namespace Indexsafe.Api.Controllers
 
             return Ok(new { success = true, data = results });
         }
+
+        /// <summary>
+        /// GET /api/hazard/detail/{id}
+        /// GET /api/hazard/{id}
+        /// Mengambil detail lengkap satu temuan Hazard.
+        /// </summary>
+        [HttpGet("detail/{id}")]
+        [HttpGet("{id}")]
+        public async Task<IActionResult> GetHazardDetail(int id)
+        {
+            var h = await _context.HazardReports
+                .AsNoTracking()
+                .FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted);
+
+            if (h == null)
+            {
+                return NotFound(new { success = false, message = "Data Hazard tidak ditemukan." });
+            }
+
+            return Ok(new
+            {
+                success = true,
+                data = new
+                {
+                    id = h.Id,
+                    tanggal = h.Tanggal.ToString("yyyy-MM-dd"),
+                    waktu = $"{h.Waktu.Hours:D2}:{h.Waktu.Minutes:D2}",
+                    nama = h.Nama,
+                    nik = h.Nik,
+                    departemen = h.Departemen,
+                    area = h.Area,
+                    lokasi = h.Lokasi,
+                    detil_lokasi = h.DetilLokasi,
+                    temuan = h.Temuan,
+                    kategori_bahaya = h.KategoriBahaya,
+                    jenis_bahaya = h.JenisBahaya,
+                    jenis_ketidaksesuaian = h.JenisKetidaksesuaian,
+                    tingkat_resiko = h.TingkatResiko ?? "Rendah",
+                    perbaikan = h.Perbaikan,
+                    tindakan_perbaikan = h.TindakanPerbaikan,
+                    pja = h.Pja,
+                    nik_pja = h.NikPja,
+                    departemen_pja = h.DepartemenPja,
+                    status_temuan = h.StatusTemuan,
+                    foto_temuan = h.FotoTemuan,
+                    foto_perbaikan = h.FotoPerbaikan,
+                    created_at = h.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss")
+                }
+            });
+        }
     }
 }

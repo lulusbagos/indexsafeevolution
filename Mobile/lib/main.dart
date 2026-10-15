@@ -15,7 +15,7 @@ Future<void> main() async {
   await PreferenceService.init();
   await NotificationService.init();
   await BackgroundService.instance.init();
-  OfflineSyncService.instance.initAutoSyncListener();
+  await OfflineSyncService.instance.init();
 
   runApp(const MyApp());
 }

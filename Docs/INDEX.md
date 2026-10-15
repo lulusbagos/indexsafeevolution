@@ -14,6 +14,7 @@ Dokumentasi ini disusun secara terstruktur berdasarkan hasil analisis mendalam t
 | **03** | [**03_SPESIFIKASI_API_CONTRACT.md**](file:///d:/4.%20PROJECT/13.%20Mobile/Indexsafe%20Evolution/Docs/03_SPESIFIKASI_API_CONTRACT.md) | Kontrak REST API lengkap yang dibutuhkan oleh mobile client: Endpoint, HTTP Method, Headers, Payload JSON/FormData, format response, dan penanganan error. |
 | **04** | [**04_DESAIN_BACKEND_ASPNET_SQLSERVER.md**](file:///d:/4.%20PROJECT/13.%20Mobile/Indexsafe%20Evolution/Docs/04_DESAIN_BACKEND_ASPNET_SQLSERVER.md) | Cetak biru arsitektur backend **ASP.NET Core (.NET 8/9)** teroptimasi untuk beban transaksi berat di **SQL Server Windows Server** (Bulk insert, Idempotency, Background Service). |
 | **05** | [**05_PANDUAN_LANGKAH_PENGEMBANGAN.md**](file:///d:/4.%20PROJECT/13.%20Mobile/Indexsafe%20Evolution/Docs/05_PANDUAN_LANGKAH_PENGEMBANGAN.md) | Panduan langkah demi langkah (roadmap) praktis untuk memulai pembuatan backend kapan saja Anda siap. |
+| **06** | [**PANDUAN_BUILD_DAN_PUBLISH_HP.md**](file:///d:/4.%20PROJECT/13.%20Mobile/Indexsafe%20Evolution/Docs/PANDUAN_BUILD_DAN_PUBLISH_HP.md) | Panduan kompilasi dan instalasi APK ke HP fisik dengan trik bypass ManageEngine Endpoint Central. |
 
 ---
 

@@ -1,570 +1,241 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
-import '../../models/link_model.dart';
+import '../../pages/home_page.dart';
+import '../../pages/notif_page.dart';
 import '../../services/offline_sync_service.dart';
+import '../../utils/globals.dart' as globals;
 import '../../utils/links.dart';
 import '../../utils/routers.dart';
-import '../../widgets/ambient_background.dart';
-import '../../widgets/top_bar.dart';
-import '../sync/pending_sync_page.dart';
 
-class SapPage extends StatefulWidget {
+const _ink = Color(0xFF0D2F31);
+const _green = Color(0xFF0AA45A);
+
+class SapPage extends StatelessWidget {
   const SapPage({super.key});
 
   @override
-  State<SapPage> createState() => _SapPageState();
-}
-
-class _SapPageState extends State<SapPage> {
-  final OfflineSyncService _syncService = OfflineSyncService();
-  int _pendingCount = 0;
-  bool _isSyncing = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _checkPendingSync();
-    _syncService.pendingCountNotifier.addListener(_onPendingCountChanged);
-    _syncService.isSyncingNotifier.addListener(_onSyncingChanged);
-  }
-
-  @override
-  void dispose() {
-    _syncService.pendingCountNotifier.removeListener(_onPendingCountChanged);
-    _syncService.isSyncingNotifier.removeListener(_onSyncingChanged);
-    super.dispose();
-  }
-
-  void _onPendingCountChanged() {
-    if (mounted) {
-      setState(() {
-        _pendingCount = _syncService.pendingCountNotifier.value;
-      });
-    }
-  }
-
-  void _onSyncingChanged() {
-    if (mounted) {
-      setState(() {
-        _isSyncing = _syncService.isSyncingNotifier.value;
-      });
-    }
-  }
-
-  Future<void> _checkPendingSync() async {
-    final count = await _syncService.refreshPendingCount();
-    if (!mounted) return;
-    setState(() {
-      _pendingCount = count;
-    });
-  }
-
-  Future<void> _syncNow() async {
-    if (_isSyncing) return;
-    if (_pendingCount == 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Semua data lokal sudah tersinkronkan ke server.'),
-          backgroundColor: Color(0xFF16A34A),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-      return;
-    }
-
-    setState(() => _isSyncing = true);
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Menyinkronkan data offline ke server...'),
-        backgroundColor: Color(0xFF2563EB),
-        behavior: SnackBarBehavior.floating,
-        duration: Duration(seconds: 2),
-      ),
-    );
-
-    final res = await _syncService.syncAll();
-    if (!mounted) return;
-    setState(() => _isSyncing = false);
-
-    if (res.failed == 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-              'Sinkronisasi selesai! ${res.success} transaksi berhasil dikirim ke server.'),
-          backgroundColor: const Color(0xFF16A34A),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-              'Sinkronisasi: ${res.success} berhasil, ${res.failed} gagal/menunggu jaringan.'),
-          backgroundColor: const Color(0xFFDC2626),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-    }
-    _checkPendingSync();
-  }
-
-  void _openPendingSyncPage() async {
-    try {
-      HapticFeedback.lightImpact();
-    } catch (_) {}
-    await Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => const PendingSyncPage()),
-    );
-    _checkPendingSync();
-  }
-
-  LinkMenuModel _findMenuItem(String route) {
-    return listMenuSap.firstWhere(
-      (m) => m.route == route,
-      orElse: () => LinkMenuModel(
-          title: '', icon: Icons.widgets_rounded, image: '', route: route, opacity: 1),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final hasPending = _pendingCount > 0;
-
-    final hazard = _findMenuItem('/hazard_report');
-    final inspection = _findMenuItem('/inspection');
-    final observation = _findMenuItem('/observation');
-    final safetyTalk = _findMenuItem('/safety_talk');
-    final coaching = _findMenuItem('/coaching');
-    final sapReport = _findMenuItem('/sap_report');
-
-    final groupReporting = [
-      _FioriItemData(
-        title: 'Hazard Report',
-        subtitle: 'Pelaporan Bahaya KTA & TTA',
-        description: 'Formulir pelaporan temuan kondisi dan tindakan tidak aman secara langsung di lapangan.',
-        tag: 'PRIORITAS K3',
-        tagColor: const Color(0xFFDC2626),
-        tagBgColor: const Color(0xFFFEF2F2),
-        image: hazard.image,
-        fallbackIcon: Icons.warning_amber_rounded,
-        route: hazard.route,
-      ),
-      _FioriItemData(
-        title: 'Observation',
-        subtitle: 'Observasi Perilaku K3 (BBS)',
-        description: 'Observasi interaksi kerja selamat dan pembudayaan kebiasaan aman antar karyawan.',
-        tag: 'BEHAVIOR SAFETY',
-        tagColor: const Color(0xFF0D9488),
-        tagBgColor: const Color(0xFFF0FDFA),
-        image: observation.image,
-        fallbackIcon: Icons.visibility_rounded,
-        route: observation.route,
-      ),
-    ];
-
-    final groupInspection = [
-      _FioriItemData(
-        title: 'Inspection',
-        subtitle: 'Inspeksi Keselamatan Terencana',
-        description: 'Pemeriksaan standar keselamatan kerja dan kepatuhan prosedur operasional tambang.',
-        tag: 'AUDIT TERENCANA',
-        tagColor: const Color(0xFF059669),
-        tagBgColor: const Color(0xFFECFDF5),
-        image: inspection.image,
-        fallbackIcon: Icons.fact_check_rounded,
-        route: inspection.route,
-      ),
-      _FioriItemData(
-        title: 'Safety Talk',
-        subtitle: 'Briefing 5M Pra-Shift',
-        description: 'Penyampaian materi komunikasi K3, pengenalan bahaya harian, dan absensi tim shift.',
-        tag: 'BRIEFING PRA-SHIFT',
-        tagColor: const Color(0xFF4F46E5),
-        tagBgColor: const Color(0xFFEEF2FF),
-        image: safetyTalk.image,
-        fallbackIcon: Icons.record_voice_over_rounded,
-        route: safetyTalk.route,
-      ),
-    ];
-
-    final groupReview = [
-      _FioriItemData(
-        title: 'Coaching',
-        subtitle: 'Bimbingan Konseling K3',
-        description: 'Program pendampingan, konseling personal, dan evaluasi kepatuhan keselamatan kerja.',
-        tag: 'EDUKASI & COACHING',
-        tagColor: const Color(0xFFE11D48),
-        tagBgColor: const Color(0xFFFFF1F2),
-        image: coaching.image,
-        fallbackIcon: Icons.psychology_rounded,
-        route: coaching.route,
-      ),
-      _FioriItemData(
-        title: 'SAP Report',
-        subtitle: 'Statistik & Rekapitulasi',
-        description: 'Laporan komprehensif, evaluasi tren kinerja, dan riwayat akuntabilitas K3 departemen.',
-        tag: 'ANALYTICS & REKAP',
-        tagColor: const Color(0xFF2563EB),
-        tagBgColor: const Color(0xFFEFF6FF),
-        image: sapReport.image,
-        fallbackIcon: Icons.bar_chart_rounded,
-        route: sapReport.route,
-      ),
-    ];
-
-    return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
-      appBar: const TopBar(title: 'Safety Accountability Program'),
-      body: AmbientBackground(
-        child: RefreshIndicator(
-          onRefresh: _checkPendingSync,
-          color: const Color(0xFF2563EB),
-          child: SingleChildScrollView(
-            physics: const AlwaysScrollableScrollPhysics(
-              parent: BouncingScrollPhysics(),
+  Widget build(BuildContext context) => Scaffold(
+        backgroundColor: const Color(0xFFF5F9F8),
+        body: SafeArea(
+          child: Column(children: [
+            _header(context),
+            Expanded(
+              child: CustomScrollView(slivers: [
+                SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 30),
+                  sliver: SliverList(
+                    delegate: SliverChildListDelegate([
+                      const Text('Pilih Aktivitas',
+                          style: TextStyle(
+                              color: _ink,
+                              fontSize: 18,
+                              fontWeight: FontWeight.w900)),
+                      const SizedBox(height: 10),
+                    ]),
+                  ),
+                ),
+                SliverPadding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  sliver: SliverGrid(
+                    delegate: SliverChildBuilderDelegate(
+                      (context, index) => _moduleCard(context, index),
+                      childCount: listMenuSap.length,
+                    ),
+                    gridDelegate:
+                        const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 3,
+                      mainAxisSpacing: 10,
+                      crossAxisSpacing: 10,
+                      childAspectRatio: .92,
+                    ),
+                  ),
+                ),
+                const SliverToBoxAdapter(child: SizedBox(height: 30)),
+              ]),
             ),
-            padding: const EdgeInsets.fromLTRB(16, 14, 16, 32),
+          ]),
+        ),
+      );
+
+  Widget _header(BuildContext context) => Padding(
+        padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
+        child: Row(children: [
+          _roundButton(
+              icon: Icons.chevron_left_rounded,
+              onTap: () => Navigator.maybePop(context)),
+          const SizedBox(width: 10),
+          const Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // 1. ALERT SYNC HANYA JIKA ADA DATA PENDING
-                if (hasPending) ...[
-                  _buildPendingAlertBar(),
-                  const SizedBox(height: 14),
-                ],
-
-                // 2. DOMAIN 1: PELAPORAN BAHAYA & OBSERVASI
-                _buildDomainSection(
-                  domainTitle: 'Pelaporan & Temuan Lapangan',
-                  domainCount: '2 Modul',
-                  items: groupReporting,
-                ),
-
-                const SizedBox(height: 20),
-
-                // 3. DOMAIN 2: INSPEKSI & EDUKASI K3
-                _buildDomainSection(
-                  domainTitle: 'Inspeksi & Komunikasi K3',
-                  domainCount: '2 Modul',
-                  items: groupInspection,
-                ),
-
-                const SizedBox(height: 20),
-
-                // 4. DOMAIN 3: PEMBINAAN & REKAPITULASI
-                _buildDomainSection(
-                  domainTitle: 'Pembinaan & Evaluasi Program',
-                  domainCount: '2 Modul',
-                  items: groupReview,
-                ),
+                Text('Safety Activity',
+                    style: TextStyle(
+                        color: _ink,
+                        fontSize: 22,
+                        height: 1,
+                        fontWeight: FontWeight.w900)),
+                SizedBox(height: 4),
+                Text('Catat hari ini, lebih aman esok hari',
+                    style: TextStyle(color: Color(0xFF68757B), fontSize: 11)),
               ],
             ),
           ),
-        ),
-      ),
-    );
-  }
-
-  /// Baris Notifikasi Pending Data Ringkas & Bersih
-  Widget _buildPendingAlertBar() {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: _openPendingSyncPage,
-        borderRadius: BorderRadius.circular(14),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-          decoration: BoxDecoration(
-            color: const Color(0xFFFFFBEB),
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: const Color(0xFFFDE68A), width: 1.2),
-          ),
-          child: Row(
-            children: [
-              const Icon(Icons.cloud_upload_outlined,
-                  color: Color(0xFFD97706), size: 19),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  '$_pendingCount data lokal siap disinkronkan',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF92400E),
-                  ),
-                ),
+          ValueListenableBuilder<OfflineSyncState>(
+            valueListenable: OfflineSyncService.instance.state,
+            builder: (_, state, __) =>
+                Stack(clipBehavior: Clip.none, children: [
+              _roundButton(
+                icon: state.isOnline
+                    ? Icons.sync_rounded
+                    : Icons.cloud_off_rounded,
+                color: state.pendingCount > 0 || !state.isOnline
+                    ? const Color(0xFFDC2626)
+                    : _green,
+                onTap: () => OfflineSyncService.instance.syncNow(),
               ),
-              TextButton(
-                onPressed: _isSyncing ? null : _syncNow,
-                style: TextButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  minimumSize: Size.zero,
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  backgroundColor: const Color(0xFFD97706),
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-                child: _isSyncing
-                    ? const SizedBox(
-                        width: 12,
-                        height: 12,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
-                        ),
-                      )
-                    : const Text(
-                        'Sinkronkan',
-                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
-                      ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  /// Section Header & List of Fiori Tiles
-  Widget _buildDomainSection({
-    required String domainTitle,
-    required String domainCount,
-    required List<_FioriItemData> items,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                domainTitle,
-                style: const TextStyle(
-                  fontSize: 14.5,
-                  fontWeight: FontWeight.w800,
-                  color: Color(0xFF0F172A),
-                  letterSpacing: -0.2,
-                ),
-              ),
-              Text(
-                domainCount,
-                style: TextStyle(
-                  fontSize: 11.5,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.blueGrey.shade500,
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 8),
-        ListView.separated(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          itemCount: items.length,
-          separatorBuilder: (_, __) => const SizedBox(height: 10),
-          itemBuilder: (context, index) {
-            return _buildFioriWorklistCard(items[index]);
-          },
-        ),
-      ],
-    );
-  }
-
-  /// Authentic SAP Fiori Enterprise Worklist Card
-  Widget _buildFioriWorklistCard(_FioriItemData item) {
-    return _AnimatedPressable(
-      onTap: () {
-        if (item.route.isNotEmpty) {
-          routePage(context, item.route, title: item.title);
-        }
-      },
-      child: Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: const Color(0xFFE2E8F0), width: 1.1),
-          boxShadow: const [
-            BoxShadow(
-              color: Color(0x050F172A),
-              blurRadius: 8,
-              offset: Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Leading Icon Container
-            Container(
-              width: 48,
-              height: 48,
-              decoration: BoxDecoration(
-                color: const Color(0xFFF8FAFC),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFFE2E8F0)),
-              ),
-              padding: const EdgeInsets.all(8),
-              child: item.image.isNotEmpty
-                  ? Image.asset(
-                      item.image,
-                      fit: BoxFit.contain,
-                      errorBuilder: (_, __, ___) => Icon(
-                        item.fallbackIcon,
-                        color: const Color(0xFF1E3A8A),
-                        size: 26,
-                      ),
-                    )
-                  : Icon(
-                      item.fallbackIcon,
-                      color: const Color(0xFF1E3A8A),
-                      size: 26,
-                    ),
-            ),
-            const SizedBox(width: 14),
-
-            // Center Content
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: item.tagBgColor,
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          item.tag,
-                          style: TextStyle(
-                            color: item.tagColor,
+              if (state.pendingCount > 0)
+                Positioned(
+                  top: -2,
+                  right: -2,
+                  child: CircleAvatar(
+                    radius: 9,
+                    backgroundColor: const Color(0xFFDC2626),
+                    child: Text('${state.pendingCount}',
+                        style: const TextStyle(
+                            color: Colors.white,
                             fontSize: 9,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: 0.3,
-                          ),
-                        ),
-                      ),
-                    ],
+                            fontWeight: FontWeight.w800)),
                   ),
-                  const SizedBox(height: 5),
-                  Text(
-                    item.title,
-                    style: const TextStyle(
-                      fontSize: 15.5,
-                      fontWeight: FontWeight.w700,
-                      color: Color(0xFF0F172A),
-                      letterSpacing: -0.2,
-                    ),
-                  ),
-                  const SizedBox(height: 3),
-                  Text(
-                    item.description,
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
-                      color: Colors.blueGrey.shade600,
-                      height: 1.35,
-                    ),
-                  ),
-                ],
-              ),
-            ),
+                ),
+            ]),
+          ),
+          const SizedBox(width: 7),
+          _roundButton(
+              icon: Icons.notifications_none_rounded,
+              onTap: () => Navigator.push(context,
+                  MaterialPageRoute(builder: (_) => const NotifPage()))),
+          const SizedBox(width: 7),
+          _roundButton(
+            icon: Icons.account_circle_outlined,
+            onTap: () {
+              globals.currentPage = 4;
+              Navigator.pushAndRemoveUntil(
+                  context,
+                  MaterialPageRoute(builder: (_) => const HomePage()),
+                  (_) => false);
+            },
+          ),
+        ]),
+      );
 
-            // Trailing Chevron Indicator
-            const SizedBox(width: 8),
-            Padding(
-              padding: const EdgeInsets.only(top: 14),
-              child: Icon(
-                Icons.arrow_forward_ios_rounded,
-                size: 14,
-                color: Colors.grey.shade400,
-              ),
+  Widget _moduleCard(BuildContext context, int index) {
+    final item = listMenuSap[index];
+    final style = _styles[index];
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(23),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(23),
+        onTap: () => routePage(context, item.route, title: item.title),
+        child: Ink(
+          padding: const EdgeInsets.all(11),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(23),
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [Colors.white, style.color.withValues(alpha: .07)],
             ),
-          ],
+            border: Border.all(color: style.color.withValues(alpha: .14)),
+            boxShadow: const [
+              BoxShadow(
+                  color: Color(0x140B2B33),
+                  blurRadius: 14,
+                  offset: Offset(0, 7))
+            ],
+          ),
+          child: Stack(children: [
+            Positioned(
+                right: -17,
+                top: 8,
+                child: Icon(style.icon,
+                    size: 92, color: style.color.withValues(alpha: .075))),
+            Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Container(
+                height: 43,
+                width: 43,
+                decoration: BoxDecoration(
+                    color: style.color,
+                    borderRadius: BorderRadius.circular(13),
+                    boxShadow: [
+                      BoxShadow(
+                          color: style.color.withValues(alpha: .28),
+                          blurRadius: 10,
+                          offset: const Offset(0, 5))
+                    ]),
+                child: Icon(style.icon, color: Colors.white, size: 23),
+              ),
+              const SizedBox(height: 7),
+              Expanded(
+                child: Center(
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(item.title,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                            color: _ink,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w900)),
+                  ),
+                ),
+              ),
+            ]),
+          ]),
         ),
       ),
     );
   }
+
+  Widget _roundButton(
+          {required IconData icon,
+          required VoidCallback onTap,
+          Color color = _ink}) =>
+      Material(
+        color: const Color(0xFFF1F6F4),
+        borderRadius: BorderRadius.circular(16),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(16),
+          child: SizedBox(
+              height: 40, width: 40, child: Icon(icon, color: color, size: 23)),
+        ),
+      );
 }
 
-class _FioriItemData {
-  final String title;
-  final String subtitle;
+class _ModuleStyle {
+  const _ModuleStyle(this.color, this.icon, this.description);
+  final Color color;
+  final IconData icon;
   final String description;
-  final String tag;
-  final Color tagColor;
-  final Color tagBgColor;
-  final String image;
-  final IconData fallbackIcon;
-  final String route;
-
-  const _FioriItemData({
-    required this.title,
-    required this.subtitle,
-    required this.description,
-    required this.tag,
-    required this.tagColor,
-    required this.tagBgColor,
-    required this.image,
-    required this.fallbackIcon,
-    required this.route,
-  });
 }
 
-/// Widget Interaktif: Animasi Bouncing Scale saat disentuh + Haptic Feedback
-class _AnimatedPressable extends StatefulWidget {
-  final Widget child;
-  final VoidCallback onTap;
-
-  const _AnimatedPressable({
-    required this.child,
-    required this.onTap,
-  });
-
-  @override
-  State<_AnimatedPressable> createState() => _AnimatedPressableState();
-}
-
-class _AnimatedPressableState extends State<_AnimatedPressable> {
-  bool _isPressed = false;
-
-  void _onTapDown(TapDownDetails _) {
-    setState(() => _isPressed = true);
-    try {
-      HapticFeedback.lightImpact();
-    } catch (_) {}
-  }
-
-  void _onTapCancel() {
-    setState(() => _isPressed = false);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTapDown: _onTapDown,
-      onTapCancel: _onTapCancel,
-      onTap: () {
-        setState(() => _isPressed = false);
-        widget.onTap();
-      },
-      behavior: HitTestBehavior.opaque,
-      child: AnimatedScale(
-        scale: _isPressed ? 0.97 : 1.0,
-        duration: const Duration(milliseconds: 120),
-        curve: Curves.easeOutQuad,
-        child: widget.child,
-      ),
-    );
-  }
-}
+const _styles = [
+  _ModuleStyle(Color(0xFF16A34A), Icons.bar_chart_rounded,
+      'Laporan aktivitas keselamatan'),
+  _ModuleStyle(Color(0xFF2677E8), Icons.find_in_page_rounded,
+      'Inspeksi area dan peralatan'),
+  _ModuleStyle(Color(0xFFF59E0B), Icons.warning_amber_rounded,
+      'Identifikasi potensi bahaya'),
+  _ModuleStyle(Color(0xFF0AA99A), Icons.fact_check_rounded,
+      'Catat observasi area kerja'),
+  _ModuleStyle(Color(0xFF7C4DE8), Icons.record_voice_over_rounded,
+      'Komunikasi keselamatan'),
+  _ModuleStyle(
+      Color(0xFFEE5966), Icons.groups_rounded, 'Pembinaan dan tindak lanjut'),
+  _ModuleStyle(Color(0xFF2481D4), Icons.groups_3_rounded,
+      'Perilaku aman di tempat kerja'),
+  _ModuleStyle(Color(0xFF159947), Icons.analytics_rounded,
+      'Pantau kondisi dan indikator'),
+];

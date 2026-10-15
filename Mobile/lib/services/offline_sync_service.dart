@@ -1,12 +1,53 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'api.dart';
 import 'database.dart';
 import 'notification.dart';
 import 'preference.dart';
 import 'sync.dart';
+
+/// Persistent outbox used by features whose server endpoint is not connected yet.
+class OfflineSyncJob {
+  const OfflineSyncJob({
+    required this.id,
+    required this.feature,
+    required this.localId,
+    required this.payload,
+    required this.createdAt,
+  });
+
+  final String id;
+  final String feature;
+  final String localId;
+  final Map<String, dynamic> payload;
+  final DateTime createdAt;
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'feature': feature,
+        'localId': localId,
+        'payload': payload,
+        'createdAt': createdAt.toIso8601String(),
+      };
+
+  factory OfflineSyncJob.fromJson(Map<String, dynamic> json) => OfflineSyncJob(
+        id: '${json['id']}',
+        feature: '${json['feature']}',
+        localId: '${json['localId']}',
+        payload: Map<String, dynamic>.from(json['payload'] as Map),
+        createdAt: DateTime.parse('${json['createdAt']}'),
+      );
+}
+
+class OfflineSyncState {
+  const OfflineSyncState({required this.isOnline, required this.pendingCount});
+  final bool isOnline;
+  final int pendingCount;
+}
 
 class PendingSyncItem {
   final int id;
@@ -43,16 +84,186 @@ class OfflineSyncService {
   factory OfflineSyncService() => instance;
   OfflineSyncService._internal();
 
+  static const _legacyOutboxKey = 'offline_sync_outbox_v1';
+
   final DatabaseService _db = DatabaseService();
   final ApiService _api = ApiService();
 
   StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
   bool _isAutoSyncing = false;
   bool _isListenerStarted = false;
+  bool _syncing = false;
+
+  /// ValueNotifier state kompatibel dengan UI Client (TopBar, ActivityHubHeader, BBS, CI)
+  final ValueNotifier<OfflineSyncState> state =
+      ValueNotifier(const OfflineSyncState(isOnline: true, pendingCount: 0));
 
   /// Notifier untuk memberi tahu UI secara instan ketika ada data baru atau sinkronisasi selesai
   final ValueNotifier<int> pendingCountNotifier = ValueNotifier<int>(0);
   final ValueNotifier<bool> isSyncingNotifier = ValueNotifier<bool>(false);
+
+  Future<void> init() async {
+    await _migrateLegacyOutbox();
+    final connectivity = await Connectivity().checkConnectivity();
+    await _setConnection(connectivity);
+    _connectivitySubscription ??= Connectivity().onConnectivityChanged.listen(
+          (results) => _setConnection(results),
+        );
+    initAutoSyncListener();
+    await refresh();
+  }
+
+  Future<void> _setConnection(List<ConnectivityResult> results) async {
+    final online = results.any((result) =>
+        result == ConnectivityResult.wifi ||
+        result == ConnectivityResult.mobile ||
+        result == ConnectivityResult.ethernet ||
+        result == ConnectivityResult.vpn);
+    state.value = OfflineSyncState(
+      isOnline: online,
+      pendingCount: state.value.pendingCount,
+    );
+    await refresh();
+    if (online) unawaited(syncNow());
+  }
+
+  Future<List<OfflineSyncJob>> _jobs() async {
+    try {
+      final rows = await _db.rawQuery(
+          'select id, feature, local_id, payload, created_at from offline_sync_jobs order by created_at asc');
+      return rows
+          .map((row) => OfflineSyncJob(
+                id: '${row['id']}',
+                feature: '${row['feature']}',
+                localId: '${row['local_id']}',
+                payload: Map<String, dynamic>.from(
+                    jsonDecode('${row['payload']}') as Map),
+                createdAt: DateTime.parse('${row['created_at']}'),
+              ))
+          .toList();
+    } catch (_) {
+      return [];
+    }
+  }
+
+  Future<void> enqueue({
+    required String feature,
+    required String localId,
+    required Map<String, dynamic> payload,
+  }) async {
+    final job = OfflineSyncJob(
+      id: '$feature-$localId',
+      feature: feature,
+      localId: localId,
+      payload: payload,
+      createdAt: DateTime.now(),
+    );
+    try {
+      final db = await _db.database;
+      await db.insert('offline_sync_jobs', {
+        'id': job.id,
+        'feature': job.feature,
+        'local_id': job.localId,
+        'payload': jsonEncode(job.payload),
+        'created_at': job.createdAt.toIso8601String(),
+      });
+    } catch (e) {
+      debugPrint('[OfflineSyncService] Error enqueue job: $e');
+    }
+    await refresh();
+    if (state.value.isOnline) {
+      unawaited(syncNow());
+    }
+  }
+
+  Future<void> _migrateLegacyOutbox() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_legacyOutboxKey);
+    if (raw == null) return;
+    try {
+      final db = await _db.database;
+      for (final data in jsonDecode(raw) as List) {
+        final job =
+            OfflineSyncJob.fromJson(Map<String, dynamic>.from(data as Map));
+        await db.insert('offline_sync_jobs', {
+          'id': job.id,
+          'feature': job.feature,
+          'local_id': job.localId,
+          'payload': jsonEncode(job.payload),
+          'created_at': job.createdAt.toIso8601String(),
+        });
+      }
+      await prefs.remove(_legacyOutboxKey);
+    } catch (_) {
+      // Leave old data untouched if it cannot be read.
+    }
+  }
+
+  Future<bool> isPending(String feature, String localId) async =>
+      (await _jobs())
+          .any((job) => job.feature == feature && job.localId == localId);
+
+  Future<void> refresh() async {
+    int pending = (await _jobs()).length;
+    for (final name in const [
+      'inspection',
+      'hazard',
+      'coaching',
+      'k3',
+      'observation',
+      'p2h',
+      'p5m',
+      'safety'
+    ]) {
+      try {
+        final rows = await _db
+            .rawQuery('select id from ${name}_trans where deleted_at is null and sync_id is null');
+        pending += rows.length;
+      } catch (_) {}
+    }
+    state.value =
+        OfflineSyncState(isOnline: state.value.isOnline, pendingCount: pending);
+    pendingCountNotifier.value = pending;
+  }
+
+  Future<void> syncNow() async {
+    if (_syncing || !state.value.isOnline) {
+      return;
+    }
+    _syncing = true;
+    isSyncingNotifier.value = true;
+    try {
+      if (_api.getToken.isEmpty) {
+        final auth = PreferenceService.getAuth();
+        if (auth != null && auth.token != null && auth.token!.isNotEmpty) {
+          _api.setToken = auth.token!;
+        }
+      }
+
+      for (final name in const [
+        'inspection',
+        'hazard',
+        'coaching',
+        'k3',
+        'observation',
+        'p2h',
+        'p5m',
+        'safety'
+      ]) {
+        try {
+          final rows = await _db
+              .rawQuery('select id from ${name}_trans where deleted_at is null and sync_id is null');
+          for (final row in rows) {
+            await syncTran(_db, _api, name, row['id'] as int);
+          }
+        } catch (_) {}
+      }
+    } finally {
+      _syncing = false;
+      isSyncingNotifier.value = false;
+      await refresh();
+    }
+  }
 
   /// Inisialisasi listener deteksi koneksi jaringan untuk auto-sync
   void initAutoSyncListener() {
@@ -61,28 +272,6 @@ class OfflineSyncService {
 
     // Load hitungan pending saat aplikasi dimulai
     refreshPendingCount();
-
-    // Dengarkan perubahan konektivitas jaringan (Online / Offline)
-    _connectivitySubscription =
-        Connectivity().onConnectivityChanged.listen((results) async {
-      final isOnline = results.any((r) =>
-          r == ConnectivityResult.wifi ||
-          r == ConnectivityResult.mobile ||
-          r == ConnectivityResult.ethernet ||
-          r == ConnectivityResult.vpn);
-
-      if (isOnline) {
-        debugPrint('[OfflineSyncService] Jaringan online terdeteksi ($results). Memeriksa data pending...');
-        // Beri jeda 2.5 detik agar koneksi benar-benar terhubung stabil
-        await Future.delayed(const Duration(milliseconds: 2500));
-
-        final count = await getPendingCount();
-        if (count > 0 && !_isAutoSyncing) {
-          debugPrint('[OfflineSyncService] Terdapat $count data lokal offline. Memulai Auto-Sync ke server...');
-          await autoSyncPending();
-        }
-      }
-    });
 
     // Pengecekan otomatis saat startup (jika HP sudah online dan ada data tertinggal)
     Future.delayed(const Duration(seconds: 4), () async {
@@ -113,7 +302,6 @@ class OfflineSyncService {
     isSyncingNotifier.value = true;
 
     try {
-      // Pastikan token login tersedia
       if (_api.getToken.isEmpty) {
         final auth = PreferenceService.getAuth();
         if (auth != null && auth.token != null && auth.token!.isNotEmpty) {
@@ -146,9 +334,8 @@ class OfflineSyncService {
 
   /// Memperbarui nilai pending count dan memberitahu UI listener
   Future<int> refreshPendingCount() async {
-    final count = await getPendingCount();
-    pendingCountNotifier.value = count;
-    return count;
+    await refresh();
+    return pendingCountNotifier.value;
   }
 
   /// Mendapatkan daftar semua transaksi lokal yang belum disinkronkan ke server (sync_id is null)
@@ -187,17 +374,16 @@ class OfflineSyncService {
         items.add(PendingSyncItem(
           id: row['id'] as int,
           tableKey: 'inspection',
-          moduleTitle: 'Inspection',
-          title: (row['category'] != null && row['category'].toString().isNotEmpty)
-              ? 'Inspeksi ${row['category']}'
-              : (row['remark']?.toString() ?? 'Laporan Inspeksi'),
+          moduleTitle: 'Inspeksi K3',
+          title: (row['title'] != null && row['title'].toString().isNotEmpty)
+              ? row['title'].toString()
+              : (row['remark']?.toString() ?? 'Inspeksi Area'),
           date: row['date']?.toString() ?? '',
           time: row['time']?.toString() ?? '',
           location: row['location_detail']?.toString() ?? '',
-          icon: Icons.fact_check_rounded,
-          color: const Color(0xFF059669),
+          icon: Icons.search_rounded,
+          color: const Color(0xFF2563EB),
           detailText: row['remark']?.toString(),
-          imagePath: row['image']?.toString(),
           rawData: Map<String, dynamic>.from(row),
         ));
       }
@@ -210,17 +396,16 @@ class OfflineSyncService {
         items.add(PendingSyncItem(
           id: row['id'] as int,
           tableKey: 'observation',
-          moduleTitle: 'Observation',
+          moduleTitle: 'Observasi Tugas',
           title: (row['title'] != null && row['title'].toString().isNotEmpty)
               ? row['title'].toString()
-              : (row['activity']?.toString() ?? 'Observasi K3'),
+              : (row['remark']?.toString() ?? 'Observasi Karyawan'),
           date: row['date']?.toString() ?? '',
           time: row['time']?.toString() ?? '',
           location: row['location_detail']?.toString() ?? '',
           icon: Icons.visibility_rounded,
-          color: const Color(0xFF0D9488),
+          color: const Color(0xFF059669),
           detailText: row['remark']?.toString(),
-          imagePath: row['image']?.toString(),
           rawData: Map<String, dynamic>.from(row),
         ));
       }
@@ -236,11 +421,11 @@ class OfflineSyncService {
           moduleTitle: 'Safety Talk',
           title: (row['title'] != null && row['title'].toString().isNotEmpty)
               ? row['title'].toString()
-              : (row['remark']?.toString() ?? 'Safety Talk (5M)'),
+              : (row['remark']?.toString() ?? 'Safety Talk'),
           date: row['date']?.toString() ?? '',
           time: row['time']?.toString() ?? '',
           location: row['location_detail']?.toString() ?? '',
-          icon: Icons.record_voice_over_rounded,
+          icon: Icons.campaign_rounded,
           color: const Color(0xFF4F46E5),
           detailText: row['remark']?.toString(),
           rawData: Map<String, dynamic>.from(row),

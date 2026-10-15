@@ -4,6 +4,8 @@ import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:path/path.dart' as path;
+import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 import '../utils/globals.dart' as globals;
@@ -25,11 +27,25 @@ Future<File?> pickImage({ImageSource? source}) async {
     );
     if (imgPicked == null) return null;
 
-    return File(imgPicked.path);
+    return await persistReportFile(File(imgPicked.path));
   } catch (e) {
     debugPrint(e.toString());
     return null;
   }
+}
+
+/// Moves camera/gallery media out of temporary cache into app documents.
+/// Cache cleaners can clear picker cache, but this location remains intact.
+Future<File> persistReportFile(File source) async {
+  final documents = await getApplicationDocumentsDirectory();
+  final mediaDir = Directory(path.join(documents.path, 'report_media'));
+  if (!await mediaDir.exists()) await mediaDir.create(recursive: true);
+  final extension = path.extension(source.path).isEmpty
+      ? '.jpg'
+      : path.extension(source.path);
+  final target = File(path.join(mediaDir.path,
+      'report_${DateTime.now().microsecondsSinceEpoch}$extension'));
+  return source.copy(target.path);
 }
 
 Future<bool> _ensureMediaPermission({

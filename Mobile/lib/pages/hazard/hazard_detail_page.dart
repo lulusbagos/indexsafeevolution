@@ -210,9 +210,10 @@ class _HazardDetailPageState extends State<HazardDetailPage> {
               ),
               Visibility(
                 visible: _remark.text != '' ? true : false,
-                child: Row(
+                child: Column(
                   children: [
-                    Expanded(
+                    SizedBox(
+                      width: double.infinity,
                       child: ChoiceChip(
                         selected: _repair == true,
                         label:
@@ -232,8 +233,9 @@ class _HazardDetailPageState extends State<HazardDetailPage> {
                         },
                       ),
                     ),
-                    const SizedBox(width: 10),
-                    Expanded(
+                    const SizedBox(height: 10),
+                    SizedBox(
+                      width: double.infinity,
                       child: ChoiceChip(
                         selected: _repair == false,
                         label: const Center(
