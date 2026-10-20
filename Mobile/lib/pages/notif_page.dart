@@ -9,6 +9,7 @@ import '../services/sync.dart';
 import '../utils/enums.dart';
 import '../utils/globals.dart' as globals;
 import '../utils/helpers.dart';
+import 'hazard/hazard_hub_page.dart';
 import 'history/history_detail_page.dart';
 
 class NotifPage extends StatefulWidget {
@@ -24,6 +25,8 @@ class _NotifPageState extends State<NotifPage> {
   final _api = ApiService();
   final _profile = PreferenceService.getProfile();
   List<dynamic> _rawData = [];
+  bool _isLoading = false;
+  String _selectedFilter = 'all'; // 'all', 'hazard', 'inspection'
 
   @override
   void initState() {
@@ -31,254 +34,1162 @@ class _NotifPageState extends State<NotifPage> {
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _getData();
+      _fetchApiActions();
+    });
+  }
 
-      Future.delayed(const Duration(milliseconds: 1000), () async {
-        /* get actions */
-        for (var name in ['inspection', 'hazard'].toList()) {
-          debugPrint('--- get action: $name ---');
-          _api.getAction(name).then((res) {
-            res.fold((error) {
-              debugPrint(error['message'].toString());
-            }, (response) async {
-              for (var item in (response['data'] as List).toList()) {
-                var row = <String, dynamic>{};
-                for (var e in (item as Map<String, dynamic>).entries) {
-                  if (e.value != null) {
-                    row[e.key] = e.value;
-                  }
+  void _fetchApiActions() {
+    Future.delayed(const Duration(milliseconds: 800), () async {
+      /* get actions */
+      for (var name in ['inspection', 'hazard'].toList()) {
+        debugPrint('--- get action: $name ---');
+        _api.getAction(name).then((res) {
+          res.fold((error) {
+            debugPrint(error['message'].toString());
+          }, (response) async {
+            const validCols = {
+              'id', 'code', 'title', 'area_id', 'location_id', 'location_detail',
+              'date', 'time', 'remark', 'image', 'video', 'status', 'pja_id', 'pic_id',
+              'plan', 'plan_date', 'overdue', 'reason', 'action', 'action_date',
+              'action_image', 'action_video', 'table', 'category', 'tran_id',
+              'detail_id', 'company_id', 'employee_id', 'created_at', 'updated_at', 'deleted_at'
+            };
+            for (var item in (response['data'] as List).toList()) {
+              var row = <String, dynamic>{};
+              for (var e in (item as Map<String, dynamic>).entries) {
+                if (e.value != null && validCols.contains(e.key)) {
+                  row[e.key] = e.value;
                 }
-                row.remove('created_by');
-                row.remove('updated_by');
-                row.remove('deleted_by');
-                _db.get('action_plans', row['id'] as int).then((get) {
-                  if (get == null) {
-                    _db.insert('action_plans', row).then((insertId) {
-                      debugPrint('--- insert action_plans: $insertId ---');
-                      var profileId = _profile?.id;
-                      var status = '';
-                      if (row['employee_id'] != null &&
-                          (row['employee_id'] as int) == profileId) {
-                        status = 'Terkirim';
-                      }
-                      if (row['pja_id'] != null &&
-                          (row['pja_id'] as int) == profileId) {
-                        status = 'Masuk';
-                      }
-                      if (row['pic_id'] != null &&
-                          (row['pic_id'] as int) == profileId) {
-                        status = 'Masuk';
-                      }
-                      if (status != '') {
-                        NotificationService.display(
-                          title: titleCase('${row['category']} $status'),
-                          body: titleCase(row['title'] ?? ''),
-                        );
-                        _getData();
-                      }
-                    });
-                  } else {
-                    if ((row['status'] ?? 0) > (get['status'] ?? 0)) {
-                      _db
-                          .update('action_plans', row, row['id'] as int)
-                          .then((tot) {
-                        if (tot > 0) {
-                          debugPrint(
-                              '--- update action_plans: ${row['id']} ---');
-                          var profileId = _profile?.id;
-                          var status = '';
-                          if (row['status'] as int == 1) {
-                            if (row['employee_id'] != null &&
-                                (row['employee_id'] as int) == profileId) {
-                              status = 'Diproses PJA';
-                            }
-                          }
-                          if (row['status'] as int == 2) {
-                            if (row['employee_id'] != null &&
-                                (row['employee_id'] as int) == profileId) {
-                              status = 'Diproses PIC';
-                            }
-                            if (row['pja_id'] != null &&
-                                (row['pja_id'] as int) == profileId) {
-                              status = 'Diproses PIC';
-                            }
-                          }
-                          if (status != '') {
-                            NotificationService.display(
-                              title: titleCase('${row['category']} $status'),
-                              body: titleCase(row['title'] ?? ''),
-                            );
-                            _getData();
+              }
+              row.remove('created_by');
+              row.remove('updated_by');
+              row.remove('deleted_by');
+              if (row['id'] == null) continue;
+              _db.get('action_plans', row['id'] as int).then((get) {
+                if (get == null) {
+                  _db.insert('action_plans', row).then((insertId) {
+                    debugPrint('--- insert action_plans: $insertId ---');
+                    var profileId = _profile?.id;
+                    var status = '';
+                    if (row['employee_id'] != null &&
+                        (row['employee_id'] as int) == profileId) {
+                      status = 'Terkirim';
+                    }
+                    if (row['pja_id'] != null &&
+                        (row['pja_id'] as int) == profileId) {
+                      status = 'Masuk';
+                    }
+                    if (row['pic_id'] != null &&
+                        (row['pic_id'] as int) == profileId) {
+                      status = 'Masuk';
+                    }
+                    if (status != '') {
+                      NotificationService.display(
+                        title: titleCase('${row['category']} $status'),
+                        body: titleCase(row['title'] ?? ''),
+                      );
+                      _getData();
+                    }
+                  });
+                } else {
+                  if ((row['status'] ?? 0) > (get['status'] ?? 0)) {
+                    _db
+                        .update('action_plans', row, row['id'] as int)
+                        .then((tot) {
+                      if (tot > 0) {
+                        debugPrint(
+                            '--- update action_plans: ${row['id']} ---');
+                        var profileId = _profile?.id;
+                        var status = '';
+                        if (row['status'] as int == 1) {
+                          if (row['employee_id'] != null &&
+                              (row['employee_id'] as int) == profileId) {
+                            status = 'Diproses PJA';
                           }
                         }
-                      });
-                    }
+                        if (row['status'] as int == 2) {
+                          if (row['employee_id'] != null &&
+                              (row['employee_id'] as int) == profileId) {
+                            status = 'Diproses PIC';
+                          }
+                          if (row['pja_id'] != null &&
+                              (row['pja_id'] as int) == profileId) {
+                            status = 'Diproses PIC';
+                          }
+                        }
+                        if (status != '') {
+                          NotificationService.display(
+                            title: titleCase('${row['category']} $status'),
+                            body: titleCase(row['title'] ?? ''),
+                          );
+                          _getData();
+                        }
+                      }
+                    });
                   }
-                });
-              }
-            });
-          });
-          await Future.delayed(const Duration(seconds: 2));
-        }
-
-        /* post actions */
-        debugPrint('--- post action plans ---');
-        _db.rawQuery('''select id, `table` from action_plans where deleted_at is null and updated_at is null and status > 0''').then(
-            (val) async {
-          if (val.isNotEmpty) {
-            for (var row in val.toList()) {
-              syncAction(_db, _api, row['table'], row['id'] as int);
-              await Future.delayed(const Duration(seconds: 2));
+                }
+              });
             }
-          }
+          });
         });
+        await Future.delayed(const Duration(seconds: 2));
+      }
+
+      /* post actions */
+      debugPrint('--- post action plans ---');
+      _db.rawQuery('''select id, `table` from action_plans where deleted_at is null and updated_at is null and status > 0''').then(
+          (val) async {
+        if (val.isNotEmpty) {
+          for (var row in val.toList()) {
+            syncAction(_db, _api, row['table'], row['id'] as int);
+            await Future.delayed(const Duration(seconds: 2));
+          }
+        }
       });
     });
   }
 
   @override
   void dispose() {
-    /** */
-
+    _scrollCtrl.dispose();
     super.dispose();
   }
 
-  void _getData() {
-    _db.rawQuery(
-        '''select tr.*, me1.name as area_name, me2.name as location_name, 1 as sync_id,
-          (select e.nama_lengkap from employees e where e.id=tr.pja_id) as pja_name,
-          (select e.nama_lengkap from employees e where e.id=tr.pic_id) as pic_name
-          from action_plans tr
-          left join enum_masters me1 on me1.type='area' and me1.id=tr.area_id and me1.deleted_at is null
-          left join enum_masters me2 on me2.type='location' and me2.id=tr.location_id and me2.deleted_at is null
-          where tr.deleted_at is null and ((tr.pja_id=${_profile?.id} and tr.status<1) or (tr.pic_id=${_profile?.id} and tr.status<2))
-          order by tr.id desc''').then((val) async {
-      await PreferenceService.setNotif(val.length);
-      if (val.isNotEmpty) {
-        if (!mounted) return;
-        setState(() => _rawData = val.toList());
+  Future<void> _getData() async {
+    setState(() => _isLoading = true);
+    try {
+      final List<Map<String, dynamic>> combined = [];
+
+      // 1. Fetch online server notifications (berisi notifikasi penugasan PJA Hazard dsb)
+      final serverRes = await _api.getNotifications(limit: 60);
+      serverRes.fold(
+        (_) {},
+        (serverNotifs) {
+          for (var n in serverNotifs) {
+            // Sesuai permintaan pengguna: notifikasi yang sudah complete / actioned tidak usah ditampilkan
+            if (n.isActioned ||
+                n.notifType.toLowerCase().contains('completed') ||
+                n.notifType.toLowerCase().contains('closed')) {
+              continue;
+            }
+
+            final titleLower = (n.title).toLowerCase();
+            final msgLower = (n.message).toLowerCase();
+            final urlLower = (n.url ?? '').toLowerCase();
+            final typeLower = (n.notifType).toLowerCase();
+
+            final isCoaching = typeLower.contains('coaching') ||
+                titleLower.contains('coaching') ||
+                titleLower.contains('pembinaan') ||
+                msgLower.contains('coaching') ||
+                msgLower.contains('pembinaan') ||
+                urlLower.contains('performance');
+
+            // Sesuai permintaan pengguna:
+            // "dan akan hilang 7 hari berikutnya di notifikasi"
+            if (isCoaching && n.createdAt != null) {
+              final diffDays = DateTime.now().difference(n.createdAt!).inDays;
+              if (diffDays >= 7) {
+                continue; // Melewati notifikasi coaching yang sudah lewat 7 hari
+              }
+            }
+
+            final isHazard = !isCoaching && (typeLower.contains('hazard') || urlLower.contains('hazard'));
+            final isInspect = !isCoaching && (typeLower.contains('inspect') || urlLower.contains('inspect'));
+
+            final String category = isCoaching
+                ? 'coaching'
+                : (isHazard ? 'hazard' : (isInspect ? 'inspection' : 'general'));
+
+            combined.add({
+              'id': n.id,
+              'is_server_notif': true,
+              'title': n.title,
+              'remark': n.message,
+              'category': category,
+              'notif_type': isCoaching ? 'coaching' : n.notifType,
+              'url': n.url,
+              'is_read': n.isRead,
+              'is_actioned': n.isActioned,
+              'is_action_required': isCoaching ? false : n.isActionRequired,
+              'date': n.createdAt != null ? DateFormat('yyyy-MM-dd').format(n.createdAt!) : '',
+              'time': n.createdAt != null ? DateFormat('HH:mm').format(n.createdAt!) : '',
+              'created_at_dt': n.createdAt ?? DateTime.now(),
+              // Coaching tidak ada statusnya (status = -1)
+              'status': isCoaching ? -1 : (n.isActioned ? 2 : (n.isRead ? 1 : 0)),
+              'area_name': isCoaching ? 'Kinerja & Pembinaan' : (isHazard ? 'K3 Temuan Lapangan' : 'Sistem SAP'),
+              'location_name': n.url ?? '',
+            });
+          }
+        },
+      );
+
+      // 2. Fetch local SQLite action plans
+      final val = await _db.rawQuery(
+          '''select tr.*, me1.name as area_name, me2.name as location_name, 1 as sync_id,
+            (select e.nama_lengkap from employees e where e.id=tr.pja_id) as pja_name,
+            (select e.nama_lengkap from employees e where e.id=tr.pic_id) as pic_name
+            from action_plans tr
+            left join enum_masters me1 on me1.type='area' and me1.id=tr.area_id and me1.deleted_at is null
+            left join enum_masters me2 on me2.type='location' and me2.id=tr.location_id and me2.deleted_at is null
+            where tr.deleted_at is null and ((tr.pja_id=${_profile?.id} and tr.status<1) or (tr.pic_id=${_profile?.id} and tr.status<2))
+            order by tr.id desc''');
+
+      for (var row in val) {
+        final m = Map<String, dynamic>.from(row);
+        m['is_server_notif'] = false;
+        combined.add(m);
       }
-    });
+
+      await PreferenceService.setNotif(combined.length);
+      if (mounted) {
+        setState(() {
+          _rawData = combined;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error getting notifications: $e');
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Notification'),
-        surfaceTintColor: Colors.transparent,
-        centerTitle: true,
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 20),
-        child: (_rawData.isNotEmpty)
-            ? ListView.builder(
-                controller: _scrollCtrl,
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: _rawData.length,
-                itemBuilder: (context, index) {
-                  var date = DateTime.parse(_rawData[index]['date']);
-                  return Card(
-                    color: Colors.white,
-                    shadowColor: Colors.green,
-                    child: ListTile(
-                      title: Text(
-                        titleCase(_rawData[index]['title'] ?? ''),
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.indigo,
-                        ),
-                      ),
-                      subtitle: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                              'Note: ${titleCase(_rawData[index]['remark'] ?? '')}'),
-                          Text(
-                              'Area: ${titleCase(_rawData[index]['area_name'] ?? '')}'),
-                          Text(
-                              'Lokasi: ${titleCase(_rawData[index]['location_name'] ?? '')}'),
-                          const SizedBox(height: 10),
-                          Row(
-                            children: [
-                              Text(
-                                  '${DateFormat('dd/MM/yyyy').format(date)} ${_rawData[index]['time']}'),
-                              Expanded(
-                                child: Container(),
-                              ),
-                              Text(
-                                  '${globals.status[_rawData[index]['status'] as int]}',
-                                  style: TextStyle(
-                                    color: globals.statusColor[
-                                        _rawData[index]['status'] as int],
-                                    fontWeight: FontWeight.bold,
-                                  )),
-                            ],
+  List<dynamic> get _filteredData {
+    if (_selectedFilter == 'all') return _rawData;
+    if (_selectedFilter == 'hazard') {
+      return _rawData.where((item) {
+        final cat = (item['category'] ?? '').toString().toLowerCase();
+        return cat.contains('hazard');
+      }).toList();
+    }
+    if (_selectedFilter == 'inspection') {
+      return _rawData.where((item) {
+        final cat = (item['category'] ?? '').toString().toLowerCase();
+        return cat.contains('inspect') || cat.contains('simama');
+      }).toList();
+    }
+    if (_selectedFilter == 'coaching') {
+      return _rawData.where((item) {
+        final cat = (item['category'] ?? '').toString().toLowerCase();
+        return cat.contains('coaching');
+      }).toList();
+    }
+    return _rawData;
+  }
+
+  int _countFor(String type) {
+    if (type == 'all') return _rawData.length;
+    if (type == 'hazard') {
+      return _rawData.where((item) {
+        final cat = (item['category'] ?? '').toString().toLowerCase();
+        return cat.contains('hazard');
+      }).length;
+    }
+    if (type == 'inspection') {
+      return _rawData.where((item) {
+        final cat = (item['category'] ?? '').toString().toLowerCase();
+        return cat.contains('inspect') || cat.contains('simama');
+      }).length;
+    }
+    if (type == 'coaching') {
+      return _rawData.where((item) {
+        final cat = (item['category'] ?? '').toString().toLowerCase();
+        return cat.contains('coaching');
+      }).length;
+    }
+    return 0;
+  }
+
+  String _formatDisplayDate(String? rawDate, String? rawTime) {
+    if (rawDate == null || rawDate.isEmpty) return rawTime ?? '-';
+    try {
+      final date = DateTime.parse(rawDate);
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
+      final itemDate = DateTime(date.year, date.month, date.day);
+      final difference = today.difference(itemDate).inDays;
+
+      final timeStr = (rawTime != null && rawTime.isNotEmpty) ? ' $rawTime' : '';
+
+      if (difference == 0) {
+        return 'Hari ini$timeStr';
+      } else if (difference == 1) {
+        return 'Kemarin$timeStr';
+      } else if (difference < 7) {
+        return '$difference hari lalu';
+      } else {
+        return '${DateFormat('dd MMM yyyy').format(date)}$timeStr';
+      }
+    } catch (_) {
+      return '$rawDate ${rawTime ?? ''}'.trim();
+    }
+  }
+
+  void _showCoachingDialog(Map<String, dynamic> item) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        final title = item['title']?.toString() ?? 'Coaching & Pembinaan';
+        final remark = item['remark']?.toString() ?? '';
+        final date = item['date']?.toString() ?? '';
+        final time = item['time']?.toString() ?? '';
+        final formattedDate = _formatDisplayDate(date, time);
+
+        return Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 18),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF5F3FF),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(
+                      Icons.psychology_outlined,
+                      color: Color(0xFF7C3AED),
+                      size: 24,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFEDE9FE),
+                            borderRadius: BorderRadius.circular(6),
                           ),
-                        ],
-                      ),
-                      trailing: Icon(
-                        Icons.arrow_forward_ios,
-                        color: Colors.indigo.shade400,
-                        size: 18,
-                      ),
-                      contentPadding:
-                          const EdgeInsets.symmetric(horizontal: 10),
-                      onTap: () {
-                        Module module;
-                        switch (_rawData[index]['category']) {
-                          case 'inspection':
-                            module = Module.inspection;
-                            break;
-                          case 'inspectionDaily':
-                            module = Module.inspectionDaily;
-                            break;
-                          case 'inspectionWeekly':
-                            module = Module.inspectionWeekly;
-                            break;
-                          case 'simama':
-                            module = Module.simama;
-                            break;
-                          default:
-                            module = Module.hazard;
-                            break;
-                        }
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => HistoryDetailPage(
-                              module,
-                              History.action,
-                              _rawData[index] as Map<String, dynamic>,
+                          child: const Text(
+                            'COACHING & PEMBINAAN',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w800,
+                              color: Color(0xFF7C3AED),
+                              letterSpacing: 0.5,
                             ),
                           ),
-                        );
-                      },
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          title,
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF1E293B),
+                          ),
+                        ),
+                      ],
                     ),
-                  );
-                },
-              )
-            : Container(
-                margin: const EdgeInsets.only(top: 100),
-                width: MediaQuery.of(context).size.width,
-                child: const Column(
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Image(
-                      image: AssetImage('assets/images/no-data.png'),
-                      width: 180,
+                    Row(
+                      children: [
+                        const Icon(Icons.info_outline, size: 14, color: Color(0xFF64748B)),
+                        const SizedBox(width: 6),
+                        Text(
+                          'Waktu: $formattedDate',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                            color: Color(0xFF64748B),
+                          ),
+                        ),
+                      ],
                     ),
-                    SizedBox(height: 30),
+                    const SizedBox(height: 10),
                     Text(
-                      'Data Notification Tidak Ditemukan!',
-                      style: TextStyle(
-                        fontStyle: FontStyle.italic,
+                      remark,
+                      style: const TextStyle(
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w500,
+                        color: Color(0xFF334155),
+                        height: 1.5,
                       ),
-                      textAlign: TextAlign.center,
                     ),
                   ],
                 ),
               ),
+              const SizedBox(height: 14),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF1F5F9),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.access_time_rounded, size: 14, color: Color(0xFF64748B)),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        'Notifikasi pembinaan ini bersifat informasi dari PIC Anda dan akan otomatis hilang dalam 7 hari.',
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          color: Colors.grey.shade700,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF7C3AED),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text(
+                    'Mengerti',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _openDetail(Map<String, dynamic> item) {
+    final cat = (item['category'] ?? '').toString().toLowerCase();
+    final isCoaching = cat.contains('coaching') ||
+        (item['title'] ?? '').toString().toLowerCase().contains('coaching') ||
+        (item['title'] ?? '').toString().toLowerCase().contains('pembinaan') ||
+        (item['remark'] ?? '').toString().toLowerCase().contains('coaching') ||
+        (item['remark'] ?? '').toString().toLowerCase().contains('pembinaan');
+
+    if (item['is_server_notif'] == true) {
+      final notifId = item['id'] as int? ?? 0;
+      if (notifId > 0 && item['is_read'] != true) {
+        _api.markNotificationRead(notifId);
+      }
+      
+      // Jika Coaching, tampilkan detail modal informasi
+      if (isCoaching) {
+        _showCoachingDialog(item);
+        return;
+      }
+
+      final url = (item['url'] ?? '').toString().toLowerCase();
+      if (cat.contains('hazard') || url.contains('hazard')) {
+        HazardHubTab targetTab = HazardHubTab.action;
+        final t = (item['notif_type'] ?? '').toString().toLowerCase();
+        if (t.contains('completed') || t.contains('closed')) {
+          targetTab = HazardHubTab.summary;
+        } else if (t.contains('takeup') || t.contains('progress') || t.contains('info')) {
+          targetTab = HazardHubTab.monitoring;
+        } else {
+          targetTab = HazardHubTab.action;
+        }
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => HazardHubPage(initialTab: targetTab)),
+        ).then((_) => _getData());
+        return;
+      }
+    } else if (isCoaching) {
+      _showCoachingDialog(item);
+      return;
+    }
+
+    Module module;
+    switch (cat) {
+      case 'inspection':
+        module = Module.inspection;
+        break;
+      case 'inspectionDaily':
+        module = Module.inspectionDaily;
+        break;
+      case 'inspectionWeekly':
+        module = Module.inspectionWeekly;
+        break;
+      case 'simama':
+        module = Module.simama;
+        break;
+      default:
+        module = Module.hazard;
+        break;
+    }
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => HistoryDetailPage(
+          module,
+          History.action,
+          item,
+        ),
+      ),
+    ).then((_) => _getData());
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final filtered = _filteredData;
+
+    return Scaffold(
+      backgroundColor: const Color(0xFFF6F8FA),
+      appBar: AppBar(
+        elevation: 0,
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(7),
+              decoration: BoxDecoration(
+                color: const Color(0xFF009688).withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(
+                Icons.notifications_active_rounded,
+                color: Color(0xFF009688),
+                size: 20,
+              ),
+            ),
+            const SizedBox(width: 12),
+            const Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Notifikasi Tindak Lanjut',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF1E293B),
+                  ),
+                ),
+                Text(
+                  'Action Plan & Temuan Lapangan',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w400,
+                    color: Color(0xFF64748B),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+        actions: [
+          IconButton(
+            tooltip: 'Segarkan Notifikasi',
+            icon: _isLoading
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Color(0xFF009688),
+                    ),
+                  )
+                : const Icon(
+                    Icons.refresh_rounded,
+                    color: Color(0xFF334155),
+                  ),
+            onPressed: () {
+              _getData();
+              _fetchApiActions();
+            },
+          ),
+          const SizedBox(width: 8),
+        ],
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(56),
+          child: Container(
+            color: Colors.white,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              physics: const BouncingScrollPhysics(),
+              child: Row(
+                children: [
+                  _buildFilterChip('all', 'Semua', _countFor('all')),
+                  const SizedBox(width: 8),
+                  _buildFilterChip('hazard', 'Hazard', _countFor('hazard')),
+                  const SizedBox(width: 8),
+                  _buildFilterChip('inspection', 'Inspeksi', _countFor('inspection')),
+                  const SizedBox(width: 8),
+                  _buildFilterChip('coaching', 'Coaching', _countFor('coaching')),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+      body: RefreshIndicator(
+        color: const Color(0xFF009688),
+        onRefresh: () async {
+          await _getData();
+          _fetchApiActions();
+        },
+        child: filtered.isNotEmpty
+            ? ListView.builder(
+                controller: _scrollCtrl,
+                padding: const EdgeInsets.fromLTRB(16, 14, 16, 32),
+                itemCount: filtered.length,
+                itemBuilder: (context, index) {
+                  final item = filtered[index] as Map<String, dynamic>;
+                  return _buildNotificationCard(item);
+                },
+              )
+            : _buildEmptyState(),
+      ),
+    );
+  }
+
+  Widget _buildFilterChip(String key, String label, int count) {
+    final isSelected = _selectedFilter == key;
+    return GestureDetector(
+      onTap: () {
+        setState(() => _selectedFilter = key);
+      },
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: isSelected ? const Color(0xFF009688) : const Color(0xFFF1F5F9),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isSelected ? const Color(0xFF009688) : const Color(0xFFE2E8F0),
+            width: 1,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                color: isSelected ? Colors.white : const Color(0xFF475569),
+              ),
+            ),
+            if (count > 0) ...[
+              const SizedBox(width: 6),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                decoration: BoxDecoration(
+                  color: isSelected
+                      ? Colors.white.withValues(alpha: 0.25)
+                      : const Color(0xFFCBD5E1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  count.toString(),
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    color: isSelected ? Colors.white : const Color(0xFF1E293B),
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNotificationCard(Map<String, dynamic> item) {
+    final category = (item['category'] ?? '').toString().toLowerCase();
+    final isCoaching = category.contains('coaching') ||
+        (item['title'] ?? '').toString().toLowerCase().contains('coaching') ||
+        (item['title'] ?? '').toString().toLowerCase().contains('pembinaan') ||
+        (item['remark'] ?? '').toString().toLowerCase().contains('coaching') ||
+        (item['remark'] ?? '').toString().toLowerCase().contains('pembinaan');
+    final isHazard = !isCoaching && category.contains('hazard');
+    final isInspection = !isCoaching && (category.contains('inspect') || category.contains('simama'));
+
+    final primaryTheme = isCoaching
+        ? const Color(0xFF7C3AED)
+        : (isHazard
+            ? const Color(0xFFE65100)
+            : (isInspection
+                ? const Color(0xFF0288D1)
+                : const Color(0xFF00897B)));
+
+    final bgTheme = isCoaching
+        ? const Color(0xFFF5F3FF)
+        : (isHazard
+            ? const Color(0xFFFFF3E0)
+            : (isInspection
+                ? const Color(0xFFE1F5FE)
+                : const Color(0xFFE0F2F1)));
+
+    final statusInt = (item['status'] as int?) ?? (isCoaching ? -1 : 0);
+    final String statusText = (statusInt >= 0 && statusInt < globals.status.length)
+        ? (globals.status[statusInt] ?? 'Status $statusInt')
+        : 'Status $statusInt';
+    final Color statusColor = (statusInt >= 0 && statusInt < globals.statusColor.length)
+        ? (globals.statusColor[statusInt] ?? Colors.grey)
+        : Colors.grey;
+
+    final dateStr = _formatDisplayDate(item['date']?.toString(), item['time']?.toString());
+    final title = titleCase(item['title']?.toString() ?? 'Tindak Lanjut');
+    final remark = item['remark']?.toString() ?? '';
+    final areaName = titleCase(item['area_name']?.toString() ?? '-');
+    final locName = titleCase(item['location_name']?.toString() ?? '-');
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+        border: Border.all(
+          color: const Color(0xFFF1F5F9),
+          width: 1.2,
+        ),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: () => _openDetail(item),
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Top header: Module Pill + Timestamp
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: bgTheme,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            isCoaching
+                                ? Icons.psychology_outlined
+                                : (isHazard
+                                    ? Icons.warning_amber_rounded
+                                    : Icons.fact_check_outlined),
+                            size: 13,
+                            color: primaryTheme,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            isCoaching
+                                ? 'COACHING'
+                                : (item['is_server_notif'] == true && (item['notif_type']?.toString().contains('assigned') == true)
+                                    ? 'TUGAS PJA HAZARD'
+                                    : (isHazard
+                                        ? 'HAZARD'
+                                        : (category.contains('simama') ? 'SIMAMA' : 'INSPEKSI'))),
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w800,
+                              color: primaryTheme,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Spacer(),
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.access_time_rounded,
+                          size: 13,
+                          color: Color(0xFF94A3B8),
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          dateStr,
+                          style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w500,
+                            color: Color(0xFF64748B),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+
+                // Title
+                Text(
+                  title,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF0F172A),
+                    height: 1.3,
+                  ),
+                ),
+
+                // Remark / Note Quote Bubble
+                if (remark.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border(
+                        left: BorderSide(
+                          color: primaryTheme.withValues(alpha: 0.6),
+                          width: 3,
+                        ),
+                      ),
+                    ),
+                    child: Text(
+                      titleCase(remark),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Color(0xFF475569),
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                  ),
+                ],
+
+                const SizedBox(height: 10),
+
+                // Area & Location Pills
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 4,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF1F5F9),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.location_on_outlined,
+                              size: 12, color: Color(0xFF64748B)),
+                          const SizedBox(width: 3),
+                          Text(
+                            areaName,
+                            style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w500,
+                              color: Color(0xFF475569),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (locName != '-' && locName.isNotEmpty)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF1F5F9),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.place_outlined,
+                                size: 12, color: Color(0xFF64748B)),
+                            const SizedBox(width: 3),
+                            Text(
+                              locName,
+                              style: const TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w500,
+                                color: Color(0xFF475569),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                  ],
+                ),
+
+                const Divider(height: 20, thickness: 0.8, color: Color(0xFFF1F5F9)),
+
+                // Bottom row: Status badge + Action link
+                Row(
+                  children: [
+                    if (isCoaching || statusInt < 0) ...[
+                      // Coaching is purely informational: "ini hanya menampilkan saya dapat coacing dari PIC nya dan tidak ada statusnya"
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFEDE9FE),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.info_outline_rounded,
+                              size: 12,
+                              color: Color(0xFF7C3AED),
+                            ),
+                            SizedBox(width: 5),
+                            Text(
+                              'Informasi Pembinaan PIC',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFF6D28D9),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Spacer(),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.history_rounded,
+                            size: 13,
+                            color: Colors.grey.shade400,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            'Aktif 7 hari',
+                            style: TextStyle(
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w500,
+                              color: Colors.grey.shade500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ] else ...[
+                      // Status Badge
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: statusColor.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              width: 6,
+                              height: 6,
+                              decoration: BoxDecoration(
+                                color: statusColor,
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              statusText,
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: statusColor,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Spacer(),
+                      if (item['is_server_notif'] == true &&
+                          (item['notif_type'] == 'hazard_assigned' || item['notif_type'] == 'hazard_new' || item['notif_type'] == 'hazard_reassigned') &&
+                          item['is_actioned'] != true) ...[
+                        ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF0284C7),
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            minimumSize: const Size(54, 28),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          ),
+                          onPressed: () {
+                            final notifId = item['id'] as int? ?? 0;
+                            if (notifId > 0) _api.markNotificationActioned(notifId);
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (_) => const HazardHubPage()),
+                            ).then((_) => _getData());
+                          },
+                          icon: const Icon(Icons.touch_app_rounded, size: 12),
+                          label: const Text('Take Up', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold)),
+                        ),
+                        const SizedBox(width: 6),
+                        OutlinedButton(
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: const Color(0xFFD97706),
+                            side: const BorderSide(color: Color(0xFFFDE68A)),
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            minimumSize: const Size(48, 28),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          ),
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (_) => const HazardHubPage()),
+                            ).then((_) => _getData());
+                          },
+                          child: const Text('Alihkan', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold)),
+                        ),
+                      ] else ...[
+                        InkWell(
+                          onTap: () => _openDetail(item),
+                          child: const Row(
+                            children: [
+                              Text(
+                                'Tindak Lanjuti',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xFF009688),
+                                ),
+                              ),
+                              SizedBox(width: 2),
+                              Icon(
+                                Icons.arrow_forward_ios_rounded,
+                                size: 11,
+                                color: Color(0xFF009688),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ],
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return SingleChildScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 80),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 90,
+              height: 90,
+              decoration: BoxDecoration(
+                color: const Color(0xFF009688).withValues(alpha: 0.1),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.task_alt_rounded,
+                size: 46,
+                color: Color(0xFF009688),
+              ),
+            ),
+            const SizedBox(height: 22),
+            const Text(
+              'Semua Beres! Tidak Ada Notifikasi',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF1E293B),
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Tidak ada action plan atau temuan yang membutuhkan respon Anda saat ini. Tetap utamakan keselamatan kerja.',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w400,
+                color: Color(0xFF64748B),
+                height: 1.4,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              onPressed: () {
+                _getData();
+                _fetchApiActions();
+              },
+              icon: const Icon(Icons.refresh_rounded, size: 18),
+              label: const Text('Periksa Kembali'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF009688),
+                foregroundColor: Colors.white,
+                elevation: 0,
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 11),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

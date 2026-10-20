@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../services/database.dart';
 import 'snackbar_msg.dart';
@@ -311,6 +312,12 @@ Future<void> fillGpsCoordinate(
   try {
     final serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) {
+      final prefs = await SharedPreferences.getInstance();
+      final cachedGps = prefs.getString('last_known_gps_coord');
+      if (cachedGps != null && cachedGps.isNotEmpty && controller.text.isEmpty) {
+        controller.text = cachedGps;
+        onChanged();
+      }
       if (!silent && context.mounted) {
         SnackBarMsg.warning(
           context,
@@ -327,6 +334,12 @@ Future<void> fillGpsCoordinate(
 
     if (permission == LocationPermission.denied ||
         permission == LocationPermission.deniedForever) {
+      final prefs = await SharedPreferences.getInstance();
+      final cachedGps = prefs.getString('last_known_gps_coord');
+      if (cachedGps != null && cachedGps.isNotEmpty && controller.text.isEmpty) {
+        controller.text = cachedGps;
+        onChanged();
+      }
       if (!silent && context.mounted) {
         SnackBarMsg.danger(
           context,
@@ -336,19 +349,57 @@ Future<void> fillGpsCoordinate(
       return;
     }
 
-    final position = await Geolocator.getCurrentPosition(
-      desiredAccuracy: LocationAccuracy.high,
-    );
-    if (!context.mounted) return;
-    controller.text =
-        '${position.latitude.toStringAsFixed(6)}, ${position.longitude.toStringAsFixed(6)}';
-    onChanged();
-    if (!silent && context.mounted) {
-      SnackBarMsg.success(context, 'Koordinat GPS berhasil diambil.');
+    // 1. Cepat: Ambil Last Known Position dari sensor perangkat (0 ms, 100% bekerja offline tanpa sinyal internet)
+    Position? pos = await Geolocator.getLastKnownPosition();
+    if (pos != null && controller.text.isEmpty) {
+      if (context.mounted) {
+        controller.text = '${pos.latitude.toStringAsFixed(6)}, ${pos.longitude.toStringAsFixed(6)}';
+        onChanged();
+      }
+    }
+
+    // 2. Akurat: Ambil posisi satelit hardware aktual langsung dengan timeout 5 detik
+    try {
+      final freshPos = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.medium,
+        timeLimit: const Duration(seconds: 5),
+      );
+      pos = freshPos;
+      if (context.mounted) {
+        controller.text = '${pos.latitude.toStringAsFixed(6)}, ${pos.longitude.toStringAsFixed(6)}';
+        onChanged();
+      }
+    } catch (_) {
+      // Timeout satelit offline: posisi last known tetap dipakai
+    }
+
+    if (pos != null) {
+      // Simpan koordinat ke SharedPreferences agar bisa digunakan offline sewaktu-waktu
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(
+        'last_known_gps_coord',
+        '${pos.latitude.toStringAsFixed(6)}, ${pos.longitude.toStringAsFixed(6)}',
+      );
+      if (!silent && context.mounted) {
+        SnackBarMsg.success(context, 'Koordinat GPS satelit berhasil dideteksi.');
+      }
+    } else {
+      // 3. Fallback: Ambil dari penyimpanan lokal aplikasi jika perangkat baru restart tanpa cache OS
+      final prefs = await SharedPreferences.getInstance();
+      final cachedGps = prefs.getString('last_known_gps_coord');
+      if (cachedGps != null && cachedGps.isNotEmpty && controller.text.isEmpty) {
+        controller.text = cachedGps;
+        onChanged();
+        if (!silent && context.mounted) {
+          SnackBarMsg.info(context, 'Menggunakan titik koordinat GPS tersimpan sebelumnya.');
+        }
+      } else if (!silent && context.mounted) {
+        SnackBarMsg.warning(context, 'Sedang mencari sinyal satelit GPS...');
+      }
     }
   } catch (e) {
     if (!silent && context.mounted) {
-      SnackBarMsg.danger(context, 'Gagal mengambil lokasi GPS.');
+      SnackBarMsg.danger(context, 'Gagal mengambil lokasi GPS: $e');
     }
   }
 }

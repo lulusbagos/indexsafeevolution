@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:percent_indicator/linear_percent_indicator.dart';
 
 import '../models/profile_model.dart';
+import 'package:sqflite/sqflite.dart';
 import '../services/api.dart';
 import '../services/database.dart';
 import '../services/preference.dart';
@@ -37,8 +38,28 @@ class _SyncPageState extends State<SyncPage> {
     'p5m',
     'safety',
     'employee',
-    'vehicle'
+    'vehicle',
+    'areas',
+    'benchmarks',
   ];
+
+  final _friendlyNames = {
+    'enum': 'Master Status & Referensi',
+    'bridges': 'Jembatan Referensi',
+    'inspection': 'Format Inspeksi Tambang',
+    'hazard': 'Kategori Bahaya & Resiko',
+    'coaching': 'Modul Edukasi & Coaching',
+    'k3': 'Standar Keselamatan K3',
+    'observation': 'Pedoman Observasi Lapangan',
+    'p2h': 'Pemeriksaan Harian Unit (P2H)',
+    'p5m': 'Topik Keselamatan P5M',
+    'safety': 'Aturan & Regulasi Safety',
+    'employee': 'Otoritas & Pengawas Lapangan (PJA)',
+    'vehicle': 'Daftar Alat Berat & Kendaraan',
+    'areas': 'Area Utama Tambang',
+    'benchmarks': 'Detail Lokasi & Benchmark',
+  };
+
   String _name = '';
   String _table = '...';
 
@@ -52,68 +73,176 @@ class _SyncPageState extends State<SyncPage> {
       setState(
           () => _name = (widget.profile?.namaLengkap?.split(' ')[0] ?? ''));
       try {
+        final sqldb = await _db.database;
         var master = <String, int>{};
-        var x = 1;
-        for (var name in _masters.toList()) {
+
+        for (int mIdx = 0; mIdx < _masters.length; mIdx++) {
+          final name = _masters[mIdx];
+          final friendly = _friendlyNames[name] ?? name;
+
+          if (_dataSync != null && (_dataSync![name] ?? 0) == 1 && globals.reSync != true) {
+            master[name] = 1;
+            PreferenceService.setDataSync(master);
+            continue;
+          }
+
+          if (mounted) {
+            setState(() => _table = friendly);
+          }
+          _progress.value = 0;
+
+          if (name == 'areas' || name == 'benchmarks') {
+            try {
+              final res = await _api.getMaster(name);
+              await res.fold(
+                (err) async {
+                  debugPrint('[SyncPage] Error $name: ${err['message']}');
+                },
+                (response) async {
+                  final items = (response['data'] as List?) ?? [];
+                  final batch = sqldb.batch();
+                  for (var item in items) {
+                    if (name == 'areas') {
+                      final areaName = (item is Map ? (item['name'] ?? item['namaArea']) : item)?.toString().trim() ?? '';
+                      final compId = item is Map ? (item['company_id'] as int? ?? 1) : 1;
+                      if (areaName.isNotEmpty && !areaName.toUpperCase().contains('CAMP EKSPLORASI')) {
+                        batch.rawInsert(
+                          'INSERT OR IGNORE INTO tbl_m_benchmark (perusahaan_id, area_utama, nama_benchmark, created_at) VALUES (?, ?, ?, ?)',
+                          [compId, areaName, '', DateTime.now().toIso8601String()],
+                        );
+                      }
+                    } else {
+                      if (item is Map) {
+                        final benchName = (item['namaBenchmark'] ?? item['name'])?.toString().trim() ?? '';
+                        final areaName = (item['areaUtama'] ?? item['area'])?.toString().trim() ?? '';
+                        final compId = item['perusahaanId'] as int? ?? (item['company_id'] as int? ?? 1);
+                        if (benchName.isNotEmpty) {
+                          batch.rawInsert(
+                            'INSERT OR IGNORE INTO tbl_m_benchmark (perusahaan_id, area_utama, nama_benchmark, created_at) VALUES (?, ?, ?, ?)',
+                            [compId, areaName, benchName, DateTime.now().toIso8601String()],
+                          );
+                        }
+                      }
+                    }
+                  }
+                  await batch.commit(noResult: true);
+                  _progress.value = 100;
+                  master[name] = 1;
+                  PreferenceService.setDataSync(master);
+                },
+              );
+            } catch (e) {
+              debugPrint('[SyncPage] Error syncing $name: $e');
+            }
+            continue;
+          }
+
           var table = '';
           switch (name) {
             case 'employee':
+            case 'employees':
               table = 'employees';
               break;
             case 'bridges':
               table = 'enum_bridges';
+              break;
+            case 'vehicle':
+            case 'vehicles':
+              table = 'vehicle_masters';
               break;
             default:
               table = '${name}_masters';
               break;
           }
 
-          if (_dataSync != null && (_dataSync![name] ?? 0) == 1) {
-            x++;
-            master[name] = 1;
-            PreferenceService.setDataSync(master);
-            continue;
-          }
+          try {
+            final res = await _api.getMaster(name);
+            await res.fold(
+              (error) async {
+                debugPrint('[SyncPage] Sync Data $name Error: ${error['message']}');
+                if (mounted) {
+                  SnackBarMsg.danger(context, titleCase('Sync Data $name Gagal!'));
+                }
+              },
+              (response) async {
+                final items = (response['data'] as List?) ?? [];
+                final n = items.length;
+                if (n == 0) {
+                  _progress.value = 100;
+                  master[name] = 1;
+                  PreferenceService.setDataSync(master);
+                  return;
+                }
 
-          _progress.value = 0;
-          _api.getMaster(name).then((res) {
-            res.fold((error) async {
-              debugPrint(error['message'].toString());
-              SnackBarMsg.danger(context, titleCase('Sync Data $name Error!'));
-              x++;
-            }, (response) async {
-              var i = 1;
-              var n = (response['data'] as List).length;
-              for (var item in (response['data'] as List).toList()) {
-                var row = <String, dynamic>{};
-                for (var e in (item as Map<String, dynamic>).entries) {
-                  if (e.value != null) {
-                    row[e.key] = e.value;
+                var batch = sqldb.batch();
+                int count = 0;
+
+                for (var item in items) {
+                  if (item is Map<String, dynamic>) {
+                    var row = <String, dynamic>{};
+                    for (var e in item.entries) {
+                      if (e.value != null) {
+                        row[e.key] = e.value;
+                      }
+                    }
+                    row.remove('created_by');
+                    row.remove('updated_by');
+                    row.remove('deleted_by');
+
+                    if (name == 'employee' || name == 'employees') {
+                      final dept = (row['departemen'] ?? row['depart'])?.toString() ?? 'GENERAL';
+                      final jab = (row['jabatan'] ?? row['posisi'])?.toString() ?? 'Karyawan';
+                      final perush = (row['perusahaan'] ?? row['company'])?.toString() ?? 'PT INDEXIM COALINDO';
+                      final nikVal = (row['no_nik'] ?? row['nik'] ?? row['id'])?.toString() ?? '';
+                      final namaVal = (row['nama_lengkap'] ?? row['nama'])?.toString() ?? '';
+                      final compIdVal = row['company_id'] ?? row['companyId'] ?? 1;
+
+                      row = <String, dynamic>{
+                        'no_nik': nikVal,
+                        'nik': nikVal,
+                        'nama_lengkap': namaVal,
+                        'depart': dept,
+                        'departemen': dept,
+                        'posisi': jab,
+                        'jabatan': jab,
+                        'perusahaan': perush,
+                        'company_id': compIdVal,
+                      };
+                      if (item['id'] != null && item['id'] is int) {
+                        row['id'] = item['id'];
+                      }
+                    }
+
+                    batch.insert(table, row, conflictAlgorithm: ConflictAlgorithm.replace);
+                    count++;
+
+                    if (count % 400 == 0) {
+                      await batch.commit(noResult: true);
+                      batch = sqldb.batch();
+                      _progress.value = (count / n * 100).floor();
+                    }
                   }
                 }
-                row.remove('created_by');
-                row.remove('updated_by');
-                row.remove('deleted_by');
-                _db.insert(table, row).then((insertId) {
-                  debugPrint('--- insert $table: $insertId ---');
-                  _progress.value = (i / n * 100).floor();
-                  if (i == 1) {
-                    x++;
-                    setState(() => _table = name);
-                  }
-                  if (i >= n && x >= _masters.length) {
-                    Future.delayed(const Duration(milliseconds: 3000), () {
-                      _complete();
-                    });
-                  }
-                  i++;
-                });
-              }
-              master[name] = 1;
-              PreferenceService.setDataSync(master);
-            });
+                if (count % 400 != 0) {
+                  await batch.commit(noResult: true);
+                }
+                _progress.value = 100;
+                master[name] = 1;
+                PreferenceService.setDataSync(master);
+              },
+            );
+          } catch (e) {
+            debugPrint('[SyncPage] Exception syncing $name: $e');
+          }
+
+          await Future.delayed(const Duration(milliseconds: 150));
+        }
+
+        // Selesai seluruh master data
+        if (mounted) {
+          Future.delayed(const Duration(milliseconds: 1000), () {
+            _complete();
           });
-          await Future.delayed(const Duration(seconds: 2));
         }
       } catch (e) {
         debugPrint(e.toString());

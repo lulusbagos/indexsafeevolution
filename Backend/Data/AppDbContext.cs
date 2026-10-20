@@ -32,6 +32,9 @@ namespace Indexsafe.Api.Data
         public DbSet<IncidentNews> IncidentNewsList { get; set; } = null!;
         public DbSet<AttendanceEvent> AttendanceEvents { get; set; } = null!;
         public DbSet<AttendanceRecord> AttendanceRecords { get; set; } = null!;
+        public DbSet<UserScanPermission> UserScanPermissions { get; set; } = null!;
+        public DbSet<PermitViolation> PermitViolations { get; set; } = null!;
+        public DbSet<PermitGateLog> PermitGateLogs { get; set; } = null!;
         public DbSet<Coaching> Coachings { get; set; } = null!;
         public DbSet<CoachingParticipant> CoachingParticipants { get; set; } = null!;
         public DbSet<Roster> Rosters { get; set; } = null!;
@@ -48,6 +51,7 @@ namespace Indexsafe.Api.Data
         public DbSet<DepartemenView> Departemens { get; set; } = null!;
         public DbSet<JabatanView> Jabatans { get; set; } = null!;
         public DbSet<KaryawanJabatanMappingPreviewView> KaryawanJabatanMappings { get; set; } = null!;
+        public DbSet<MitraKaryawanAktifView> MitraKaryawanAktifs { get; set; } = null!;
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -155,6 +159,12 @@ namespace Indexsafe.Api.Data
             modelBuilder.Entity<SapQualityAssessment>()
                 .ToTable("tbl_m_penilaian_kualitas_sap");
 
+            modelBuilder.Entity<UserScanPermission>(entity =>
+            {
+                entity.ToTable("tbl_m_user_scan_permission");
+                entity.Property(e => e.CanScanMinePermit).HasColumnName("can_scan_minepermit");
+            });
+
             // View mappings
             modelBuilder.Entity<KaryawanView>()
                 .ToView("vw_karyawan")
@@ -199,6 +209,10 @@ namespace Indexsafe.Api.Data
             modelBuilder.Entity<MitraDepartmentDropdownView>()
                 .ToSqlQuery("SELECT id_perusahaan, kode_perusahaan, nama_perusahaan, id_departemen, kode_departemen, nama_departemen, label_dropdown, perusahaan_status_aktif, departemen_status_aktif, perusahaan_deleted_at, group_label, option_label, sort_order FROM ONE_DB_MITRA.dbo.vw_m_departemen_dropdown")
                 .HasNoKey();
+
+            modelBuilder.Entity<MitraKaryawanAktifView>()
+                .ToSqlQuery("SELECT id_karyawan, id_personal, no_nik, nama_lengkap, id_perusahaan, nama_perusahaan, id_departemen, nama_departemen, id_jabatan, nama_jabatan, id_posisi, nama_posisi, path_foto, status_aktif_efektif FROM ONE_DB_MITRA.dbo.vw_m_karyawan_aktif")
+                .HasKey(k => k.IdKaryawan);
 
             // Apply snake_case column names mapping
             foreach (var entity in modelBuilder.Model.GetEntityTypes())

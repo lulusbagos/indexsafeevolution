@@ -139,6 +139,8 @@ class PreferenceService {
     return decrypted.isNotEmpty ? decrypted : null;
   }
 
+  static String? getBgToken() => prefs?.getString('bgToken');
+
   static Future<void> removeAuth() async {
     await prefs?.remove('authJson');
   }
@@ -211,5 +213,14 @@ class PreferenceService {
 
   static bool isAutoNotifEnabled() {
     return prefs?.getBool('auto_notif_enabled') ?? false; // Default: OFF (Mencegah panas)
+  }
+
+  /// Pengaturan Mode Peta Hazard ('heatmap', 'points', 'off')
+  static Future<void> setHazardMapMode(String mode) async {
+    await prefs?.setString('hazard_map_mode', mode);
+  }
+
+  static String getHazardMapMode() {
+    return prefs?.getString('hazard_map_mode') ?? 'heatmap';
   }
 }

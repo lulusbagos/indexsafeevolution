@@ -270,7 +270,7 @@ namespace Indexsafe.Api.Controllers
         /// Search employees / PJAs across companies
         /// </summary>
         [HttpGet("master/employees")]
-        public async Task<IActionResult> SearchEmployees([FromQuery] string? query, [FromQuery] bool lintasPerusahaan = true)
+        public async Task<IActionResult> SearchEmployees([FromQuery] string? query, [FromQuery] bool lintasPerusahaan = true, [FromQuery] int? limit = null)
         {
             var cid = GetCurrentCompanyId();
             var allowedIds = lintasPerusahaan ? null : await _companyHierarchyService.GetAccessibleCompanyIdsAsync(cid);
@@ -308,47 +308,186 @@ namespace Indexsafe.Api.Controllers
                                  e.perusahaan.ToLower().Contains(cleanQuery));
             }
 
-            var list = await q.Take(50).ToListAsync();
+            var effectiveLimit = limit ?? (string.IsNullOrEmpty(cleanQuery) ? 10000 : 50);
+            var list = await q.Take(effectiveLimit).ToListAsync();
             return Ok(list);
         }
 
-        [HttpGet("master/areas")]
-        public async Task<IActionResult> GetAreas()
+        [AllowAnonymous]
+        [HttpGet("master/areas", Order = -1)]
+        public async Task<IActionResult> GetAreas([FromQuery] int? perusahaanId)
         {
-            var cid = GetCurrentCompanyId();
-            var allowedIds = await _companyHierarchyService.GetAccessibleCompanyIdsAsync(cid);
+            var cidClaim = User.FindFirst("CompanyId")?.Value;
+            var targetCid = perusahaanId ?? (int.TryParse(cidClaim, out var c) ? c : 1);
 
-            var areas = await _context.MasterAreas
-                .AsNoTracking()
-                .Where(a => allowedIds.Contains(a.PerusahaanId) || a.PerusahaanId == 1)
-                .OrderBy(a => a.NamaArea)
-                .Select(a => new { id = a.Id, namaArea = a.NamaArea })
+            var query = _context.Benchmarks.AsNoTracking();
+
+            if (targetCid > 0)
+            {
+                var hasCompanyAreas = await query.AnyAsync(b => b.PerusahaanId == targetCid && !string.IsNullOrEmpty(b.AreaUtama));
+                if (hasCompanyAreas)
+                {
+                    query = query.Where(b => b.PerusahaanId == targetCid);
+                }
+                else
+                {
+                    query = query.Where(b => b.PerusahaanId == 1);
+                }
+            }
+
+            var areaNames = await query
+                .Where(b => !string.IsNullOrEmpty(b.AreaUtama) && !b.AreaUtama.Contains("CAMP EKSPLORASI"))
+                .Select(b => b.AreaUtama!.Trim())
+                .Distinct()
+                .OrderBy(s => s)
                 .ToListAsync();
+
+            var areas = areaNames
+                .Select((name, idx) => new { id = idx + 1, namaArea = name })
+                .ToList();
 
             return Ok(areas);
         }
 
-        [HttpGet("master/benchmarks")]
-        public async Task<IActionResult> GetBenchmarks([FromQuery] string? areaUtama)
+        [AllowAnonymous]
+        [HttpGet("master/benchmarks", Order = -1)]
+        public async Task<IActionResult> GetBenchmarks([FromQuery] string? areaUtama, [FromQuery] int? perusahaanId)
         {
-            var cid = GetCurrentCompanyId();
-            var allowedIds = await _companyHierarchyService.GetAccessibleCompanyIdsAsync(cid);
+            var cidClaim = User.FindFirst("CompanyId")?.Value;
+            var targetCid = perusahaanId ?? (int.TryParse(cidClaim, out var c) ? c : 1);
 
-            var query = _context.Benchmarks
-                .AsNoTracking()
-                .Where(b => (b.PerusahaanId.HasValue && allowedIds.Contains(b.PerusahaanId.Value)) || b.PerusahaanId == 1);
+            var query = _context.Benchmarks.AsNoTracking();
+
+            if (targetCid > 0)
+            {
+                var hasCompanyRows = await query.AnyAsync(b => b.PerusahaanId == targetCid && (string.IsNullOrEmpty(areaUtama) || b.AreaUtama == areaUtama));
+                if (hasCompanyRows)
+                {
+                    query = query.Where(b => b.PerusahaanId == targetCid);
+                }
+                else
+                {
+                    query = query.Where(b => b.PerusahaanId == 1);
+                }
+            }
 
             if (!string.IsNullOrWhiteSpace(areaUtama))
             {
-                query = query.Where(b => b.AreaUtama == areaUtama);
+                var targetArea = areaUtama.Trim().ToLower();
+                query = query.Where(b => b.AreaUtama != null && b.AreaUtama.ToLower() == targetArea);
             }
 
             var list = await query
-                .OrderBy(b => b.NamaBenchmark)
-                .Select(b => new { id = b.Id, namaBenchmark = b.NamaBenchmark, areaUtama = b.AreaUtama })
+                .Where(b => !string.IsNullOrWhiteSpace(b.NamaBenchmark))
+                .Select(b => new { id = b.Id, namaBenchmark = b.NamaBenchmark!.Trim(), areaUtama = b.AreaUtama, perusahaanId = b.PerusahaanId })
                 .ToListAsync();
 
-            return Ok(list);
+            var distinctList = list
+                .GroupBy(b => b.namaBenchmark, StringComparer.OrdinalIgnoreCase)
+                .Select(g => g.First())
+                .OrderBy(b => b.namaBenchmark)
+                .ToList();
+
+            return Ok(distinctList);
+        }
+
+        public class CreateBenchmarkRequest
+        {
+            public string? AreaUtama { get; set; }
+            public string? NamaBenchmark { get; set; }
+            public int? PerusahaanId { get; set; }
+            public string? CreatedByNik { get; set; }
+            public string? CreatedByName { get; set; }
+        }
+
+        [AllowAnonymous]
+        [HttpPost("master/benchmarks", Order = -1)]
+        public async Task<IActionResult> CreateBenchmark([FromBody] CreateBenchmarkRequest request)
+        {
+            if (string.IsNullOrWhiteSpace(request?.AreaUtama) || string.IsNullOrWhiteSpace(request?.NamaBenchmark))
+            {
+                return BadRequest(new { message = "Area Utama dan Nama Benchmark wajib diisi." });
+            }
+
+            var cleanArea = request.AreaUtama.Trim();
+            var cleanBench = request.NamaBenchmark.Trim();
+
+            var cidClaim = User.FindFirst("CompanyId")?.Value;
+            var cid = request.PerusahaanId ?? (int.TryParse(cidClaim, out var c) ? c : 1);
+            var nik = User.FindFirst("Nik")?.Value ?? request.CreatedByNik ?? "USER";
+            var nama = User.FindFirst("Nama")?.Value ?? request.CreatedByName ?? "User Mobile";
+
+            var existing = await _context.Benchmarks
+                .AsNoTracking()
+                .FirstOrDefaultAsync(b => b.PerusahaanId == cid &&
+                                          b.AreaUtama != null && 
+                                          b.AreaUtama.ToLower() == cleanArea.ToLower() && 
+                                          b.NamaBenchmark != null && 
+                                          b.NamaBenchmark.ToLower() == cleanBench.ToLower());
+            if (existing != null)
+            {
+                return Ok(new { id = existing.Id, namaBenchmark = existing.NamaBenchmark, areaUtama = existing.AreaUtama, perusahaanId = existing.PerusahaanId });
+            }
+
+            var item = new MasterBenchmark
+            {
+                PerusahaanId = cid,
+                AreaUtama = cleanArea,
+                NamaBenchmark = cleanBench,
+                CreatedByNik = nik,
+                CreatedByName = nama,
+                CreatedAt = DateTime.Now
+            };
+
+            _context.Benchmarks.Add(item);
+            await _context.SaveChangesAsync();
+
+            return Ok(new { id = item.Id, namaBenchmark = item.NamaBenchmark, areaUtama = item.AreaUtama, perusahaanId = item.PerusahaanId });
+        }
+
+        public class CreateAreaRequest
+        {
+            public string? NamaArea { get; set; }
+            public string? CreatedByNik { get; set; }
+            public string? CreatedByName { get; set; }
+        }
+
+        [AllowAnonymous]
+        [HttpPost("master/areas", Order = -1)]
+        public async Task<IActionResult> CreateArea([FromBody] CreateAreaRequest request)
+        {
+            if (string.IsNullOrWhiteSpace(request?.NamaArea))
+            {
+                return BadRequest(new { message = "Nama Area wajib diisi." });
+            }
+
+            var cleanArea = request.NamaArea.Trim();
+            var existing = await _context.MasterAreas
+                .AsNoTracking()
+                .FirstOrDefaultAsync(a => a.NamaArea.ToLower() == cleanArea.ToLower());
+            if (existing != null)
+            {
+                return Ok(new { id = existing.Id, namaArea = existing.NamaArea });
+            }
+
+            var cidClaim = User.FindFirst("CompanyId")?.Value;
+            var cid = int.TryParse(cidClaim, out var c) ? c : 1;
+            var nik = User.FindFirst("Nik")?.Value ?? request.CreatedByNik ?? "USER";
+            var nama = User.FindFirst("Nama")?.Value ?? request.CreatedByName ?? "User Mobile";
+
+            var area = new MasterArea
+            {
+                PerusahaanId = cid,
+                NamaArea = cleanArea,
+                CreatedByNik = nik,
+                CreatedByName = nama,
+                CreatedAt = DateTime.Now
+            };
+
+            _context.MasterAreas.Add(area);
+            await _context.SaveChangesAsync();
+
+            return Ok(new { id = area.Id, namaArea = area.NamaArea });
         }
     }
 }

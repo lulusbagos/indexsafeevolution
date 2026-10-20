@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 
 import '../../services/api.dart';
 import '../../services/database.dart';
+import '../../services/offline_sync_service.dart';
 import '../../services/preference.dart';
 import '../../services/sync.dart';
 import '../../utils/enums.dart';
@@ -31,6 +32,31 @@ class _HistoryPageState extends State<HistoryPage> {
   final _profile = PreferenceService.getProfile();
   List<dynamic> _rawData = [];
   String _table = '';
+  String _searchQuery = '';
+
+  List<dynamic> get _displayData {
+    if (_searchQuery.trim().isEmpty) return _rawData;
+    final q = _searchQuery.toLowerCase().trim();
+    return _rawData.where((item) {
+      if (item is! Map) return false;
+      final title = '${item['title'] ?? ''}'.toLowerCase();
+      final remark = '${item['remark'] ?? item['detil_temuan'] ?? ''}'.toLowerCase();
+      final location = '${item['location_name'] ?? item['location_detail'] ?? item['lokasi'] ?? ''}'.toLowerCase();
+      final area = '${item['area_name'] ?? item['area'] ?? ''}'.toLowerCase();
+      final pja = '${item['pja_name'] ?? item['pja'] ?? ''}'.toLowerCase();
+      final pic = '${item['pic_name'] ?? item['pic'] ?? ''}'.toLowerCase();
+      final code = '${item['code'] ?? ''}'.toLowerCase();
+      final company = '${item['company'] ?? item['perusahaan'] ?? ''}'.toLowerCase();
+      return title.contains(q) ||
+          remark.contains(q) ||
+          location.contains(q) ||
+          area.contains(q) ||
+          pja.contains(q) ||
+          pic.contains(q) ||
+          code.contains(q) ||
+          company.contains(q);
+    }).toList();
+  }
 
   @override
   void initState() {
@@ -49,12 +75,106 @@ class _HistoryPageState extends State<HistoryPage> {
 
   @override
   void dispose() {
-    /** */
-
     super.dispose();
   }
 
+  Future<void> _fetchAndRefresh() async {
+    final isOnline = OfflineSyncService.instance.state.value.isOnline;
+    if (isOnline) {
+      final userNik = _profile?.noNik ?? '';
+      final profileId = _profile?.id ?? 0;
+
+      if (widget.history == History.summary && widget.module == Module.hazard) {
+        try {
+          final res = await _api.dio.get('/tran/hazard?limit=100');
+          if (res.data != null && res.data['data'] is List) {
+            for (var raw in (res.data['data'] as List)) {
+              if (raw is Map) {
+                final item = Map<String, dynamic>.from(raw);
+                final id = item['id'];
+                if (id is int) {
+                  final row = <String, dynamic>{
+                    'id': id,
+                    'code': item['code'] ?? 'HZ-$id',
+                    'title': item['title'] ?? item['remark'] ?? 'Laporan Bahaya',
+                    'location_detail': item['location_detail'] ?? item['lokasi'] ?? '',
+                    'date': item['date'] ?? '',
+                    'time': item['time'] ?? '',
+                    'remark': item['remark'] ?? '',
+                    'image': item['image'] ?? item['foto_temuan'],
+                    'status': item['status'] is int ? item['status'] : 0,
+                    'repair': item['repair'] is int ? item['repair'] : 0,
+                    'repair_remark': item['repair_remark'] ?? item['perbaikan'],
+                    'repair_image': item['repair_image'] ?? item['foto_perbaikan'],
+                    'pja_id': (item['nik_pja'] == userNik) ? profileId : (item['pja_id'] ?? 0),
+                    'employee_id': (item['nik'] == userNik) ? profileId : (item['employee_id'] ?? profileId),
+                    'sync_id': id,
+                    'created_at': item['created_at'] ?? DateTime.now().toString(),
+                  };
+                  final existing = await _db.get('hazard_trans', id);
+                  if (existing == null) {
+                    await _db.insert('hazard_trans', row);
+                  } else {
+                    await _db.update('hazard_trans', row, id);
+                  }
+                }
+              }
+            }
+          }
+        } catch (_) {}
+      } else if (widget.history == History.action || widget.history == History.monitoring) {
+        try {
+          final actionRes = await _api.getAction(widget.module.name);
+          await actionRes.fold((_) async {}, (response) async {
+            final list = response['data'];
+            if (list is List) {
+              for (var raw in list) {
+                if (raw is Map) {
+                  final item = Map<String, dynamic>.from(raw);
+                  final id = item['id'];
+                  if (id is int) {
+                    final row = <String, dynamic>{
+                      'id': id,
+                      'code': item['code'] ?? 'AP-$id',
+                      'title': item['title'] ?? item['detilTemuan'] ?? item['kategoriTemuan'] ?? 'Action',
+                      'location_detail': item['location_detail'] ?? item['detilLokasi'] ?? item['lokasi'] ?? '',
+                      'date': item['date'] ?? item['tanggal'] ?? '',
+                      'time': item['time'] ?? item['waktu'] ?? '',
+                      'remark': item['remark'] ?? item['detilTemuan'] ?? '',
+                      'image': item['image'] ?? item['fotoTemuan'],
+                      'status': item['status'] is int ? item['status'] : 0,
+                      'pja_id': (item['nik_pja'] == userNik || item['nikPja'] == userNik) ? profileId : (item['pja_id'] ?? 0),
+                      'pic_id': (item['nik_pic'] == userNik || item['nikPic'] == userNik) ? profileId : (item['pic_id'] ?? 0),
+                      'employee_id': (item['nik'] == userNik) ? profileId : (item['employee_id'] ?? 0),
+                      'plan': item['plan'] ?? item['rencanaPerbaikan'],
+                      'plan_date': item['plan_date'] ?? item['tanggalRencanaPerbaikan'],
+                      'action': item['action'] ?? item['perbaikan'],
+                      'action_date': item['action_date'] ?? item['tanggalPerbaikan'],
+                      'action_image': item['action_image'] ?? item['fotoPerbaikan'],
+                      'table': widget.module.name,
+                      'category': widget.module.name,
+                      'created_at': item['created_at'] ?? DateTime.now().toString(),
+                      'updated_at': DateTime.now().toString(),
+                    };
+                    final existing = await _db.get('action_plans', id);
+                    if (existing == null) {
+                      await _db.insert('action_plans', row);
+                    } else {
+                      await _db.update('action_plans', row, id);
+                    }
+                  }
+                }
+              }
+            }
+          });
+        } catch (_) {}
+      }
+    }
+    _getData();
+  }
+
   void _getData() {
+    final profileId = _profile?.id ?? 0;
     var qry = '';
     var select =
         '''select tr.*, me1.name as area_name, me2.name as location_name''';
@@ -77,7 +197,7 @@ class _HistoryPageState extends State<HistoryPage> {
         (select em."name" from enum_masters em where em."type"='shift' and em.id=tr.shift_id) as shift_name
         from inspection_trans tr $joinArea
         left join inspection_masters im on im.id=tr.inspection_id and im.deleted_at is null and im.ref_id is null
-        where tr.deleted_at is null and tr.employee_id=${_profile?.id} and tr.category='${widget.module.name}' order by tr.id desc''';
+        where tr.deleted_at is null and (tr.employee_id=$profileId or tr.employee_id=0 or tr.employee_id is null) and tr.category='${widget.module.name}' order by tr.id desc''';
         _table = 'inspection_trans';
         break;
       case Module.hazard:
@@ -88,12 +208,12 @@ class _HistoryPageState extends State<HistoryPage> {
         (select hm."name" from hazard_masters hm where hm."type"='subtype' and hm.id=tr.hazard_subtype_id) as jenis_ketidaksesuaian,
         (select e.nama_lengkap from employees e where e.id=tr.pja_id) as pja_name
         from hazard_trans tr $joinArea
-        where tr.deleted_at is null and tr.employee_id=${_profile?.id} order by tr.id desc''';
+        where tr.deleted_at is null and (tr.employee_id=$profileId or tr.employee_id=0 or tr.employee_id is null) order by tr.id desc''';
         _table = 'hazard_trans';
         break;
       case Module.coaching:
         qry = '''$select from coaching_trans tr $joinArea
-        where tr.deleted_at is null and tr.employee_id=${_profile?.id} order by tr.id desc''';
+        where tr.deleted_at is null and (tr.employee_id=$profileId or tr.employee_id=0 or tr.employee_id is null) order by tr.id desc''';
         _table = 'coaching_trans';
         break;
       case Module.observation:
@@ -102,7 +222,7 @@ class _HistoryPageState extends State<HistoryPage> {
         (select om."name" from observation_masters om where om."type"='document' and om.id=tr.doc_id) as dokumen_pendukung,
         (select om."name" from observation_masters om where om."type"='risk' and om.id=tr.risk_id) as resiko_kritis
         from observation_trans tr $joinArea
-        where tr.deleted_at is null and tr.employee_id=${_profile?.id} order by tr.id desc''';
+        where tr.deleted_at is null and (tr.employee_id=$profileId or tr.employee_id=0 or tr.employee_id is null) order by tr.id desc''';
         _table = 'observation_trans';
         break;
       case Module.p2h:
@@ -110,52 +230,59 @@ class _HistoryPageState extends State<HistoryPage> {
         mv.type as jenis_kendaraan, mv.code as no_lambung_kendaraan, mv."name" as merek_kendaraan
         from p2h_trans tr
         left join vehicle_masters mv on mv.id=tr.vehicle_id and mv.deleted_at is null
-        where tr.deleted_at is null and tr.employee_id=${_profile?.id} order by tr.id desc''';
+        where tr.deleted_at is null and (tr.employee_id=$profileId or tr.employee_id=0 or tr.employee_id is null) order by tr.id desc''';
         _table = 'p2h_trans';
         break;
       case Module.p5m:
         qry = '''$select,
         (select pm."name" from p5m_masters pm where pm."type"='topic-p5m' and pm.id=tr.topic_id) as topic_name
         from p5m_trans tr $joinArea
-        where tr.deleted_at is null and tr.employee_id=${_profile?.id} order by tr.id desc''';
+        where tr.deleted_at is null and (tr.employee_id=$profileId or tr.employee_id=0 or tr.employee_id is null) order by tr.id desc''';
         _table = 'p5m_trans';
         break;
       case Module.safety:
         qry = '''$select from safety_trans tr $joinArea
-        where tr.deleted_at is null and tr.employee_id=${_profile?.id} order by tr.id desc''';
+        where tr.deleted_at is null and (tr.employee_id=$profileId or tr.employee_id=0 or tr.employee_id is null) order by tr.id desc''';
         _table = 'safety_trans';
         break;
       case Module.induction:
         qry = '''$select from k3_trans tr $joinArea
-        where tr.deleted_at is null and tr.employee_id=${_profile?.id} order by tr.id desc''';
+        where tr.deleted_at is null and (tr.employee_id=$profileId or tr.employee_id=0 or tr.employee_id is null) order by tr.id desc''';
         _table = 'k3_trans';
         break;
     }
 
     if (widget.history == History.action) {
-      qry = '''$select, 1 as sync_id,
+      qry = '''$select, 
+      (case when tr.updated_at is null then null else 1 end) as sync_id,
       (select e.nama_lengkap from employees e where e.id=tr.pja_id) as pja_name,
       (select e.nama_lengkap from employees e where e.id=tr.pic_id) as pic_name
       from action_plans tr $joinArea
-      where tr.deleted_at is null and ((tr.pja_id=${_profile?.id} and tr.status<1) or (tr.pic_id=${_profile?.id} and tr.status<2))
-      and tr.category='${widget.module.name}'
+      where tr.deleted_at is null 
+        and ((tr.pja_id=$profileId and tr.status<1) or (tr.pic_id=$profileId and tr.status<2))
+        and (tr.category='${widget.module.name}' or tr.table='${widget.module.name}')
+        and tr.status < 2
       order by tr.id desc''';
-      _table = '';
+      _table = 'action_plans';
     }
 
     if (widget.history == History.monitoring) {
-      qry = '''$select, 1 as sync_id,
+      qry = '''$select, 
+      (case when tr.updated_at is null then null else 1 end) as sync_id,
       (select e.nama_lengkap from employees e where e.id=tr.pja_id) as pja_name,
       (select e.nama_lengkap from employees e where e.id=tr.pic_id) as pic_name
       from action_plans tr $joinArea
-      where tr.deleted_at is null and ((tr.pja_id=${_profile?.id} and tr.status>0) or (tr.pic_id=${_profile?.id} and tr.status>1) or tr.employee_id=${_profile?.id})
-      and tr.category='${widget.module.name}'
+      where tr.deleted_at is null 
+        and ((tr.pja_id=$profileId and tr.status>0) or (tr.pic_id=$profileId and tr.status>1) or tr.employee_id=$profileId)
+        and (tr.category='${widget.module.name}' or tr.table='${widget.module.name}')
+        and tr.status < 2
       order by tr.id desc''';
-      _table = '';
+      _table = 'action_plans';
     }
 
     if (qry != '') {
       _db.rawQuery(qry).then((val) {
+        if (!mounted) return;
         if (val.isNotEmpty) {
           debugPrint('--- $_table : ${val.length} ---');
 
@@ -163,7 +290,6 @@ class _HistoryPageState extends State<HistoryPage> {
             var lastData =
                 val.where((e) => e['id'] as int == widget.lastId).toList();
             if (lastData.isNotEmpty) {
-              if (!mounted) return;
               Navigator.push(
                 context,
                 MaterialPageRoute(
@@ -177,9 +303,9 @@ class _HistoryPageState extends State<HistoryPage> {
               return;
             }
           }
-
-          if (!mounted) return;
           setState(() => _rawData = val.toList());
+        } else {
+          setState(() => _rawData = []);
         }
       });
     }
@@ -360,7 +486,7 @@ class _HistoryPageState extends State<HistoryPage> {
         title: '${titleCase(widget.history.name)} ${pageTitle(widget.module)}',
       ),
       body: RefreshIndicator(
-        onRefresh: () async => _getData(),
+        onRefresh: () async => _fetchAndRefresh(),
         child: SingleChildScrollView(
           controller: _scrollCtrl,
           physics: const AlwaysScrollableScrollPhysics(),
@@ -371,12 +497,36 @@ class _HistoryPageState extends State<HistoryPage> {
               SapModuleHeader(
                 module: widget.module,
                 trailing: SapStatusPill(
-                  label: '${_rawData.length} Data',
+                  label: '${_displayData.length} Data',
                   color: Colors.white,
                   icon: Icons.dataset_rounded,
                 ),
               ),
-              const SizedBox(height: 18),
+              const SizedBox(height: 14),
+              Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                ),
+                child: TextField(
+                  onChanged: (val) => setState(() => _searchQuery = val),
+                  decoration: InputDecoration(
+                    hintText: 'Cari laporan, lokasi, PJA, atau PIC...',
+                    hintStyle: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
+                    prefixIcon: const Icon(Icons.search_rounded, color: Color(0xFF64748B), size: 20),
+                    suffixIcon: _searchQuery.isNotEmpty
+                        ? IconButton(
+                            icon: const Icon(Icons.clear_rounded, size: 18),
+                            onPressed: () => setState(() => _searchQuery = ''),
+                          )
+                        : null,
+                    border: InputBorder.none,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 14),
               Text(
                 _historyTitle(),
                 style: const TextStyle(
@@ -386,13 +536,13 @@ class _HistoryPageState extends State<HistoryPage> {
                 ),
               ),
               const SizedBox(height: 10),
-              if (_rawData.isNotEmpty)
+              if (_displayData.isNotEmpty)
                 ListView.builder(
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
-                  itemCount: _rawData.length,
+                  itemCount: _displayData.length,
                   itemBuilder: (context, index) {
-                    final row = _rawData[index] as Map<String, dynamic>;
+                    final row = _displayData[index] as Map<String, dynamic>;
                     return _HistoryRecordCard(
                       row: row,
                       module: widget.module,
@@ -411,7 +561,7 @@ class _HistoryPageState extends State<HistoryPage> {
                                 row,
                               ),
                             ),
-                          );
+                          ).then((_) => _getData());
                         }
                       },
                     );
@@ -466,9 +616,11 @@ class _HistoryRecordCard extends StatelessWidget {
     final date = DateTime.tryParse('${row['date']}');
     final sync = row['sync_id'] != null;
     final title = titleCase('${row['title'] ?? pageTitle(module)}');
-    final remark = titleCase('${row['remark'] ?? '-'}');
-    final area = titleCase('${row['area_name'] ?? '-'}');
-    final location = titleCase('${row['location_name'] ?? '-'}');
+    final remark = titleCase('${row['remark'] ?? row['detil_temuan'] ?? '-'}');
+    final area = titleCase('${row['area_name'] ?? row['area'] ?? '-'}');
+    final location = titleCase('${row['location_name'] ?? row['location_detail'] ?? row['lokasi'] ?? '-'}');
+    final pjaName = row['pja_name'] ?? row['pja'];
+    final picName = row['pic_name'] ?? row['pic'];
     final timeText = [
       if (date != null) DateFormat('dd MMM yyyy').format(date),
       if ((row['time'] ?? '').toString().isNotEmpty) row['time'],
@@ -523,12 +675,19 @@ class _HistoryRecordCard extends StatelessWidget {
                                   color: Color(0xFFEF4444),
                                   icon: Icons.cloud_off_rounded,
                                 )
-                        else
+                        else ...[
                           SapStatusPill(
                             label: _actionStatusLabel(row),
                             color: _actionStatusColor(row),
                             icon: Icons.flag_rounded,
                           ),
+                          if (!sync)
+                            const SapStatusPill(
+                              label: 'Belum Sinkron',
+                              color: Color(0xFFEF4444),
+                              icon: Icons.cloud_off_rounded,
+                            ),
+                        ],
                         if (timeText.isNotEmpty)
                           SapStatusPill(
                             label: timeText,
@@ -548,6 +707,10 @@ class _HistoryRecordCard extends StatelessWidget {
           SapInfoLine(icon: Icons.notes_rounded, text: 'Note: $remark'),
           SapInfoLine(icon: Icons.map_rounded, text: 'Area: $area'),
           SapInfoLine(icon: Icons.place_rounded, text: 'Lokasi: $location'),
+          if (pjaName != null && pjaName.toString().isNotEmpty && pjaName != '-')
+            SapInfoLine(icon: Icons.person_outline_rounded, text: 'PJA: $pjaName'),
+          if (picName != null && picName.toString().isNotEmpty && picName != '-')
+            SapInfoLine(icon: Icons.assignment_ind_outlined, text: 'PIC: $picName'),
         ],
       ),
     );
@@ -555,17 +718,20 @@ class _HistoryRecordCard extends StatelessWidget {
 
   String _actionStatusLabel(Map<String, dynamic> row) {
     final status = row['status'];
+    if (status == 0) return 'Open (Menunggu PJA)';
+    if (status == 1) return 'In Progress (Tindak Lanjut)';
+    if (status == 2) return 'Closed (Selesai)';
     if (status is int && globals.status.containsKey(status)) {
       return '${globals.status[status]}';
     }
-    return 'Open';
+    return '${row['statusName'] ?? 'Open'}';
   }
 
   Color _actionStatusColor(Map<String, dynamic> row) {
     final status = row['status'];
-    if (status is int && globals.statusColor.containsKey(status)) {
-      return globals.statusColor[status]!;
-    }
+    if (status == 0) return const Color(0xFFEF4444);
+    if (status == 1) return const Color(0xFFF59E0B);
+    if (status == 2) return const Color(0xFF16A34A);
     return const Color(0xFFF59E0B);
   }
 }

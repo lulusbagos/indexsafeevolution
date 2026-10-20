@@ -80,41 +80,6 @@ class SapPage extends StatelessWidget {
               ],
             ),
           ),
-          ValueListenableBuilder<OfflineSyncState>(
-            valueListenable: OfflineSyncService.instance.state,
-            builder: (_, state, __) =>
-                Stack(clipBehavior: Clip.none, children: [
-              _roundButton(
-                icon: state.isOnline
-                    ? Icons.sync_rounded
-                    : Icons.cloud_off_rounded,
-                color: state.pendingCount > 0 || !state.isOnline
-                    ? const Color(0xFFDC2626)
-                    : _green,
-                onTap: () => OfflineSyncService.instance.syncNow(),
-              ),
-              if (state.pendingCount > 0)
-                Positioned(
-                  top: -2,
-                  right: -2,
-                  child: CircleAvatar(
-                    radius: 9,
-                    backgroundColor: const Color(0xFFDC2626),
-                    child: Text('${state.pendingCount}',
-                        style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 9,
-                            fontWeight: FontWeight.w800)),
-                  ),
-                ),
-            ]),
-          ),
-          const SizedBox(width: 7),
-          _roundButton(
-              icon: Icons.notifications_none_rounded,
-              onTap: () => Navigator.push(context,
-                  MaterialPageRoute(builder: (_) => const NotifPage()))),
-          const SizedBox(width: 7),
           _roundButton(
             icon: Icons.account_circle_outlined,
             onTap: () {
@@ -149,50 +114,65 @@ class SapPage extends StatelessWidget {
             border: Border.all(color: style.color.withValues(alpha: .14)),
             boxShadow: const [
               BoxShadow(
-                  color: Color(0x140B2B33),
-                  blurRadius: 14,
-                  offset: Offset(0, 7))
+                color: Color(0x140B2B33),
+                blurRadius: 14,
+                offset: Offset(0, 7),
+              ),
             ],
           ),
-          child: Stack(children: [
-            Positioned(
+          child: Stack(
+            children: [
+              Positioned(
                 right: -17,
                 top: 8,
-                child: Icon(style.icon,
-                    size: 92, color: style.color.withValues(alpha: .075))),
-            Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Container(
-                height: 43,
-                width: 43,
-                decoration: BoxDecoration(
-                    color: style.color,
-                    borderRadius: BorderRadius.circular(13),
-                    boxShadow: [
-                      BoxShadow(
-                          color: style.color.withValues(alpha: .28),
-                          blurRadius: 10,
-                          offset: const Offset(0, 5))
-                    ]),
-                child: Icon(style.icon, color: Colors.white, size: 23),
-              ),
-              const SizedBox(height: 7),
-              Expanded(
-                child: Center(
-                  child: FittedBox(
-                    fit: BoxFit.scaleDown,
-                    child: Text(item.title,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                            color: _ink,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w900)),
-                  ),
+                child: Icon(
+                  style.icon,
+                  size: 92,
+                  color: style.color.withValues(alpha: .075),
                 ),
               ),
-            ]),
-          ]),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    height: 43,
+                    width: 43,
+                    decoration: BoxDecoration(
+                      color: style.color,
+                      borderRadius: BorderRadius.circular(13),
+                      boxShadow: [
+                        BoxShadow(
+                          color: style.color.withValues(alpha: .28),
+                          blurRadius: 10,
+                          offset: const Offset(0, 5),
+                        ),
+                      ],
+                    ),
+                    child: Icon(style.icon, color: Colors.white, size: 23),
+                  ),
+                  const SizedBox(height: 7),
+                  Expanded(
+                    child: Center(
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          item.title,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            color: _ink,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );

@@ -21,11 +21,13 @@ namespace Indexsafe.Api.Controllers
     {
         private readonly AppDbContext _context;
         private readonly ImageUploadService _imageUploadService;
+        private readonly CompanyHierarchyService _companyHierarchyService;
 
-        public HazardApiController(AppDbContext context, ImageUploadService imageUploadService)
+        public HazardApiController(AppDbContext context, ImageUploadService imageUploadService, CompanyHierarchyService companyHierarchyService)
         {
             _context = context;
             _imageUploadService = imageUploadService;
+            _companyHierarchyService = companyHierarchyService;
         }
 
         private string GetCurrentNik() => User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "0000";
@@ -48,27 +50,53 @@ namespace Indexsafe.Api.Controllers
                 .AsNoTracking()
                 .Where(h => !h.IsDeleted && (h.Nik == trimmedNik || h.NikPja == trimmedNik));
 
-            // Statistik dokumentasi & scoring
+            // 1. ACTION (Tugas PJA yang diarahkan ke saya dan belum selesai)
+            var totalAction = await _context.HazardReports.CountAsync(h => !h.IsDeleted && h.NikPja == trimmedNik && h.StatusTemuan != "Closed");
+
+            // 2. MONITORING (Temuan yang SAYA laporkan yang masih aktif / sedang berproses di PJA)
+            var totalMonitoring = await _context.HazardReports.CountAsync(h => !h.IsDeleted && h.Nik == trimmedNik && h.StatusTemuan != "Closed");
+
+            // 3. SUMMARY (Laporan yang SUDAH SELESAI / Closed)
+            var totalSummary = await _context.HazardReports.CountAsync(h => !h.IsDeleted && (h.Nik == trimmedNik || h.NikPja == trimmedNik) && h.StatusTemuan == "Closed");
+
             var totalInput = await _context.HazardReports.CountAsync(h => !h.IsDeleted && h.Nik == trimmedNik);
-            var totalOpen = await _context.HazardReports.CountAsync(h => !h.IsDeleted && h.Nik == trimmedNik && h.StatusTemuan == "Open");
-            var totalClosed = await _context.HazardReports.CountAsync(h => !h.IsDeleted && h.Nik == trimmedNik && h.StatusTemuan == "Closed");
-            var totalAssignedToMe = await _context.HazardReports.CountAsync(h => !h.IsDeleted && h.NikPja == trimmedNik && h.Nik != trimmedNik && h.StatusTemuan == "Open");
+            var totalSiteAll = await _context.HazardReports.CountAsync(h => !h.IsDeleted);
 
-            var query = baseQuery;
+            IQueryable<HazardReport> query = baseQuery;
 
-            // Filter status/assigned
+            // Filter alur kerja & status
             filter = (filter ?? "all").Trim().ToLowerInvariant();
-            if (filter == "open")
+            if (filter == "action" || filter == "assigned" || filter == "pja" || filter == "tugas_pja")
             {
-                query = query.Where(h => h.StatusTemuan == "Open");
+                // Action: diarahkan ke saya sebagai PJA yang masih butuh tindakan
+                query = _context.HazardReports.AsNoTracking().Where(h => !h.IsDeleted && h.NikPja == trimmedNik && h.StatusTemuan != "Closed");
             }
-            else if (filter == "closed")
+            else if (filter == "monitoring" || filter == "monitor" || filter == "in_flight" || filter == "berproses")
             {
-                query = query.Where(h => h.StatusTemuan == "Closed");
+                // Monitoring: laporan saya yang sedang berjalan / diarahkan ke PJA
+                query = _context.HazardReports.AsNoTracking().Where(h => !h.IsDeleted && h.Nik == trimmedNik && h.StatusTemuan != "Closed");
             }
-            else if (filter == "assigned" || filter == "pja")
+            else if (filter == "summary" || filter == "selesai" || filter == "closed")
             {
-                query = query.Where(h => h.NikPja == trimmedNik && h.Nik != trimmedNik);
+                // Summary: laporan selesai / Closed
+                query = _context.HazardReports.AsNoTracking().Where(h => !h.IsDeleted && (h.Nik == trimmedNik || h.NikPja == trimmedNik) && h.StatusTemuan == "Closed");
+            }
+            else if (filter == "all_site" || filter == "all_company" || filter == "site")
+            {
+                // Pantau seluruh site (opsional)
+                query = _context.HazardReports.AsNoTracking().Where(h => !h.IsDeleted);
+            }
+            else if (filter == "my_reports" || filter == "laporan_saya")
+            {
+                query = _context.HazardReports.AsNoTracking().Where(h => !h.IsDeleted && h.Nik == trimmedNik);
+            }
+            else if (filter == "open")
+            {
+                query = query.Where(h => h.StatusTemuan == "Open" || h.StatusTemuan == "In Progress");
+            }
+            else if (filter == "inprogress" || filter == "in_progress" || filter == "takeup")
+            {
+                query = query.Where(h => h.StatusTemuan == "In Progress");
             }
 
             // Filter search
@@ -114,6 +142,7 @@ namespace Indexsafe.Api.Controllers
                     created_at = h.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss"),
                     is_my_report = h.Nik == trimmedNik,
                     is_assigned_to_me = h.NikPja == trimmedNik && h.Nik != trimmedNik,
+                    can_take_up = (h.NikPja == trimmedNik || h.Nik == trimmedNik) && h.StatusTemuan == "Open",
                     can_close = (h.Nik == trimmedNik || h.NikPja == trimmedNik) && h.StatusTemuan != "Closed",
                     can_reassign = (h.NikPja == trimmedNik || h.Nik == trimmedNik) && h.StatusTemuan != "Closed",
                     can_delete = h.Nik == trimmedNik && h.StatusTemuan != "Closed"
@@ -125,10 +154,14 @@ namespace Indexsafe.Api.Controllers
                 success = true,
                 summary = new
                 {
+                    total_action = totalAction,
+                    total_monitoring = totalMonitoring,
+                    total_summary = totalSummary,
                     total_input = totalInput,
-                    total_open = totalOpen,
-                    total_closed = totalClosed,
-                    total_assigned = totalAssignedToMe,
+                    total_open = totalMonitoring,
+                    total_closed = totalSummary,
+                    total_assigned = totalAction,
+                    total_site = totalSiteAll,
                     score = totalInput * 10 // Poin skor keselamatan SAP
                 },
                 data = items
@@ -279,11 +312,13 @@ namespace Indexsafe.Api.Controllers
                 {
                     _context.Notifications.Add(new Notification
                     {
-                        RecipientNik = nikPja,
-                        Title = "Temuan Hazard Baru",
-                        Message = $"Anda ditunjuk sebagai PJA untuk temuan Hazard di {lokasi} oleh {userName}.",
-                        Url = $"/ActionPlan/Index",
-                        NotifType = "hazard_new",
+                        RecipientNik = nikPja.Trim(),
+                        Title = "Penugasan PJA Temuan Hazard",
+                        Message = $"Anda ditunjuk sebagai PJA untuk temuan Hazard di {lokasi} oleh {userName}. Segera tindaklanjuti (Take Up) atau alihkan ke PJA lain jika salah sasaran.",
+                        Url = "/Hazard/Index",
+                        NotifType = "hazard_assigned",
+                        IsRead = false,
+                        IsActioned = false,
                         CreatedAt = DateTime.Now
                     });
                     await _context.SaveChangesAsync();
@@ -414,7 +449,7 @@ namespace Indexsafe.Api.Controllers
                     {
                         _context.Notifications.Add(new Notification
                         {
-                            RecipientNik = hazard.NikPja,
+                            RecipientNik = hazard.NikPja.Trim(),
                             Title = "Action Plan Hazard Baru",
                             Message = $"Anda menerima tindak lanjut hazard dari {hazard.Nama} di {hazard.Lokasi ?? hazard.Area}.",
                             Url = "/ActionPlan/Index",
@@ -463,16 +498,26 @@ namespace Indexsafe.Api.Controllers
                         _context.ActionPlans.Update(actionPlan);
                     }
 
+                    // Tandai notifikasi penugasan terkait temuan ini sebagai actioned (agar tidak muncul lagi sebagai tugas tertunda)
+                    var relatedNotifs = await _context.Notifications
+                        .Where(n => !n.IsActioned && (n.Message.Contains(hazard.Lokasi ?? "") || n.Message.Contains($"#{hazard.Id}")))
+                        .ToListAsync();
+                    foreach (var rn in relatedNotifs)
+                    {
+                        rn.IsActioned = true;
+                    }
+
                     // Notifikasi ke pelapor jika ditutup oleh PJA
                     if (isPja && !string.IsNullOrWhiteSpace(hazard.Nik) && hazard.Nik != userNik)
                     {
                         _context.Notifications.Add(new Notification
                         {
-                            RecipientNik = hazard.Nik,
-                            Title = "Temuan Hazard Telah Ditutup",
-                            Message = $"Temuan Hazard di {hazard.Lokasi ?? hazard.Area} telah selesai ditindaklanjuti oleh {userName} (PJA).",
+                            RecipientNik = hazard.Nik.Trim(),
+                            Title = "Temuan Hazard Telah Ditutup (Completed)",
+                            Message = $"Temuan Hazard #{hazard.Id} di {hazard.Lokasi ?? hazard.Area} telah selesai ditindaklanjuti oleh {userName} (PJA).",
                             Url = "/Hazard/Index",
-                            NotifType = "hazard_closed",
+                            NotifType = "hazard_completed",
+                            IsActioned = true,
                             CreatedAt = DateTime.Now
                         });
                     }
@@ -570,13 +615,24 @@ namespace Indexsafe.Api.Controllers
                 {
                     _context.Notifications.Add(new Notification
                     {
-                        RecipientNik = hazard.NikPja,
+                        RecipientNik = hazard.NikPja.Trim(),
                         Title = "Pengalihan Penugasan PJA Hazard",
-                        Message = $"{userName} telah mengalihkan penugasan temuan hazard di {hazard.Lokasi ?? hazard.Area} kepada Anda. Alasan: {req.Keterangan}",
-                        Url = $"/ActionPlan/Index",
-                        NotifType = "hazard_reassigned",
+                        Message = $"{userName} telah mengalihkan penugasan temuan hazard di {hazard.Lokasi ?? hazard.Area} kepada Anda. Alasan: {req.Keterangan}. Segera tindaklanjuti (Take Up) atau alihkan jika salah sasaran.",
+                        Url = "/Hazard/Index",
+                        NotifType = "hazard_assigned",
+                        IsRead = false,
+                        IsActioned = false,
                         CreatedAt = DateTime.Now
                     });
+                }
+
+                // Tandai notifikasi pengalihan PJA sebelumnya sebagai actioned
+                var prevNotifs = await _context.Notifications
+                    .Where(n => n.RecipientNik == userNik && !n.IsActioned && (n.NotifType == "hazard_assigned" || n.NotifType == "hazard_new" || n.NotifType == "hazard_reassigned"))
+                    .ToListAsync();
+                foreach (var pn in prevNotifs)
+                {
+                    pn.IsActioned = true;
                 }
 
                 // Notifikasi ke Pelapor bahwa PJA telah dialihkan
@@ -584,7 +640,7 @@ namespace Indexsafe.Api.Controllers
                 {
                     _context.Notifications.Add(new Notification
                     {
-                        RecipientNik = hazard.Nik,
+                        RecipientNik = hazard.Nik.Trim(),
                         Title = "Info Pengalihan PJA Temuan Hazard",
                         Message = $"PJA untuk temuan Hazard Anda di {hazard.Lokasi ?? hazard.Area} telah dialihkan oleh {userName} kepada {hazard.Pja}.",
                         Url = $"/Hazard/Index",
@@ -655,12 +711,120 @@ namespace Indexsafe.Api.Controllers
             return Ok(new { success = true, message = "Laporan hazard berhasil dihapus." });
         }
 
+        public class TakeUpDto
+        {
+            public int Id { get; set; }
+            public string? Note { get; set; }
+        }
+
+        /// <summary>
+        /// POST /api/hazard/take-up
+        /// PJA mengambil alih (Take Up) temuan hazard untuk ditindaklanjuti.
+        /// Status temuan diperbarui menjadi 'In Progress'.
+        /// </summary>
+        [HttpPost("take-up")]
+        public async Task<IActionResult> TakeUpHazard([FromBody] TakeUpDto req)
+        {
+            try
+            {
+                var userNik = GetCurrentNik();
+                var userName = GetCurrentName();
+
+                if (req == null || req.Id <= 0)
+                {
+                    return BadRequest(new { success = false, message = "ID Hazard tidak valid." });
+                }
+
+                var hazard = await _context.HazardReports.FirstOrDefaultAsync(h => h.Id == req.Id && !h.IsDeleted);
+                if (hazard == null)
+                {
+                    return NotFound(new { success = false, message = "Data Hazard tidak ditemukan." });
+                }
+
+                if (string.Equals(hazard.StatusTemuan, "Closed", StringComparison.OrdinalIgnoreCase))
+                {
+                    return BadRequest(new { success = false, message = "Temuan Hazard sudah berstatus Closed." });
+                }
+
+                // Periksa otorisasi PJA atau pelapor atau Admin
+                if (hazard.NikPja != userNik && hazard.Nik != userNik && !User.IsInRole("Admin"))
+                {
+                    return StatusCode(403, new { success = false, message = "Anda bukan PJA yang ditugaskan untuk temuan ini." });
+                }
+
+                hazard.StatusTemuan = "In Progress";
+                if (!string.IsNullOrWhiteSpace(req.Note))
+                {
+                    hazard.TindakanPerbaikan = string.IsNullOrWhiteSpace(hazard.TindakanPerbaikan)
+                        ? req.Note.Trim()
+                        : $"{hazard.TindakanPerbaikan}\n[Take Up oleh {userName}]: {req.Note.Trim()}";
+                }
+
+                _context.HazardReports.Update(hazard);
+
+                // Sinkron ke ActionPlan jika ada
+                var actionPlanItemSap = $"hazard:{hazard.Id}";
+                var actionPlan = await _context.ActionPlans.FirstOrDefaultAsync(a => a.ItemSap == actionPlanItemSap && !a.IsDeleted);
+                if (actionPlan != null)
+                {
+                    actionPlan.Status = "In Progress";
+                    if (!string.IsNullOrWhiteSpace(req.Note))
+                    {
+                        actionPlan.RencanaPerbaikan = req.Note.Trim();
+                    }
+                    _context.ActionPlans.Update(actionPlan);
+                }
+
+                // Kirim notifikasi ke pelapor bahwa temuan telah di-take up
+                if (!string.IsNullOrWhiteSpace(hazard.Nik) && hazard.Nik != userNik)
+                {
+                    _context.Notifications.Add(new Notification
+                    {
+                        RecipientNik = hazard.Nik.Trim(),
+                        Title = "Temuan Hazard Di-Take Up oleh PJA",
+                        Message = $"Temuan Hazard Anda di {hazard.Lokasi ?? hazard.Area} telah di-take up oleh {userName} (PJA) dan sedang diproses.",
+                        Url = "/Hazard/Index",
+                        NotifType = "hazard_takeup",
+                        IsRead = false,
+                        IsActioned = false,
+                        CreatedAt = DateTime.Now
+                    });
+                }
+
+                // Tandai notifikasi penugasan PJA milik user ini sebagai telah di-action
+                var userNotifs = await _context.Notifications
+                    .Where(n => n.RecipientNik == userNik && !n.IsActioned && (n.NotifType == "hazard_assigned" || n.NotifType == "hazard_new" || n.NotifType == "hazard_reassigned"))
+                    .ToListAsync();
+                foreach (var notif in userNotifs)
+                {
+                    notif.IsActioned = true;
+                }
+
+                await _context.SaveChangesAsync();
+
+                return Ok(new
+                {
+                    success = true,
+                    message = $"Temuan Hazard #{hazard.Id} berhasil di-take up untuk ditindaklanjuti!",
+                    data = new
+                    {
+                        id = hazard.Id,
+                        status_temuan = hazard.StatusTemuan
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { success = false, message = $"Gagal take up Hazard: {ex.Message}" });
+            }
+        }
+
         /// <summary>
         /// GET /api/hazard/search-pja
-        /// Cari karyawan untuk penunjukan atau pengalihan PJA.
+        /// Cari karyawan untuk penunjukan atau pengalihan PJA dengan dukungan Mode Lintas Perusahaan.
         /// </summary>
         [HttpGet("search-pja")]
-        public async Task<IActionResult> SearchPja([FromQuery] string? q)
+        public async Task<IActionResult> SearchPja([FromQuery] string? q, [FromQuery] bool lintasPerusahaan = true)
         {
             var query = (q ?? string.Empty).Trim().ToLower();
             if (string.IsNullOrWhiteSpace(query))
@@ -668,30 +832,53 @@ namespace Indexsafe.Api.Controllers
                 return Ok(new { success = true, data = new List<object>() });
             }
 
-            var results = await (from k in _context.Karyawans.AsNoTracking()
-                                 join p in _context.Personals.AsNoTracking() on k.IdPersonal equals p.IdPersonal
-                                 join j in _context.Jabatans.AsNoTracking() on k.IdJabatan equals j.JabatanId into jg
-                                 from j in jg.DefaultIfEmpty()
-                                 join d in _context.Departemens.AsNoTracking() on k.IdDepartemen equals d.DepartemenId into dg
-                                 from d in dg.DefaultIfEmpty()
-                                 join c in _context.Perusahaans.AsNoTracking() on k.IdPerusahaan equals c.PerusahaanId into cg
-                                 from c in cg.DefaultIfEmpty()
-                                 where k.StatusAktif && (
-                                     k.NoNik.ToLower().Contains(query) ||
-                                     p.NamaLengkap.ToLower().Contains(query) ||
-                                     (d != null && d.NamaDepartemen.ToLower().Contains(query))
-                                 )
-                                 orderby p.NamaLengkap
-                                 select new
-                                 {
-                                     nik = k.NoNik,
-                                     nama = p.NamaLengkap,
-                                     jabatan = j != null ? j.NamaJabatan : "Staff",
-                                     departemen = d != null ? d.NamaDepartemen : "GENERAL",
-                                     perusahaan = c != null ? c.NamaPerusahaan : "PT INDEXIM COALINDO"
-                                 })
-                                 .Take(30)
-                                 .ToListAsync();
+            var cid = GetCurrentCompanyId();
+            var allowedCompanyIds = lintasPerusahaan ? null : await _companyHierarchyService.GetAccessibleCompanyIdsAsync(cid);
+
+            var baseQuery = from k in _context.Karyawans.AsNoTracking()
+                            join p in _context.Personals.AsNoTracking() on k.IdPersonal equals p.IdPersonal
+                            join j in _context.Jabatans.AsNoTracking() on k.IdJabatan equals j.JabatanId into jg
+                            from j in jg.DefaultIfEmpty()
+                            join d in _context.Departemens.AsNoTracking() on k.IdDepartemen equals d.DepartemenId into dg
+                            from d in dg.DefaultIfEmpty()
+                            join c in _context.Perusahaans.AsNoTracking() on k.IdPerusahaan equals c.PerusahaanId into cg
+                            from c in cg.DefaultIfEmpty()
+                            where k.StatusAktif
+                            select new
+                            {
+                                nik = k.NoNik,
+                                nama = p.NamaLengkap,
+                                jabatan = j != null ? j.NamaJabatan : "Staff",
+                                departemen = d != null ? d.NamaDepartemen : "GENERAL",
+                                perusahaan = c != null ? c.NamaPerusahaan : "PT INDEXIM COALINDO",
+                                companyId = k.IdPerusahaan
+                            };
+
+            if (allowedCompanyIds != null && allowedCompanyIds.Count > 0)
+            {
+                baseQuery = baseQuery.Where(k => allowedCompanyIds.Contains(k.companyId));
+            }
+
+            baseQuery = baseQuery.Where(k =>
+                k.nik.ToLower().Contains(query) ||
+                k.nama.ToLower().Contains(query) ||
+                k.departemen.ToLower().Contains(query) ||
+                k.perusahaan.ToLower().Contains(query)
+            );
+
+            var results = await baseQuery
+                .OrderBy(k => k.nama)
+                .Take(40)
+                .Select(k => new
+                {
+                    nik = k.nik,
+                    nama = k.nama,
+                    jabatan = k.jabatan,
+                    departemen = k.departemen,
+                    perusahaan = k.perusahaan,
+                    company_id = k.companyId
+                })
+                .ToListAsync();
 
             return Ok(new { success = true, data = results });
         }

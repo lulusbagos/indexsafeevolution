@@ -37,11 +37,13 @@ namespace Indexsafe.Api.Controllers
     {
         private readonly AppDbContext _context;
         private readonly SyncMonitorService _monitor;
+        private readonly PermitService _permitService;
 
-        public QrController(AppDbContext context, SyncMonitorService monitor)
+        public QrController(AppDbContext context, SyncMonitorService monitor, PermitService permitService)
         {
             _context = context;
             _monitor = monitor;
+            _permitService = permitService;
         }
 
         private string GetCurrentNik() => User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "0000";
@@ -69,6 +71,20 @@ namespace Indexsafe.Api.Controllers
             var userJob = GetCurrentJobTitle();
             var userComp = GetCurrentCompany();
 
+            // Check User Scan Permissions in tbl_m_user_scan_permission
+            var userPerm = await _context.UserScanPermissions
+                .AsNoTracking()
+                .FirstOrDefaultAsync(p => p.Nik == userNik);
+
+            bool canAcara = userPerm?.CanScanAcara ?? true; // Default: Semua orang bisa scan acara
+            bool canMine = userPerm?.CanScanMinePermit ?? false; // Scan Detail Permit
+            bool canPelanggaran = userPerm?.CanScanPermitPelanggaran ?? false; // Scan Pelanggaran Permit
+            bool canKeluarMasuk = userPerm?.CanScanPermitKeluarMasuk ?? false; // Scan Keluar Masuk Permit
+            bool canSimper = userPerm?.CanScanSimper ?? false;
+            bool canComm = userPerm?.CanScanCommissioning ?? false;
+            bool canSpecial = userPerm?.CanScanSpecialPermit ?? false;
+            bool canOther = userPerm?.CanScanOther ?? false;
+
             // Extract token if code is a full URL (e.g. http://.../QrAttendance/Scan/{token})
             var token = rawCode;
             if (rawCode.Contains("/QrAttendance/Scan/", StringComparison.OrdinalIgnoreCase))
@@ -84,6 +100,16 @@ namespace Indexsafe.Api.Controllers
 
             if (attendanceEvent != null)
             {
+                if (!canAcara)
+                {
+                    return Ok(new QrScanResponse
+                    {
+                        Status = false,
+                        ActionType = "Denied",
+                        Message = "Akses Ditolak: Izin presensi acara Anda dinonaktifkan oleh Administrator."
+                    });
+                }
+
                 if (!attendanceEvent.IsActive)
                 {
                     return Ok(new QrScanResponse
@@ -202,7 +228,7 @@ namespace Indexsafe.Api.Controllers
                 });
             }
 
-            // 2. Check if code matches an Employee NIK / Mine Permit Badge
+            // 2. Check if code matches an Employee NIK / Mine Permit Badge or ONE_DB_MITRA QR formula
             var cleanNik = rawCode.Trim();
             if (cleanNik.Contains(':'))
             {
@@ -218,6 +244,51 @@ namespace Indexsafe.Api.Controllers
                 cleanNik = cleanNik.Substring(2).Trim();
             }
 
+            string? matchedNikFromQr = null;
+            try
+            {
+                var conn = _context.Database.GetDbConnection();
+                bool wasClosed = conn.State == System.Data.ConnectionState.Closed;
+                if (wasClosed) await conn.OpenAsync();
+                try
+                {
+                    using var cmd = conn.CreateCommand();
+                    cmd.CommandText = @"
+                        SELECT TOP 1 ttk.no_nik 
+                        FROM [ONE_DB_MITRA].dbo.tbl_m_personal tmp 
+                        JOIN [ONE_DB_MITRA].dbo.tbl_t_karyawan ttk on tmp.id_personal = ttk.id_personal 
+                        JOIN [ONE_DB_MITRA].dbo.tbl_m_departemen tmd on ttk.id_departemen = tmd.id 
+                        JOIN [ONE_DB_MITRA].dbo.tbl_m_perusahaan tmp2 on tmp2.id = ttk.id_perusahaan   
+                        WHERE (CONCAT(tmp2.id, FORMAT(tmp.tanggal_lahir , 'yyyyMMdd'), FORMAT(ttk.date_of_hire , 'ddMMyyyy'), left(tmp.nama_lengkap, 3)) = @qrCode OR ttk.no_nik = @qrCode)
+                          AND ttk.status_aktif = 1 AND tmp2.status_aktif = 1;
+                    ";
+                    var p = cmd.CreateParameter();
+                    p.ParameterName = "@qrCode";
+                    p.Value = rawCode.Trim();
+                    cmd.Parameters.Add(p);
+
+                    var res = await cmd.ExecuteScalarAsync();
+                    if (res != null && res != DBNull.Value)
+                    {
+                        matchedNikFromQr = res.ToString();
+                    }
+                }
+                finally
+                {
+                    if (wasClosed) await conn.CloseAsync();
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[QrController] Error checking ONE_DB_MITRA QR: {ex.Message}");
+            }
+
+            var targetNik = matchedNikFromQr ?? cleanNik;
+
+            // 2. Query Mine Permit dari PostgreSQL Bima (tb_permit)
+            var permit = await _permitService.GetFullPermitDetailAsync(targetNik);
+
+            // Cari data karyawan dari SQL Server (ONE_DB_MITRA / DB_SAP) sebagai fallback / pelengkap
             var employee = await (from k in _context.Karyawans.AsNoTracking()
                                   join p in _context.Personals.AsNoTracking() on k.IdPersonal equals p.IdPersonal
                                   join c in _context.Perusahaans.AsNoTracking() on k.IdPerusahaan equals c.PerusahaanId into cg
@@ -226,7 +297,7 @@ namespace Indexsafe.Api.Controllers
                                   from d in dg.DefaultIfEmpty()
                                   join j in _context.Jabatans.AsNoTracking() on k.IdJabatan equals j.JabatanId into jg
                                   from j in jg.DefaultIfEmpty()
-                                  where k.NoNik == cleanNik || k.NoNik == rawCode
+                                  where k.NoNik == targetNik || k.NoNik == cleanNik || k.NoNik == rawCode
                                   select new
                                   {
                                       k.IdKaryawan,
@@ -238,22 +309,63 @@ namespace Indexsafe.Api.Controllers
                                       k.StatusAktif
                                   }).FirstOrDefaultAsync();
 
-            if (employee != null)
+            if (permit != null || employee != null)
             {
+                if (!canMine && !canPelanggaran && !canKeluarMasuk && !canSimper)
+                {
+                    return Ok(new QrScanResponse
+                    {
+                        Status = false,
+                        ActionType = "Denied",
+                        Message = "Akses Ditolak: Anda tidak memiliki izin untuk memindai Mine Permit (Detail / Pelanggaran / Keluar Masuk). Hubungi Administrator di menu User Scan.",
+                        Data = new
+                        {
+                            required_permission = "MinePermit",
+                            is_authorized = false
+                        }
+                    });
+                }
+
+                var finalNik = permit?.Nik ?? employee?.NoNik ?? targetNik;
+                var finalNama = permit?.Nama ?? employee?.NamaLengkap ?? "Karyawan Tambang";
+                var finalDept = permit?.Departemen ?? employee?.Departemen ?? "-";
+                var finalPerusahaan = permit?.Perusahaan ?? employee?.Perusahaan ?? "PT INDEXIM COALINDO";
+                var finalJabatan = permit?.Jabatan ?? employee?.Jabatan ?? "-";
+                var finalPosisi = permit?.Posisi ?? "-";
+                var finalNomor = permit?.Nomor ?? "-";
+                var finalTanggal = permit?.Tanggal ?? "-";
+                var finalMasaAktif = permit?.MasaAktifPermit ?? "-";
+                var finalAksesLokasi = permit?.AksesLokasi ?? "GNR";
+                var finalStatus = permit?.Status ?? (employee?.StatusAktif == true ? "PRINTED" : "INACTIVE");
+                var isExpired = permit?.IsExpired ?? false;
+                var daysLeft = permit?.DaysLeft ?? 0;
+
                 return Ok(new QrScanResponse
                 {
                     Status = true,
                     ActionType = "MinePermit",
-                    Message = "Mine Permit / Profil Karyawan ditemukan.",
+                    Message = isExpired ? "Mine Permit telah habis masa aktif!" : "Data Mine Permit berhasil diverifikasi.",
                     Data = new
                     {
-                        nik = employee.NoNik,
-                        nama = employee.NamaLengkap,
-                        departemen = employee.Departemen,
-                        jabatan = employee.Jabatan,
-                        perusahaan = employee.Perusahaan,
-                        status_aktif = employee.StatusAktif ? "AKTIF" : "NONAKTIF",
-                        is_eligible = employee.StatusAktif
+                        nik = finalNik,
+                        nama = finalNama,
+                        nomor = finalNomor,
+                        tanggal = finalTanggal,
+                        masa_aktif_permit = finalMasaAktif,
+                        days_left = daysLeft,
+                        is_expired = isExpired,
+                        status = finalStatus,
+                        pengajuan = permit?.Pengajuan ?? "REGULER",
+                        berakhir_kerja = permit?.BerakhirKerja ?? "-",
+                        perusahaan = finalPerusahaan,
+                        departemen = finalDept,
+                        jabatan = finalJabatan,
+                        posisi = finalPosisi,
+                        email = permit?.Email ?? "-",
+                        akses_lokasi = finalAksesLokasi,
+                        can_input_pelanggaran = canPelanggaran,
+                        can_input_keluar_masuk = canKeluarMasuk,
+                        can_view_detail = canMine
                     }
                 });
             }
@@ -264,6 +376,21 @@ namespace Indexsafe.Api.Controllers
 
             if (vehicle != null)
             {
+                if (!canComm)
+                {
+                    return Ok(new QrScanResponse
+                    {
+                        Status = false,
+                        ActionType = "Denied",
+                        Message = "Akses Ditolak: Anda tidak memiliki izin untuk memindai Commissioning Unit / Alat Berat. Hubungi Administrator di menu User Scan.",
+                        Data = new
+                        {
+                            required_permission = "Commissioning",
+                            is_authorized = false
+                        }
+                    });
+                }
+
                 return Ok(new QrScanResponse
                 {
                     Status = true,
@@ -301,18 +428,36 @@ namespace Indexsafe.Api.Controllers
         public async Task<IActionResult> GetActiveEvents()
         {
             var now = DateTime.Now;
+            var today = DateTime.Today;
+            var userNik = GetCurrentNik();
+
+            // Ambil semua event asli dari tbl_t_attendance_event
             var events = await _context.AttendanceEvents
                 .AsNoTracking()
-                .Where(e => !e.IsDeleted && e.IsActive && e.EndAt >= now.AddHours(-12))
-                .OrderBy(e => e.StartAt)
+                .Where(e => !e.IsDeleted)
+                .OrderByDescending(e => e.StartAt)
                 .Select(e => new
                 {
                     id = e.Id,
                     event_name = e.EventName,
                     event_location = e.EventLocation,
+                    event_description = e.EventDescription,
                     start_at = e.StartAt.ToString("yyyy-MM-dd HH:mm:ss"),
                     end_at = e.EndAt.ToString("yyyy-MM-dd HH:mm:ss"),
-                    qr_token = e.QrToken
+                    qr_token = e.QrToken,
+                    is_active = e.IsActive,
+                    total_attendees = e.AttendanceRecords.Count,
+                    is_attended = e.AttendanceRecords.Any(r => r.Nik == userNik),
+                    attended_at = e.AttendanceRecords
+                        .Where(r => r.Nik == userNik)
+                        .OrderByDescending(r => r.ScanAt)
+                        .Select(r => r.ScanAt.ToString("yyyy-MM-dd HH:mm:ss"))
+                        .FirstOrDefault(),
+                    is_today = e.StartAt.Date == today || e.EndAt.Date == today || (today >= e.StartAt.Date && today <= e.EndAt.Date),
+                    is_ongoing = now >= e.StartAt && now <= e.EndAt,
+                    status_state = (now >= e.StartAt && now <= e.EndAt) ? "ongoing" :
+                                   (now < e.StartAt) ? "upcoming" :
+                                   (now <= e.EndAt.AddHours(12)) ? "late_allowed" : "closed"
                 })
                 .ToListAsync();
 
@@ -346,5 +491,448 @@ namespace Indexsafe.Api.Controllers
 
             return Ok(new { status = true, data = history });
         }
+
+        /// <summary>
+        /// GET /api/qr/my-permissions
+        /// Returns scanning permissions for currently logged-in user
+        /// </summary>
+        [HttpGet("my-permissions")]
+        public async Task<IActionResult> GetMyPermissions()
+        {
+            var userNik = GetCurrentNik();
+            var perm = await _context.UserScanPermissions
+                .AsNoTracking()
+                .FirstOrDefaultAsync(p => p.Nik == userNik);
+
+            return Ok(new
+            {
+                status = true,
+                data = new
+                {
+                    nik = userNik,
+                    can_scan_acara = perm?.CanScanAcara ?? true, // Default: Semua orang bisa scan acara
+                    can_scan_minepermit = perm?.CanScanMinePermit ?? false, // Scan Detail Permit
+                    can_scan_permit_pelanggaran = perm?.CanScanPermitPelanggaran ?? false, // Scan Pelanggaran Permit
+                    can_scan_permit_keluar_masuk = perm?.CanScanPermitKeluarMasuk ?? false, // Scan Keluar Masuk Permit
+                    can_scan_simper = perm?.CanScanSimper ?? false,
+                    can_scan_commissioning = perm?.CanScanCommissioning ?? false,
+                    can_scan_special_permit = perm?.CanScanSpecialPermit ?? false,
+                    can_scan_other = perm?.CanScanOther ?? false
+                }
+            });
+        }
+
+        /// <summary>
+        /// GET /api/qr/permit/violation-master
+        /// Returns Safety criteria (tbl_m_pelanggaran_kriteria) and Safety sanction types (tbl_m_pelanggaran_jenis where jenis='SAFETY')
+        /// </summary>
+        [HttpGet("permit/violation-master")]
+        public async Task<IActionResult> GetViolationMaster()
+        {
+            var kriteriaList = new List<object>();
+            var sanksiList = new List<object>();
+
+            try
+            {
+                var conn = _context.Database.GetDbConnection();
+                if (conn.State != System.Data.ConnectionState.Open)
+                {
+                    await conn.OpenAsync();
+                }
+
+                // 1. Get Kriteria
+                using (var cmd = conn.CreateCommand())
+                {
+                    cmd.CommandText = @"
+                        SELECT id, urutan, kode, nama, kategori 
+                        FROM [ONE_DB_MITRA].[dbo].[tbl_m_pelanggaran_kriteria]
+                        WHERE is_active = 1
+                        ORDER BY urutan ASC, id ASC;";
+
+                    using (var reader = await cmd.ExecuteReaderAsync())
+                    {
+                        while (await reader.ReadAsync())
+                        {
+                            kriteriaList.Add(new
+                            {
+                                id = reader.GetInt32(0),
+                                urutan = reader.GetInt32(1),
+                                kode = reader.IsDBNull(2) ? "" : reader.GetString(2),
+                                nama = reader.GetString(3),
+                                kategori = reader.GetString(4)
+                            });
+                        }
+                    }
+                }
+
+                // 2. Get Jenis Pelanggaran (SAFETY only)
+                using (var cmd = conn.CreateCommand())
+                {
+                    cmd.CommandText = @"
+                        SELECT id, kode_pelanggaran, nama, jenis, keterangan, durasi, jenis_durasi 
+                        FROM [ONE_DB_MITRA].[dbo].[tbl_m_pelanggaran_jenis]
+                        WHERE UPPER(jenis) = 'SAFETY' AND deleted_at IS NULL
+                        ORDER BY id ASC;";
+
+                    using (var reader = await cmd.ExecuteReaderAsync())
+                    {
+                        while (await reader.ReadAsync())
+                        {
+                            sanksiList.Add(new
+                            {
+                                id = reader.GetInt32(0),
+                                kode = reader.IsDBNull(1) ? "" : reader.GetString(1),
+                                nama = reader.GetString(2),
+                                jenis = reader.GetString(3),
+                                keterangan = reader.IsDBNull(4) ? "" : reader.GetString(4),
+                                durasi = reader.IsDBNull(5) ? (int?)null : reader.GetInt32(5),
+                                jenis_durasi = reader.IsDBNull(6) ? "" : reader.GetString(6)
+                            });
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[GetViolationMaster] Error: {ex.Message}");
+            }
+
+            return Ok(new
+            {
+                status = true,
+                data = new
+                {
+                    kriteria = kriteriaList,
+                    jenis_sanksi = sanksiList
+                }
+            });
+        }
+
+        /// <summary>
+        /// POST /api/qr/permit/violation
+        /// Records a safety violation against an employee into [ONE_DB_MITRA].[dbo].[tbl_t_karyawan_pelanggaran]
+        /// </summary>
+        [HttpPost("permit/violation")]
+        public async Task<IActionResult> RecordPermitViolation([FromBody] CreatePermitViolationRequest req)
+        {
+            if (string.IsNullOrWhiteSpace(req.ViolatorNik) || string.IsNullOrWhiteSpace(req.ViolationDescription))
+            {
+                return BadRequest(new { status = false, message = "NIK Pelanggar dan Deskripsi Pelanggaran wajib diisi." });
+            }
+
+            var userNik = GetCurrentNik();
+            var userName = GetCurrentName();
+
+            var userPerm = await _context.UserScanPermissions
+                .AsNoTracking()
+                .FirstOrDefaultAsync(p => p.Nik == userNik);
+
+            bool canPelanggaran = userPerm?.CanScanPermitPelanggaran ?? false;
+            if (!canPelanggaran)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, new
+                {
+                    status = false,
+                    message = "Akses Ditolak: Anda tidak memiliki wewenang untuk mencatat pelanggaran permit. Hubungi Administrator di menu User Scan."
+                });
+            }
+
+            int? newMitraPelanggaranId = null;
+            DateTime tglKejadian = req.TanggalKejadian ?? DateTime.Today;
+            DateTime? tglKadaluarsa = null;
+            int idPelanggaranJenis = req.IdPelanggaranJenis ?? 6; // default Lubang 1 / SP-1 (6)
+
+            try
+            {
+                var conn = _context.Database.GetDbConnection();
+                if (conn.State != System.Data.ConnectionState.Open)
+                {
+                    await conn.OpenAsync();
+                }
+
+                // 1. Resolve id_karyawan from ONE_DB_MITRA
+                int? idKaryawan = null;
+                using (var cmd = conn.CreateCommand())
+                {
+                    cmd.CommandText = @"
+                        SELECT TOP 1 id_karyawan 
+                        FROM [ONE_DB_MITRA].dbo.tbl_t_karyawan 
+                        WHERE no_nik = @nik 
+                        ORDER BY status_aktif DESC, id_karyawan DESC;";
+                    var pNik = cmd.CreateParameter();
+                    pNik.ParameterName = "@nik";
+                    pNik.Value = req.ViolatorNik.Trim();
+                    cmd.Parameters.Add(pNik);
+
+                    var scalar = await cmd.ExecuteScalarAsync();
+                    if (scalar != null && scalar != DBNull.Value)
+                    {
+                        idKaryawan = Convert.ToInt32(scalar);
+                    }
+                }
+
+                if (!idKaryawan.HasValue)
+                {
+                    using (var cmd = conn.CreateCommand())
+                    {
+                        cmd.CommandText = @"
+                            SELECT TOP 1 id_karyawan 
+                            FROM [ONE_DB_MITRA].dbo.vw_m_karyawan_aktif 
+                            WHERE no_nik = @nik;";
+                        var pNik = cmd.CreateParameter();
+                        pNik.ParameterName = "@nik";
+                        pNik.Value = req.ViolatorNik.Trim();
+                        cmd.Parameters.Add(pNik);
+
+                        var scalar = await cmd.ExecuteScalarAsync();
+                        if (scalar != null && scalar != DBNull.Value)
+                        {
+                            idKaryawan = Convert.ToInt32(scalar);
+                        }
+                    }
+                }
+
+                // 2. Resolve id_pelanggaran_jenis duration & calculate tanggal_kadaluarsa
+                int durasiBulan = 0;
+                using (var cmd = conn.CreateCommand())
+                {
+                    cmd.CommandText = @"
+                        SELECT TOP 1 id, durasi, jenis_durasi 
+                        FROM [ONE_DB_MITRA].dbo.tbl_m_pelanggaran_jenis 
+                        WHERE id = @idJenis;";
+                    var pId = cmd.CreateParameter();
+                    pId.ParameterName = "@idJenis";
+                    pId.Value = idPelanggaranJenis;
+                    cmd.Parameters.Add(pId);
+
+                    using (var r = await cmd.ExecuteReaderAsync())
+                    {
+                        if (await r.ReadAsync())
+                        {
+                            idPelanggaranJenis = r.GetInt32(0);
+                            if (!r.IsDBNull(1))
+                            {
+                                int d = r.GetInt32(1);
+                                string jd = r.IsDBNull(2) ? "" : r.GetString(2);
+                                if (jd.ToLower().Contains("month"))
+                                    durasiBulan = d;
+                                else if (jd.ToLower().Contains("year"))
+                                    durasiBulan = d * 12;
+                            }
+                        }
+                    }
+                }
+
+                if (durasiBulan > 0)
+                {
+                    tglKadaluarsa = tglKejadian.AddMonths(durasiBulan);
+                }
+
+                // 3. Format keterangan
+                var kriteria = !string.IsNullOrWhiteSpace(req.KriteriaNama)
+                    ? req.KriteriaNama.Trim()
+                    : (!string.IsNullOrWhiteSpace(req.ViolationType) ? req.ViolationType.Trim() : "Pelanggaran Safety");
+
+                var sbKet = new System.Text.StringBuilder();
+                sbKet.Append($"Kriteria: {kriteria}");
+                if (!string.IsNullOrWhiteSpace(req.ViolationLocation))
+                    sbKet.Append($" | Lokasi: {req.ViolationLocation.Trim()}");
+                if (!string.IsNullOrWhiteSpace(req.ViolationDescription))
+                    sbKet.Append($" | Remark: {req.ViolationDescription.Trim()}");
+                if (!string.IsNullOrWhiteSpace(req.ActionTaken))
+                    sbKet.Append($" | Penindakan: {req.ActionTaken.Trim()}");
+                if (!string.IsNullOrWhiteSpace(req.PermitNumber))
+                    sbKet.Append($" | No Permit: {req.PermitNumber.Trim()}");
+
+                var createdBy = $"{userNik} | mobile";
+                var createdAt = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
+
+                // 4. Insert into [ONE_DB_MITRA].[dbo].[tbl_t_karyawan_pelanggaran]
+                using (var cmd = conn.CreateCommand())
+                {
+                    cmd.CommandText = @"
+                        INSERT INTO [ONE_DB_MITRA].[dbo].[tbl_t_karyawan_pelanggaran] (
+                            id_karyawan,
+                            tanggal_kejadian,
+                            tanggal_surat,
+                            tanggal_kadaluarsa,
+                            id_pelanggaran_jenis,
+                            keterangan,
+                            file_pendukung,
+                            created_by,
+                            created_at
+                        ) VALUES (
+                            @id_karyawan,
+                            @tanggal_kejadian,
+                            @tanggal_surat,
+                            @tanggal_kadaluarsa,
+                            @id_pelanggaran_jenis,
+                            @keterangan,
+                            @file_pendukung,
+                            @created_by,
+                            @created_at
+                        );
+                        SELECT SCOPE_IDENTITY();";
+
+                    var p1 = cmd.CreateParameter(); p1.ParameterName = "@id_karyawan"; p1.Value = (object?)idKaryawan ?? DBNull.Value; cmd.Parameters.Add(p1);
+                    var p2 = cmd.CreateParameter(); p2.ParameterName = "@tanggal_kejadian"; p2.Value = tglKejadian.Date; cmd.Parameters.Add(p2);
+                    var p3 = cmd.CreateParameter(); p3.ParameterName = "@tanggal_surat"; p3.Value = tglKejadian.Date; cmd.Parameters.Add(p3);
+                    var p4 = cmd.CreateParameter(); p4.ParameterName = "@tanggal_kadaluarsa"; p4.Value = (object?)tglKadaluarsa?.Date ?? DBNull.Value; cmd.Parameters.Add(p4);
+                    var p5 = cmd.CreateParameter(); p5.ParameterName = "@id_pelanggaran_jenis"; p5.Value = idPelanggaranJenis; cmd.Parameters.Add(p5);
+                    var p6 = cmd.CreateParameter(); p6.ParameterName = "@keterangan"; p6.Value = sbKet.ToString(); cmd.Parameters.Add(p6);
+                    var p7 = cmd.CreateParameter(); p7.ParameterName = "@file_pendukung"; p7.Value = (object?)req.PhotoUrl ?? DBNull.Value; cmd.Parameters.Add(p7);
+                    var p8 = cmd.CreateParameter(); p8.ParameterName = "@created_by"; p8.Value = createdBy; cmd.Parameters.Add(p8);
+                    var p9 = cmd.CreateParameter(); p9.ParameterName = "@created_at"; p9.Value = createdAt; cmd.Parameters.Add(p9);
+
+                    var idScalar = await cmd.ExecuteScalarAsync();
+                    if (idScalar != null && idScalar != DBNull.Value)
+                    {
+                        newMitraPelanggaranId = Convert.ToInt32(idScalar);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[RecordPermitViolation] Error writing to ONE_DB_MITRA: {ex.Message}");
+            }
+
+            // Also keep local audit log
+            var violation = new PermitViolation
+            {
+                ViolatorNik = req.ViolatorNik.Trim(),
+                ViolatorName = req.ViolatorName,
+                ViolatorCompany = req.ViolatorCompany,
+                ViolatorDepartment = req.ViolatorDepartment,
+                PermitNumber = req.PermitNumber,
+                ViolationType = string.IsNullOrWhiteSpace(req.KriteriaNama) ? req.ViolationType : req.KriteriaNama,
+                ViolationDescription = req.ViolationDescription,
+                ViolationLocation = req.ViolationLocation,
+                PhotoUrl = req.PhotoUrl,
+                Severity = string.IsNullOrWhiteSpace(req.Severity) ? "Medium" : req.Severity,
+                ActionTaken = req.ActionTaken,
+                ReportedByNik = $"{userNik} | mobile",
+                ReportedByName = userName,
+                CreatedAt = DateTime.Now
+            };
+
+            _context.PermitViolations.Add(violation);
+            await _context.SaveChangesAsync();
+
+            return Ok(new
+            {
+                status = true,
+                message = "Pelanggaran K3 berhasil dicatat resmi ke database karyawan.",
+                data = new
+                {
+                    id = newMitraPelanggaranId ?? violation.Id,
+                    mitra_pelanggaran_id = newMitraPelanggaranId,
+                    violator_nik = violation.ViolatorNik,
+                    violator_name = violation.ViolatorName,
+                    violation_type = violation.ViolationType,
+                    severity = violation.Severity,
+                    created_by = $"{userNik} | mobile",
+                    created_at = violation.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss")
+                }
+            });
+        }
+
+        /// <summary>
+        /// POST /api/qr/permit/movement
+        /// Records employee gate check-in / check-out with vehicle unit and purpose
+        /// </summary>
+        [HttpPost("permit/movement")]
+        public async Task<IActionResult> RecordPermitMovement([FromBody] CreatePermitMovementRequest req)
+        {
+            if (string.IsNullOrWhiteSpace(req.Nik) || string.IsNullOrWhiteSpace(req.Keperluan))
+            {
+                return BadRequest(new { status = false, message = "NIK Karyawan dan Keperluan Keluar/Masuk wajib diisi." });
+            }
+
+            var userNik = GetCurrentNik();
+            var userName = GetCurrentName();
+
+            var userPerm = await _context.UserScanPermissions
+                .AsNoTracking()
+                .FirstOrDefaultAsync(p => p.Nik == userNik);
+
+            bool canKeluarMasuk = userPerm?.CanScanPermitKeluarMasuk ?? false;
+            if (!canKeluarMasuk)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, new
+                {
+                    status = false,
+                    message = "Akses Ditolak: Anda tidak memiliki wewenang untuk mencatat keluar/masuk permit. Hubungi Administrator di menu User Scan."
+                });
+            }
+
+            var log = new PermitGateLog
+            {
+                Nik = req.Nik.Trim(),
+                Nama = req.Nama,
+                Perusahaan = req.Perusahaan,
+                Departemen = req.Departemen,
+                NomorPermit = req.NomorPermit,
+                Direction = string.Equals(req.Direction, "KELUAR", StringComparison.OrdinalIgnoreCase) ? "KELUAR" : "MASUK",
+                NomorUnit = req.NomorUnit?.Trim(),
+                Keperluan = req.Keperluan.Trim(),
+                LokasiPos = string.IsNullOrWhiteSpace(req.LokasiPos) ? "Pos Security Utama" : req.LokasiPos.Trim(),
+                CreatedByNik = userNik,
+                CreatedByName = userName,
+                CreatedAt = DateTime.Now
+            };
+
+            _context.PermitGateLogs.Add(log);
+            await _context.SaveChangesAsync();
+
+            return Ok(new
+            {
+                status = true,
+                message = $"Pergerakan {log.Direction} karyawan berhasil dicatat.",
+                data = new
+                {
+                    id = log.Id,
+                    nik = log.Nik,
+                    nama = log.Nama,
+                    direction = log.Direction,
+                    nomor_unit = log.NomorUnit,
+                    keperluan = log.Keperluan,
+                    lokasi_pos = log.LokasiPos,
+                    created_at = log.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss")
+                }
+            });
+        }
+    }
+
+    public class CreatePermitMovementRequest
+    {
+        public string Nik { get; set; } = string.Empty;
+        public string? Nama { get; set; }
+        public string? Perusahaan { get; set; }
+        public string? Departemen { get; set; }
+        public string? NomorPermit { get; set; }
+        public string Direction { get; set; } = "MASUK"; // 'MASUK' / 'KELUAR'
+        public string? NomorUnit { get; set; }
+        public string Keperluan { get; set; } = string.Empty;
+        public string? LokasiPos { get; set; }
+    }
+
+    public class CreatePermitViolationRequest
+    {
+        public string ViolatorNik { get; set; } = string.Empty;
+        public string? ViolatorName { get; set; }
+        public string? ViolatorCompany { get; set; }
+        public string? ViolatorDepartment { get; set; }
+        public string? PermitNumber { get; set; }
+        public int? IdPelanggaranJenis { get; set; }
+        public string? JenisPelanggaranNama { get; set; }
+        public int? IdKriteria { get; set; }
+        public string? KriteriaNama { get; set; }
+        public string ViolationType { get; set; } = string.Empty;
+        public string ViolationDescription { get; set; } = string.Empty;
+        public string? ViolationLocation { get; set; }
+        public string? PhotoUrl { get; set; }
+        public string Severity { get; set; } = "Medium";
+        public string? ActionTaken { get; set; }
+        public DateTime? TanggalKejadian { get; set; }
     }
 }

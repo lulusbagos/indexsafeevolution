@@ -46,13 +46,20 @@ namespace Indexsafe.Api.Controllers
 
         private bool CheckIsActionRequired(string? type, string title, string message)
         {
+            var combined = (title + " " + message).ToLower();
             var t = type?.ToLower() ?? "";
+
+            // Coaching / Pembinaan adalah notifikasi informasi penerimaan coaching dari PIC yang TIDAK membutuhkan status / tindak lanjut
+            if (combined.Contains("coaching") || combined.Contains("pembinaan") || t.Contains("coaching"))
+            {
+                return false;
+            }
+
             if (t.StartsWith("hazard_") || t.StartsWith("inspection_") || t.StartsWith("actionplan_"))
             {
                 return true;
             }
 
-            var combined = (title + " " + message).ToLower();
             return combined.Contains("temuan") ||
                    combined.Contains("penugasan") ||
                    combined.Contains("perlu mitigasi") ||
@@ -62,78 +69,93 @@ namespace Indexsafe.Api.Controllers
                    combined.Contains("reassign");
         }
 
+        [HttpGet("notifications/count")]
+        public async Task<IActionResult> GetNotificationCounts()
+        {
+            await EnsureSchemaAsync();
+            var userNik = GetCurrentNik()?.Trim() ?? "";
+            var coachingCutoff = DateTime.Now.AddDays(-7);
+
+            // Sesuai permintaan pengguna:
+            // 1. Notifikasi completed/closed tidak ditampilkan
+            // 2. Coaching hanya bertahan 7 hari, setelah itu hilang
+            // 3. Coaching tidak memiliki status/tindak lanjut (tidak masuk unactioned)
+            int unreadCount = await _context.Notifications
+                .CountAsync(n => !string.IsNullOrEmpty(n.RecipientNik) && n.RecipientNik.Trim() == userNik 
+                    && !n.IsRead 
+                    && !n.IsActioned 
+                    && n.NotifType != "hazard_completed" 
+                    && n.NotifType != "hazard_closed"
+                    && !(
+                        (n.Title.Contains("Coaching") || n.Title.Contains("Pembinaan") || n.Message.Contains("Coaching") || n.Message.Contains("Pembinaan") || (n.NotifType != null && n.NotifType.Contains("coaching")) || (n.Url != null && n.Url.Contains("Performance")))
+                        && n.CreatedAt < coachingCutoff
+                    )
+                );
+
+            int unactionedNotifs = await _context.Notifications
+                .CountAsync(n => !string.IsNullOrEmpty(n.RecipientNik) && n.RecipientNik.Trim() == userNik 
+                    && !n.IsActioned 
+                    && n.NotifType != "hazard_completed" 
+                    && n.NotifType != "hazard_closed"
+                    && !n.Title.Contains("Coaching") 
+                    && !n.Title.Contains("Pembinaan") 
+                    && !n.Message.Contains("Coaching") 
+                    && !n.Message.Contains("Pembinaan")
+                    && (n.NotifType == null || !n.NotifType.Contains("coaching"))
+                    && (n.Url == null || !n.Url.Contains("Performance"))
+                );
+
+            // Periksa temuan aktif di database yang secara spesifik menunjuk user yang login sebagai PJA
+            int activeHazardPja = await _context.HazardReports
+                .CountAsync(h => !h.IsDeleted && h.NikPja != null && h.NikPja.Trim() == userNik && h.StatusTemuan != "Closed");
+            int activeActionPlans = await _context.ActionPlans
+                .CountAsync(a => !a.IsDeleted && ((a.NikPic != null && a.NikPic.Trim() == userNik) || (a.NikPja != null && a.NikPja.Trim() == userNik)) && a.Status != "Closed");
+
+            int totalActionPending = Math.Max(unactionedNotifs, activeHazardPja + activeActionPlans);
+            int totalPending = Math.Max(unreadCount, totalActionPending);
+
+            return Ok(new
+            {
+                status = true,
+                unread_count = unreadCount,
+                unactioned_count = totalActionPending,
+                total_pending_count = totalPending,
+                active_hazard_count = activeHazardPja,
+                active_action_plan_count = activeActionPlans
+            });
+        }
+
         [HttpGet("notifications")]
         public async Task<IActionResult> GetNotifications([FromQuery] int limit = 50)
         {
             await EnsureSchemaAsync();
-            var userNik = GetCurrentNik();
+            var userNik = GetCurrentNik()?.Trim() ?? "";
+            var coachingCutoff = DateTime.Now.AddDays(-7);
 
+            // Sesuai permintaan pengguna:
+            // 1. Notifikasi yang sudah complete / closed tidak usah ditampilkan
+            // 2. Notifikasi Coaching otomatis kadaluarsa & hilang setelah 7 hari
             var notifs = await _context.Notifications
-                .Where(n => n.RecipientNik == userNik)
+                .Where(n => !string.IsNullOrEmpty(n.RecipientNik) && n.RecipientNik.Trim() == userNik)
+                .Where(n => !n.IsActioned && n.NotifType != "hazard_completed" && n.NotifType != "hazard_closed")
+                .Where(n => !(
+                    (n.Title.Contains("Coaching") || n.Title.Contains("Pembinaan") || n.Message.Contains("Coaching") || n.Message.Contains("Pembinaan") || (n.NotifType != null && n.NotifType.Contains("coaching")) || (n.Url != null && n.Url.Contains("Performance")))
+                    && n.CreatedAt < coachingCutoff
+                ))
                 .OrderByDescending(n => n.CreatedAt)
                 .Take(limit)
                 .ToListAsync();
 
-            // If user has no notifications yet, seed welcoming & actual safety notifications
-            if (notifs.Count == 0)
-            {
-                var seedNotifs = new[]
-                {
-                    new Indexsafe.Api.Models.Notification
-                    {
-                        RecipientNik = userNik,
-                        Title = "Penugasan Temuan Hazard K3 (Kritis)",
-                        Message = "Temuan potensi bahaya K3 baru di Pit Utara dialihkan kepada Anda sebagai PJA. Segera lakukan tindakan perbaikan & mitigasi!",
-                        Url = "/Hazard/Index",
-                        NotifType = "hazard_new",
-                        IsRead = false,
-                        IsActioned = false,
-                        CreatedAt = DateTime.Now.AddMinutes(-5)
-                    },
-                    new Indexsafe.Api.Models.Notification
-                    {
-                        RecipientNik = userNik,
-                        Title = "Action Plan Temuan Inspeksi",
-                        Message = "Tindakan perbaikan hasil inspeksi area workshop memerlukan persetujuan dan verifikasi lapangan dari Anda.",
-                        Url = "/ActionTracker/Index",
-                        NotifType = "actionplan_new",
-                        IsRead = false,
-                        IsActioned = false,
-                        CreatedAt = DateTime.Now.AddHours(-1)
-                    },
-                    new Indexsafe.Api.Models.Notification
-                    {
-                        RecipientNik = userNik,
-                        Title = "Target Minggu Ini Tercapai!",
-                        Message = "Luar biasa! Anda telah mengunggah laporan SAP untuk minggu ini. Terima kasih atas komitmen Anda dalam menjaga keselamatan kerja.",
-                        Url = "/Performance/Index",
-                        NotifType = "inspection_new",
-                        IsRead = false,
-                        IsActioned = true,
-                        CreatedAt = DateTime.Now.AddHours(-3)
-                    },
-                    new Indexsafe.Api.Models.Notification
-                    {
-                        RecipientNik = userNik,
-                        Title = "Pembaruan Liga Departemen",
-                        Message = "Departemen SYSTEM INTEGRATIONS berada di Peringkat #19 dari 24 Departemen (MTD: 0.0%).",
-                        Url = "/Performance/Index",
-                        NotifType = "general",
-                        IsRead = true,
-                        IsActioned = true,
-                        CreatedAt = DateTime.Now.AddHours(-6)
-                    }
-                };
-
-                _context.Notifications.AddRange(seedNotifs);
-                await _context.SaveChangesAsync();
-
-                notifs = seedNotifs.OrderByDescending(n => n.CreatedAt).ToList();
-            }
-
             var result = notifs.Select(n =>
             {
                 bool actionRequired = CheckIsActionRequired(n.NotifType, n.Title, n.Message);
+                bool isCoaching = (n.NotifType != null && n.NotifType.ToLower().Contains("coaching")) ||
+                                  n.Title.ToLower().Contains("coaching") ||
+                                  n.Title.ToLower().Contains("pembinaan") ||
+                                  n.Message.ToLower().Contains("coaching") ||
+                                  n.Message.ToLower().Contains("pembinaan") ||
+                                  (n.Url != null && n.Url.ToLower().Contains("performance"));
+
                 return new
                 {
                     id = n.Id,
@@ -143,28 +165,51 @@ namespace Indexsafe.Api.Controllers
                     is_read = n.IsRead,
                     is_actioned = n.IsActioned,
                     is_action_required = actionRequired,
-                    notif_type = n.NotifType ?? "general",
+                    notif_type = isCoaching ? "coaching" : (n.NotifType ?? "general"),
                     created_at = n.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss")
                 };
             }).ToList();
 
-            int unreadCount = notifs.Count(n => !n.IsRead);
-            int unactionedCount = result.Count(n => n.is_action_required && !n.is_actioned);
+            // Hitung secara presisi di seluruh database untuk user yang sedang login (hanya yang aktif/belum complete)
+            int unreadCount = await _context.Notifications
+                .CountAsync(n => !string.IsNullOrEmpty(n.RecipientNik) && n.RecipientNik.Trim() == userNik 
+                    && !n.IsRead 
+                    && !n.IsActioned 
+                    && n.NotifType != "hazard_completed" 
+                    && n.NotifType != "hazard_closed"
+                    && !(
+                        (n.Title.Contains("Coaching") || n.Title.Contains("Pembinaan") || n.Message.Contains("Coaching") || n.Message.Contains("Pembinaan") || (n.NotifType != null && n.NotifType.Contains("coaching")) || (n.Url != null && n.Url.Contains("Performance")))
+                        && n.CreatedAt < coachingCutoff
+                    )
+                );
 
-            // Periksa juga temuan aktif di database yang diarahkan ke user yang login
+            int unactionedNotifs = await _context.Notifications
+                .CountAsync(n => !string.IsNullOrEmpty(n.RecipientNik) && n.RecipientNik.Trim() == userNik 
+                    && !n.IsActioned 
+                    && n.NotifType != "hazard_completed" 
+                    && n.NotifType != "hazard_closed"
+                    && !n.Title.Contains("Coaching") 
+                    && !n.Title.Contains("Pembinaan") 
+                    && !n.Message.Contains("Coaching") 
+                    && !n.Message.Contains("Pembinaan")
+                    && (n.NotifType == null || !n.NotifType.Contains("coaching"))
+                    && (n.Url == null || !n.Url.Contains("Performance"))
+                );
+
             int activeHazardFindings = await _context.HazardReports
-                .CountAsync(h => !h.IsDeleted && h.NikPja == userNik && h.StatusTemuan == "Open");
+                .CountAsync(h => !h.IsDeleted && h.NikPja != null && h.NikPja.Trim() == userNik && h.StatusTemuan != "Closed");
             int activeActionPlans = await _context.ActionPlans
-                .CountAsync(a => !a.IsDeleted && (a.NikPic == userNik || a.NikPja == userNik) && a.Status == "Open");
+                .CountAsync(a => !a.IsDeleted && ((a.NikPic != null && a.NikPic.Trim() == userNik) || (a.NikPja != null && a.NikPja.Trim() == userNik)) && a.Status != "Closed");
 
-            int totalActionPending = Math.Max(unactionedCount, activeHazardFindings + activeActionPlans);
+            int totalActionPending = Math.Max(unactionedNotifs, activeHazardFindings + activeActionPlans);
+            int totalPending = Math.Max(unreadCount, totalActionPending);
 
             return Ok(new
             {
                 status = true,
                 unread_count = unreadCount,
                 unactioned_count = totalActionPending,
-                total_pending_count = unreadCount + totalActionPending,
+                total_pending_count = totalPending,
                 active_hazard_count = activeHazardFindings,
                 active_action_plan_count = activeActionPlans,
                 data = result

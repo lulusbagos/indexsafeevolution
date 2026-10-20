@@ -221,6 +221,11 @@ class OfflineSyncService {
         pending += rows.length;
       } catch (_) {}
     }
+    try {
+      final actRows = await _db.rawQuery(
+          'select id from action_plans where deleted_at is null and updated_at is null');
+      pending += actRows.length;
+    } catch (_) {}
     state.value =
         OfflineSyncState(isOnline: state.value.isOnline, pendingCount: pending);
     pendingCountNotifier.value = pending;
@@ -257,6 +262,20 @@ class OfflineSyncService {
             await syncTran(_db, _api, name, row['id'] as int);
           }
         } catch (_) {}
+      }
+
+      // Sync pending action plans
+      try {
+        final pendingActions = await _db.rawQuery(
+          'select id, [table] from action_plans where deleted_at is null and updated_at is null',
+        );
+        for (final row in pendingActions) {
+          final id = row['id'] as int;
+          final tableName = (row['table'] ?? 'hazard').toString();
+          await syncAction(_db, _api, tableName, id);
+        }
+      } catch (e) {
+        debugPrint('[OfflineSyncService] Error syncing pending actions: $e');
       }
     } finally {
       _syncing = false;
@@ -296,16 +315,21 @@ class OfflineSyncService {
   }
 
   /// Sinkronisasi otomatis ke server di background ketika mendeteksi koneksi jaringan
-  Future<({int success, int failed})> autoSyncPending() async {
-    if (_isAutoSyncing) return (success: 0, failed: 0);
+  Future<({int success, int failed})> autoSyncPending({bool force = false}) async {
+    if (_isAutoSyncing && !force) return (success: 0, failed: 0);
     _isAutoSyncing = true;
     isSyncingNotifier.value = true;
 
     try {
-      if (_api.getToken.isEmpty) {
+      if (_api.getToken.isEmpty || _api.getToken.startsWith('offline_token_')) {
         final auth = PreferenceService.getAuth();
-        if (auth != null && auth.token != null && auth.token!.isNotEmpty) {
+        if (auth != null && auth.token != null && auth.token!.isNotEmpty && !auth.token!.startsWith('offline_token_')) {
           _api.setToken = auth.token!;
+        } else {
+          final bg = PreferenceService.getBgToken();
+          if (bg != null && bg.isNotEmpty) {
+            _api.setToken = bg;
+          }
         }
       }
 
@@ -526,6 +550,13 @@ class OfflineSyncService {
           total += (res[0]['jml'] as int);
         }
       }
+
+      final actRes = await _db.rawQuery(
+        'select count(1) as jml from action_plans where deleted_at is null and updated_at is null',
+      );
+      if (actRes.isNotEmpty && actRes[0]['jml'] != null) {
+        total += (actRes[0]['jml'] as int);
+      }
     } catch (e) {
       debugPrint('[OfflineSyncService] Error getPendingCount: $e');
     }
@@ -535,10 +566,15 @@ class OfflineSyncService {
   /// Sinkronkan satu item ke server
   Future<bool> syncItem(PendingSyncItem item) async {
     try {
-      if (_api.getToken.isEmpty) {
+      if (_api.getToken.isEmpty || _api.getToken.startsWith('offline_token_')) {
         final auth = PreferenceService.getAuth();
-        if (auth != null && auth.token != null && auth.token!.isNotEmpty) {
+        if (auth != null && auth.token != null && auth.token!.isNotEmpty && !auth.token!.startsWith('offline_token_')) {
           _api.setToken = auth.token!;
+        } else {
+          final bg = PreferenceService.getBgToken();
+          if (bg != null && bg.isNotEmpty) {
+            _api.setToken = bg;
+          }
         }
       }
       final ok = await syncTran(_db, _api, item.tableKey, item.id);
@@ -558,10 +594,15 @@ class OfflineSyncService {
     int success = 0;
     int failed = 0;
 
-    if (_api.getToken.isEmpty) {
+    if (_api.getToken.isEmpty || _api.getToken.startsWith('offline_token_')) {
       final auth = PreferenceService.getAuth();
-      if (auth != null && auth.token != null && auth.token!.isNotEmpty) {
+      if (auth != null && auth.token != null && auth.token!.isNotEmpty && !auth.token!.startsWith('offline_token_')) {
         _api.setToken = auth.token!;
+      } else {
+        final bg = PreferenceService.getBgToken();
+        if (bg != null && bg.isNotEmpty) {
+          _api.setToken = bg;
+        }
       }
     }
 

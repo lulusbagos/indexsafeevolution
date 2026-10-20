@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import '../../services/database.dart';
 import '../../services/preference.dart';
 import '../../widgets/top_bar.dart';
+import '../sap_report_page.dart';
 
 class AchievementSapPage extends StatelessWidget {
   const AchievementSapPage({super.key});
@@ -65,6 +66,59 @@ class SapLeaguePage extends StatelessWidget {
             subtitle: 'Posisi anda bulan ini dari 128 peserta',
             color: Color(0xFFF59E0B),
             icon: Icons.emoji_events_rounded,
+          ),
+          const SizedBox(height: 14),
+          InkWell(
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const SapReportPage(
+                    title: 'Live Display Klasemen',
+                  ),
+                ),
+              );
+            },
+            borderRadius: BorderRadius.circular(14),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF0F172A), Color(0xFF1E293B)],
+                ),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: const Color(0xFF38BDF8).withValues(alpha: .3)),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.live_tv_rounded, color: Color(0xFF38BDF8), size: 24),
+                  SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Buka Live Display Klasemen & F1',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        Text(
+                          'Tampilan penuh real-time layar monitor / TV',
+                          style: TextStyle(
+                            color: Color(0xFF94A3B8),
+                            fontSize: 11,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Icon(Icons.arrow_forward_ios_rounded, color: Color(0xFF38BDF8), size: 14),
+                ],
+              ),
+            ),
           ),
           const SizedBox(height: 14),
           const _SectionTitle('Leaderboard'),

@@ -243,6 +243,44 @@ class _LoginPageState extends State<LoginPage>
               errMsg.toLowerCase().contains('refused') ||
               errMsg.toLowerCase().contains('server');
 
+          if (errMsg.contains('pemetaan jabatan SAP') ||
+              errMsg.contains('vw_r_karyawan_jabatan_mapping_preview') ||
+              errMsg.toLowerCase().contains('akses tidak diizinkan') ||
+              errMsg.toLowerCase().contains('akses ditolak')) {
+            showDialog(
+              context: context,
+              builder: (ctx) => AlertDialog(
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                title: const Row(
+                  children: [
+                    Icon(Icons.gpp_bad_rounded, color: Color(0xFFDC2626), size: 24),
+                    SizedBox(width: 10),
+                    Text(
+                      'Akses Ditolak',
+                      style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
+                    ),
+                  ],
+                ),
+                content: Text(
+                  errMsg,
+                  style: const TextStyle(fontSize: 13, height: 1.4, color: Color(0xFF475569)),
+                ),
+                actions: [
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFDC2626),
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    onPressed: () => Navigator.pop(ctx),
+                    child: const Text('Mengerti'),
+                  ),
+                ],
+              ),
+            );
+            return;
+          }
+
           if (isOffline) {
             await _performOfflineLogin(isExplicitOffline: false);
           } else {
@@ -267,7 +305,38 @@ class _LoginPageState extends State<LoginPage>
           _api.getProfile().then((res) {
             res.fold((error) {
               if (mounted) setState(() => _isLoading = false);
-              debugPrint(error['message'].toString());
+              final pErr = error['message'].toString();
+              showDialog(
+                context: context,
+                builder: (ctx) => AlertDialog(
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                  title: const Row(
+                    children: [
+                      Icon(Icons.gpp_bad_rounded, color: Color(0xFFDC2626), size: 24),
+                      SizedBox(width: 10),
+                      Text(
+                        'Akses Ditolak',
+                        style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
+                      ),
+                    ],
+                  ),
+                  content: Text(
+                    pErr,
+                    style: const TextStyle(fontSize: 13, height: 1.4, color: Color(0xFF475569)),
+                  ),
+                  actions: [
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFDC2626),
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                      onPressed: () => Navigator.pop(ctx),
+                      child: const Text('Tutup'),
+                    ),
+                  ],
+                ),
+              );
             }, (profile) async {
               if (mounted) setState(() => _isLoading = false);
               PreferenceService.setProfile(profile);

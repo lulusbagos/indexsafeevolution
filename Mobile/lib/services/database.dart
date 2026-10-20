@@ -15,6 +15,10 @@ class DatabaseService {
   Future<Database> get database async {
     if (_database != null) return _database!;
     _database = await _initDatabase();
+    await _ensureHazardTransColumns(_database!);
+    await _ensureInspectionTransColumns(_database!);
+    await _ensureEmployeeColumns(_database!);
+    await _ensureBenchmarkTable(_database!);
     return _database!;
   }
 
@@ -31,6 +35,93 @@ class DatabaseService {
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
     if (oldVersion < 2) await _createOfflineSyncJobsTable(db);
+    await _ensureHazardTransColumns(db);
+    await _ensureInspectionTransColumns(db);
+    await _ensureEmployeeColumns(db);
+    await _ensureBenchmarkTable(db);
+  }
+
+  static Future<void> _ensureInspectionTransColumns(Database db) async {
+    final cols = [
+      'area',
+      'lokasi',
+      'jenis_inspeksi',
+      'pja',
+      'nik_pja',
+      'departemen_pja',
+      'payload_json',
+      'q1_1', 'q1_2', 'q1_3',
+      'q2_1', 'q2_2', 'q2_3',
+      'q3_1', 'q3_2', 'q3_3',
+      'q4_1', 'q4_2', 'q4_3',
+      'q5_1', 'q5_2', 'q5_3',
+    ];
+    for (var col in cols) {
+      try {
+        await db.execute('ALTER TABLE inspection_trans ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  }
+
+  static Future<void> _ensureEmployeeColumns(Database db) async {
+    final cols = ['departemen', 'jabatan', 'perusahaan'];
+    for (var col in cols) {
+      try {
+        await db.execute('ALTER TABLE employees ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+    try {
+      await db.execute('CREATE INDEX IF NOT EXISTS idx_emp_nik ON employees (no_nik);');
+      await db.execute('CREATE INDEX IF NOT EXISTS idx_emp_nama ON employees (nama_lengkap);');
+    } catch (_) {}
+  }
+
+  static Future<void> _ensureBenchmarkTable(Database db) async {
+    try {
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS tbl_m_benchmark (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          perusahaan_id INTEGER,
+          area_utama TEXT,
+          nama_benchmark TEXT,
+          created_by_nik TEXT,
+          created_by_name TEXT,
+          created_at TEXT
+        );
+      ''');
+      await db.execute('CREATE INDEX IF NOT EXISTS idx_bm_area ON tbl_m_benchmark (area_utama);');
+      await db.execute('CREATE INDEX IF NOT EXISTS idx_bm_name ON tbl_m_benchmark (nama_benchmark);');
+      // Bersihkan entri invalid CAMP EKSPLORASI dari area_utama
+      await db.execute("DELETE FROM tbl_m_benchmark WHERE area_utama LIKE '%CAMP EKSPLORASI%' OR nama_benchmark = 'CAMP EKSPLORASI BLOCK CENTRAL';");
+      
+      // Pastikan kolom nik, departemen, jabatan, perusahaan ada di tabel employees
+      for (var col in ['nik', 'departemen', 'jabatan', 'perusahaan']) {
+        try {
+          await db.execute('ALTER TABLE employees ADD COLUMN `$col` TEXT;');
+        } catch (_) {}
+      }
+    } catch (_) {}
+  }
+
+  static Future<void> _ensureHazardTransColumns(Database db) async {
+    final cols = [
+      'area',
+      'lokasi',
+      'kategori_bahaya',
+      'jenis_bahaya',
+      'jenis_ketidaksesuaian',
+      'tingkat_resiko',
+      'tindakan_perbaikan',
+      'pja',
+      'nik_pja',
+      'departemen_pja',
+      'payload_json',
+    ];
+    for (var col in cols) {
+      try {
+        await db.execute('ALTER TABLE hazard_trans ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
   }
 
   Future<void> _createOfflineSyncJobsTable(Database db) => db.execute('''
@@ -253,6 +344,9 @@ class DatabaseService {
 			`foto` TEXT,
 			`user_id` INTEGER,
 			`company_id` INTEGER,
+			`departemen` TEXT,
+			`jabatan` TEXT,
+			`perusahaan` TEXT,
 			`created_at` TEXT,
 			`updated_at` TEXT,
 			`deleted_at` TEXT
@@ -726,9 +820,9 @@ class DatabaseService {
     return db.close();
   }
 
-  Future<List<Map>> rawQuery(String sql) async {
+  Future<List<Map>> rawQuery(String sql, [List<Object?>? arguments]) async {
     final db = await database;
-    return db.rawQuery(sql);
+    return db.rawQuery(sql, arguments);
   }
 
   Future<List<dynamic>> gets(table, where, order) async {

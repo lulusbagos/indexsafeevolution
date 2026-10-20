@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 
 import 'package:dartz/dartz.dart' hide State;
 import 'package:flutter/foundation.dart';
@@ -14,6 +15,7 @@ import 'package:webview_flutter/webview_flutter.dart';
 import '../models/incident_news_model.dart';
 import '../models/link_model.dart';
 import '../services/api.dart';
+import '../services/database.dart';
 import '../services/preference.dart';
 import '../utils/links.dart';
 import '../widgets/snackbar_msg.dart';
@@ -253,11 +255,14 @@ Future<void> _injectCurrentPosition(WebViewController controller) async {
 
 class _FullscreenHazardMapPage extends StatefulWidget {
   const _FullscreenHazardMapPage({
+    super.key,
     required this.html,
     required this.onCloseHazard,
     required this.onShowDetail,
     this.initialMode = 'heatmap',
     this.onModeChanged,
+    this.unclosedHazards = const [],
+    this.initialUserPosition,
   });
 
   final String html;
@@ -265,20 +270,37 @@ class _FullscreenHazardMapPage extends StatefulWidget {
   final Function(BuildContext context, int id) onShowDetail;
   final String initialMode;
   final ValueChanged<String>? onModeChanged;
+  final List<MapHazardItem> unclosedHazards;
+  final Position? initialUserPosition;
 
   @override
   State<_FullscreenHazardMapPage> createState() =>
       _FullscreenHazardMapPageState();
 }
 
-class _FullscreenHazardMapPageState extends State<_FullscreenHazardMapPage> {
+class _FullscreenHazardMapPageState extends State<_FullscreenHazardMapPage>
+    with SingleTickerProviderStateMixin {
   late final WebViewController _controller;
   late String _mapMode;
+  bool _isHunterMode = true; // Mode Berburu Hazard (Pokemon GO style radar)
+  Position? _currentPos;
+  StreamSubscription<Position>? _posSub;
+  int _currentTargetIndex = 0;
+  int _score = 350;
+  bool _hasVibratedForTarget = false;
+  late final AnimationController _pulseCtrl;
 
   @override
   void initState() {
     super.initState();
-    _mapMode = widget.initialMode;
+    _mapMode = PreferenceService.getHazardMapMode();
+    _currentPos = widget.initialUserPosition;
+
+    _pulseCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1400),
+    )..repeat(reverse: true);
+
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setBackgroundColor(Colors.transparent)
@@ -295,6 +317,16 @@ class _FullscreenHazardMapPageState extends State<_FullscreenHazardMapPage> {
               widget.onShowDetail(context, id);
             } else if (action == 'close') {
               widget.onCloseHazard(context, id);
+            } else if (action == 'select') {
+              final sorted = _sortedHazards;
+              final foundIdx = sorted.indexWhere((h) => h.id == id);
+              if (foundIdx != -1) {
+                setState(() {
+                  _currentTargetIndex = foundIdx;
+                  _hasVibratedForTarget = false;
+                });
+                _updateMapGuide();
+              }
             }
           } catch (e) {
             debugPrint('Error handling HazardBridge message: $e');
@@ -303,27 +335,529 @@ class _FullscreenHazardMapPageState extends State<_FullscreenHazardMapPage> {
       )
       ..setNavigationDelegate(
         NavigationDelegate(
-          onPageFinished: (_) => _injectCurrentPosition(_controller),
+          onPageFinished: (_) {
+            _injectCurrentPosition(_controller);
+            Future.delayed(const Duration(milliseconds: 600), () {
+              if (mounted) _updateMapGuide();
+            });
+          },
         ),
       )
       ..loadHtmlString(widget.html);
+
+    _startLocationStream();
+  }
+
+  @override
+  void dispose() {
+    _posSub?.cancel();
+    _pulseCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _startLocationStream() async {
+    try {
+      bool serviceEnabled = false;
+      try {
+        serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      } catch (e) {
+        debugPrint('Geolocator service check fallback: $e');
+        serviceEnabled = true;
+      }
+      if (!serviceEnabled) return;
+
+      _posSub = Geolocator.getPositionStream(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          distanceFilter: 1,
+        ),
+      ).listen(
+        (pos) {
+          if (mounted) {
+            setState(() {
+              _currentPos = pos;
+            });
+            _controller.runJavaScript(
+              'if(window.setUserLocation) window.setUserLocation(${pos.latitude}, ${pos.longitude}, ${pos.accuracy});',
+            );
+            _updateMapGuide();
+          }
+        },
+        onError: (err) {
+          debugPrint('Position stream error: $err');
+        },
+      );
+    } catch (e) {
+      debugPrint('Location stream error: $e');
+    }
+  }
+
+  void _updateMapGuide() {
+    if (!_isHunterMode || _mapMode == 'off') {
+      _controller.runJavaScript('if(window.clearGuideLine) window.clearGuideLine();');
+      return;
+    }
+    final sorted = _sortedHazards;
+    if (sorted.isEmpty) return;
+    final target = sorted[_currentTargetIndex % sorted.length];
+    final pos = _currentPos ?? widget.initialUserPosition;
+    if (pos == null) return;
+
+    _controller.runJavaScript(
+      'if(window.updateGuideLine) window.updateGuideLine(${pos.latitude}, ${pos.longitude}, ${target.lat}, ${target.lng}, "${target.color}");',
+    );
+  }
+
+  double _calculateBearing(double startLat, double startLng, double endLat, double endLng) {
+    final dLng = (endLng - startLng) * (pi / 180.0);
+    final phi1 = startLat * (pi / 180.0);
+    final phi2 = endLat * (pi / 180.0);
+    final y = sin(dLng) * cos(phi2);
+    final x = cos(phi1) * sin(phi2) - sin(phi1) * cos(phi2) * cos(dLng);
+    final rad = atan2(y, x);
+    return (rad * (180.0 / pi) + 360.0) % 360.0;
+  }
+
+  String _bearingToDirectionName(double bearing) {
+    if (bearing >= 337.5 || bearing < 22.5) return 'Utara';
+    if (bearing >= 22.5 && bearing < 67.5) return 'Timur Laut';
+    if (bearing >= 67.5 && bearing < 112.5) return 'Timur';
+    if (bearing >= 112.5 && bearing < 157.5) return 'Tenggara';
+    if (bearing >= 157.5 && bearing < 202.5) return 'Selatan';
+    if (bearing >= 202.5 && bearing < 247.5) return 'Barat Daya';
+    if (bearing >= 247.5 && bearing < 292.5) return 'Barat';
+    return 'Barat Laut';
+  }
+
+  List<MapHazardItem> get _sortedHazards {
+    if (widget.unclosedHazards.isEmpty) return [];
+    final list = List<MapHazardItem>.from(widget.unclosedHazards);
+    final pos = _currentPos ?? widget.initialUserPosition;
+    if (pos != null) {
+      list.sort((a, b) {
+        final da = Geolocator.distanceBetween(pos.latitude, pos.longitude, a.lat, a.lng);
+        final db = Geolocator.distanceBetween(pos.latitude, pos.longitude, b.lat, b.lng);
+        return da.compareTo(db);
+      });
+    }
+    return list;
   }
 
   void _onSelectMode(String mode) {
     if (_mapMode == mode) return;
     setState(() => _mapMode = mode);
+    PreferenceService.setHazardMapMode(mode); // Simpan permanen ke lokal
     _controller.runJavaScript(
       "if(window.setMapMode) window.setMapMode('$mode');",
     );
     widget.onModeChanged?.call(mode);
+    if (mode == 'off') {
+      _hasVibratedForTarget = false;
+      _controller.runJavaScript('if(window.clearGuideLine) window.clearGuideLine();');
+    } else {
+      _updateMapGuide();
+    }
+  }
+
+  void _flyToTarget(MapHazardItem target) {
+    _controller.runJavaScript(
+      "map.flyTo([${target.lat}, ${target.lng}], 17.5, { animate: true, duration: 0.7 });",
+    );
+    _updateMapGuide();
+  }
+
+  void _showTooFarWarning(BuildContext context, double distance) {
+    HapticFeedback.lightImpact();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF0F172A),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(22),
+          side: const BorderSide(color: Color(0xFFEF4444), width: 1.8),
+        ),
+        title: const Row(
+          children: [
+            Icon(Icons.location_off_rounded, color: Color(0xFFEF4444), size: 24),
+            SizedBox(width: 8),
+            Text(
+              'Belum Dalam Radius 50M',
+              style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Jarak Anda saat ini: ${distance.round()} meter dari titik hazard.',
+              style: const TextStyle(color: Color(0xFFE2E8F0), fontSize: 13, height: 1.4),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(11),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1E293B),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.amber.withOpacity(0.4)),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.security_rounded, color: Colors.amber, size: 22),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'SOP K3: Hazard hanya dapat diamankan (takeup) jika berada dalam radius 50 meter untuk verifikasi fisik langsung di lapangan.',
+                      style: TextStyle(color: Colors.amber, fontSize: 11, fontWeight: FontWeight.w600, height: 1.35),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF0284C7),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Siap, Saya Dekati Target', style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showEncounterModal(BuildContext context, MapHazardItem target, double distance, {required bool canTakeUp}) {
+    HapticFeedback.heavyImpact();
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (modalCtx) {
+        return Container(
+          margin: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [Color(0xFF0F172A), Color(0xFF1E293B)],
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+            ),
+            borderRadius: BorderRadius.circular(26),
+            border: Border.all(color: canTakeUp ? const Color(0xFF10B981) : const Color(0xFF38BDF8), width: 1.6),
+            boxShadow: [
+              BoxShadow(
+                color: (canTakeUp ? const Color(0xFF10B981) : const Color(0xFF0284C7)).withOpacity(0.45),
+                blurRadius: 30,
+                spreadRadius: 2,
+              ),
+            ],
+          ),
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 44,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.white24,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 14),
+
+              // Title Header ala Pokemon Wild Encounter
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: canTakeUp
+                        ? [const Color(0xFF10B981), const Color(0xFF059669)]
+                        : [const Color(0xFFEF4444), const Color(0xFFF97316)],
+                  ),
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(
+                      color: (canTakeUp ? Colors.green : Colors.red).withOpacity(0.5),
+                      blurRadius: 12,
+                    ),
+                  ],
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(canTakeUp ? Icons.check_circle_rounded : Icons.radar_rounded, color: Colors.white, size: 18),
+                    const SizedBox(width: 7),
+                    Text(
+                      canTakeUp ? 'TARGET TERVERIFIKASI DALAM 50M!' : 'WILD HAZARD DETECTED!',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 12,
+                        letterSpacing: 0.8,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 14),
+
+              // Photo with Tactical Scan Reticle Overlay
+              Stack(
+                alignment: Alignment.center,
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(16),
+                    child: Container(
+                      height: 160,
+                      width: double.infinity,
+                      color: Colors.black38,
+                      child: Image.network(
+                        target.photo,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => Container(
+                          color: const Color(0xFF1E293B),
+                          child: const Icon(Icons.warning_amber_rounded,
+                              size: 54, color: Colors.amber),
+                        ),
+                      ),
+                    ),
+                  ),
+                  // Tactical Reticle
+                  Container(
+                    width: 76,
+                    height: 76,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(color: canTakeUp ? Colors.greenAccent : Colors.amberAccent, width: 2),
+                    ),
+                    child: Center(
+                      child: Icon(Icons.filter_center_focus,
+                          color: canTakeUp ? Colors.greenAccent : Colors.amberAccent, size: 44),
+                    ),
+                  ),
+                  Positioned(
+                    top: 10,
+                    right: 10,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.black87,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.white24),
+                      ),
+                      child: Text(
+                        'ID #${target.id}',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    bottom: 10,
+                    left: 10,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.black87,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: canTakeUp ? Colors.greenAccent : Colors.amberAccent),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.gps_fixed, color: canTakeUp ? Colors.greenAccent : Colors.amberAccent, size: 12),
+                          const SizedBox(width: 4),
+                          Text(
+                            'Jarak: ${distance.round()}m ${canTakeUp ? "(Aman)" : "(Jauh)"}',
+                            style: TextStyle(
+                              color: canTakeUp ? Colors.greenAccent : Colors.amberAccent,
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+
+              Text(
+                target.title,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w900,
+                  fontSize: 16,
+                  height: 1.3,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: target.color.startsWith('#')
+                          ? Color(int.parse(target.color.replaceFirst('#', '0xFF')))
+                          : Colors.red,
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      target.level.toUpperCase(),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: Text(
+                      target.area,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Color(0xFF94A3B8),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+
+              // XP Reward Box
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF38BDF8).withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFF38BDF8).withOpacity(0.35)),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.military_tech_rounded, color: Colors.amber, size: 20),
+                    SizedBox(width: 6),
+                    Text(
+                      'Reward Temuan: +50 Poin SAP & Lencana Hunter',
+                      style: TextStyle(
+                        color: Color(0xFFE0F2FE),
+                        fontWeight: FontWeight.w700,
+                        fontSize: 11.5,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 18),
+
+              // Action Buttons
+              Row(
+                children: [
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: canTakeUp ? const Color(0xFF10B981) : const Color(0xFF475569),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 13),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        elevation: canTakeUp ? 4 : 0,
+                      ),
+                      onPressed: canTakeUp
+                          ? () {
+                              Navigator.pop(modalCtx);
+                              setState(() {
+                                _score += 50;
+                              });
+                              widget.onCloseHazard(context, target.id);
+                            }
+                          : () {
+                              Navigator.pop(modalCtx);
+                              _showTooFarWarning(context, distance);
+                            },
+                      icon: Icon(canTakeUp ? Icons.check_circle_rounded : Icons.lock_rounded, size: 18),
+                      label: Text(
+                        canTakeUp ? 'Amankan & Close Temuan (+50P)' : 'Terkunci (Harus < 50M)',
+                        style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12.5),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  IconButton(
+                    style: IconButton.styleFrom(
+                      backgroundColor: Colors.white12,
+                      padding: const EdgeInsets.all(12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    onPressed: () {
+                      Navigator.pop(modalCtx);
+                      widget.onShowDetail(context, target.id);
+                    },
+                    icon: const Icon(Icons.info_outline_rounded, color: Colors.white),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   @override
   Widget build(BuildContext context) {
+    final sorted = _sortedHazards;
+    final hasTargets = sorted.isNotEmpty;
+    final target = hasTargets ? sorted[_currentTargetIndex % sorted.length] : null;
+
+    final userLat = _currentPos?.latitude ?? widget.initialUserPosition?.latitude ?? (hasTargets ? target!.lat + 0.0003 : 1.0564);
+    final userLng = _currentPos?.longitude ?? widget.initialUserPosition?.longitude ?? (hasTargets ? target!.lng + 0.0002 : 117.7265);
+
+    double distance = 999;
+    double bearing = 0;
+    String dirName = 'Utara';
+
+    if (target != null) {
+      distance = Geolocator.distanceBetween(userLat, userLng, target.lat, target.lng);
+      bearing = _calculateBearing(userLat, userLng, target.lat, target.lng);
+      dirName = _bearingToDirectionName(bearing);
+    }
+
+    // Toleransi radius takeup dan getar: 10 - 12 meter
+    final isWithin50Meters = distance <= 50.0;
+
+    // Trigger haptic jika baru saja masuk dalam radius 50m
+    if (isWithin50Meters && !_hasVibratedForTarget) {
+      _hasVibratedForTarget = true;
+      HapticFeedback.heavyImpact();
+      Future.delayed(const Duration(milliseconds: 250), () => HapticFeedback.heavyImpact());
+    } else if (!isWithin50Meters && _hasVibratedForTarget) {
+      _hasVibratedForTarget = false;
+    }
+
     return Scaffold(
       backgroundColor: Colors.black,
       body: Stack(
         children: [
+          // Map WebView
           Positioned.fill(
             child: SafeArea(
               child: WebViewWidget(
@@ -336,34 +870,222 @@ class _FullscreenHazardMapPageState extends State<_FullscreenHazardMapPage> {
               ),
             ),
           ),
-          // Tombol Kembali (Back Button)
+
+          // Top Header Bar (Ramping & Overflow-Proof)
           Positioned(
-            top: 14,
-            left: 14,
+            top: 10,
+            left: 10,
+            right: 10,
             child: SafeArea(
-              child: Material(
-                color: Colors.white,
-                elevation: 6,
-                borderRadius: BorderRadius.circular(24),
-                child: InkWell(
-                  onTap: () => Navigator.pop(context),
-                  borderRadius: BorderRadius.circular(24),
+              child: Row(
+                children: [
+                  // Sleek Circular Back Button
+                  Material(
+                    color: Colors.white,
+                    elevation: 6,
+                    shape: const CircleBorder(),
+                    child: InkWell(
+                      customBorder: const CircleBorder(),
+                      onTap: () => Navigator.pop(context),
+                      child: const Padding(
+                        padding: EdgeInsets.all(9),
+                        child: Icon(Icons.arrow_back_rounded, color: Color(0xFF1D4ED8), size: 20),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+
+                  // Center: Mode Berburu Hazard Toggle Pill
+                  Expanded(
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: () {
+                          setState(() {
+                            _isHunterMode = !_isHunterMode;
+                            _updateMapGuide();
+                          });
+                          HapticFeedback.lightImpact();
+                        },
+                        borderRadius: BorderRadius.circular(24),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 250),
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7.5),
+                          decoration: BoxDecoration(
+                            gradient: _isHunterMode
+                                ? const LinearGradient(
+                                    colors: [Color(0xFF0F172A), Color(0xFF1E293B)],
+                                  )
+                                : null,
+                            color: _isHunterMode ? null : Colors.white.withOpacity(0.95),
+                            borderRadius: BorderRadius.circular(24),
+                            border: Border.all(
+                              color: _isHunterMode ? const Color(0xFF38BDF8) : Colors.black12,
+                              width: 1.5,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: _isHunterMode
+                                    ? const Color(0xFF0284C7).withOpacity(0.35)
+                                    : Colors.black12,
+                                blurRadius: 8,
+                              ),
+                            ],
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                _isHunterMode ? Icons.radar_rounded : Icons.explore_off_rounded,
+                                color: _isHunterMode ? const Color(0xFF38BDF8) : Colors.grey,
+                                size: 15,
+                              ),
+                              const SizedBox(width: 5),
+                              Flexible(
+                                child: Text(
+                                  _isHunterMode ? 'SAFE MAPS' : 'MODE BIASA',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    color: _isHunterMode ? Colors.white : Colors.black87,
+                                    fontWeight: FontWeight.w900,
+                                    fontSize: 11,
+                                    letterSpacing: 0.5,
+                                  ),
+                                ),
+                              ),
+                              if (_isHunterMode) ...[
+                                const SizedBox(width: 5),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFF59E0B),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Text(
+                                    '${_score}P',
+                                    style: const TextStyle(
+                                      color: Colors.black,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 9,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+
+                  // Mode Switcher (Heatmap | Titik | Off) - Compact
+                  Material(
+                    color: Colors.white,
+                    elevation: 6,
+                    borderRadius: BorderRadius.circular(20),
+                    child: Container(
+                      padding: const EdgeInsets.all(2),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          _buildFullscreenModeButton('heatmap', 'Heatmap'),
+                          _buildFullscreenModeButton('points', 'Titik'),
+                          _buildFullscreenModeButton('off', 'Off'),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          // Tactical Compass / Bearing HUD (Hanya muncul jika Hunter Mode Aktif)
+          if (_isHunterMode && target != null && _mapMode != 'off')
+            Positioned(
+              top: 66,
+              left: 14,
+              right: 14,
+              child: SafeArea(
+                child: Center(
                   child: Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-                    child: const Row(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF0F172A).withOpacity(0.94),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: isWithin50Meters ? const Color(0xFF10B981) : const Color(0xFF38BDF8),
+                        width: 1.6,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: (isWithin50Meters ? const Color(0xFF10B981) : const Color(0xFF0284C7)).withOpacity(0.4),
+                          blurRadius: 14,
+                        ),
+                      ],
+                    ),
+                    child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.arrow_back_rounded,
-                            color: Color(0xFF1D4ED8), size: 20),
-                        SizedBox(width: 6),
-                        Text(
-                          'Kembali',
-                          style: TextStyle(
-                            color: Color(0xFF1D4ED8),
-                            fontWeight: FontWeight.bold,
-                            fontSize: 13,
+                        // Panah Kompas Navigasi Realtime Berotasi Halus (Smooth AnimatedRotation)
+                        AnimatedRotation(
+                          turns: bearing / 360.0,
+                          duration: const Duration(milliseconds: 300),
+                          curve: Curves.easeOutCubic,
+                          child: Container(
+                            width: 32,
+                            height: 32,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              gradient: LinearGradient(
+                                colors: isWithin50Meters
+                                    ? [const Color(0xFF10B981), const Color(0xFF059669)]
+                                    : [const Color(0xFF0284C7), const Color(0xFF38BDF8)],
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: (isWithin50Meters ? const Color(0xFF10B981) : const Color(0xFF38BDF8)).withOpacity(0.6),
+                                  blurRadius: 8,
+                                ),
+                              ],
+                            ),
+                            child: const Center(
+                              child: Icon(Icons.navigation_rounded, color: Colors.white, size: 18),
+                            ),
                           ),
+                        ),
+                        const SizedBox(width: 10),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              isWithin50Meters
+                                  ? '🚨 SAFE MAPS: DALAM RADIUS 10M!'
+                                  : '🧭 SAFE MAPS • IKUTI PANAH',
+                              style: TextStyle(
+                                color: isWithin50Meters ? const Color(0xFF86EFAC) : const Color(0xFF7DD3FC),
+                                fontSize: 9.5,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                            Text(
+                              isWithin50Meters
+                                  ? '${distance.round()} Meter • SIAP DIAMANKAN'
+                                  : '${distance.round()} Meter ke Arah $dirName',
+                              style: TextStyle(
+                                color: isWithin50Meters ? const Color(0xFF4ADE80) : Colors.white,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
@@ -371,33 +1093,10 @@ class _FullscreenHazardMapPageState extends State<_FullscreenHazardMapPage> {
                 ),
               ),
             ),
-          ),
-          // Segmented Switcher di Fullscreen: Heatmap | Titik | Off
+
+          // Tombol Lokasi Saya (Floating Right)
           Positioned(
-            top: 14,
-            right: 14,
-            child: SafeArea(
-              child: Material(
-                color: Colors.white,
-                elevation: 6,
-                borderRadius: BorderRadius.circular(20),
-                child: Container(
-                  padding: const EdgeInsets.all(2.5),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      _buildFullscreenModeButton('heatmap', 'Heatmap'),
-                      _buildFullscreenModeButton('points', 'Titik'),
-                      _buildFullscreenModeButton('off', 'Off'),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-          // Tombol Lokasi Saya di Fullscreen (Kanan Bawah)
-          Positioned(
-            bottom: 24,
+            bottom: (_isHunterMode && target != null) ? 220 : 24,
             right: 16,
             child: SafeArea(
               child: Material(
@@ -409,6 +1108,7 @@ class _FullscreenHazardMapPageState extends State<_FullscreenHazardMapPage> {
                     _controller.runJavaScript(
                       'if(window.locateMe) window.locateMe();',
                     );
+                    _updateMapGuide();
                   },
                   borderRadius: BorderRadius.circular(12),
                   child: const SizedBox(
@@ -424,6 +1124,243 @@ class _FullscreenHazardMapPageState extends State<_FullscreenHazardMapPage> {
               ),
             ),
           ),
+
+          // Bottom Encounter Card (Pokemon GO Wild Hazard Card)
+          if (_isHunterMode && target != null && _mapMode != 'off')
+            Positioned(
+              bottom: 14,
+              left: 14,
+              right: 14,
+              child: SafeArea(
+                child: Container(
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF0F172A), Color(0xFF1E293B)],
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                    ),
+                    borderRadius: BorderRadius.circular(22),
+                    border: Border.all(
+                      color: isWithin50Meters ? const Color(0xFF10B981) : const Color(0xFF38BDF8),
+                      width: 1.5,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.5),
+                        blurRadius: 20,
+                        offset: const Offset(0, 6),
+                      ),
+                    ],
+                  ),
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Target Index & Risk Badge
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF0284C7).withOpacity(0.25),
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(color: const Color(0xFF0284C7)),
+                                ),
+                                child: Text(
+                                  '🎯 TARGET #${(_currentTargetIndex % sorted.length) + 1}/${sorted.length}',
+                                  style: const TextStyle(
+                                    color: Color(0xFF7DD3FC),
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w900,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: target.color.startsWith('#')
+                                      ? Color(int.parse(target.color.replaceFirst('#', '0xFF'))).withOpacity(0.2)
+                                      : Colors.red.withOpacity(0.2),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  target.level,
+                                  style: TextStyle(
+                                    color: target.color.startsWith('#')
+                                        ? Color(int.parse(target.color.replaceFirst('#', '0xFF')))
+                                        : Colors.red,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          Row(
+                            children: [
+                              IconButton(
+                                constraints: const BoxConstraints(),
+                                padding: const EdgeInsets.all(4),
+                                icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 14, color: Colors.white70),
+                                onPressed: () {
+                                  setState(() {
+                                    _currentTargetIndex = (_currentTargetIndex - 1 + sorted.length) % sorted.length;
+                                    _hasVibratedForTarget = false;
+                                  });
+                                  _flyToTarget(sorted[_currentTargetIndex]);
+                                },
+                              ),
+                              const SizedBox(width: 8),
+                              IconButton(
+                                constraints: const BoxConstraints(),
+                                padding: const EdgeInsets.all(4),
+                                icon: const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Colors.white70),
+                                onPressed: () {
+                                  setState(() {
+                                    _currentTargetIndex = (_currentTargetIndex + 1) % sorted.length;
+                                    _hasVibratedForTarget = false;
+                                  });
+                                  _flyToTarget(sorted[_currentTargetIndex]);
+                                },
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+
+                      // Title & Area
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(10),
+                            child: SizedBox(
+                              width: 48,
+                              height: 48,
+                              child: Image.network(
+                                target.photo,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) => Container(
+                                  color: Colors.white12,
+                                  child: const Icon(Icons.warning, color: Colors.amber, size: 24),
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  target.title,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  '${target.area} • ${target.kategori}',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    color: Color(0xFF94A3B8),
+                                    fontSize: 11,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+
+                      // Pokemon Style Action Row (Enforce Distance < 10M)
+                      Row(
+                        children: [
+                          Expanded(
+                            child: ElevatedButton.icon(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: isWithin50Meters ? const Color(0xFF10B981) : const Color(0xFF334155),
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(vertical: 11),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                elevation: isWithin50Meters ? 4 : 0,
+                                shadowColor: isWithin50Meters ? const Color(0xFF10B981).withOpacity(0.5) : null,
+                              ),
+                              onPressed: isWithin50Meters
+                                  ? () {
+                                      _showEncounterModal(context, target, distance, canTakeUp: true);
+                                    }
+                                  : () {
+                                      _showTooFarWarning(context, distance);
+                                    },
+                              icon: Icon(
+                                isWithin50Meters ? Icons.track_changes_rounded : Icons.lock_rounded,
+                                size: 18,
+                                color: isWithin50Meters ? Colors.white : const Color(0xFF94A3B8),
+                              ),
+                              label: Text(
+                                isWithin50Meters
+                                    ? 'TANGKAP & AMANKAN (+50P)'
+                                    : 'DEKATI TARGET (< 50M) - ${distance.round()}M',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w900,
+                                  fontSize: 11.5,
+                                  letterSpacing: 0.4,
+                                  color: isWithin50Meters ? Colors.white : const Color(0xFFCBD5E1),
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+
+                          // Fly to Camera Button
+                          Material(
+                            color: Colors.white12,
+                            borderRadius: BorderRadius.circular(12),
+                            child: InkWell(
+                              onTap: () => _flyToTarget(target),
+                              borderRadius: BorderRadius.circular(12),
+                              child: const Padding(
+                                padding: EdgeInsets.all(10),
+                                child: Icon(Icons.near_me_rounded, color: Colors.white, size: 20),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+
+                          // Detail Button
+                          Material(
+                            color: Colors.white12,
+                            borderRadius: BorderRadius.circular(12),
+                            child: InkWell(
+                              onTap: () => widget.onShowDetail(context, target.id),
+                              borderRadius: BorderRadius.circular(12),
+                              child: const Padding(
+                                padding: EdgeInsets.all(10),
+                                child: Icon(Icons.info_outline_rounded, color: Colors.white, size: 20),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
     );
@@ -431,27 +1368,22 @@ class _FullscreenHazardMapPageState extends State<_FullscreenHazardMapPage> {
 
   Widget _buildFullscreenModeButton(String key, String label) {
     final isSelected = _mapMode == key;
-    final isOff = key == 'off';
     return InkWell(
       onTap: () => _onSelectMode(key),
       borderRadius: BorderRadius.circular(16),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         decoration: BoxDecoration(
-          color: isSelected
-              ? (isOff ? const Color(0xFFFEE2E2) : const Color(0xFFEFF6FF))
-              : Colors.transparent,
+          color: isSelected ? const Color(0xFF1D4ED8) : Colors.transparent,
           borderRadius: BorderRadius.circular(16),
         ),
         child: Text(
           label,
           style: TextStyle(
-            fontSize: 11,
-            fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-            color: isSelected
-                ? (isOff ? const Color(0xFFDC2626) : const Color(0xFF1D4ED8))
-                : const Color(0xFF64748B),
+            fontSize: 10,
+            fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+            color: isSelected ? Colors.white : const Color(0xFF64748B),
           ),
         ),
       ),
@@ -491,7 +1423,7 @@ class _DashboardPageState extends State<DashboardPage> {
   int _notifCount = PreferenceService.getNotif();
 
   // Heatmap & Radar Proximity State ('heatmap', 'points', 'off')
-  String _hazardMapMode = 'heatmap';
+  String _hazardMapMode = PreferenceService.getHazardMapMode();
   StreamSubscription<Position>? _positionStreamSub;
   Position? _lastUserPosition;
   bool _hasPlacedNearbyDemoHazard = false;
@@ -502,103 +1434,43 @@ class _DashboardPageState extends State<DashboardPage> {
   // Daftar hazard belum closed (30 hari terakhir)
   late List<MapHazardItem> _unclosedHazards;
 
+  void _openFullscreenHazardHunter(BuildContext context) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        fullscreenDialog: true,
+        builder: (context) => _FullscreenHazardMapPage(
+          html: _hazardMapHtml(
+            mapMode: _hazardMapMode,
+            userPosition: _lastUserPosition,
+          ),
+          initialMode: _hazardMapMode,
+          unclosedHazards: _unclosedHazards,
+          initialUserPosition: _lastUserPosition,
+          onModeChanged: (mode) {
+            _setMapMode(mode);
+          },
+          onCloseHazard: (modalCtx, id) {
+            final matches = _unclosedHazards.where((item) => item.id == id);
+            if (matches.isNotEmpty) {
+              _showHazardCloseModal(modalCtx, matches.first);
+            }
+          },
+          onShowDetail: (modalCtx, id) {
+            final matches = _unclosedHazards.where((item) => item.id == id);
+            if (matches.isNotEmpty) {
+              _showHazardDetailModal(modalCtx, matches.first);
+            }
+          },
+        ),
+      ),
+    );
+  }
+
   @override
   void initState() {
     super.initState();
 
-    final now = DateTime.now();
-    _unclosedHazards = [
-      MapHazardItem(
-        id: 101,
-        title: 'Tumpahan oli di workshop',
-        area: 'Workshop LV',
-        level: 'Tinggi',
-        color: '#ef4444',
-        status: 'On Progress',
-        statusColor: '#f59e0b',
-        lat: 1.2118,
-        lng: 117.2198,
-        photo:
-            'https://images.unsplash.com/photo-1581092160607-ee22621dd758?auto=format&fit=crop&w=520&q=80',
-        notes: 'Potensi terpeleset dan kontaminasi area kerja.',
-        date: now.subtract(const Duration(days: 3)),
-        pelapor: 'Ahmad Ridwan',
-        pja: 'Budi Santoso',
-        kategori: 'Kondisi Tidak Aman (KTA)',
-      ),
-      MapHazardItem(
-        id: 102,
-        title: 'Material loose di hauling road',
-        area: 'Hauling Road KM 4',
-        level: 'Sedang',
-        color: '#f59e0b',
-        status: 'Open',
-        statusColor: '#ef4444',
-        lat: 1.1997,
-        lng: 117.2331,
-        photo:
-            'https://images.unsplash.com/photo-1503387762-592deb58ef4e?auto=format&fit=crop&w=520&q=80',
-        notes: 'Butuh housekeeping dan rambu sementara.',
-        date: now.subtract(const Duration(days: 7)),
-        pelapor: 'Joko Susilo',
-        pja: 'Hendra Wijaya',
-        kategori: 'Kondisi Tidak Aman (KTA)',
-      ),
-      MapHazardItem(
-        id: 103,
-        title: 'Area kerja tanpa barricade',
-        area: 'Pit Selatan',
-        level: 'Kritis',
-        color: '#b91c1c',
-        status: 'Open',
-        statusColor: '#ef4444',
-        lat: 1.1914,
-        lng: 117.2145,
-        photo:
-            'https://images.unsplash.com/photo-1516937941344-00b4e0337589?auto=format&fit=crop&w=520&q=80',
-        notes: 'Perlu isolasi area sebelum aktivitas lanjut.',
-        date: now.subtract(const Duration(days: 12)),
-        pelapor: 'Dedi Kurniawan',
-        pja: 'Agus Pratama',
-        kategori: 'Kondisi Tidak Aman (KTA)',
-      ),
-      MapHazardItem(
-        id: 105,
-        title: 'Debu tinggi di crusher',
-        area: 'Crusher Area',
-        level: 'Sedang',
-        color: '#f97316',
-        status: 'On Progress',
-        statusColor: '#f59e0b',
-        lat: 1.2071,
-        lng: 117.2462,
-        photo:
-            'https://images.unsplash.com/photo-1518709268805-4e9042af2176?auto=format&fit=crop&w=520&q=80',
-        notes: 'Cek water spray dan penggunaan respirator.',
-        date: now.subtract(const Duration(days: 18)),
-        pelapor: 'Siti Rahma',
-        pja: 'Bambang Irawan',
-        kategori: 'Tindakan Tidak Aman (TTA)',
-      ),
-      MapHazardItem(
-        id: 106,
-        title: 'Genangan dekat panel listrik',
-        area: 'Fuel Station',
-        level: 'Kritis',
-        color: '#dc2626',
-        status: 'Open',
-        statusColor: '#ef4444',
-        lat: 1.2232,
-        lng: 117.2268,
-        photo:
-            'https://images.unsplash.com/photo-1581094480465-4e6c25fb4a52?auto=format&fit=crop&w=520&q=80',
-        notes: 'Amankan panel dan lakukan draining area.',
-        date: now.subtract(const Duration(days: 22)),
-        pelapor: 'Eko Prasetyo',
-        pja: 'Rudi Hartono',
-        kategori: 'Kondisi Tidak Aman (KTA)',
-      ),
-    ];
+    _unclosedHazards = [];
 
     _hazardMapCtrl
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
@@ -612,14 +1484,14 @@ class _DashboardPageState extends State<DashboardPage> {
             final id = data['id'] is int
                 ? data['id'] as int
                 : int.tryParse(data['id']?.toString() ?? '0') ?? 0;
-            final hazard = _unclosedHazards.firstWhere(
-              (h) => h.id == id,
-              orElse: () => _unclosedHazards.first,
-            );
-            if (action == 'detail') {
-              _showHazardDetailModal(context, hazard);
-            } else if (action == 'close') {
-              _showHazardCloseModal(context, hazard);
+            final matches = _unclosedHazards.where((h) => h.id == id);
+            if (matches.isNotEmpty) {
+              final hazard = matches.first;
+              if (action == 'detail') {
+                _showHazardDetailModal(context, hazard);
+              } else if (action == 'close') {
+                _showHazardCloseModal(context, hazard);
+              }
             }
           } catch (e) {
             debugPrint('Error on dashboard hazard bridge: $e');
@@ -659,9 +1531,11 @@ class _DashboardPageState extends State<DashboardPage> {
 
   Future<void> _fetchHazardPointsFromApi([Position? pos]) async {
     try {
+      // Ambil hazard aktif 1 periode berjalan (30 hari), hanya yang belum closed, dibatasi 80 titik teratas agar sangat ringan
       final res = await _api.getSafeMapHazardPoints(
         days: 30,
         onlyOpen: true,
+        limit: 80,
         lat: pos?.latitude ?? _lastUserPosition?.latitude,
         lon: pos?.longitude ?? _lastUserPosition?.longitude,
       );
@@ -669,9 +1543,18 @@ class _DashboardPageState extends State<DashboardPage> {
       res.fold(
         (err) => debugPrint('Fetch safe map error: $err'),
         (points) {
-          if (points.isNotEmpty && mounted) {
+          if (mounted) {
             final now = DateTime.now();
-            final items = points.map((p) {
+            final items = <MapHazardItem>[];
+
+            for (final p in points) {
+              final statusStr = p['status']?.toString() ?? 'Open';
+              final statusLower = statusStr.toLowerCase();
+              // Pastikan hanya hazard yang belum closed saja
+              if (statusLower == 'closed' || statusLower == 'selesai' || statusLower == 'tutup') {
+                continue;
+              }
+
               final level = p['resiko']?.toString() ??
                   p['tingkatResiko']?.toString() ??
                   'Sedang';
@@ -685,12 +1568,14 @@ class _DashboardPageState extends State<DashboardPage> {
 
               DateTime tgl = now;
               try {
-                if (p['tanggal'] != null) {
+                if (p['tanggalIso'] != null) {
+                  tgl = DateTime.tryParse(p['tanggalIso'].toString()) ?? now;
+                } else if (p['tanggal'] != null) {
                   tgl = DateTime.tryParse(p['tanggal'].toString()) ?? now;
                 }
               } catch (_) {}
 
-              return MapHazardItem(
+              items.add(MapHazardItem(
                 id: int.tryParse(p['id']?.toString() ?? '0') ?? 0,
                 title: p['detail']?.toString() ??
                     p['temuan']?.toString() ??
@@ -698,7 +1583,7 @@ class _DashboardPageState extends State<DashboardPage> {
                 area: p['area']?.toString() ?? 'Area Operasional',
                 level: level,
                 color: color,
-                status: p['status']?.toString() ?? 'Open',
+                status: statusStr,
                 statusColor: '#ef4444',
                 lat: double.tryParse(p['lat']?.toString() ?? '0') ?? 0.0,
                 lng: double.tryParse(p['lon']?.toString() ??
@@ -722,8 +1607,8 @@ class _DashboardPageState extends State<DashboardPage> {
                 pja: p['pja']?.toString() ?? 'Foreman Area',
                 kategori: p['kategoriBahaya']?.toString() ??
                     'Kondisi Tidak Aman (KTA)',
-              );
-            }).toList();
+              ));
+            }
 
             setState(() {
               _unclosedHazards = items;
@@ -758,7 +1643,7 @@ class _DashboardPageState extends State<DashboardPage> {
       _positionStreamSub = Geolocator.getPositionStream(
         locationSettings: const LocationSettings(
           accuracy: LocationAccuracy.high,
-          distanceFilter: 2,
+          distanceFilter: 1,
         ),
       ).listen((pos) {
         _onUserPositionUpdated(pos);
@@ -823,9 +1708,14 @@ class _DashboardPageState extends State<DashboardPage> {
     setState(() {
       _hazardMapMode = mode;
     });
+    PreferenceService.setHazardMapMode(mode); // Simpan permanen ke lokal
     _hazardMapCtrl.runJavaScript(
       "if(window.setMapMode) window.setMapMode('$mode');",
     );
+    if (mode == 'off') {
+      _nearbyAlertHazard = null;
+      _nearbyDistance = 0;
+    }
   }
 
   void _reloadMap() {
@@ -1177,14 +2067,12 @@ class _DashboardPageState extends State<DashboardPage> {
                               setModalState(() => isSaving = true);
 
                               try {
-                                if (hazard.id != 999) {
-                                  await _api.closeHazardDirect(
-                                    hazard.id,
-                                    text,
-                                    closeMode: closeMode,
-                                    fotoPerbaikan: fotoPerbaikan,
-                                  );
-                                }
+                                await _api.closeHazardDirect(
+                                  hazard.id,
+                                  text,
+                                  closeMode: closeMode,
+                                  fotoPerbaikan: fotoPerbaikan,
+                                );
                               } catch (e) {
                                 debugPrint('Closing api error: $e');
                               }
@@ -1640,10 +2528,26 @@ class _DashboardPageState extends State<DashboardPage> {
 
   Future<void> _fetchNotifCount() async {
     try {
+      int count = 0;
       final counts = await _api.getNotificationCounts();
+      count = counts['total'] ?? counts['unread'] ?? 0;
+
+      // Juga periksa apakah ada action_plans lokal di SQLite yang mengarah ke user
+      try {
+        final db = DatabaseService();
+        final localPlans = await db.rawQuery(
+            '''select count(*) as cnt from action_plans 
+               where deleted_at is null and ((pja_id=${_profile?.id} and status<1) or (pic_id=${_profile?.id} and status<2))''');
+        if (localPlans.isNotEmpty && localPlans.first['cnt'] != null) {
+          final localCnt = (localPlans.first['cnt'] as num).toInt();
+          count = count > localCnt ? count : localCnt;
+        }
+      } catch (_) {}
+
+      await PreferenceService.setNotif(count);
       if (mounted) {
         setState(() {
-          _notifCount = counts['total'] ?? counts['unread'] ?? PreferenceService.getNotif();
+          _notifCount = count;
         });
       }
     } catch (_) {}
@@ -1897,7 +2801,9 @@ class _DashboardPageState extends State<DashboardPage> {
           HapticFeedback.selectionClick();
           Navigator.push(
             context,
-            MaterialPageRoute(builder: (_) => const SafetyUpdatesPage()),
+            MaterialPageRoute(
+              builder: (_) => SafetyUpdatesPage(selectedIncident: banner),
+            ),
           );
         },
         child: Stack(
@@ -2349,7 +3255,7 @@ class _DashboardPageState extends State<DashboardPage> {
                             Row(
                               children: [
                                 const Text(
-                                  'Heatmap Lokasi Bahaya',
+                                  'Safe Map',
                                   style: TextStyle(
                                     fontSize: 15.5,
                                     fontWeight: FontWeight.w700,
@@ -2367,7 +3273,7 @@ class _DashboardPageState extends State<DashboardPage> {
                                         color: const Color(0xFFBFDBFE)),
                                   ),
                                   child: Text(
-                                    '${_unclosedHazards.length} Titik',
+                                    '${_unclosedHazards.length} Radar Aktif',
                                     style: const TextStyle(
                                       fontSize: 10.5,
                                       fontWeight: FontWeight.bold,
@@ -2379,7 +3285,7 @@ class _DashboardPageState extends State<DashboardPage> {
                             ),
                             const SizedBox(height: 2),
                             Text(
-                              'Hazard belum close (30 hari terakhir)',
+                              'Peta sebaran & navigasi temuan bahaya aktif',
                               style: TextStyle(
                                   fontSize: 11, color: Colors.grey.shade600),
                             ),
@@ -2411,7 +3317,7 @@ class _DashboardPageState extends State<DashboardPage> {
                   ClipRRect(
                     borderRadius: BorderRadius.circular(20),
                     child: Container(
-                      height: 320,
+                      height: 425,
                       decoration: BoxDecoration(
                         border: Border.all(color: Colors.grey.shade200),
                         borderRadius: BorderRadius.circular(20),
@@ -2426,6 +3332,43 @@ class _DashboardPageState extends State<DashboardPage> {
                                   () => EagerGestureRecognizer(),
                                 ),
                               },
+                            ),
+                          ),
+                          // Tombol Cepat Masuk Mode Hazard Hunter
+                          Positioned(
+                            top: 12,
+                            left: 12,
+                            child: Material(
+                              color: const Color(0xFF0F172A).withOpacity(0.88),
+                              elevation: 4,
+                              borderRadius: BorderRadius.circular(20),
+                              child: InkWell(
+                                onTap: () => _openFullscreenHazardHunter(context),
+                                borderRadius: BorderRadius.circular(20),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(20),
+                                    border: Border.all(color: const Color(0xFF38BDF8), width: 1.2),
+                                  ),
+                                  child: const Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(Icons.radar_rounded, color: Color(0xFF38BDF8), size: 14),
+                                      SizedBox(width: 5),
+                                      Text(
+                                        'SAFE MAPS',
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.w900,
+                                          fontSize: 10,
+                                          letterSpacing: 0.5,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
                             ),
                           ),
                           // Tombol Kontrol Peta Rapi (Fullscreen + Lokasi Saya)
@@ -2451,24 +3394,22 @@ class _DashboardPageState extends State<DashboardPage> {
                                               userPosition: _lastUserPosition,
                                             ),
                                             initialMode: _hazardMapMode,
+                                            unclosedHazards: _unclosedHazards,
+                                            initialUserPosition: _lastUserPosition,
                                             onModeChanged: (mode) {
                                               _setMapMode(mode);
                                             },
                                             onCloseHazard: (modalCtx, id) {
-                                              final h = _unclosedHazards.firstWhere(
-                                                (item) => item.id == id,
-                                                orElse: () =>
-                                                    _unclosedHazards.first,
-                                              );
-                                              _showHazardCloseModal(modalCtx, h);
+                                              final matches = _unclosedHazards.where((item) => item.id == id);
+                                              if (matches.isNotEmpty) {
+                                                _showHazardCloseModal(modalCtx, matches.first);
+                                              }
                                             },
                                             onShowDetail: (modalCtx, id) {
-                                              final h = _unclosedHazards.firstWhere(
-                                                (item) => item.id == id,
-                                                orElse: () =>
-                                                    _unclosedHazards.first,
-                                              );
-                                              _showHazardDetailModal(modalCtx, h);
+                                              final matches = _unclosedHazards.where((item) => item.id == id);
+                                              if (matches.isNotEmpty) {
+                                                _showHazardDetailModal(modalCtx, matches.first);
+                                              }
                                             },
                                           ),
                                         ),
@@ -2519,7 +3460,7 @@ class _DashboardPageState extends State<DashboardPage> {
                 ],
               ),
             ),
-            const SizedBox(height: 75),
+            const SizedBox(height: 12),
           ],
         ),
       ),
@@ -2712,6 +3653,64 @@ class _DashboardPageState extends State<DashboardPage> {
           0% { transform: scale(.65); opacity: 1; }
           100% { transform: scale(1.7); opacity: 0; }
         }
+        
+        .cluster-center-beacon {
+          width: 32px;
+          height: 32px;
+          border-radius: 50%;
+          background: #0f172a;
+          border: 2.5px solid #38bdf8;
+          box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          position: relative;
+          cursor: pointer;
+          transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        .cluster-center-beacon:hover, .cluster-center-beacon:active {
+          transform: scale(1.15);
+        }
+        .cluster-center-beacon .cluster-num {
+          font-size: 13px;
+          font-weight: 900;
+          color: #ffffff;
+          line-height: 1;
+        }
+        .cluster-center-beacon.is-expanded {
+          background: #1e293b;
+          border-color: #f43f5e !important;
+          box-shadow: 0 0 14px rgba(244, 63, 94, 0.85);
+        }
+        .cluster-ping {
+          position: absolute;
+          inset: -4px;
+          border-radius: 50%;
+          border: 2px solid #38bdf8;
+          animation: clusterPulse 2s cubic-bezier(0, 0, 0.2, 1) infinite;
+          opacity: 0.75;
+          pointer-events: none;
+        }
+        @keyframes clusterPulse {
+          70%, 100% {
+            transform: scale(1.7);
+            opacity: 0;
+          }
+        }
+        .pin-cluster-subtag {
+          position: absolute;
+          top: -5px;
+          right: -5px;
+          background: #0f172a;
+          color: #fff;
+          border: 1.5px solid #ffffff;
+          font-size: 8.5px;
+          font-weight: 900;
+          padding: 1px 3.5px;
+          border-radius: 8px;
+          line-height: 1;
+          box-shadow: 0 2px 5px rgba(0,0,0,0.5);
+        }
         .hazard-pin-wrap {
           position: relative;
           width: 32px;
@@ -2760,9 +3759,20 @@ class _DashboardPageState extends State<DashboardPage> {
     <body>
       <div id="map"></div>
       <script>
-        // Mode Satelit langsung, tanpa attribution
-        const satellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-          maxZoom: 19,
+        // Google Hybrid Satellite (resolusi tinggi, stabil di area tambang Kalimantan, tidak ada tile error)
+        const googleSat = L.tileLayer('https://mt{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
+          subdomains: ['0', '1', '2', '3'],
+          maxZoom: 20,
+          maxNativeZoom: 19,
+          keepBuffer: 6,
+          updateWhenIdle: false,
+          attribution: ''
+        });
+
+        // Fallback ESRI Satelit dengan batas maxNativeZoom 16 agar tidak pernah menampilkan "Map data not yet available"
+        const esriSat = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+          maxZoom: 20,
+          maxNativeZoom: 16,
           keepBuffer: 4,
           updateWhenIdle: false,
           attribution: ''
@@ -2775,9 +3785,11 @@ class _DashboardPageState extends State<DashboardPage> {
 
         // Inisialisasi map langsung ke lokasi pengguna jika tersedia agar area sekitarnya langsung terlihat
         const map = L.map('map', {
-          center: hasUserPos ? [initialUserLat, initialUserLng] : [1.2057, 117.2247],
-          zoom: hasUserPos ? 17 : 13,
-          layers: [satellite],
+          center: hasUserPos ? [initialUserLat, initialUserLng] : [1.0564, 117.7265],
+          zoom: hasUserPos ? 16 : 13.5,
+          maxZoom: 19,
+          minZoom: 10,
+          layers: [googleSat],
           preferCanvas: true,
           zoomControl: false,
           attributionControl: false,
@@ -2795,6 +3807,12 @@ class _DashboardPageState extends State<DashboardPage> {
           zoomSnap: .5,
           zoomDelta: .5,
           wheelPxPerZoomLevel: 90
+        });
+
+        googleSat.on('tileerror', function() {
+          if (!map.hasLayer(esriSat)) {
+            map.addLayer(esriSat);
+          }
         });
 
         if (map.attributionControl) {
@@ -2838,19 +3856,19 @@ class _DashboardPageState extends State<DashboardPage> {
         let userAccuracyCircle = null;
         let userCoordinates = hasUserPos ? [initialUserLat, initialUserLng] : null;
 
-        function renderUserMarker(lat, lng, accuracy, autoFly) {
+        function renderUserMarker(lat, lng, accuracy, autoFly, heading) {
           userCoordinates = [lat, lng];
           if (userMarker) map.removeLayer(userMarker);
           if (userAccuracyCircle) map.removeLayer(userAccuracyCircle);
 
           const userIcon = L.divIcon({
             className: '',
-            html: '<div class="user-location-arrow"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 4.5 20.29l.71.71L12 18l6.79 3 .71-.71L12 2z"/></svg></div>',
+            html: '<div class="user-location-arrow"><svg id="user-heading-arrow" style="transform:rotate(' + (heading || 18) + 'deg); transition: transform 0.3s ease-out;" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 4.5 20.29l.71.71L12 18l6.79 3 .71-.71L12 2z"/></svg></div>',
             iconSize: [38, 38],
             iconAnchor: [19, 19]
           });
           userAccuracyCircle = L.circle(userCoordinates, {
-            radius: Math.max(accuracy || 10, 10),
+            radius: Math.min(Math.max(accuracy || 10, 6), 15),
             color: '#2563eb',
             weight: 1,
             fillColor: '#60a5fa',
@@ -2870,7 +3888,7 @@ class _DashboardPageState extends State<DashboardPage> {
           `);
 
           if (autoFly) {
-            map.setView(userCoordinates, 17);
+            map.setView(userCoordinates, 16);
           }
         }
 
@@ -2878,51 +3896,78 @@ class _DashboardPageState extends State<DashboardPage> {
           renderUserMarker(initialUserLat, initialUserLng, initialAccuracy, true);
         }
 
-        window.setUserLocation = function(lat, lng, accuracy) {
-          renderUserMarker(lat, lng, accuracy, true);
+        window.setUserLocation = function(lat, lng, accuracy, heading) {
+          renderUserMarker(lat, lng, accuracy, true, heading);
+        };
+
+        
+        let targetGuideLine = null;
+
+        window.updateGuideLine = function(uLat, uLng, tLat, tLng, color) {
+          if (targetGuideLine) {
+            map.removeLayer(targetGuideLine);
+            targetGuideLine = null;
+          }
+          if (!uLat || !uLng || !tLat || !tLng) return;
+
+          // Garis laser navigasi tunggal (elegan dan tidak menumpuk panah kedua di user marker)
+          targetGuideLine = L.polyline([[uLat, uLng], [tLat, tLng]], {
+            color: color || '#38bdf8',
+            weight: 4,
+            opacity: 0.9,
+            dashArray: '10, 10',
+            lineCap: 'round'
+          }).addTo(map);
+        };
+
+        window.clearGuideLine = function() {
+          if (targetGuideLine) { map.removeLayer(targetGuideLine); targetGuideLine = null; }
         };
 
         window.locateMe = function() {
           if (userCoordinates) {
-            map.flyTo(userCoordinates, 17, { animate: true, duration: .55 });
+            map.flyTo(userCoordinates, 16.5, { animate: true, duration: .55 });
             if (userMarker) setTimeout(() => userMarker.openPopup(), 600);
           }
         };
 
-        hazardPoints.forEach((point) => {
-          // Area temuan bahaya dibuat 20 meter (sesuai spesifikasi)
-          L.circle([point.lat, point.lng], {
-            radius: 20,
-            color: point.color,
-            weight: 1.5,
-            fillColor: point.color,
-            fillOpacity: 0.35
-          }).addTo(heatLayer);
+        // Spiderfy & Proximity Grouping Engine (Anti-Pin Bertumpuk)
+        const clusters = [];
+        hazardPoints.forEach((point, index) => {
+          point._origIndex = index;
+          let added = false;
+          for (const c of clusters) {
+            const dLat = (c.centerLat - point.lat);
+            const dLng = (c.centerLng - point.lng);
+            const distDeg = Math.sqrt(dLat * dLat + dLng * dLng);
+            if (distDeg < 0.00018) { // Radius tumpukan ~18-20 meter
+              c.points.push(point);
+              added = true;
+              break;
+            }
+          }
+          if (!added) {
+            clusters.push({
+              centerLat: point.lat,
+              centerLng: point.lng,
+              points: [point]
+            });
+          }
+        });
 
-          // Titik Hazard Pin yang Jelas & Terlihat
-          const pinIcon = L.divIcon({
-            className: '',
-            html: `
-              <div class="hazard-pin-wrap">
-                <div class="hazard-ping" style="background:\${point.color}"></div>
-                <div class="hazard-pin-badge" style="background:\${point.color}">
-                  <span>!</span>
-                </div>
-              </div>
-            `,
-            iconSize: [30, 30],
-            iconAnchor: [15, 30],
-            popupAnchor: [0, -30]
-          });
+        const allMarkersMap = {};
 
-          const marker = L.marker([point.lat, point.lng], {
-            icon: pinIcon,
-            zIndexOffset: 300
-          }).addTo(markerLayer);
-
-          marker.bindPopup(`
+        function getHazardPopupHtml(point, isStacked, idx, N, clusterPoints) {
+          const nextPoint = isStacked && clusterPoints ? clusterPoints[(idx + 1) % N] : null;
+          return `
             <div class="hazard-popup">
               <img src="\${point.photo}" onerror="this.style.display='none'" />
+              \${isStacked ? `
+                <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:6px;padding:3px 7px;font-size:10px;font-weight:700;color:#1d4ed8;margin-bottom:6px;display:flex;align-items:center;justify-content:space-between">
+                  <span>📍 Titik Bersama</span>
+                  <span>Temuan \${idx + 1} dari \${N}</span>
+                </div>
+              ` : ''}
               <div style="display:flex;gap:4px;margin-bottom:6px">
                 <span class="badge" style="background:\${point.color}">\${point.level}</span>
                 <span class="badge" style="background:\${point.statusColor}">\${point.status}</span>
@@ -2937,13 +3982,224 @@ class _DashboardPageState extends State<DashboardPage> {
               <button class="btn-action-close" onclick="if(window.HazardBridge) window.HazardBridge.postMessage(JSON.stringify({action:'close',id:\${point.id}}))">
                 ⚡ Closing Hazard
               </button>
+              \${isStacked && nextPoint ? `
+                <button style="width:100%;padding:6px 0;background:#0f172a;color:#38bdf8;border:1px solid #0284c7;border-radius:8px;font-size:11px;font-weight:800;cursor:pointer;margin-top:5px" onclick="window.focusNextHazard(\${nextPoint.id})">
+                  🔄 Temuan Lain di Titik Ini (\${((idx + 1) % N) + 1}/\${N}) ➡
+                </button>
+              ` : ''}
             </div>
-          `, {
-            maxWidth: 220,
-            autoPan: true,
-            autoPanPaddingTopLeft: [18, 90],
-            autoPanPaddingBottomRight: [18, 28]
+          `;
+        }
+
+        window.focusNextHazard = function(targetId) {
+          const cluster = clusters.find(c => c.points && c.points.some(p => p.id === targetId));
+          if (cluster && cluster.points.length > 1 && !cluster.isExpanded && cluster.expand) {
+            cluster.expand();
+          }
+
+          setTimeout(() => {
+            if (allMarkersMap[targetId]) {
+              map.closePopup();
+              setTimeout(() => {
+                allMarkersMap[targetId].openPopup();
+                if (window.HazardBridge) {
+                  window.HazardBridge.postMessage(JSON.stringify({ action: 'select', id: targetId }));
+                }
+              }, 120);
+            }
+          }, 80);
+        };
+
+        // Tutup cluster saat pengguna klik di sembarang area peta
+        map.on('click', function(e) {
+          if (e.originalEvent && e.originalEvent._clusterHandled) return;
+          clusters.forEach(c => {
+            if (c.isExpanded && c.collapse) c.collapse();
           });
+        });
+
+        clusters.forEach((cluster) => {
+          const N = cluster.points.length;
+          const isStacked = N > 1;
+
+          // Warna tingkat risiko tertinggi dalam cluster
+          let topColor = cluster.points[0].color;
+          if (cluster.points.some(p => p.level === 'Kritis' || p.level === 'Tinggi')) {
+            topColor = '#ef4444';
+          } else if (cluster.points.some(p => p.level === 'Sedang')) {
+            topColor = '#f59e0b';
+          }
+
+          // Zona bahaya 50m di titik pusat cluster (sesuai perimeter take up)
+          L.circle([cluster.centerLat, cluster.centerLng], {
+            radius: 50,
+            color: topColor,
+            weight: 1.5,
+            fillColor: topColor,
+            fillOpacity: 0.22
+          }).addTo(heatLayer);
+
+          if (!isStacked) {
+            // Hazard tunggal (1 pin): langsung tampilkan pin normal
+            const point = cluster.points[0];
+            const showPing = point._origIndex < 15 && (point.level === 'Kritis' || point.level === 'Tinggi');
+            const pinIcon = L.divIcon({
+              className: '',
+              html: `
+                <div class="hazard-pin-wrap">
+                  \${showPing ? `<div class="hazard-ping" style="background:\${point.color}"></div>` : ''}
+                  <div class="hazard-pin-badge" style="background:\${point.color}">
+                    <span>!</span>
+                  </div>
+                </div>
+              `,
+              iconSize: [28, 28],
+              iconAnchor: [14, 28],
+              popupAnchor: [0, -28]
+            });
+
+            const marker = L.marker([point.lat, point.lng], {
+              icon: pinIcon,
+              zIndexOffset: 300
+            }).addTo(markerLayer);
+
+            allMarkersMap[point.id] = marker;
+
+            marker.on('click', function() {
+              if (window.HazardBridge) {
+                window.HazardBridge.postMessage(JSON.stringify({ action: 'select', id: point.id }));
+              }
+            });
+
+            marker.bindPopup(getHazardPopupHtml(point, false, 0, 1), {
+              maxWidth: 220,
+              autoPan: true,
+              autoPanPaddingTopLeft: [18, 90],
+              autoPanPaddingBottomRight: [18, 28]
+            });
+
+          } else {
+            // Hazard bertumpuk (>1 pin):
+            // Default: HANYA TAMPILKAN BEACON CLUSTER (ANGKA)
+            // Pin & garis kaki HANYA muncul jika beacon di-klik!
+            cluster.isExpanded = false;
+            cluster.elements = [];
+
+            const radiusDeg = 0.00015 + (N > 3 ? 0.00004 : 0);
+
+            function createBeaconHtml(isExpanded) {
+              return `
+                <div class="cluster-center-beacon \${isExpanded ? 'is-expanded' : ''}" style="border-color:\${isExpanded ? '#f43f5e' : topColor}">
+                  \${!isExpanded ? `<div class="cluster-ping" style="border-color:\${topColor}"></div>` : ''}
+                  <span class="cluster-num">\${isExpanded ? '✕' : N}</span>
+                </div>
+              `;
+            }
+
+            const centerIcon = L.divIcon({
+              className: '',
+              html: createBeaconHtml(false),
+              iconSize: [32, 32],
+              iconAnchor: [16, 16]
+            });
+
+            const clusterMarker = L.marker([cluster.centerLat, cluster.centerLng], {
+              icon: centerIcon,
+              zIndexOffset: 450
+            }).addTo(markerLayer);
+
+            cluster.collapse = function() {
+              if (!cluster.isExpanded) return;
+              cluster.isExpanded = false;
+              clusterMarker.setIcon(L.divIcon({
+                className: '',
+                html: createBeaconHtml(false),
+                iconSize: [32, 32],
+                iconAnchor: [16, 16]
+              }));
+              cluster.elements.forEach(el => markerLayer.removeLayer(el));
+              cluster.elements = [];
+            };
+
+            cluster.expand = function() {
+              if (cluster.isExpanded) return;
+              // Tutup cluster lain yang sedang terbuka
+              clusters.forEach(c => {
+                if (c !== cluster && c.isExpanded && c.collapse) c.collapse();
+              });
+
+              cluster.isExpanded = true;
+              clusterMarker.setIcon(L.divIcon({
+                className: '',
+                html: createBeaconHtml(true),
+                iconSize: [32, 32],
+                iconAnchor: [16, 16]
+              }));
+
+              // Render garis laba-laba dan pin
+              cluster.points.forEach((point, idx) => {
+                const angle = (2 * Math.PI * idx) / N - Math.PI / 2;
+                const mLat = cluster.centerLat + radiusDeg * Math.cos(angle);
+                const mLng = cluster.centerLng + (radiusDeg / Math.cos(cluster.centerLat * Math.PI / 180)) * Math.sin(angle);
+
+                // Garis kaki spider leg
+                const leg = L.polyline([[cluster.centerLat, cluster.centerLng], [mLat, mLng]], {
+                  color: point.color,
+                  weight: 2,
+                  opacity: 0.85,
+                  dashArray: '3, 4'
+                }).addTo(markerLayer);
+                cluster.elements.push(leg);
+
+                // Pin marker
+                const pinIcon = L.divIcon({
+                  className: '',
+                  html: `
+                    <div class="hazard-pin-wrap">
+                      <div class="hazard-pin-badge" style="background:\${point.color}">
+                        <span>!</span>
+                      </div>
+                      <span class="pin-cluster-subtag">\${idx + 1}/\${N}</span>
+                    </div>
+                  `,
+                  iconSize: [28, 28],
+                  iconAnchor: [14, 28],
+                  popupAnchor: [0, -28]
+                });
+
+                const marker = L.marker([mLat, mLng], {
+                  icon: pinIcon,
+                  zIndexOffset: 550 + idx
+                }).addTo(markerLayer);
+
+                cluster.elements.push(marker);
+                allMarkersMap[point.id] = marker;
+
+                marker.on('click', function(ev) {
+                  if (ev && ev.originalEvent) ev.originalEvent._clusterHandled = true;
+                  if (window.HazardBridge) {
+                    window.HazardBridge.postMessage(JSON.stringify({ action: 'select', id: point.id }));
+                  }
+                });
+
+                marker.bindPopup(getHazardPopupHtml(point, true, idx, N, cluster.points), {
+                  maxWidth: 220,
+                  autoPan: true,
+                  autoPanPaddingTopLeft: [18, 90],
+                  autoPanPaddingBottomRight: [18, 28]
+                });
+              });
+            };
+
+            clusterMarker.on('click', function(ev) {
+              if (ev && ev.originalEvent) ev.originalEvent._clusterHandled = true;
+              if (cluster.isExpanded) {
+                cluster.collapse();
+              } else {
+                cluster.expand();
+              }
+            });
+          }
         });
 
         // Fit bounds HANYA jika posisi user belum tersedia

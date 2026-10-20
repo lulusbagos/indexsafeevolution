@@ -9,6 +9,7 @@ import '../services/api.dart';
 import '../services/preference.dart';
 import '../utils/globals.dart' as globals;
 import 'dashboard_page.dart';
+import 'hazard/hazard_create_page.dart';
 import 'hazard/hazard_form_page.dart';
 import 'profile_page.dart';
 import 'safety_updates_page.dart';
@@ -140,68 +141,81 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget bottomNavBar() {
+    final bottomInset = MediaQuery.of(context).padding.bottom;
+    final navHeight = 92.0 + (bottomInset > 0 ? bottomInset : 8.0);
+    final bgColor = Theme.of(context).bottomAppBarTheme.color ?? Colors.white;
+
     return SizedBox(
-      height: 122,
+      height: navHeight,
       child: Stack(
         clipBehavior: Clip.none,
         children: [
+          // Sculpted Concave Notched Background
           Positioned.fill(
-            top: 27,
-            child: Container(
-              decoration: BoxDecoration(
-                color:
-                    Theme.of(context).bottomAppBarTheme.color ?? Colors.white,
-                boxShadow: const [
-                  BoxShadow(
-                    color: Color(0x1A0F172A),
-                    blurRadius: 18,
-                    offset: Offset(0, -4),
-                  ),
-                ],
+            top: 18,
+            child: CustomPaint(
+              painter: NotchedNavBarPainter(
+                color: bgColor,
+                notchRadius: 37.0,
+                cornerRadius: 24.0,
               ),
               child: SafeArea(
                 top: false,
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: _bottomItem(
-                        index: 0,
-                        icon: Icons.home_rounded,
-                        label: 'Beranda',
+                bottom: true,
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 6),
+                  child: Row(
+                    children: [
+                      // 1. Beranda
+                      Expanded(
+                        child: _bottomItem(
+                          index: 0,
+                          activeIcon: Icons.home_rounded,
+                          inactiveIcon: Icons.home_outlined,
+                          label: 'Beranda',
+                        ),
                       ),
-                    ),
-                    Expanded(
-                      child: Transform.translate(
-                        offset: const Offset(-8, 0),
+
+                      // 2. Safety Updates
+                      Expanded(
                         child: _bottomItem(
                           index: 1,
-                          icon: Icons.health_and_safety_rounded,
+                          activeIcon: Icons.health_and_safety_rounded,
+                          inactiveIcon: Icons.health_and_safety_outlined,
                           label: 'Safety Updates',
                         ),
                       ),
-                    ),
-                    Expanded(
-                      child: Transform.translate(
-                        offset: const Offset(8, 0),
+
+                      // 3. Center Notch Spacer
+                      const SizedBox(width: 68),
+
+                      // 4. Scan
+                      Expanded(
                         child: _bottomItem(
                           index: 3,
-                          icon: Icons.qr_code_scanner_rounded,
+                          activeIcon: Icons.qr_code_scanner_rounded,
+                          inactiveIcon: Icons.qr_code_scanner_rounded,
                           label: 'Scan',
                         ),
                       ),
-                    ),
-                    Expanded(
-                      child: _bottomItem(
-                        index: 4,
-                        icon: Icons.person_rounded,
-                        label: 'Profil',
+
+                      // 5. Profil
+                      Expanded(
+                        child: _bottomItem(
+                          index: 4,
+                          activeIcon: Icons.person_rounded,
+                          inactiveIcon: Icons.person_outline_rounded,
+                          label: 'Profil',
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
           ),
+
+          // Center Quick Hazard Button nestled seamlessly into the Notch
           Positioned(
             top: 0,
             left: 0,
@@ -214,18 +228,39 @@ class _HomePageState extends State<HomePage> {
                   onTap: _openQuickHazard,
                   customBorder: const CircleBorder(),
                   child: Container(
-                    width: 70,
-                    height: 70,
-                    padding: const EdgeInsets.all(3),
+                    width: 62,
+                    height: 62,
+                    padding: const EdgeInsets.all(2.5),
                     decoration: BoxDecoration(
-                      color: Colors.white,
                       shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white, width: 3),
-                      boxShadow: const [
+                      gradient: const LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          Colors.white,
+                          Color(0xFFF8FAFC),
+                          Color(0xFFE2E8F0),
+                        ],
+                      ),
+                      border: Border.all(color: Colors.white, width: 2.5),
+                      boxShadow: [
+                        // Deep floating 3D ambient glow
                         BoxShadow(
-                          color: Color(0x401D4ED8),
-                          blurRadius: 16,
-                          offset: Offset(0, 7),
+                          color: const Color(0xFF0284C7).withValues(alpha: .44),
+                          blurRadius: 20,
+                          offset: const Offset(0, 8),
+                        ),
+                        // Directional drop shadow
+                        BoxShadow(
+                          color: const Color(0xFF0F172A).withValues(alpha: .18),
+                          blurRadius: 8,
+                          offset: const Offset(0, 3),
+                        ),
+                        // Top rim specular light (3D dome shine)
+                        BoxShadow(
+                          color: Colors.white.withValues(alpha: .9),
+                          blurRadius: 4,
+                          offset: const Offset(0, -2),
                         ),
                       ],
                     ),
@@ -245,13 +280,13 @@ class _HomePageState extends State<HomePage> {
 
   Widget _bottomItem({
     required int index,
-    required IconData icon,
+    required IconData activeIcon,
+    required IconData inactiveIcon,
     required String label,
   }) {
     final selected = _currentPage == index;
-    final color = selected
-        ? Theme.of(context).colorScheme.primary
-        : const Color(0xFF667085);
+    final primaryColor = Theme.of(context).colorScheme.primary;
+    final color = selected ? primaryColor : const Color(0xFF64748B);
 
     return InkWell(
       onTap: () {
@@ -261,25 +296,41 @@ class _HomePageState extends State<HomePage> {
           curve: Curves.easeOutCubic,
         );
       },
-      child: Padding(
-        padding: const EdgeInsets.only(top: 10),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 27, color: color),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: color,
-                fontSize: 10,
-                fontWeight: selected ? FontWeight.w800 : FontWeight.w500,
-              ),
+      splashColor: Colors.transparent,
+      highlightColor: Colors.transparent,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+            decoration: BoxDecoration(
+              color: selected
+                  ? primaryColor.withValues(alpha: 0.12)
+                  : Colors.transparent,
+              borderRadius: BorderRadius.circular(14),
             ),
-          ],
-        ),
+            child: Icon(
+              selected ? activeIcon : inactiveIcon,
+              size: 23,
+              color: color,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: color,
+              fontSize: 10,
+              fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
+              letterSpacing: -0.2,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -287,7 +338,138 @@ class _HomePageState extends State<HomePage> {
   void _openQuickHazard() {
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (context) => const HazardFormPage()),
+      MaterialPageRoute(builder: (context) => const HazardCreatePage()),
     );
+  }
+}
+
+/// Custom Sculpted Notched Navbar Painter with 3D Silhouette & Specular Rim Light
+class NotchedNavBarPainter extends CustomPainter {
+  final Color color;
+  final double notchRadius;
+  final double cornerRadius;
+
+  NotchedNavBarPainter({
+    required this.color,
+    this.notchRadius = 37.0,
+    this.cornerRadius = 24.0,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final w = size.width;
+    final h = size.height;
+    final cx = w / 2;
+    final path = Path();
+
+    // Start top-left
+    path.moveTo(0, cornerRadius);
+    path.quadraticBezierTo(0, 0, cornerRadius, 0);
+
+    // Straight line to start of notch
+    final notchStart = cx - notchRadius - 12;
+    final notchEnd = cx + notchRadius + 12;
+    path.lineTo(notchStart, 0);
+
+    // Smooth organic concave curve around the center FAB
+    path.cubicTo(
+      cx - notchRadius, 0,
+      cx - notchRadius + 4, notchRadius * 0.72,
+      cx, notchRadius * 0.72,
+    );
+    path.cubicTo(
+      cx + notchRadius - 4, notchRadius * 0.72,
+      cx + notchRadius, 0,
+      notchEnd, 0,
+    );
+
+    // Straight line to top-right
+    path.lineTo(w - cornerRadius, 0);
+    path.quadraticBezierTo(w, 0, w, cornerRadius);
+
+    // Bottom and left edges
+    path.lineTo(w, h);
+    path.lineTo(0, h);
+    path.close();
+
+    // 1. Multi-tier 3D Ambient & Directional Elevation Shadows
+    canvas.drawShadow(
+      path,
+      const Color(0xFF0F172A).withValues(alpha: 0.18),
+      18.0,
+      true,
+    );
+    canvas.drawShadow(
+      path,
+      const Color(0xFF0284C7).withValues(alpha: 0.12),
+      8.0,
+      true,
+    );
+
+    // 2. Base Fill with subtle 3D vertical depth gradient (crisp white to pearl slate)
+    final fillPaint = Paint()
+      ..shader = LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [
+          color,
+          color.withValues(alpha: 0.98),
+          const Color(0xFFF8FAFC),
+        ],
+        stops: const [0.0, 0.4, 1.0],
+      ).createShader(Rect.fromLTWH(0, 0, w, h));
+    canvas.drawPath(path, fillPaint);
+
+    // 3. 3D Bevel Rim Light (Specular Highlight on top contoured edge)
+    final topEdgePath = Path();
+    topEdgePath.moveTo(0, cornerRadius);
+    topEdgePath.quadraticBezierTo(0, 0, cornerRadius, 0);
+    topEdgePath.lineTo(notchStart, 0);
+    topEdgePath.cubicTo(
+      cx - notchRadius, 0,
+      cx - notchRadius + 4, notchRadius * 0.72,
+      cx, notchRadius * 0.72,
+    );
+    topEdgePath.cubicTo(
+      cx + notchRadius - 4, notchRadius * 0.72,
+      cx + notchRadius, 0,
+      notchEnd, 0,
+    );
+    topEdgePath.lineTo(w - cornerRadius, 0);
+    topEdgePath.quadraticBezierTo(w, 0, w, cornerRadius);
+
+    final rimPaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.3
+      ..shader = const LinearGradient(
+        colors: [
+          Color(0x22CBD5E1),
+          Color(0x6694A3B8),
+          Color(0xFF38BDF8), // Subtle cyan reflection near center socket
+          Color(0x6694A3B8),
+          Color(0x22CBD5E1),
+        ],
+        stops: [0.0, 0.3, 0.5, 0.7, 1.0],
+      ).createShader(Rect.fromLTWH(0, 0, w, 30));
+    canvas.drawPath(topEdgePath, rimPaint);
+
+    // 4. Subtle 3D Socket Occlusion Silhouette inside the Notch Scoop
+    final notchOcclusionPaint = Paint()
+      ..shader = RadialGradient(
+        center: const Alignment(0, -0.65),
+        radius: 0.45,
+        colors: [
+          const Color(0xFF0F172A).withValues(alpha: 0.08),
+          Colors.transparent,
+        ],
+      ).createShader(Rect.fromCircle(center: Offset(cx, notchRadius * 0.4), radius: notchRadius + 14));
+    canvas.drawPath(path, notchOcclusionPaint);
+  }
+
+  @override
+  bool shouldRepaint(covariant NotchedNavBarPainter oldDelegate) {
+    return oldDelegate.color != color ||
+        oldDelegate.notchRadius != notchRadius ||
+        oldDelegate.cornerRadius != cornerRadius;
   }
 }

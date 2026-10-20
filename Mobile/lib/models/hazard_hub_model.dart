@@ -1,24 +1,41 @@
 class HazardSummary {
   final int totalInput;
+  final int totalSummary;
   final int totalOpen;
   final int totalClosed;
   final int totalAssigned;
+  final int totalAction;
+  final int totalMonitoring;
+  final int totalSite;
   final int score;
 
   HazardSummary({
     this.totalInput = 0,
+    this.totalSummary = 0,
     this.totalOpen = 0,
     this.totalClosed = 0,
     this.totalAssigned = 0,
+    this.totalAction = 0,
+    this.totalMonitoring = 0,
+    this.totalSite = 0,
     this.score = 0,
   });
 
   factory HazardSummary.fromJson(Map<String, dynamic> json) {
+    final action = json['total_action'] ?? json['total_assigned'] ?? 0;
+    final monitoring = json['total_monitoring'] ?? json['total_open'] ?? 0;
+    final summary = json['total_summary'] ?? json['total_closed'] ?? 0;
+    final site = json['total_site'] ?? 0;
+
     return HazardSummary(
       totalInput: json['total_input'] ?? 0,
-      totalOpen: json['total_open'] ?? 0,
-      totalClosed: json['total_closed'] ?? 0,
-      totalAssigned: json['total_assigned'] ?? 0,
+      totalSummary: summary,
+      totalOpen: monitoring,
+      totalClosed: summary,
+      totalAssigned: action,
+      totalAction: action,
+      totalMonitoring: monitoring,
+      totalSite: site,
       score: json['score'] ?? 0,
     );
   }
@@ -50,9 +67,11 @@ class HazardReportItem {
   final String? createdAt;
   final bool isMyReport;
   final bool isAssignedToMe;
+  final bool canTakeUp;
   final bool canClose;
   final bool canReassign;
   final bool canDelete;
+  final bool isOfflinePending;
 
   HazardReportItem({
     required this.id,
@@ -80,9 +99,11 @@ class HazardReportItem {
     this.createdAt,
     this.isMyReport = false,
     this.isAssignedToMe = false,
+    this.canTakeUp = false,
     this.canClose = false,
     this.canReassign = false,
     this.canDelete = false,
+    this.isOfflinePending = false,
   });
 
   factory HazardReportItem.fromJson(Map<String, dynamic> json) {
@@ -112,9 +133,13 @@ class HazardReportItem {
       createdAt: json['created_at']?.toString(),
       isMyReport: json['is_my_report'] == true,
       isAssignedToMe: json['is_assigned_to_me'] == true,
+      canTakeUp: json['can_take_up'] == true ||
+          (json['is_assigned_to_me'] == true &&
+              (json['status_temuan']?.toString().toLowerCase() == 'open')),
       canClose: json['can_close'] == true,
       canReassign: json['can_reassign'] == true,
       canDelete: json['can_delete'] == true,
+      isOfflinePending: json['is_offline_pending'] == true,
     );
   }
 }

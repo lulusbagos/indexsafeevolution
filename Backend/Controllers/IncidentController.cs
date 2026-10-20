@@ -71,13 +71,24 @@ namespace Indexsafe.Api.Controllers
         // GET /api/incidents & GET /incidents
         [HttpGet("incidents")]
         public async Task<IActionResult> GetIncidents(
-            [FromQuery] int limit = 30,
+            [FromQuery] int limit = 50,
+            [FromQuery] int? days = null,
             [FromQuery] string? category = null,
             [FromQuery] string? search = null,
             [FromQuery] bool? is_banner = null,
             [FromQuery] bool? is_update = null)
         {
-            var query = _context.IncidentNewsList.Where(i => i.IsPublished);
+            // Hanya ambil berita asli: buang data import corrupt / placeholder ("System Import Excel", "SYSTEM", konten terlalu pendek)
+            var query = _context.IncidentNewsList.Where(i => i.IsPublished &&
+                                                             i.NikPembuat != "SYSTEM" &&
+                                                             !i.DibuatOleh.Contains("System Import Excel") &&
+                                                             i.Konten.Length >= 15);
+
+            if (days.HasValue && days.Value > 0)
+            {
+                var cutoff = DateTime.Now.AddDays(-days.Value);
+                query = query.Where(i => (i.TanggalKejadian ?? i.CreatedAt) >= cutoff);
+            }
 
             if (is_banner.HasValue)
             {
@@ -101,7 +112,8 @@ namespace Indexsafe.Api.Controllers
             }
 
             var incidents = await query
-                .OrderByDescending(i => i.TanggalKejadian ?? i.CreatedAt)
+                .OrderByDescending(i => (i.Kategori != null && i.Kategori.Contains("Banner")) || i.IsBanner)
+                .ThenByDescending(i => i.TanggalKejadian ?? i.CreatedAt)
                 .ThenByDescending(i => i.Id)
                 .Take(limit)
                 .ToListAsync();
@@ -114,9 +126,16 @@ namespace Indexsafe.Api.Controllers
         [HttpGet("incidents/banners")]
         public async Task<IActionResult> GetHomeBanners([FromQuery] int limit = 5)
         {
+            // Hanya ambil berita asli yang valid
+            var baseQuery = _context.IncidentNewsList
+                .Where(i => i.IsPublished &&
+                            i.NikPembuat != "SYSTEM" &&
+                            !i.DibuatOleh.Contains("System Import Excel") &&
+                            i.Konten.Length >= 15);
+
             // 1. Coba ambil yang explicitly is_banner = true
-            var banners = await _context.IncidentNewsList
-                .Where(i => i.IsPublished && i.IsBanner)
+            var banners = await baseQuery
+                .Where(i => i.IsBanner)
                 .OrderBy(i => i.BannerUrutan)
                 .ThenByDescending(i => i.TanggalKejadian ?? i.CreatedAt)
                 .Take(limit)
@@ -125,8 +144,7 @@ namespace Indexsafe.Api.Controllers
             // 2. Jika belum ada yang di-flag banner, fallback ke insiden terbaru yang memiliki foto
             if (banners.Count == 0)
             {
-                banners = await _context.IncidentNewsList
-                    .Where(i => i.IsPublished)
+                banners = await baseQuery
                     .OrderByDescending(i => i.TanggalKejadian ?? i.CreatedAt)
                     .Take(limit)
                     .ToListAsync();

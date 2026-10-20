@@ -151,8 +151,30 @@ namespace Indexsafe.Api.Controllers
             idDepartemen = karyawanMaster.IdDepartemen ?? idDepartemen;
             idJabatan = karyawanMaster.IdJabatan ?? idJabatan;
 
-            var personalMaster = await _context.Personals.FirstOrDefaultAsync(p => p.IdPersonal == karyawanMaster.IdPersonal);
-            if (personalMaster != null && !string.IsNullOrWhiteSpace(personalMaster.NamaLengkap))
+            // Ambil data posisi dan jabatan dari [ONE_DB_MITRA].[dbo].[vw_m_karyawan_aktif]
+            var karyawanAktif = await _context.MitraKaryawanAktifs
+                .FirstOrDefaultAsync(k => k.NoNik == nrp && k.StatusAktifEfektif);
+
+            int currentKaryawanId = karyawanAktif?.IdKaryawan ?? (karyawanMaster?.IdKaryawan ?? 0);
+
+            // GATING AKSES SAP: Karyawan wajib terdaftar di [DB_SAP].[dbo].[vw_r_karyawan_jabatan_mapping_preview]
+            var sapMapping = await _context.KaryawanJabatanMappings
+                .FirstOrDefaultAsync(m => m.KaryawanId == currentKaryawanId);
+
+            if (sapMapping == null && !string.Equals(nrp, "admin.owner", StringComparison.OrdinalIgnoreCase))
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, new
+                {
+                    message = $"Akun Anda ({nrp}) tidak memiliki akses ke Indexsafe Evolution karena belum terdaftar pada pemetaan jabatan SAP (vw_r_karyawan_jabatan_mapping_preview). Silakan hubungi admin SAP atau HSE."
+                });
+            }
+
+            var personalMaster = await _context.Personals.FirstOrDefaultAsync(p => p.IdPersonal == (karyawanAktif != null ? karyawanAktif.IdPersonal : karyawanMaster.IdPersonal));
+            if (!string.IsNullOrWhiteSpace(karyawanAktif?.NamaLengkap))
+            {
+                fullName = karyawanAktif.NamaLengkap;
+            }
+            else if (personalMaster != null && !string.IsNullOrWhiteSpace(personalMaster.NamaLengkap))
             {
                 fullName = personalMaster.NamaLengkap;
             }
@@ -163,11 +185,11 @@ namespace Indexsafe.Api.Controllers
             }
 
             // Resolve company name, department name, role
-            string companyName = "PT INDEXIM COALINDO";
-            string deptName = "General";
+            string companyName = karyawanAktif?.NamaPerusahaan ?? "PT INDEXIM COALINDO";
+            string deptName = karyawanAktif?.NamaDepartemen ?? "General";
             string mappedRole = "Operator";
 
-            if (idPerusahaan.HasValue)
+            if (idPerusahaan.HasValue && string.IsNullOrEmpty(karyawanAktif?.NamaPerusahaan))
             {
                 var p = await _context.Perusahaans.FirstOrDefaultAsync(x => x.PerusahaanId == idPerusahaan.Value);
                 if (p != null)
@@ -184,7 +206,7 @@ namespace Indexsafe.Api.Controllers
                 }
             }
 
-            if (idDepartemen.HasValue)
+            if (idDepartemen.HasValue && string.IsNullOrEmpty(karyawanAktif?.NamaDepartemen))
             {
                 var d = await _context.Departemens.FirstOrDefaultAsync(x => x.DepartemenId == idDepartemen.Value);
                 if (d != null) deptName = d.NamaDepartemen ?? deptName;
@@ -199,6 +221,15 @@ namespace Indexsafe.Api.Controllers
                     jobTitle = jab.NamaJabatan;
                 }
             }
+
+            // Posisi dan Jabatan dari [ONE_DB_MITRA].[dbo].[vw_m_karyawan_aktif]
+            string finalPosisi = !string.IsNullOrWhiteSpace(karyawanAktif?.NamaPosisi)
+                ? karyawanAktif.NamaPosisi
+                : jobTitle;
+
+            string finalJabatan = !string.IsNullOrWhiteSpace(karyawanAktif?.NamaJabatan)
+                ? karyawanAktif.NamaJabatan
+                : (sapMapping?.NamaJabatanStandar ?? sapMapping?.NamaJabatanExisting ?? finalPosisi);
 
             // Check role override from AppUser
             string role;
@@ -227,7 +258,7 @@ namespace Indexsafe.Api.Controllers
                     Perusahaan = companyName,
                     IdPerusahaan = idPerusahaan,
                     Role = role,
-                    KaryawanId = karyawanMaster?.IdKaryawan,
+                    KaryawanId = currentKaryawanId,
                     LastLogin = DateTime.Now
                 };
                 _context.AppUsers.Add(existingAppUser);
@@ -238,7 +269,7 @@ namespace Indexsafe.Api.Controllers
                 existingAppUser.Departemen = deptName;
                 existingAppUser.Perusahaan = companyName;
                 existingAppUser.IdPerusahaan = idPerusahaan;
-                existingAppUser.KaryawanId = karyawanMaster?.IdKaryawan;
+                existingAppUser.KaryawanId = currentKaryawanId;
                 if (string.IsNullOrEmpty(existingAppUser.Role))
                 {
                     existingAppUser.Role = role;
@@ -256,38 +287,42 @@ namespace Indexsafe.Api.Controllers
                 companyId: idPerusahaan ?? 1,
                 companyName: companyName,
                 department: deptName,
-                jobTitle: jobTitle,
-                employeeId: karyawanMaster?.IdKaryawan);
+                jobTitle: finalPosisi,
+                employeeId: currentKaryawanId);
 
             var response = new AuthResponse
             {
                 Token = token,
                 User = new UserDto
                 {
-                    Id = karyawanMaster?.IdKaryawan ?? 1,
+                    Id = currentKaryawanId,
                     Name = fullName,
                     Email = "IC" + nrp,
                     Role = role,
                     Company = companyName,
                     CompanyId = idPerusahaan ?? 1,
                     Department = deptName,
-                    JobTitle = jobTitle,
+                    JobTitle = finalPosisi,
+                    Posisi = finalPosisi,
+                    Jabatan = finalJabatan,
                     CreatedAt = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")
                 },
                 Profile = new UserProfileDto
                 {
-                    Id = karyawanMaster?.IdKaryawan ?? 1,
+                    Id = currentKaryawanId,
                     NoNik = nrp,
                     NamaLengkap = fullName,
                     NamaAlias = fullName.Split(' ').FirstOrDefault() ?? fullName,
                     Company = companyName,
                     CompanyId = idPerusahaan ?? 1,
-                    UserId = karyawanMaster?.IdKaryawan ?? 1,
+                    UserId = currentKaryawanId,
                     Depart = deptName,
                     Section = deptName,
-                    Posisi = jobTitle,
-                    Foto = overridePwd?.ProfilePicture,
-                    Role = role
+                    Posisi = finalPosisi,
+                    Jabatan = finalJabatan,
+                    Foto = overridePwd?.ProfilePicture ?? karyawanAktif?.PathFoto,
+                    Role = role,
+                    QrCode = await GetEmployeeQrCodeAsync(nrp)
                 }
             };
 
@@ -321,12 +356,26 @@ namespace Indexsafe.Api.Controllers
 
             var appUser = await _context.AppUsers.FindAsync(userNik);
             var karyawan = await _context.Karyawans.FirstOrDefaultAsync(k => k.NoNik == userNik && k.StatusAktif);
-            var personal = karyawan != null ? await _context.Personals.FirstOrDefaultAsync(p => p.IdPersonal == karyawan.IdPersonal) : null;
+            var karyawanAktif = await _context.MitraKaryawanAktifs.FirstOrDefaultAsync(k => k.NoNik == userNik && k.StatusAktifEfektif);
+            var personal = (karyawan != null || karyawanAktif != null)
+                ? await _context.Personals.FirstOrDefaultAsync(p => p.IdPersonal == (karyawanAktif != null ? karyawanAktif.IdPersonal : karyawan!.IdPersonal))
+                : null;
             var overridePwd = await _context.PasswordOverrides.FirstOrDefaultAsync(p => p.Nrp == userNik);
 
-            var targetMapping = karyawan != null
-                ? await _context.KaryawanJabatanMappings.FirstOrDefaultAsync(m => m.KaryawanId == karyawan.IdKaryawan)
+            int activeKaryawanId = karyawanAktif?.IdKaryawan ?? (karyawan?.IdKaryawan ?? 0);
+
+            // GATING AKSES SAP: Karyawan wajib terdaftar di [DB_SAP].[dbo].[vw_r_karyawan_jabatan_mapping_preview]
+            var targetMapping = activeKaryawanId > 0
+                ? await _context.KaryawanJabatanMappings.FirstOrDefaultAsync(m => m.KaryawanId == activeKaryawanId)
                 : null;
+
+            if (targetMapping == null && !string.Equals(userNik, "admin.owner", StringComparison.OrdinalIgnoreCase))
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, new
+                {
+                    message = $"Akun Anda ({userNik}) tidak dapat mengakses aplikasi karena belum terdaftar pada pemetaan jabatan SAP (vw_r_karyawan_jabatan_mapping_preview). Silakan hubungi admin SAP atau HSE."
+                });
+            }
 
             int targetHazardReport = targetMapping?.TargetHazardReport ?? 1;
             int targetInspeksi = targetMapping?.TargetInspeksi ?? 1;
@@ -576,19 +625,28 @@ namespace Indexsafe.Api.Controllers
                 // Fallback graceful
             }
 
+            string finalPosisi = !string.IsNullOrWhiteSpace(karyawanAktif?.NamaPosisi)
+                ? karyawanAktif.NamaPosisi
+                : (User.FindFirst("JobTitle")?.Value ?? "Staff");
+
+            string finalJabatan = !string.IsNullOrWhiteSpace(karyawanAktif?.NamaJabatan)
+                ? karyawanAktif.NamaJabatan
+                : (targetMapping?.NamaJabatanStandar ?? targetMapping?.NamaJabatanExisting ?? finalPosisi);
+
             var profile = new UserProfileDto
             {
-                Id = karyawan?.IdKaryawan ?? 1,
+                Id = activeKaryawanId > 0 ? activeKaryawanId : (karyawan?.IdKaryawan ?? 1),
                 NoNik = userNik,
-                NamaLengkap = personal?.NamaLengkap ?? appUser?.Nama ?? User.Identity?.Name ?? userNik,
-                NamaAlias = (personal?.NamaLengkap ?? appUser?.Nama ?? User.Identity?.Name ?? userNik).Split(' ').FirstOrDefault() ?? userNik,
-                Company = appUser?.Perusahaan ?? User.FindFirst("Company")?.Value ?? "PT INDEXIM COALINDO",
-                CompanyId = appUser?.IdPerusahaan ?? int.Parse(User.FindFirst("CompanyId")?.Value ?? "1"),
-                UserId = karyawan?.IdKaryawan ?? 1,
-                Depart = userDeptName,
-                Section = userDeptName,
-                Posisi = User.FindFirst("JobTitle")?.Value ?? "Staff",
-                Foto = overridePwd?.ProfilePicture,
+                NamaLengkap = karyawanAktif?.NamaLengkap ?? personal?.NamaLengkap ?? appUser?.Nama ?? User.Identity?.Name ?? userNik,
+                NamaAlias = (karyawanAktif?.NamaLengkap ?? personal?.NamaLengkap ?? appUser?.Nama ?? User.Identity?.Name ?? userNik).Split(' ').FirstOrDefault() ?? userNik,
+                Company = karyawanAktif?.NamaPerusahaan ?? appUser?.Perusahaan ?? User.FindFirst("Company")?.Value ?? "PT INDEXIM COALINDO",
+                CompanyId = karyawanAktif?.IdPerusahaan ?? appUser?.IdPerusahaan ?? int.Parse(User.FindFirst("CompanyId")?.Value ?? "1"),
+                UserId = activeKaryawanId > 0 ? activeKaryawanId : (karyawan?.IdKaryawan ?? 1),
+                Depart = karyawanAktif?.NamaDepartemen ?? userDeptName,
+                Section = karyawanAktif?.NamaDepartemen ?? userDeptName,
+                Posisi = finalPosisi,
+                Jabatan = finalJabatan,
+                Foto = overridePwd?.ProfilePicture ?? karyawanAktif?.PathFoto,
                 Role = appUser?.Role ?? User.FindFirst(ClaimTypes.Role)?.Value ?? "Operator",
                 Email = personal?.EmailPribadi ?? (appUser != null ? "IC" + userNik : "-"),
                 Phone = personal?.Hp1 ?? "-",
@@ -639,6 +697,7 @@ namespace Indexsafe.Api.Controllers
                 {
                     profile.HasPermit = permitData.HasPermit;
                     profile.PermitNomor = permitData.PermitNomor;
+                    profile.MasaAktifPermit = permitData.MasaAktifPermit ?? permitData.BerakhirKerja ?? permitData.LastExpired;
                     profile.PermitStatus = permitData.PermitStatus;
                     profile.IsPermitPrinted = permitData.IsPermitPrinted;
                     profile.RawPermitStatus = permitData.RawPermitStatus;
@@ -664,7 +723,53 @@ namespace Indexsafe.Api.Controllers
                 // Fallback graceful jika database BIMA tidak merespon
             }
 
+            // Ambil string QR kustom karyawan dari ONE_DB_MITRA
+            profile.QrCode = await GetEmployeeQrCodeAsync(userNik);
+
             return Ok(profile);
+        }
+
+        private async Task<string?> GetEmployeeQrCodeAsync(string? nik)
+        {
+            if (string.IsNullOrWhiteSpace(nik)) return null;
+            try
+            {
+                var conn = _context.Database.GetDbConnection();
+                bool wasClosed = conn.State == System.Data.ConnectionState.Closed;
+                if (wasClosed) await conn.OpenAsync();
+                try
+                {
+                    using var cmd = conn.CreateCommand();
+                    cmd.CommandText = @"
+                        SELECT TOP 1 
+                            CONCAT(tmp2.id, FORMAT(tmp.tanggal_lahir , 'yyyyMMdd'), FORMAT(ttk.date_of_hire , 'ddMMyyyy'), left(tmp.nama_lengkap, 3)) AS QR
+                        FROM [ONE_DB_MITRA].dbo.tbl_m_personal tmp 
+                        JOIN [ONE_DB_MITRA].dbo.tbl_t_karyawan ttk on tmp.id_personal = ttk.id_personal 
+                        JOIN [ONE_DB_MITRA].dbo.tbl_m_departemen tmd on ttk.id_departemen = tmd.id 
+                        JOIN [ONE_DB_MITRA].dbo.tbl_m_perusahaan tmp2 on tmp2.id = ttk.id_perusahaan   
+                        WHERE ttk.no_nik = @nik AND ttk.status_aktif = 1 AND tmp2.status_aktif = 1;
+                    ";
+                    var p = cmd.CreateParameter();
+                    p.ParameterName = "@nik";
+                    p.Value = nik.Trim();
+                    cmd.Parameters.Add(p);
+
+                    var val = await cmd.ExecuteScalarAsync();
+                    if (val != null && val != DBNull.Value)
+                    {
+                        return val.ToString();
+                    }
+                }
+                finally
+                {
+                    if (wasClosed) await conn.CloseAsync();
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[AuthController] Error querying QR from ONE_DB_MITRA for NIK {nik}: {ex.Message}");
+            }
+            return null;
         }
 
         [HttpGet("profile/permit-simper/{nik?}")]

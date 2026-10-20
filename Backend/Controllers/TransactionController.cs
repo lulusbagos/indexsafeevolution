@@ -324,7 +324,7 @@ namespace Indexsafe.Api.Controllers
                     {
                         _context.Notifications.Add(new Notification
                         {
-                            RecipientNik = nikPja,
+                            RecipientNik = nikPja.Trim(),
                             Title = "Penugasan Temuan Hazard",
                             Message = $"{userName} telah menetapkan Anda sebagai PJA untuk temuan hazard di {area} - {lokasi}.",
                             Url = $"/Hazard/Detail/{hazard.Id}",
@@ -889,7 +889,92 @@ namespace Indexsafe.Api.Controllers
                     .Take(limit);
 
                 var list = await query.ToListAsync();
-                return Ok(new { status = true, data = list });
+
+                var niks = list.SelectMany(h => new[] { h.Nik, h.NikPja })
+                    .Where(n => !string.IsNullOrEmpty(n))
+                    .Distinct()
+                    .ToList();
+
+                var empList = await (from k in _context.Karyawans.AsNoTracking()
+                                    join p in _context.Personals.AsNoTracking() on k.IdPersonal equals p.IdPersonal
+                                    where niks.Contains(k.NoNik)
+                                    select new { k.IdKaryawan, k.NoNik, p.NamaLengkap, k.StatusAktif })
+                                    .ToListAsync();
+
+                var empMap = empList
+                    .Where(x => !string.IsNullOrEmpty(x.NoNik))
+                    .GroupBy(x => x.NoNik)
+                    .ToDictionary(g => g.Key, g => g.OrderByDescending(x => x.StatusAktif).First());
+
+                var currentKaryawan = await _context.Karyawans.AsNoTracking().FirstOrDefaultAsync(k => k.NoNik == userNik);
+                int currentEmpId = currentKaryawan?.IdKaryawan ?? 0;
+
+                var mapped = list.Select(h =>
+                {
+                    int pjaId = (!string.IsNullOrEmpty(h.NikPja) && empMap.TryGetValue(h.NikPja, out var pInfo)) ? pInfo.IdKaryawan : (h.NikPja == userNik ? currentEmpId : 0);
+                    int empId = (!string.IsNullOrEmpty(h.Nik) && empMap.TryGetValue(h.Nik, out var eInfo)) ? eInfo.IdKaryawan : (h.Nik == userNik ? currentEmpId : 0);
+                    string pjaName = (!string.IsNullOrEmpty(h.NikPja) && empMap.TryGetValue(h.NikPja, out var pInfo2)) ? pInfo2.NamaLengkap : h.Pja ?? "";
+
+                    int statusCode = 0;
+                    if (string.Equals(h.StatusTemuan, "Closed", StringComparison.OrdinalIgnoreCase)) statusCode = 2;
+                    else if (string.Equals(h.StatusTemuan, "In Progress", StringComparison.OrdinalIgnoreCase)) statusCode = 1;
+
+                    return new
+                    {
+                        id = h.Id,
+                        code = $"HZ-{h.Id}",
+                        title = h.Temuan ?? "Laporan Bahaya",
+                        area_id = (int?)null,
+                        location_id = (int?)null,
+                        location_detail = h.DetilLokasi ?? h.Lokasi ?? h.Area ?? "",
+                        date = h.Tanggal.ToString("yyyy-MM-dd"),
+                        time = $"{h.Waktu.Hours:D2}:{h.Waktu.Minutes:D2}",
+                        hazard_id = (int?)null,
+                        hazard_type_id = (int?)null,
+                        hazard_subtype_id = (int?)null,
+                        hazard_danger_id = (int?)null,
+                        remark = h.Temuan,
+                        image = h.FotoTemuan,
+                        video = (string?)null,
+                        status = statusCode,
+                        repair = !string.IsNullOrEmpty(h.FotoPerbaikan) ? 1 : 0,
+                        repair_remark = h.Perbaikan,
+                        repair_image = h.FotoPerbaikan,
+                        repair_video = (string?)null,
+                        repair_date = (string?)null,
+                        repair_time = (string?)null,
+                        pja_id = pjaId,
+                        company_id = h.PerusahaanId,
+                        employee_id = empId,
+                        ref_id = (int?)null,
+                        sync_id = h.Id,
+                        created_at = h.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss"),
+                        updated_at = (string?)null,
+                        deleted_at = (string?)null,
+
+                        // SQLite join fields
+                        area_name = h.Area ?? "-",
+                        location_name = h.Lokasi ?? "-",
+                        pja_name = pjaName,
+
+                        // Web/DTO fields
+                        nik = h.Nik,
+                        nama = h.Nama,
+                        nik_pja = h.NikPja,
+                        pja = h.Pja,
+                        area = h.Area,
+                        lokasi = h.Lokasi,
+                        tingkat_resiko = h.TingkatResiko ?? "Rendah",
+                        kategori_bahaya = h.KategoriBahaya,
+                        jenis_bahaya = h.JenisBahaya,
+                        jenis_ketidaksesuaian = h.JenisKetidaksesuaian,
+                        status_temuan = h.StatusTemuan,
+                        foto_temuan = h.FotoTemuan,
+                        foto_perbaikan = h.FotoPerbaikan
+                    };
+                }).ToList();
+
+                return Ok(new { status = true, data = mapped });
             }
 
             if (targetName == "inspection")
@@ -1053,7 +1138,14 @@ namespace Indexsafe.Api.Controllers
             var status = form["status"].FirstOrDefault();
             if (!string.IsNullOrEmpty(status))
             {
-                plan.Status = status;
+                var normalizedStatus = status switch
+                {
+                    "2" => "Closed",
+                    "1" => "In Progress",
+                    "0" => "Open",
+                    _ => status
+                };
+                plan.Status = normalizedStatus;
 
                 // Sync status with parent Hazard report if linked
                 if (plan.ItemSap != null && plan.ItemSap.StartsWith("hazard:"))
@@ -1064,13 +1156,32 @@ namespace Indexsafe.Api.Controllers
                         var hazard = await _context.HazardReports.FirstOrDefaultAsync(h => h.Id == hId);
                         if (hazard != null)
                         {
-                            hazard.StatusTemuan = status;
+                            hazard.StatusTemuan = normalizedStatus;
                             if (!string.IsNullOrEmpty(plan.FotoPerbaikan))
+                            {
+                                hazard.FotoPerbaikan = plan.FotoPerbaikan;
+                            }
+                            if (!string.IsNullOrEmpty(plan.Perbaikan))
                             {
                                 hazard.Perbaikan = plan.Perbaikan;
                             }
                         }
                     }
+                }
+            }
+
+            // Sync PIC if pic_id or nik_pic was provided
+            var picIdStr = form["pic_id"].FirstOrDefault();
+            if (!string.IsNullOrEmpty(picIdStr) && int.TryParse(picIdStr, out var picIdInt) && picIdInt > 0)
+            {
+                var picKaryawan = await (from k in _context.Karyawans.AsNoTracking()
+                                         join p in _context.Personals.AsNoTracking() on k.IdPersonal equals p.IdPersonal
+                                         where k.IdKaryawan == picIdInt
+                                         select new { k.NoNik, p.NamaLengkap }).FirstOrDefaultAsync();
+                if (picKaryawan != null)
+                {
+                    plan.NikPic = picKaryawan.NoNik;
+                    plan.Pic = picKaryawan.NamaLengkap;
                 }
             }
 
@@ -1117,14 +1228,122 @@ namespace Indexsafe.Api.Controllers
             var companyId = GetCurrentCompanyId();
             var allowedCompanyIds = await _companyHierarchyService.GetAccessibleCompanyIdsAsync(companyId);
 
-            var plans = await _context.ActionPlans
+            var targetName = (name ?? string.Empty).ToLowerInvariant().Trim();
+
+            var query = _context.ActionPlans
                 .AsNoTracking()
-                .Where(a => !a.IsDeleted && (a.Nik == userNik || a.NikPic == userNik || a.NikPja == userNik || (a.PerusahaanId.HasValue && allowedCompanyIds.Contains(a.PerusahaanId.Value))))
+                .Where(a => !a.IsDeleted && (a.Nik == userNik || a.NikPic == userNik || a.NikPja == userNik));
+
+            if (targetName == "hazard")
+            {
+                query = query.Where(a => a.ItemSap == null || a.ItemSap == "hazard" || a.ItemSap.StartsWith("hazard:"));
+            }
+            else if (!string.IsNullOrEmpty(targetName) && targetName != "all")
+            {
+                query = query.Where(a => a.ItemSap != null && a.ItemSap.ToLower().StartsWith(targetName));
+            }
+
+            var plans = await query
                 .OrderByDescending(a => a.CreatedAt)
                 .Take(limit)
                 .ToListAsync();
 
-            return Ok(new { status = true, data = plans });
+            var niks = plans.SelectMany(p => new[] { p.Nik, p.NikPja, p.NikPic })
+                .Where(n => !string.IsNullOrEmpty(n))
+                .Distinct()
+                .ToList();
+
+            var empList = await (from k in _context.Karyawans.AsNoTracking()
+                                join p in _context.Personals.AsNoTracking() on k.IdPersonal equals p.IdPersonal
+                                where niks.Contains(k.NoNik)
+                                select new { k.IdKaryawan, k.NoNik, p.NamaLengkap, k.StatusAktif })
+                                .ToListAsync();
+
+            var empMap = empList
+                .Where(x => !string.IsNullOrEmpty(x.NoNik))
+                .GroupBy(x => x.NoNik)
+                .ToDictionary(g => g.Key, g => g.OrderByDescending(x => x.StatusAktif).First());
+
+            var currentKaryawan = await _context.Karyawans.AsNoTracking().FirstOrDefaultAsync(k => k.NoNik == userNik);
+            int currentEmpId = currentKaryawan?.IdKaryawan ?? 0;
+
+            var mappedData = plans.Select(a =>
+            {
+                int pjaId = (!string.IsNullOrEmpty(a.NikPja) && empMap.TryGetValue(a.NikPja, out var pInfo)) ? pInfo.IdKaryawan : (a.NikPja == userNik ? currentEmpId : 0);
+                int picId = (!string.IsNullOrEmpty(a.NikPic) && empMap.TryGetValue(a.NikPic, out var cInfo)) ? cInfo.IdKaryawan : (a.NikPic == userNik ? currentEmpId : 0);
+                int empId = (!string.IsNullOrEmpty(a.Nik) && empMap.TryGetValue(a.Nik, out var eInfo)) ? eInfo.IdKaryawan : (a.Nik == userNik ? currentEmpId : 0);
+
+                string pjaName = (!string.IsNullOrEmpty(a.NikPja) && empMap.TryGetValue(a.NikPja, out var pInfo2)) ? pInfo2.NamaLengkap : a.Pja ?? "";
+                string picName = (!string.IsNullOrEmpty(a.NikPic) && empMap.TryGetValue(a.NikPic, out var cInfo2)) ? cInfo2.NamaLengkap : a.Pic ?? "";
+
+                int statusCode = 0;
+                if (string.Equals(a.Status, "Closed", StringComparison.OrdinalIgnoreCase) || a.Status == "2") statusCode = 2;
+                else if (string.Equals(a.Status, "In Progress", StringComparison.OrdinalIgnoreCase) || a.Status == "1") statusCode = 1;
+                else statusCode = 0;
+
+                int tranId = 0;
+                if (a.ItemSap != null && a.ItemSap.StartsWith("hazard:"))
+                {
+                    int.TryParse(a.ItemSap["hazard:".Length..], out tranId);
+                }
+
+                return new
+                {
+                    id = a.Id,
+                    code = $"AP-{a.Id}",
+                    title = a.DetilTemuan ?? a.KategoriTemuan ?? "Hazard Action",
+                    area_id = (int?)null,
+                    location_id = (int?)null,
+                    location_detail = a.DetilLokasi ?? a.Lokasi ?? a.Area ?? "",
+                    date = a.Tanggal.ToString("yyyy-MM-dd"),
+                    time = $"{a.Waktu.Hours:D2}:{a.Waktu.Minutes:D2}",
+                    remark = a.DetilTemuan ?? a.KategoriTemuan ?? "",
+                    image = a.FotoTemuan,
+                    video = (string?)null,
+                    status = statusCode,
+                    pja_id = pjaId,
+                    pic_id = picId,
+                    employee_id = empId,
+                    plan = a.RencanaPerbaikan,
+                    plan_date = a.TanggalRencanaPerbaikan?.ToString("yyyy-MM-dd"),
+                    overdue = (int?)null,
+                    reason = a.AlasanOverdue,
+                    action = a.Perbaikan,
+                    action_date = a.TanggalPerbaikan?.ToString("yyyy-MM-dd"),
+                    action_image = a.FotoPerbaikan,
+                    action_video = (string?)null,
+                    table = "hazard",
+                    category = "hazard",
+                    tran_id = tranId,
+                    detail_id = (int?)null,
+                    company_id = a.PerusahaanId,
+                    created_at = a.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss"),
+                    updated_at = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"),
+                    deleted_at = (string?)null,
+
+                    // UI labels for cards
+                    area_name = a.Area ?? "-",
+                    location_name = a.Lokasi ?? "-",
+                    pja_name = pjaName,
+                    pic_name = picName,
+
+                    // Web DTO compatibility
+                    nik = a.Nik,
+                    nama = a.Nama,
+                    nikPja = a.NikPja,
+                    pja = a.Pja,
+                    nikPic = a.NikPic,
+                    pic = a.Pic,
+                    statusName = a.Status,
+                    fotoTemuan = a.FotoTemuan,
+                    fotoPerbaikan = a.FotoPerbaikan,
+                    area = a.Area,
+                    lokasi = a.Lokasi,
+                    detilTemuan = a.DetilTemuan
+                };
+            }).ToList();
+
+            return Ok(new { status = true, data = mappedData });
         }
 
         /// <summary>

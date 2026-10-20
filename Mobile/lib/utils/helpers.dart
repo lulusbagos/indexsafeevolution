@@ -58,6 +58,9 @@ Future<bool> _ensureMediaPermission({
       return photosStatus.isGranted || photosStatus.isLimited;
     }
 
+    // Android: Mengikuti Google Play Photo and Video Permissions Policy.
+    // image_picker menggunakan Android System Photo Picker bawaan OS (Android 13+ / API 33+)
+    // yang tidak memerlukan izin runtime READ_MEDIA_IMAGES maupun READ_EXTERNAL_STORAGE.
     return true;
   }
 
@@ -88,16 +91,6 @@ String? validator(String? val) {
     return 'Please enter value';
   }
   return null;
-}
-
-Future<void> permissionStorage() async {
-  if (!await Permission.storage.isGranted) {
-    await Permission.storage.request();
-  } else if (!await Permission.accessMediaLocation.isGranted) {
-    await Permission.accessMediaLocation.request();
-  } else if (!await Permission.manageExternalStorage.isGranted) {
-    await Permission.manageExternalStorage.request();
-  }
 }
 
 void requestGeolocator(BuildContext context) {

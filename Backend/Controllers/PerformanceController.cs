@@ -32,6 +32,7 @@ namespace Indexsafe.Api.Controllers
             public double Lat { get; set; }
             public double Lon { get; set; }
             public string Tanggal { get; set; } = string.Empty;
+            public string TanggalIso { get; set; } = string.Empty;
             public string Waktu { get; set; } = string.Empty;
             public string Nama { get; set; } = string.Empty;
             public string Nik { get; set; } = string.Empty;
@@ -69,10 +70,65 @@ namespace Indexsafe.Api.Controllers
             return false;
         }
 
+        private static readonly Dictionary<string, (double Lat, double Lon)> KnownAreaCoordinates = new(StringComparer.OrdinalIgnoreCase)
+        {
+            { "PIT - KPP", (1.042599, 117.680257) },
+            { "PIT - MGE", (1.095973, 117.712722) },
+            { "PIT - Unggul", (0.977340, 117.695135) },
+            { "Port/Jetty - Indexim", (0.833812, 117.853334) },
+            { "Port", (0.833812, 117.853334) },
+            { "Road Coal Hauling (Jl. Nusantara)", (0.918824, 117.773958) },
+            { "Coal Road Hauling", (0.918824, 117.773958) },
+            { "CPP-33 & ROM - Indexim", (0.973054, 117.693741) },
+            { "Coal Processing Plant 33", (0.973054, 117.693741) },
+            { "Mess & Fasilitas - Indexim", (0.928804, 117.774446) },
+            { "Mess & Fasilitas - KPP", (1.019011, 117.711487) },
+            { "Mess & Fasilitas - Unggul", (0.936217, 117.728640) },
+            { "Mess & Fasilitas - MGE", (1.178196, 117.792385) },
+            { "Kantor - Indexim", (0.936469, 117.751554) },
+            { "Kantor - KPP", (1.033713, 117.676107) },
+            { "Kantor - MGE", (1.178196, 117.792385) },
+            { "Kantor - Unggul", (0.977340, 117.695135) },
+            { "Mining", (1.042599, 117.680257) },
+            { "Main Support Facility", (0.936469, 117.751554) },
+            { "Supporting Area", (0.936469, 117.751554) },
+            { "Road PIT Overburden - KPP", (1.040586, 117.669256) },
+            { "Road PIT Overburden - Unggul", (0.977340, 117.695135) },
+            { "Road Coal Mining (Jl. Mawar)", (1.005588, 117.711325) },
+            { "Road Coal Mining (Jl. Anggrek)", (1.025588, 117.701325) },
+            { "Settling Pond - Indexim", (0.953054, 117.713741) },
+            { "Settling Pond - KPP", (1.045054, 117.683741) },
+            { "Settling Pond - Unggul", (0.985054, 117.703741) },
+            { "PIT Central", (1.060000, 117.690000) },
+            { "Other Area", (1.056431, 117.726522) }
+        };
+
+        private static (double Lat, double Lon) ResolveCoordinates(int id, string? area, string? lokasi, string? detilLokasi)
+        {
+            if (TryParseCoordinates(lokasi, out var lat, out var lon) ||
+                TryParseCoordinates(detilLokasi, out lat, out lon))
+            {
+                return (lat, lon);
+            }
+
+            // Fallback ke centroid area tambang Indexim
+            var jitterLat = ((id % 50) - 25) * 0.00015;
+            var jitterLon = (((id * 7) % 50) - 25) * 0.00015;
+
+            if (!string.IsNullOrWhiteSpace(area) && KnownAreaCoordinates.TryGetValue(area.Trim(), out var centroid))
+            {
+                return (centroid.Lat + jitterLat, centroid.Lon + jitterLon);
+            }
+
+            // Default centroid Indexim Kaliorang jika area tidak terdaftar spesifik
+            return (1.056431 + jitterLat, 117.726522 + jitterLon);
+        }
+
         /// <summary>
         /// GET /api/performance/safemap
         /// Returns spatial safety points focused exclusively on Hazard findings.
-        /// Filters by unclosed hazards in the last 30-day period.
+        /// Filters by unclosed hazards in one active period (30 days / current period).
+        /// Sets a default lightweight limit (80 points) so mobile map rendering is super smooth.
         /// </summary>
         [HttpGet("safemap")]
         public async Task<IActionResult> GetSafeMapPoints(
@@ -81,39 +137,52 @@ namespace Indexsafe.Api.Controllers
             [FromQuery] int? days = 30,
             [FromQuery] bool onlyOpen = true,
             [FromQuery] double? userLat = null,
-            [FromQuery] double? userLon = null)
+            [FromQuery] double? userLon = null,
+            [FromQuery] int? limit = null)
         {
-            var cutoffDate = DateTime.Today.AddDays(-(days ?? 30));
+            // 1 Periode berjalan
+            DateTime cutoffDate;
+            if (month.HasValue && year.HasValue)
+            {
+                cutoffDate = new DateTime(year.Value, month.Value, 1);
+            }
+            else
+            {
+                cutoffDate = DateTime.Today.AddDays(-(days ?? 30));
+            }
+
             var hazardPoints = new List<GeoSafetyPointDto>();
 
             try
             {
-                // Query Hazard Reports: 30 hari terakhir dan status belum Closed
+                // Query Hazard Reports asli: 1 periode berjalan dan status HANYA yang belum Closed
                 var query = _context.HazardReports
                     .AsNoTracking()
                     .Where(h => !h.IsDeleted && h.Tanggal >= cutoffDate);
 
                 if (onlyOpen)
                 {
-                    query = query.Where(h => h.StatusTemuan != "Closed" && h.StatusTemuan != "Selesai");
+                    query = query.Where(h => h.StatusTemuan != "Closed" && 
+                                             h.StatusTemuan != "closed" &&
+                                             h.StatusTemuan != "Selesai" && 
+                                             h.StatusTemuan != "selesai" &&
+                                             h.StatusTemuan != "Tutup" &&
+                                             h.StatusTemuan != "tutup");
                 }
 
-                var hazards = await query
+                query = query
                     .OrderByDescending(h => h.Tanggal)
-                    .ThenByDescending(h => h.Id)
-                    .Take(100)
-                    .ToListAsync();
+                    .ThenByDescending(h => h.Id);
+
+                // Default limit 80 titik teratas agar rendering di HP sangat cepat dan ringan
+                int effectiveLimit = limit.HasValue && limit.Value > 0 ? limit.Value : 80;
+                query = query.Take(effectiveLimit);
+
+                var hazards = await query.ToListAsync();
 
                 foreach (var h in hazards)
                 {
-                    double lat, lon;
-                    if (!TryParseCoordinates(h.Lokasi, out lat, out lon) &&
-                        !TryParseCoordinates(h.DetilLokasi, out lat, out lon))
-                    {
-                        var hash = Math.Abs(h.Id * 37 + (h.Area?.Length ?? 13));
-                        lat = 1.1920 + ((hash % 300) / 10000.0);
-                        lon = 117.2150 + (((hash * 13) % 250) / 10000.0);
-                    }
+                    var (lat, lon) = ResolveCoordinates(h.Id, h.Area, h.Lokasi, h.DetilLokasi);
 
                     hazardPoints.Add(new GeoSafetyPointDto
                     {
@@ -122,6 +191,7 @@ namespace Indexsafe.Api.Controllers
                         Lat = lat,
                         Lon = lon,
                         Tanggal = h.Tanggal.ToString("dd MMM yyyy"),
+                        TanggalIso = h.Tanggal.ToString("yyyy-MM-dd"),
                         Waktu = h.Waktu.ToString(@"hh\:mm"),
                         Nama = string.IsNullOrWhiteSpace(h.Nama) ? "Karyawan Lapangan" : h.Nama,
                         Nik = h.Nik ?? "-",
@@ -145,154 +215,12 @@ namespace Indexsafe.Api.Controllers
                 Console.WriteLine($"Error retrieving SafeMap Hazard points: {ex.Message}");
             }
 
-            // Jika database belum memiliki data hazard atau data kosong, berikan data representatif operasional
-            if (hazardPoints.Count == 0)
-            {
-                var refLat = userLat ?? 1.2057;
-                var refLon = userLon ?? 117.2247;
-
-                hazardPoints.AddRange(new[]
-                {
-                    new GeoSafetyPointDto
-                    {
-                        Id = 1001,
-                        Type = "hazard",
-                        Lat = refLat + 0.0018,
-                        Lon = refLon + 0.0022,
-                        Tanggal = DateTime.Today.ToString("dd MMM yyyy"),
-                        Waktu = "08:30",
-                        Nama = "Ahmad Dani",
-                        Nik = "24051940986",
-                        Departemen = "Plant & Maintenance",
-                        Area = "Workshop LV Bay 3",
-                        Detail = "Tumpahan oli hidrolik licin di dekat lantai perbaikan bay 3, berpotensi terpeleset",
-                        KategoriBahaya = "Kondisi Tidak Aman (KTA)",
-                        JenisBahaya = "Kimiawi & Permukaan Licin",
-                        Resiko = "Tinggi",
-                        Status = "Open",
-                        Pja = "Bambang Sudarsono (Foreman Workshop)",
-                        NikPja = "18021004",
-                        PhotoUrl = "https://images.unsplash.com/photo-1581092160607-ee22621dd758?auto=format&fit=crop&w=600&q=80"
-                    },
-                    new GeoSafetyPointDto
-                    {
-                        Id = 1002,
-                        Type = "hazard",
-                        Lat = refLat - 0.0025,
-                        Lon = refLon + 0.0031,
-                        Tanggal = DateTime.Today.AddDays(-3).ToString("dd MMM yyyy"),
-                        Waktu = "09:15",
-                        Nama = "Supriyanto",
-                        Nik = "21041502",
-                        Departemen = "Hauling & Transshipment",
-                        Area = "Hauling Road KM 4 Tikungan",
-                        Detail = "Bongkahan batubara loose jatuh berceceran di tikungan jalan, bahaya bagi unit LV & Bus",
-                        KategoriBahaya = "Kondisi Tidak Aman (KTA)",
-                        JenisBahaya = "Jalan Tambang & Lalu Lintas",
-                        Resiko = "Sedang",
-                        Status = "Open",
-                        Pja = "Hendra Wijaya (Supervisor Road Maint)",
-                        NikPja = "17081209",
-                        PhotoUrl = "https://images.unsplash.com/photo-1503387762-592deb58ef4e?auto=format&fit=crop&w=600&q=80"
-                    },
-                    new GeoSafetyPointDto
-                    {
-                        Id = 1003,
-                        Type = "hazard",
-                        Lat = refLat - 0.0038,
-                        Lon = refLon - 0.0028,
-                        Tanggal = DateTime.Today.AddDays(-6).ToString("dd MMM yyyy"),
-                        Waktu = "10:00",
-                        Nama = "Bambang W.",
-                        Nik = "19031120",
-                        Departemen = "Mining Operations",
-                        Area = "Pit Selatan Loading Point",
-                        Detail = "Tanggul pengaman (safety bund wall) tergerus dan tingginya kurang dari 3/4 diameter ban unit HD",
-                        KategoriBahaya = "Kondisi Tidak Aman (KTA)",
-                        JenisBahaya = "Geoteknik & Tanggul Pengaman",
-                        Resiko = "Kritis",
-                        Status = "Open",
-                        Pja = "Rudi Hartono (Foreman Pit)",
-                        NikPja = "16051010",
-                        PhotoUrl = "https://images.unsplash.com/photo-1516937941344-00b4e0337589?auto=format&fit=crop&w=600&q=80"
-                    },
-                    new GeoSafetyPointDto
-                    {
-                        Id = 1004,
-                        Type = "hazard",
-                        Lat = refLat + 0.0042,
-                        Lon = refLon - 0.0019,
-                        Tanggal = DateTime.Today.AddDays(-10).ToString("dd MMM yyyy"),
-                        Waktu = "10:45",
-                        Nama = "Rizki F.",
-                        Nik = "22091880",
-                        Departemen = "Fuel & Logistic Support",
-                        Area = "Fuel Station Dispenser 2",
-                        Detail = "Kabel grounding pompa dispenser kendor dan ada rembesan solar dekat switch panel listrik",
-                        KategoriBahaya = "Kondisi Tidak Aman (KTA)",
-                        JenisBahaya = "Kelistrikan & Bahan Mudah Terbakar",
-                        Resiko = "Tinggi",
-                        Status = "Open",
-                        Pja = "Wahyu Pratama (Supervisor Fuel)",
-                        NikPja = "18041050",
-                        PhotoUrl = "https://images.unsplash.com/photo-1581094480465-4e6c25fb4a52?auto=format&fit=crop&w=600&q=80"
-                    },
-                    new GeoSafetyPointDto
-                    {
-                        Id = 1005,
-                        Type = "hazard",
-                        Lat = refLat + 0.0031,
-                        Lon = refLon + 0.0045,
-                        Tanggal = DateTime.Today.AddDays(-15).ToString("dd MMM yyyy"),
-                        Waktu = "14:10",
-                        Nama = "Hendro",
-                        Nik = "20011400",
-                        Departemen = "Civil & Infrastructure",
-                        Area = "Akses Jembatan Timbang",
-                        Detail = "Penerangan jalan malam mati di tikungan menuju jembatan timbang",
-                        KategoriBahaya = "Kondisi Tidak Aman (KTA)",
-                        JenisBahaya = "Pencahayaan & Visual",
-                        Resiko = "Rendah",
-                        Status = "Open",
-                        Pja = "Didik Suwarno (Foreman Listrik)",
-                        NikPja = "17061125",
-                        PhotoUrl = "https://images.unsplash.com/photo-1581092919535-7146ff1a590b?auto=format&fit=crop&w=600&q=80"
-                    }
-                });
-            }
-
-            // Selalu tambahkan 1 temuan dekat user jika userLat/userLon dikirim
-            if (userLat.HasValue && userLon.HasValue)
-            {
-                hazardPoints.Insert(0, new GeoSafetyPointDto
-                {
-                    Id = 999,
-                    Type = "hazard",
-                    Lat = userLat.Value + 0.000072,
-                    Lon = userLon.Value + 0.000055,
-                    Tanggal = DateTime.Today.ToString("dd MMM yyyy"),
-                    Waktu = DateTime.Now.ToString("HH:mm"),
-                    Nama = "Safety Inspector",
-                    Nik = "24051940986",
-                    Departemen = "HSE Operations",
-                    Area = "Radius Anda (< 10 Meter)",
-                    Detail = "Ceceran oli dan permukaan licin di jalur lintasan pejalan kaki dekat area kerja",
-                    KategoriBahaya = "Kondisi Tidak Aman (KTA)",
-                    JenisBahaya = "Kimiawi & Permukaan Licin",
-                    Resiko = "Kritis",
-                    Status = "Open",
-                    Pja = "Foreman Area",
-                    NikPja = "24051940986",
-                    PhotoUrl = "https://images.unsplash.com/photo-1581092160607-ee22621dd758?auto=format&fit=crop&w=600&q=80"
-                });
-            }
-
-            var openHazardsCount = hazardPoints.Count(h => h.Status.Equals("open", StringComparison.OrdinalIgnoreCase));
+            var openHazardsCount = hazardPoints.Count(h => !h.Status.Equals("closed", StringComparison.OrdinalIgnoreCase) && !h.Status.Equals("selesai", StringComparison.OrdinalIgnoreCase));
 
             return Ok(new
             {
                 status = true,
-                message = "Berhasil memuat lokasi temuan hazard 30 hari terakhir",
+                message = "Berhasil memuat lokasi temuan hazard 30 hari terakhir yang belum closed",
                 data = new
                 {
                     hazardPoints,
@@ -317,14 +245,7 @@ namespace Indexsafe.Api.Controllers
 
             if (h != null)
             {
-                double lat, lon;
-                if (!TryParseCoordinates(h.Lokasi, out lat, out lon) &&
-                    !TryParseCoordinates(h.DetilLokasi, out lat, out lon))
-                {
-                    var hash = Math.Abs(h.Id * 37 + (h.Area?.Length ?? 13));
-                    lat = 1.1920 + ((hash % 300) / 10000.0);
-                    lon = 117.2150 + (((hash * 13) % 250) / 10000.0);
-                }
+                var (lat, lon) = ResolveCoordinates(h.Id, h.Area, h.Lokasi, h.DetilLokasi);
 
                 return Ok(new
                 {
@@ -365,43 +286,10 @@ namespace Indexsafe.Api.Controllers
                 });
             }
 
-            // Fallback mock detail jika data ID testing
-            return Ok(new
+            return NotFound(new
             {
-                status = true,
-                message = "Detail Hazard (Demo Data)",
-                data = new
-                {
-                    id = id,
-                    tanggal = DateTime.Today.ToString("dd MMM yyyy"),
-                    waktu = "08:30",
-                    nama = "Safety Inspector",
-                    nik = "24051940986",
-                    departemen = "Plant & Maintenance",
-                    area = "Workshop / Pit Area",
-                    lokasi = "Area Kerja Aktif",
-                    detil_lokasi = "Jalur Lintasan dan Fasilitas Operasional",
-                    temuan = "Temuan bahaya K3 memerlukan isolasi dan tindakan perbaikan segera",
-                    detail = "Temuan bahaya K3 memerlukan isolasi dan tindakan perbaikan segera",
-                    kategori_bahaya = "Kondisi Tidak Aman (KTA)",
-                    jenis_bahaya = "Fisik / Mekanikal",
-                    tingkat_resiko = "Tinggi",
-                    resiko = "Tinggi",
-                    status = "Open",
-                    status_temuan = "Open",
-                    foto_temuan = "https://images.unsplash.com/photo-1581092160607-ee22621dd758?auto=format&fit=crop&w=600&q=80",
-                    photo_url = "https://images.unsplash.com/photo-1581092160607-ee22621dd758?auto=format&fit=crop&w=600&q=80",
-                    foto_perbaikan = (string?)null,
-                    pja = "Foreman Area",
-                    nik_pja = "18021004",
-                    departemen_pja = "Plant & Maintenance",
-                    perbaikan = (string?)null,
-                    tindakan_perbaikan = (string?)null,
-                    lat = 1.2057,
-                    lon = 117.2247,
-                    lng = 117.2247,
-                    created_at = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")
-                }
+                status = false,
+                message = $"Detail Hazard dengan ID {id} tidak ditemukan."
             });
         }
 

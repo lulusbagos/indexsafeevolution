@@ -15,6 +15,8 @@ Dokumentasi ini disusun secara terstruktur berdasarkan hasil analisis mendalam t
 | **04** | [**04_DESAIN_BACKEND_ASPNET_SQLSERVER.md**](file:///d:/4.%20PROJECT/13.%20Mobile/Indexsafe%20Evolution/Docs/04_DESAIN_BACKEND_ASPNET_SQLSERVER.md) | Cetak biru arsitektur backend **ASP.NET Core (.NET 8/9)** teroptimasi untuk beban transaksi berat di **SQL Server Windows Server** (Bulk insert, Idempotency, Background Service). |
 | **05** | [**05_PANDUAN_LANGKAH_PENGEMBANGAN.md**](file:///d:/4.%20PROJECT/13.%20Mobile/Indexsafe%20Evolution/Docs/05_PANDUAN_LANGKAH_PENGEMBANGAN.md) | Panduan langkah demi langkah (roadmap) praktis untuk memulai pembuatan backend kapan saja Anda siap. |
 | **06** | [**PANDUAN_BUILD_DAN_PUBLISH_HP.md**](file:///d:/4.%20PROJECT/13.%20Mobile/Indexsafe%20Evolution/Docs/PANDUAN_BUILD_DAN_PUBLISH_HP.md) | Panduan kompilasi dan instalasi APK ke HP fisik dengan trik bypass ManageEngine Endpoint Central. |
+| **07** | [**SISTEM_MASTER_DATA_OFFLINE.md**](file:///d:/4.%20PROJECT/13.%20Mobile/Indexsafe%20Evolution/Docs/SISTEM_MASTER_DATA_OFFLINE.md) | Panduan standar arsitektur offline-first, skema SQLite, reusable dropdown/autocomplete instan (<5ms), batch ingestion puluhan ribu data, dan fallback manual bebas ketik. |
+| **08** | [**MAPPING_MENU_TEMUAN_HAZARD.md**](file:///d:/4.%20PROJECT/13.%20Mobile/Indexsafe%20Evolution/Docs/MAPPING_MENU_TEMUAN_HAZARD.md) | Pemetaan modul Temuan Hazard: status file aktif vs legacy, dependensi database offline/online, dan integrasi endpoint backend ASP.NET Core. |
 
 ---
 
@@ -27,8 +29,11 @@ Indexsafe Evolution/
 │   ├── 02_SKEMA_DATABASE_OFFLINE.md
 │   ├── 03_SPESIFIKASI_API_CONTRACT.md
 │   ├── 04_DESAIN_BACKEND_ASPNET_SQLSERVER.md
-│   └── 05_PANDUAN_LANGKAH_PENGEMBANGAN.md
-├── Mobile/           # Kode aplikasi Flutter (ditarik dari GitHub alfiraodeng/icmbsmobile)
-└── Backend/          # Folder target pengembangan backend
-    └── README.md
+│   ├── 05_PANDUAN_LANGKAH_PENGEMBANGAN.md
+│   ├── 06_PANDUAN_BUILD_DAN_PUBLISH_HP.md
+│   ├── SISTEM_MASTER_DATA_OFFLINE.md
+│   └── MAPPING_MENU_TEMUAN_HAZARD.md
+├── Mobile/           # Kode aplikasi Flutter
+└── Backend/          # Backend ASP.NET Core & SQL Server
 ```
+

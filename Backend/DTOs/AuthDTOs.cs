@@ -110,6 +110,12 @@ namespace Indexsafe.Api.DTOs
         [JsonPropertyName("job_title")]
         public string JobTitle { get; set; } = string.Empty;
 
+        [JsonPropertyName("jabatan")]
+        public string Jabatan { get; set; } = string.Empty;
+
+        [JsonPropertyName("posisi")]
+        public string Posisi { get; set; } = string.Empty;
+
         [JsonPropertyName("created_at")]
         public string? CreatedAt { get; set; }
     }
@@ -145,6 +151,9 @@ namespace Indexsafe.Api.DTOs
 
         [JsonPropertyName("posisi")]
         public string Posisi { get; set; } = string.Empty;
+
+        [JsonPropertyName("jabatan")]
+        public string Jabatan { get; set; } = string.Empty;
 
         [JsonPropertyName("foto")]
         public string? Foto { get; set; }
@@ -279,6 +288,9 @@ namespace Indexsafe.Api.DTOs
         [JsonPropertyName("permit_nomor")]
         public string? PermitNomor { get; set; }
 
+        [JsonPropertyName("masa_aktif_permit")]
+        public string? MasaAktifPermit { get; set; }
+
         [JsonPropertyName("permit_status")]
         public string? PermitStatus { get; set; }
 
@@ -329,6 +341,9 @@ namespace Indexsafe.Api.DTOs
 
         [JsonPropertyName("is_simper_active")]
         public bool IsSimperActive { get; set; }
+
+        [JsonPropertyName("qr_code")]
+        public string? QrCode { get; set; }
     }
 
     public class ResetPasswordRequest

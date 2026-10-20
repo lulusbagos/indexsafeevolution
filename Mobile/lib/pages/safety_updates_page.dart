@@ -1,222 +1,859 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:intl/intl.dart';
+import '../models/incident_news_model.dart';
+import '../services/api.dart';
 
 class SafetyUpdatesPage extends StatefulWidget {
-  const SafetyUpdatesPage({super.key});
+  const SafetyUpdatesPage({super.key, this.selectedIncident});
+
+  final IncidentNewsModel? selectedIncident;
 
   @override
   State<SafetyUpdatesPage> createState() => _SafetyUpdatesPageState();
 }
 
 class _SafetyUpdatesPageState extends State<SafetyUpdatesPage> {
-  static const _blue = Color(0xFF155EEF);
-  String _category = 'Semua';
+  static const _primaryBlue = Color(0xFF155EEF);
 
-  final List<_SafetyUpdate> _updates = const [
-    _SafetyUpdate(
-      category: 'Safety Alert',
-      label: 'URGENT',
-      title: 'Perubahan Jalur Hauling KM 18 – KM 22',
-      summary:
-          'Mulai berlaku 1 Oktober 2026. Seluruh operator wajib mengikuti jalur terbaru untuk meningkatkan keselamatan di area kerja.',
-      date: '30 Sep 2026',
-      time: '10:30',
-      views: '1.2K',
-      image: 'assets/images/header-home.png',
-      color: Color(0xFFEF4444),
-      icon: Icons.warning_amber_rounded,
-    ),
-    _SafetyUpdate(
-      category: 'Announcement',
-      label: 'IMPORTANT',
-      title: 'Inspeksi Gabungan Area Workshop',
-      summary:
-          'Inspeksi gabungan akan dilaksanakan pada 3–5 Oktober 2026. Pastikan area kerja dalam kondisi siap dan aman.',
-      date: '29 Sep 2026',
-      time: '16:20',
-      views: '856',
-      image: 'assets/images/info2.jpg',
-      color: Color(0xFF2563EB),
-      icon: Icons.campaign_rounded,
-    ),
-    _SafetyUpdate(
-      category: 'MBS Update',
-      label: 'INFO',
-      title: 'SAP League September 2026 Result',
-      summary:
-          'Berikut hasil SAP League bulan September 2026. Terus tingkatkan komitmen dan kualitas pelaporan keselamatan.',
-      date: '28 Sep 2026',
-      time: '09:15',
-      views: '642',
-      image: 'assets/images/logo-mbs.png',
-      color: Color(0xFF16A34A),
-      icon: Icons.verified_rounded,
-    ),
-    _SafetyUpdate(
-      category: 'Safety Campaign',
-      label: 'INFO',
-      title: 'World First Aid Day 2026',
-      summary:
-          'Mari tingkatkan kesadaran pertolongan pertama di tempat kerja. Cek jadwal kegiatan dan materi kampanye.',
-      date: '27 Sep 2026',
-      time: '14:45',
-      views: '509',
-      image: 'assets/images/quick-hazard.png',
-      color: Color(0xFF7C3AED),
-      icon: Icons.health_and_safety_rounded,
-    ),
+  final ApiService _api = ApiService();
+  final TextEditingController _searchCtrl = TextEditingController();
+
+  List<IncidentNewsModel> _allUpdates = [];
+  bool _isLoading = true;
+  String? _errorMessage;
+  String _category = 'Semua';
+  String _searchQuery = '';
+
+  final List<String> _categories = [
+    'Semua',
+    'Banner Informasi',
+    'Near Miss',
+    'Property Damage',
+    'First Aid Injury',
+    'Medical Treatment',
+    'Kebakaran',
   ];
 
-  List<_SafetyUpdate> get _visibleUpdates {
-    if (_category == 'Semua') return _updates;
-    return _updates.where((item) => item.category == _category).toList();
+  @override
+  void initState() {
+    super.initState();
+    _fetchUpdates();
+
+    // Jika dibuka langsung dari banner home, langsung tampilkan detail modal
+    if (widget.selectedIncident != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _showIncidentDetail(widget.selectedIncident!);
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _fetchUpdates() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      // Ambil yang di-setting is_update = true atau ambil seluruh berita aktif
+      final res = await _api.getIncidents(limit: 50, isUpdate: true);
+
+      res.fold(
+        (err) {
+          if (mounted) {
+            setState(() {
+              _isLoading = false;
+              _errorMessage = err['message']?.toString() ?? 'Gagal memuat safety updates';
+            });
+          }
+        },
+        (data) {
+          if (mounted) {
+            final list = List<IncidentNewsModel>.from(data);
+
+            // Jika ada selectedIncident dari banner yang di-klik dan belum ada di list (misal hanya di-setting is_banner=1)
+            if (widget.selectedIncident != null) {
+              final exists = list.any((item) => item.id == widget.selectedIncident!.id);
+              if (!exists) {
+                list.insert(0, widget.selectedIncident!);
+              }
+            }
+
+            setState(() {
+              _allUpdates = list;
+              _isLoading = false;
+            });
+          }
+        },
+      );
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _errorMessage = e.toString();
+        });
+      }
+    }
+  }
+
+  List<IncidentNewsModel> get _filteredUpdates {
+    final list = _allUpdates.where((item) {
+      // Buang data import excel placeholder / dummy jika ada
+      final isDummy = item.dibuatOleh.toLowerCase().contains('system import') ||
+          item.dibuatOleh.toLowerCase().contains('system') ||
+          item.konten.trim().length < 15;
+      if (isDummy) return false;
+
+      final matchesCat = _category == 'Semua' ||
+          item.kategori.toLowerCase().contains(_category.toLowerCase());
+      final q = _searchQuery.trim().toLowerCase();
+      final matchesSearch = q.isEmpty ||
+          item.judul.toLowerCase().contains(q) ||
+          item.konten.toLowerCase().contains(q) ||
+          item.lokasi.toLowerCase().contains(q);
+      return matchesCat && matchesSearch;
+    }).toList();
+
+    // Prioritaskan 'Banner Informasi' / isBanner agar selalu berada di posisi paling depan
+    list.sort((a, b) {
+      final aIsBanner = a.kategori.toLowerCase().contains('banner') || a.isBanner;
+      final bIsBanner = b.kategori.toLowerCase().contains('banner') || b.isBanner;
+      if (aIsBanner && !bIsBanner) return -1;
+      if (!aIsBanner && bIsBanner) return 1;
+
+      // Jika status banner sama, urutkan tanggal kejadian / createdAt terbaru
+      final aDate = a.tanggalKejadian ?? a.createdAt ?? DateTime(2000);
+      final bDate = b.tanggalKejadian ?? b.createdAt ?? DateTime(2000);
+      return bDate.compareTo(aDate);
+    });
+
+    return list;
+  }
+
+  String _formatImageUrl(String? rawUrl) {
+    if (rawUrl == null || rawUrl.isEmpty) return '';
+    if (rawUrl.startsWith('http://') || rawUrl.startsWith('https://')) {
+      return rawUrl;
+    }
+    final base = _api.baseUrl.replaceAll(RegExp(r'/+$'), '');
+    final path = rawUrl.startsWith('/') ? rawUrl : '/$rawUrl';
+    return '$base$path';
+  }
+
+  String _formatDateTime(DateTime? dt, String? rawStr) {
+    if (dt != null) {
+      return DateFormat('dd MMM yyyy, HH:mm').format(dt);
+    }
+    if (rawStr != null && rawStr.isNotEmpty) {
+      final parsed = DateTime.tryParse(rawStr);
+      if (parsed != null) {
+        return DateFormat('dd MMM yyyy, HH:mm').format(parsed);
+      }
+      return rawStr;
+    }
+    return '-';
+  }
+
+  Color _getCategoryColor(String kategori) {
+    final cat = kategori.toLowerCase();
+    if (cat.contains('fatality') || cat.contains('kebakaran')) {
+      return const Color(0xFFDC2626);
+    } else if (cat.contains('near miss') || cat.contains('alert')) {
+      return const Color(0xFFF59E0B);
+    } else if (cat.contains('property damage')) {
+      return const Color(0xFFEA580C);
+    } else if (cat.contains('injury') || cat.contains('medical')) {
+      return const Color(0xFFE11D48);
+    } else if (cat.contains('banner')) {
+      return const Color(0xFF2563EB);
+    } else if (cat.contains('announcement') || cat.contains('mbs')) {
+      return const Color(0xFF059669);
+    }
+    return const Color(0xFF4B5563);
+  }
+
+  IconData _getCategoryIcon(String kategori) {
+    final cat = kategori.toLowerCase();
+    if (cat.contains('fatality') || cat.contains('kebakaran')) {
+      return Icons.local_fire_department_rounded;
+    } else if (cat.contains('near miss') || cat.contains('alert')) {
+      return Icons.warning_amber_rounded;
+    } else if (cat.contains('property damage')) {
+      return Icons.car_crash_rounded;
+    } else if (cat.contains('injury') || cat.contains('medical')) {
+      return Icons.health_and_safety_rounded;
+    } else if (cat.contains('banner')) {
+      return Icons.view_carousel_rounded;
+    } else if (cat.contains('announcement') || cat.contains('mbs')) {
+      return Icons.campaign_rounded;
+    }
+    return Icons.info_outline_rounded;
   }
 
   @override
   Widget build(BuildContext context) {
-    final categories = <String>[
-      'Semua',
-      'Safety Alert',
-      'Announcement',
-      'MBS Update',
-      'Safety Campaign',
-    ];
+    final canPop = Navigator.canPop(context);
+    final visibleItems = _filteredUpdates;
+    final heroItem = visibleItems.isNotEmpty ? visibleItems.first : null;
+    final listItems = visibleItems.length > 1 ? visibleItems.sublist(1) : <IncidentNewsModel>[];
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F7FB),
+      backgroundColor: const Color(0xFFF8FAFC),
       body: SafeArea(
         bottom: false,
-        child: CustomScrollView(
-          slivers: [
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(18, 18, 18, 8),
-              sliver: SliverToBoxAdapter(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Safety Updates',
-                      style: TextStyle(
-                        color: Color(0xFF101828),
-                        fontSize: 27,
-                        height: 1,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: -.6,
+        child: RefreshIndicator(
+          color: _primaryBlue,
+          onRefresh: _fetchUpdates,
+          child: CustomScrollView(
+            physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+            slivers: [
+              // Top Header Bar
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+                sliver: SliverToBoxAdapter(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          if (canPop)
+                            Padding(
+                              padding: const EdgeInsets.only(right: 12),
+                              child: Material(
+                                color: Colors.white,
+                                shape: const CircleBorder(),
+                                elevation: 1,
+                                shadowColor: Colors.black12,
+                                child: InkWell(
+                                  customBorder: const CircleBorder(),
+                                  onTap: () => Navigator.pop(context),
+                                  child: const Padding(
+                                    padding: EdgeInsets.all(8),
+                                    child: Icon(
+                                      Icons.arrow_back_ios_new_rounded,
+                                      size: 18,
+                                      color: Color(0xFF1E293B),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    const Text(
+                                      'Safety Updates',
+                                      style: TextStyle(
+                                        color: Color(0xFF0F172A),
+                                        fontSize: 24,
+                                        fontWeight: FontWeight.w900,
+                                        letterSpacing: -0.5,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                      decoration: BoxDecoration(
+                                        color: _primaryBlue.withValues(alpha: 0.1),
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: Text(
+                                        '${_allUpdates.length} Info',
+                                        style: const TextStyle(
+                                          color: _primaryBlue,
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  'Berita keselamatan, peringatan, dan banner terkini',
+                                  style: TextStyle(
+                                    color: Colors.blueGrey.shade600,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      'Berita keselamatan, peringatan, dan pengumuman terbaru',
-                      style: TextStyle(
-                        color: Colors.blueGrey.shade600,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
+                      const SizedBox(height: 14),
+
+                      // Search Bar
+                      Container(
+                        height: 44,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: const Color(0xFFE2E8F0)),
+                          boxShadow: const [
+                            BoxShadow(
+                              color: Color(0x08000000),
+                              blurRadius: 8,
+                              offset: Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: TextField(
+                          controller: _searchCtrl,
+                          onChanged: (val) => setState(() => _searchQuery = val),
+                          style: const TextStyle(fontSize: 13, color: Color(0xFF1E293B)),
+                          decoration: InputDecoration(
+                            hintText: 'Cari judul, konten, atau lokasi...',
+                            hintStyle: TextStyle(fontSize: 12, color: Colors.blueGrey.shade400),
+                            prefixIcon: const Icon(Icons.search_rounded, size: 20, color: Color(0xFF94A3B8)),
+                            suffixIcon: _searchQuery.isNotEmpty
+                                ? IconButton(
+                                    icon: const Icon(Icons.clear_rounded, size: 18, color: Color(0xFF94A3B8)),
+                                    onPressed: () {
+                                      _searchCtrl.clear();
+                                      setState(() => _searchQuery = '');
+                                    },
+                                  )
+                                : null,
+                            border: InputBorder.none,
+                            contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                          ),
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 16),
-                    _HeroUpdate(update: _updates.first),
-                  ],
+                    ],
+                  ),
                 ),
               ),
-            ),
-            SliverToBoxAdapter(
-              child: SizedBox(
-                height: 48,
-                child: ListView.separated(
-                  padding: const EdgeInsets.symmetric(horizontal: 18),
-                  scrollDirection: Axis.horizontal,
-                  itemCount: categories.length,
-                  separatorBuilder: (_, __) => const SizedBox(width: 8),
-                  itemBuilder: (context, index) {
-                    final category = categories[index];
-                    final selected = category == _category;
-                    return ChoiceChip(
-                      label: Text(category),
-                      selected: selected,
-                      showCheckmark: false,
-                      side: BorderSide(
-                        color: selected ? _blue : const Color(0xFFE4EAF2),
-                      ),
-                      backgroundColor: Colors.white,
-                      selectedColor: _blue,
-                      labelStyle: TextStyle(
-                        color:
-                            selected ? Colors.white : const Color(0xFF475467),
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                      ),
-                      padding: const EdgeInsets.symmetric(horizontal: 8),
-                      onSelected: (_) => setState(() => _category = category),
-                    );
-                  },
+
+              // Horizontal Category Chips
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 10, bottom: 8),
+                  child: SizedBox(
+                    height: 40,
+                    child: ListView.separated(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      scrollDirection: Axis.horizontal,
+                      itemCount: _categories.length,
+                      separatorBuilder: (_, __) => const SizedBox(width: 8),
+                      itemBuilder: (context, index) {
+                        final cat = _categories[index];
+                        final isSelected = cat == _category;
+                        return ChoiceChip(
+                          label: Text(cat),
+                          selected: isSelected,
+                          showCheckmark: false,
+                          side: BorderSide(
+                            color: isSelected ? _primaryBlue : const Color(0xFFE2E8F0),
+                          ),
+                          backgroundColor: Colors.white,
+                          selectedColor: _primaryBlue,
+                          labelStyle: TextStyle(
+                            color: isSelected ? Colors.white : const Color(0xFF475467),
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                          ),
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                          onSelected: (_) => setState(() => _category = cat),
+                        );
+                      },
+                    ),
+                  ),
                 ),
               ),
-            ),
-            const SliverPadding(
-              padding: EdgeInsets.fromLTRB(18, 8, 18, 10),
-              sliver: SliverToBoxAdapter(
-                child: Row(
-                  children: [
-                    Text(
-                      'Update Terbaru',
-                      style: TextStyle(
-                        color: Color(0xFF101828),
-                        fontSize: 18,
-                        fontWeight: FontWeight.w900,
+
+              // Content Body
+              if (_isLoading)
+                const SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        CircularProgressIndicator(strokeWidth: 3),
+                        SizedBox(height: 12),
+                        Text(
+                          'Memuat berita keselamatan...',
+                          style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+              else if (_errorMessage != null)
+                SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.cloud_off_rounded, size: 48, color: Color(0xFF94A3B8)),
+                          const SizedBox(height: 12),
+                          Text(
+                            _errorMessage!,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(fontSize: 13, color: Color(0xFF475467)),
+                          ),
+                          const SizedBox(height: 16),
+                          ElevatedButton.icon(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: _primaryBlue,
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            ),
+                            onPressed: _fetchUpdates,
+                            icon: const Icon(Icons.refresh_rounded, size: 18),
+                            label: const Text('Coba Lagi'),
+                          ),
+                        ],
                       ),
                     ),
-                    Spacer(),
-                    Text(
-                      'Lihat Semua',
-                      style: TextStyle(
-                        color: _blue,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
+                  ),
+                )
+              else if (visibleItems.isEmpty)
+                SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.inbox_rounded, size: 54, color: Colors.blueGrey.shade300),
+                          const SizedBox(height: 12),
+                          const Text(
+                            'Tidak ada berita atau update untuk filter ini',
+                            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Color(0xFF334155)),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Coba ganti kategori filter atau kata pencarian',
+                            style: TextStyle(fontSize: 12, color: Colors.blueGrey.shade500),
+                          ),
+                        ],
                       ),
                     ),
-                    SizedBox(width: 2),
-                    Icon(Icons.chevron_right_rounded, color: _blue, size: 18),
-                  ],
+                  ),
+                )
+              else ...[
+                // Hero / Featured Update (Item pertama)
+                if (heroItem != null)
+                  SliverPadding(
+                    padding: const EdgeInsets.fromLTRB(16, 6, 16, 12),
+                    sliver: SliverToBoxAdapter(
+                      child: _buildHeroCard(heroItem),
+                    ),
+                  ),
+
+                // Section Title
+                if (listItems.isNotEmpty)
+                  const SliverPadding(
+                    padding: EdgeInsets.fromLTRB(18, 6, 18, 10),
+                    sliver: SliverToBoxAdapter(
+                      child: Row(
+                        children: [
+                          Text(
+                            'Update Terkait & Berita Lainnya',
+                            style: TextStyle(
+                              color: Color(0xFF0F172A),
+                              fontSize: 16,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                // List of Updates
+                SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 120),
+                  sliver: SliverList.separated(
+                    itemCount: listItems.length,
+                    separatorBuilder: (_, __) => const SizedBox(height: 10),
+                    itemBuilder: (context, index) {
+                      final item = listItems[index];
+                      return _buildUpdateCard(item);
+                    },
+                  ),
                 ),
-              ),
-            ),
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(12, 0, 12, 120),
-              sliver: SliverList.separated(
-                itemCount: _visibleUpdates.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 9),
-                itemBuilder: (context, index) => _UpdateCard(
-                  update: _visibleUpdates[index],
-                  onTap: () => _showUpdate(_visibleUpdates[index]),
-                ),
-              ),
-            ),
-          ],
+              ],
+            ],
+          ),
         ),
       ),
     );
   }
 
-  void _showUpdate(_SafetyUpdate update) {
+  Widget _buildHeroCard(IncidentNewsModel item) {
+    final catColor = _getCategoryColor(item.kategori);
+    final catIcon = _getCategoryIcon(item.kategori);
+    final imgUrl = _formatImageUrl(item.gambarUrl);
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () {
+          HapticFeedback.selectionClick();
+          _showIncidentDetail(item);
+        },
+        borderRadius: BorderRadius.circular(20),
+        child: Container(
+          height: 220,
+          clipBehavior: Clip.antiAlias,
+          decoration: BoxDecoration(
+            color: const Color(0xFF0F172A),
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x1A0F172A),
+                blurRadius: 18,
+                offset: Offset(0, 8),
+              ),
+            ],
+          ),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              if (imgUrl.isNotEmpty)
+                Image.network(
+                  imgUrl,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => _buildPlaceholderBg(catColor, catIcon),
+                )
+              else
+                _buildPlaceholderBg(catColor, catIcon),
+
+              // Gradient Overlay
+              const DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [Color(0x20000000), Color(0xF0000000)],
+                    stops: [0.2, 1.0],
+                  ),
+                ),
+              ),
+
+              // Content Inside Hero
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        _buildBadge(
+                          label: item.kategori.toUpperCase(),
+                          icon: catIcon,
+                          color: catColor,
+                          isLight: true,
+                        ),
+                        if (item.isBanner) ...[
+                          const SizedBox(width: 6),
+                          _buildMiniTag('BANNER', const Color(0xFF2563EB)),
+                        ],
+                        if (item.isUpdate) ...[
+                          const SizedBox(width: 6),
+                          _buildMiniTag('UPDATE', const Color(0xFF059669)),
+                        ],
+                      ],
+                    ),
+                    const Spacer(),
+                    Text(
+                      item.judul,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 19,
+                        height: 1.15,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      item.konten,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Color(0xFFCBD5E1),
+                        fontSize: 12,
+                        height: 1.3,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        const Icon(Icons.location_on_rounded, color: Colors.white70, size: 12),
+                        const SizedBox(width: 4),
+                        Flexible(
+                          child: Text(
+                            item.lokasi,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(color: Colors.white70, fontSize: 11),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        const Icon(Icons.calendar_today_rounded, color: Colors.white70, size: 11),
+                        const SizedBox(width: 4),
+                        Text(
+                          _formatDateTime(item.tanggalKejadian, item.rawTanggal),
+                          style: const TextStyle(color: Colors.white70, fontSize: 11),
+                        ),
+                        const Spacer(),
+                        Container(
+                          width: 32,
+                          height: 32,
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.2),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.arrow_forward_rounded, color: Colors.white, size: 16),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildUpdateCard(IncidentNewsModel item) {
+    final catColor = _getCategoryColor(item.kategori);
+    final catIcon = _getCategoryIcon(item.kategori);
+    final imgUrl = _formatImageUrl(item.gambarUrl);
+
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(16),
+      elevation: 0.5,
+      shadowColor: Colors.black12,
+      child: InkWell(
+        onTap: () {
+          HapticFeedback.selectionClick();
+          _showIncidentDetail(item);
+        },
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            border: Border.all(color: const Color(0xFFE2E8F0)),
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: SizedBox(
+                  width: 84,
+                  height: 84,
+                  child: imgUrl.isNotEmpty
+                      ? Image.network(
+                          imgUrl,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => _buildCardThumbnailFallback(catColor, catIcon),
+                        )
+                      : _buildCardThumbnailFallback(catColor, catIcon),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        _buildBadge(
+                          label: item.kategori.toUpperCase(),
+                          icon: catIcon,
+                          color: catColor,
+                          isLight: false,
+                        ),
+                        if (item.isBanner) ...[
+                          const SizedBox(width: 4),
+                          _buildMiniTag('BANNER', const Color(0xFF2563EB)),
+                        ],
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      item.judul,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Color(0xFF0F172A),
+                        fontSize: 14,
+                        height: 1.18,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      item.konten,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Color(0xFF64748B),
+                        fontSize: 11,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        const Icon(Icons.schedule_rounded, size: 12, color: Color(0xFF94A3B8)),
+                        const SizedBox(width: 4),
+                        Flexible(
+                          child: Text(
+                            _formatDateTime(item.tanggalKejadian, item.rawTanggal),
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 10),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        const Icon(Icons.person_outline_rounded, size: 12, color: Color(0xFF94A3B8)),
+                        const SizedBox(width: 3),
+                        Flexible(
+                          child: Text(
+                            item.dibuatOleh,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 10),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const Padding(
+                padding: EdgeInsets.only(top: 28),
+                child: Icon(Icons.chevron_right_rounded, color: Color(0xFF94A3B8), size: 20),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCardThumbnailFallback(Color color, IconData icon) {
+    return Container(
+      color: color.withValues(alpha: 0.12),
+      child: Center(
+        child: Icon(icon, color: color, size: 30),
+      ),
+    );
+  }
+
+  Widget _buildPlaceholderBg(Color color, IconData icon) {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [color.withValues(alpha: 0.8), const Color(0xFF0F172A)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+      ),
+      child: Center(
+        child: Icon(icon, color: Colors.white24, size: 64),
+      ),
+    );
+  }
+
+  Widget _buildBadge({
+    required String label,
+    required IconData icon,
+    required Color color,
+    required bool isLight,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+      decoration: BoxDecoration(
+        color: isLight ? color : color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 10, color: isLight ? Colors.white : color),
+          const SizedBox(width: 3),
+          Text(
+            label,
+            style: TextStyle(
+              color: isLight ? Colors.white : color,
+              fontSize: 9,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMiniTag(String label, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: color.withValues(alpha: 0.4), width: 0.8),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: color,
+          fontSize: 8,
+          fontWeight: FontWeight.w900,
+          letterSpacing: 0.3,
+        ),
+      ),
+    );
+  }
+
+  void _showIncidentDetail(IncidentNewsModel item) {
+    final catColor = _getCategoryColor(item.kategori);
+    final catIcon = _getCategoryIcon(item.kategori);
+    final imgUrl = _formatImageUrl(item.gambarUrl);
+
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => DraggableScrollableSheet(
-        initialChildSize: .72,
-        minChildSize: .48,
-        maxChildSize: .92,
+      builder: (ctx) => DraggableScrollableSheet(
+        initialChildSize: 0.85,
+        minChildSize: 0.5,
+        maxChildSize: 0.95,
         expand: false,
-        builder: (context, controller) => Container(
+        builder: (ctx, scrollController) => Container(
           decoration: const BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
           ),
-          child: ListView(
-            controller: controller,
-            padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
+          child: Column(
             children: [
+              // Drag Indicator Bar
               Center(
                 child: Container(
+                  margin: const EdgeInsets.only(top: 12, bottom: 8),
                   width: 44,
                   height: 5,
                   decoration: BoxDecoration(
@@ -225,212 +862,159 @@ class _SafetyUpdatesPageState extends State<SafetyUpdatesPage> {
                   ),
                 ),
               ),
-              const SizedBox(height: 18),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(18),
-                child: Image.asset(
-                  update.image,
-                  height: 190,
-                  width: double.infinity,
-                  fit: BoxFit.cover,
-                ),
-              ),
-              const SizedBox(height: 18),
-              _CategoryBadge(update: update),
-              const SizedBox(height: 12),
-              Text(
-                update.title,
-                style: const TextStyle(
-                  color: Color(0xFF101828),
-                  fontSize: 23,
-                  height: 1.15,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-              const SizedBox(height: 12),
-              _UpdateMeta(update: update),
-              const SizedBox(height: 18),
-              Text(
-                update.summary,
-                style: const TextStyle(
-                  color: Color(0xFF475467),
-                  fontSize: 15,
-                  height: 1.55,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
 
-class _HeroUpdate extends StatelessWidget {
-  const _HeroUpdate({required this.update});
-
-  final _SafetyUpdate update;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 205,
-      clipBehavior: Clip.antiAlias,
-      decoration: BoxDecoration(
-        color: const Color(0xFF0F172A),
-        borderRadius: BorderRadius.circular(19),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x220F172A),
-            blurRadius: 18,
-            offset: Offset(0, 9),
-          ),
-        ],
-      ),
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          Image.asset(update.image, fit: BoxFit.cover),
-          const DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [Color(0x10000000), Color(0xE6000000)],
-                stops: [.28, 1],
-              ),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _CategoryBadge(update: update, light: true),
-                const Spacer(),
-                Text(
-                  update.title,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 21,
-                    height: 1.05,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                const SizedBox(height: 7),
-                Text(
-                  update.summary,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Color(0xFFE4E7EC),
-                    fontSize: 11,
-                    height: 1.25,
-                  ),
-                ),
-                const SizedBox(height: 10),
-                Row(
-                  children: [
-                    const Icon(Icons.calendar_today_rounded,
-                        color: Colors.white, size: 13),
-                    const SizedBox(width: 6),
-                    Text(
-                      '${update.date} • ${update.time}',
-                      style: const TextStyle(color: Colors.white, fontSize: 10),
-                    ),
-                    const Spacer(),
-                    Container(
-                      width: 34,
-                      height: 34,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white70),
-                      ),
-                      child: const Icon(Icons.arrow_forward_rounded,
-                          color: Colors.white, size: 18),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _UpdateCard extends StatelessWidget {
-  const _UpdateCard({required this.update, required this.onTap});
-
-  final _SafetyUpdate update;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(17),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(17),
-        child: Container(
-          padding: const EdgeInsets.all(9),
-          decoration: BoxDecoration(
-            border: Border.all(color: const Color(0xFFEAECF0)),
-            borderRadius: BorderRadius.circular(17),
-          ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: Container(
-                  width: 78,
-                  height: 78,
-                  color: update.color.withValues(alpha: .1),
-                  child: Image.asset(update.image, fit: BoxFit.cover),
-                ),
-              ),
-              const SizedBox(width: 10),
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                child: ListView(
+                  controller: scrollController,
+                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 40),
                   children: [
-                    _CategoryBadge(update: update),
-                    const SizedBox(height: 5),
+                    // Gambar Utama (Jika Ada)
+                    if (imgUrl.isNotEmpty) ...[
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(18),
+                        child: Container(
+                          constraints: const BoxConstraints(maxHeight: 260),
+                          width: double.infinity,
+                          color: const Color(0xFF0F172A),
+                          child: Image.network(
+                            imgUrl,
+                            fit: BoxFit.contain,
+                            errorBuilder: (_, __, ___) => Container(
+                              height: 180,
+                              color: catColor.withValues(alpha: 0.1),
+                              child: Center(
+                                child: Icon(catIcon, size: 54, color: catColor),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                    ],
+
+                    // Badges row
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 6,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        _buildBadge(
+                          label: item.kategori.toUpperCase(),
+                          icon: catIcon,
+                          color: catColor,
+                          isLight: false,
+                        ),
+                        if (item.isBanner)
+                          _buildMiniTag('TAMPIL DI BANNER HOME', const Color(0xFF2563EB)),
+                        if (item.isUpdate)
+                          _buildMiniTag('SAFETY UPDATE MOBILE', const Color(0xFF059669)),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Title
                     Text(
-                      update.title,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
+                      item.judul,
                       style: const TextStyle(
-                        color: Color(0xFF101828),
-                        fontSize: 13,
-                        height: 1.12,
+                        color: Color(0xFF0F172A),
+                        fontSize: 22,
+                        height: 1.2,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+
+                    // Metadata Box
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF1F5F9),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                      ),
+                      child: Column(
+                        children: [
+                          Row(
+                            children: [
+                              const Icon(Icons.location_on_rounded, size: 16, color: Color(0xFF64748B)),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  'Lokasi: ${item.lokasi}',
+                                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF334155)),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const Divider(height: 16, color: Color(0xFFE2E8F0)),
+                          Row(
+                            children: [
+                              const Icon(Icons.calendar_today_rounded, size: 15, color: Color(0xFF64748B)),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  'Waktu Kejadian: ${_formatDateTime(item.tanggalKejadian, item.rawTanggal)}',
+                                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF334155)),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const Divider(height: 16, color: Color(0xFFE2E8F0)),
+                          Row(
+                            children: [
+                              const Icon(Icons.person_rounded, size: 16, color: Color(0xFF64748B)),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  'Dibuat oleh: ${item.dibuatOleh}',
+                                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF334155)),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+
+                    // Konten Isi Berita
+                    const Text(
+                      'Detail Informasi:',
+                      style: TextStyle(
+                        fontSize: 14,
                         fontWeight: FontWeight.w800,
+                        color: Color(0xFF1E293B),
                       ),
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 8),
                     Text(
-                      update.summary,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                      item.konten,
                       style: const TextStyle(
-                        color: Color(0xFF667085),
-                        fontSize: 10,
+                        color: Color(0xFF334155),
+                        fontSize: 14,
+                        height: 1.6,
+                        letterSpacing: 0.1,
                       ),
                     ),
-                    const SizedBox(height: 6),
-                    _UpdateMeta(update: update),
+                    const SizedBox(height: 30),
+
+                    // Close Button
+                    SizedBox(
+                      width: double.infinity,
+                      height: 48,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF0F172A),
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                          elevation: 0,
+                        ),
+                        onPressed: () => Navigator.pop(ctx),
+                        child: const Text('Tutup', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+                      ),
+                    ),
                   ],
                 ),
-              ),
-              const Padding(
-                padding: EdgeInsets.only(top: 29),
-                child: Icon(Icons.chevron_right_rounded,
-                    color: Color(0xFF667085), size: 21),
               ),
             ],
           ),
@@ -438,119 +1022,4 @@ class _UpdateCard extends StatelessWidget {
       ),
     );
   }
-}
-
-class _CategoryBadge extends StatelessWidget {
-  const _CategoryBadge({required this.update, this.light = false});
-
-  final _SafetyUpdate update;
-  final bool light;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-          decoration: BoxDecoration(
-            color: light ? update.color : update.color.withValues(alpha: .1),
-            borderRadius: BorderRadius.circular(5),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(update.icon,
-                  size: 11, color: light ? Colors.white : update.color),
-              const SizedBox(width: 3),
-              Text(
-                update.category.toUpperCase(),
-                style: TextStyle(
-                  color: light ? Colors.white : update.color,
-                  fontSize: 8,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(width: 5),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-          decoration: BoxDecoration(
-            color: update.label == 'URGENT'
-                ? const Color(0xFFFFE4E8)
-                : const Color(0xFFF2F4F7),
-            borderRadius: BorderRadius.circular(5),
-          ),
-          child: Text(
-            update.label,
-            style: TextStyle(
-              color: update.label == 'URGENT'
-                  ? const Color(0xFFD92D20)
-                  : const Color(0xFF667085),
-              fontSize: 8,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _UpdateMeta extends StatelessWidget {
-  const _UpdateMeta({required this.update});
-
-  final _SafetyUpdate update;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        const Icon(Icons.calendar_today_rounded,
-            size: 11, color: Color(0xFF98A2B3)),
-        const SizedBox(width: 4),
-        Flexible(
-          child: Text(
-            '${update.date} • ${update.time}',
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(color: Color(0xFF98A2B3), fontSize: 9),
-          ),
-        ),
-        const SizedBox(width: 9),
-        const Icon(Icons.visibility_outlined,
-            size: 12, color: Color(0xFF98A2B3)),
-        const SizedBox(width: 3),
-        Text(update.views,
-            style: const TextStyle(color: Color(0xFF98A2B3), fontSize: 9)),
-      ],
-    );
-  }
-}
-
-class _SafetyUpdate {
-  const _SafetyUpdate({
-    required this.category,
-    required this.label,
-    required this.title,
-    required this.summary,
-    required this.date,
-    required this.time,
-    required this.views,
-    required this.image,
-    required this.color,
-    required this.icon,
-  });
-
-  final String category;
-  final String label;
-  final String title;
-  final String summary;
-  final String date;
-  final String time;
-  final String views;
-  final String image;
-  final Color color;
-  final IconData icon;
 }

@@ -16,7 +16,7 @@ class ApiService {
   // Wi-Fi Kantor / LAN = http://192.168.130.236:5200
   // USB ADB Reverse = http://127.0.0.1:5200
   // PROD = https://indexsafeevolution.indexim.id
-  final baseUrl = 'http://192.168.137.1:5200';
+  final baseUrl = 'http://127.0.0.1:5200';
   bool get isLocalDev => baseUrl.contains('192.168.') || baseUrl.contains('127.0.0.1');
   final company = 'IC';
   late Dio dio;
@@ -54,6 +54,30 @@ class ApiService {
 
   set setToken(String token) {
     _token = token;
+  }
+
+  Future<String> getEmbedWebUrl({String type = 'display'}) async {
+    try {
+      final res = await dio.get('/config/embed-web');
+      if (res.data != null && res.data is Map) {
+        final data = res.data as Map;
+        if (type == 'sap_report' && data['sap_report_url'] != null) {
+          return data['sap_report_url'].toString();
+        }
+        if (type == 'global_report' && data['global_report_url'] != null) {
+          return data['global_report_url'].toString();
+        }
+        if (data['display_url'] != null) {
+          return data['display_url'].toString();
+        }
+        if (data['embed_url'] != null) {
+          return data['embed_url'].toString();
+        }
+      }
+    } catch (e) {
+      debugPrint('[ApiService] Error fetching embed-web config: $e');
+    }
+    return 'https://mbssap.indexim.id/displaymobile';
   }
 
   Future<Either<Map, AuthModel>> register(name, email, pswd) async {
@@ -277,6 +301,9 @@ class ApiService {
       }
 
       var res = await dio.get('/master/$name?limit=10000');
+      if (res.data is List) {
+        return Right({'data': res.data});
+      }
       return Right(Map<String, dynamic>.from(res.data as Map));
     } on DioException catch (err) {
       return Left(errorHandler(err));
@@ -354,6 +381,41 @@ class ApiService {
     }
   }
 
+  Future<Map<String, int>> getNotificationCounts() async {
+    try {
+      dio.options.headers['Authorization'] = 'Bearer $getToken';
+      var res = await dio.get('/notifications/count');
+      if (res.data is Map) {
+        final m = res.data as Map;
+        final unread = (m['unread_count'] as num?)?.toInt() ?? 0;
+        final unactioned = (m['unactioned_count'] as num?)?.toInt() ?? 0;
+        final total = (m['total_pending_count'] as num?)?.toInt() ?? (unread + unactioned);
+        return {
+          'unread': unread,
+          'unactioned': unactioned,
+          'total': total,
+        };
+      }
+      return {'unread': 0, 'unactioned': 0, 'total': 0};
+    } catch (_) {
+      try {
+        var resFallback = await dio.get('/notifications', queryParameters: {'limit': 1});
+        if (resFallback.data is Map) {
+          final m = resFallback.data as Map;
+          final unread = (m['unread_count'] as num?)?.toInt() ?? 0;
+          final unactioned = (m['unactioned_count'] as num?)?.toInt() ?? 0;
+          final total = (m['total_pending_count'] as num?)?.toInt() ?? (unread + unactioned);
+          return {
+            'unread': unread,
+            'unactioned': unactioned,
+            'total': total,
+          };
+        }
+      } catch (_) {}
+      return {'unread': 0, 'unactioned': 0, 'total': 0};
+    }
+  }
+
   Future<Either<Map, List<NotificationItemModel>>> getNotifications({int limit = 30}) async {
     try {
       dio.options.headers['Authorization'] = 'Bearer $getToken';
@@ -410,20 +472,6 @@ class ApiService {
     }
   }
 
-  Future<Map<String, int>> getNotificationCounts() async {
-    try {
-      dio.options.headers['Authorization'] = 'Bearer $getToken';
-      var res = await dio.get('/notifications', queryParameters: {'limit': 1});
-      if (res.data is Map) {
-        final unread = (res.data['unread_count'] as num?)?.toInt() ?? 0;
-        final unactioned = (res.data['unactioned_count'] as num?)?.toInt() ?? 0;
-        final total = (res.data['total_pending_count'] as num?)?.toInt() ?? (unread + unactioned);
-        return {'unread': unread, 'unactioned': unactioned, 'total': total};
-      }
-    } catch (_) {}
-    return {'unread': 0, 'unactioned': 0, 'total': 0};
-  }
-
   Future<Either<Map, NotificationItemModel>> createTestNotification() async {
     try {
       dio.options.headers['Authorization'] = 'Bearer $getToken';
@@ -442,6 +490,8 @@ class ApiService {
     int limit = 30,
     String? category,
     String? search,
+    bool? isBanner,
+    bool? isUpdate,
   }) async {
     try {
       dio.options.headers['Authorization'] = 'Bearer $getToken';
@@ -451,6 +501,12 @@ class ApiService {
       }
       if (search != null && search.isNotEmpty) {
         params['search'] = search;
+      }
+      if (isBanner != null) {
+        params['is_banner'] = isBanner;
+      }
+      if (isUpdate != null) {
+        params['is_update'] = isUpdate;
       }
 
       Response res;
@@ -991,12 +1047,15 @@ class ApiService {
     }
   }
 
-  Future<Either<Map, List<Map<String, dynamic>>>> searchPja(String query) async {
+  Future<Either<Map, List<Map<String, dynamic>>>> searchPja(String query, {bool lintasPerusahaan = true}) async {
     try {
       if (_token != null && _token!.isNotEmpty) {
         dio.options.headers['Authorization'] = 'Bearer $getToken';
       }
-      final params = {'q': query};
+      final params = {
+        'q': query,
+        'lintasPerusahaan': lintasPerusahaan.toString(),
+      };
 
       Response res;
       try {
@@ -1032,9 +1091,31 @@ class ApiService {
     }
   }
 
+  Future<Either<Map, Map<String, dynamic>>> takeUpHazard(int id, {String? note}) async {
+    try {
+      if (_token != null && _token!.isNotEmpty) {
+        dio.options.headers['Authorization'] = 'Bearer $getToken';
+      }
+      final payload = {
+        'id': id,
+        'note': note ?? '',
+      };
+
+      final res = await dio.post('/hazard/take-up', data: payload);
+      if (res.data is Map) {
+        return Right(Map<String, dynamic>.from(res.data as Map));
+      }
+      return const Right({'success': true});
+    } on DioException catch (err) {
+      return Left(errorHandler(err));
+    }
+  }
+
+
   Future<Either<Map, List<Map<String, dynamic>>>> getSafeMapHazardPoints({
     int days = 30,
     bool onlyOpen = true,
+    int limit = 80,
     double? lat,
     double? lon,
   }) async {
@@ -1046,6 +1127,7 @@ class ApiService {
       final params = <String, dynamic>{
         'days': days,
         'onlyOpen': onlyOpen,
+        'limit': limit,
       };
       if (lat != null && lon != null) {
         params['userLat'] = lat;
@@ -1124,6 +1206,247 @@ class ApiService {
     } on DioException catch (err) {
       return Left(errorHandler(err));
     }
+  }
+
+  Future<Either<Map, List<dynamic>>> getAttendanceEvents() async {
+    dio.options.headers['Authorization'] = 'Bearer $_token';
+    try {
+      var con = await Connectivity().checkConnectivity();
+      if (con.contains(ConnectivityResult.wifi) == false &&
+          con.contains(ConnectivityResult.mobile) == false &&
+          con.contains(ConnectivityResult.ethernet) == false) {
+        return const Left({'message': 'No internet access!'});
+      }
+
+      var res = await dio.get('/qr/events');
+      if (res.data is Map && res.data['data'] is List) {
+        return Right(res.data['data'] as List<dynamic>);
+      }
+      return const Right([]);
+    } on DioException catch (err) {
+      return Left(errorHandler(err));
+    }
+  }
+
+  Future<Either<Map, Map<String, dynamic>>> scanAttendanceQr({
+    required String code,
+    double? latitude,
+    double? longitude,
+    double? accuracy,
+    String? scanType,
+  }) async {
+    dio.options.headers['Authorization'] = 'Bearer $_token';
+    try {
+      var con = await Connectivity().checkConnectivity();
+      if (con.contains(ConnectivityResult.wifi) == false &&
+          con.contains(ConnectivityResult.mobile) == false &&
+          con.contains(ConnectivityResult.ethernet) == false) {
+        return const Left({'message': 'No internet access!'});
+      }
+
+      final payload = <String, dynamic>{
+        'code': code.trim(),
+        'scanType': scanType ?? 'Absen Acara',
+        'latitude': latitude,
+        'longitude': longitude,
+        'accuracy': accuracy,
+      };
+
+      var res = await dio.post('/qr/scan', data: json.encode(payload));
+      if (res.data is Map) {
+        return Right(Map<String, dynamic>.from(res.data as Map));
+      }
+      return const Right({});
+    } on DioException catch (err) {
+      return Left(errorHandler(err));
+    }
+  }
+
+  Future<Either<Map, List<dynamic>>> getAttendanceHistory() async {
+    dio.options.headers['Authorization'] = 'Bearer $_token';
+    try {
+      var con = await Connectivity().checkConnectivity();
+      if (con.contains(ConnectivityResult.wifi) == false &&
+          con.contains(ConnectivityResult.mobile) == false &&
+          con.contains(ConnectivityResult.ethernet) == false) {
+        return const Left({'message': 'No internet access!'});
+      }
+
+      var res = await dio.get('/qr/history');
+      if (res.data is Map && res.data['data'] is List) {
+        return Right(res.data['data'] as List<dynamic>);
+      }
+      return const Right([]);
+    } on DioException catch (err) {
+      return Left(errorHandler(err));
+    }
+  }
+
+  Future<Either<Map, Map<String, dynamic>>> getMyScanPermissions() async {
+    dio.options.headers['Authorization'] = 'Bearer $_token';
+    try {
+      var con = await Connectivity().checkConnectivity();
+      if (con.contains(ConnectivityResult.wifi) == false &&
+          con.contains(ConnectivityResult.mobile) == false &&
+          con.contains(ConnectivityResult.ethernet) == false) {
+        return const Left({'message': 'No internet access!'});
+      }
+
+      var res = await dio.get('/qr/my-permissions');
+      if (res.data is Map && res.data['data'] is Map) {
+        return Right(Map<String, dynamic>.from(res.data['data'] as Map));
+      }
+      return const Right({});
+    } on DioException catch (err) {
+      return Left(errorHandler(err));
+    }
+  }
+
+  Future<Either<Map, Map<String, dynamic>>> getPermitViolationMaster() async {
+    dio.options.headers['Authorization'] = 'Bearer $_token';
+    try {
+      var con = await Connectivity().checkConnectivity();
+      if (con.contains(ConnectivityResult.wifi) == false &&
+          con.contains(ConnectivityResult.mobile) == false &&
+          con.contains(ConnectivityResult.ethernet) == false) {
+        return const Left({'message': 'No internet access!'});
+      }
+
+      var res = await dio.get('/qr/permit/violation-master');
+      if (res.data is Map && res.data['data'] is Map) {
+        return Right(Map<String, dynamic>.from(res.data['data'] as Map));
+      }
+      return const Right({});
+    } on DioException catch (err) {
+      return Left(errorHandler(err));
+    }
+  }
+
+  Future<Either<Map, Map<String, dynamic>>> recordPermitViolation(Map<String, dynamic> payload) async {
+    dio.options.headers['Authorization'] = 'Bearer $_token';
+    try {
+      var con = await Connectivity().checkConnectivity();
+      if (con.contains(ConnectivityResult.wifi) == false &&
+          con.contains(ConnectivityResult.mobile) == false &&
+          con.contains(ConnectivityResult.ethernet) == false) {
+        return const Left({'message': 'No internet access!'});
+      }
+
+      var res = await dio.post('/qr/permit/violation', data: json.encode(payload));
+      if (res.data is Map) {
+        return Right(Map<String, dynamic>.from(res.data as Map));
+      }
+      return const Right({});
+    } on DioException catch (err) {
+      return Left(errorHandler(err));
+    }
+  }
+
+  Future<Either<Map, Map<String, dynamic>>> recordPermitMovement(Map<String, dynamic> payload) async {
+    dio.options.headers['Authorization'] = 'Bearer $_token';
+    try {
+      var con = await Connectivity().checkConnectivity();
+      if (con.contains(ConnectivityResult.wifi) == false &&
+          con.contains(ConnectivityResult.mobile) == false &&
+          con.contains(ConnectivityResult.ethernet) == false) {
+        return const Left({'message': 'No internet access!'});
+      }
+
+      var res = await dio.post('/qr/permit/movement', data: json.encode(payload));
+      if (res.data is Map) {
+        return Right(Map<String, dynamic>.from(res.data as Map));
+      }
+      return const Right({});
+    } on DioException catch (err) {
+      return Left(errorHandler(err));
+    }
+  }
+
+  Future<List<String>> getMasterAreas({int? perusahaanId}) async {
+    try {
+      final res = await dio.get('/master/areas', queryParameters: {
+        if (perusahaanId != null && perusahaanId > 0) 'perusahaanId': perusahaanId,
+      });
+      if (res.data is List) {
+        final list = (res.data as List)
+            .map((e) => (e is Map ? e['namaArea']?.toString() : e.toString()) ?? '')
+            .where((s) => s.isNotEmpty)
+            .toList();
+        return list;
+      }
+    } catch (e) {
+      debugPrint('[ApiService] Error fetching master areas: $e');
+    }
+    return [];
+  }
+
+  Future<List<String>> getBenchmarks(String areaUtama, {int? perusahaanId}) async {
+    try {
+      final res = await dio.get('/master/benchmarks', queryParameters: {
+        'areaUtama': areaUtama,
+        if (perusahaanId != null && perusahaanId > 0) 'perusahaanId': perusahaanId,
+      });
+      if (res.data is List) {
+        final list = (res.data as List)
+            .map((e) => (e is Map ? e['namaBenchmark']?.toString() : e.toString()) ?? '')
+            .where((s) => s.isNotEmpty)
+            .toList();
+        return list;
+      }
+    } catch (e) {
+      debugPrint('[ApiService] Error fetching benchmarks for $areaUtama: $e');
+    }
+    return [];
+  }
+
+  Future<Map<String, dynamic>?> createBenchmark({
+    required String areaUtama,
+    required String namaBenchmark,
+    int? perusahaanId,
+    String? createdByNik,
+    String? createdByName,
+  }) async {
+    try {
+      if (_token != null && _token!.isNotEmpty) {
+        dio.options.headers['Authorization'] = 'Bearer $getToken';
+      }
+      final res = await dio.post('/master/benchmarks', data: {
+        'areaUtama': areaUtama,
+        'namaBenchmark': namaBenchmark,
+        if (perusahaanId != null && perusahaanId > 0) 'perusahaanId': perusahaanId,
+        'createdByNik': createdByNik,
+        'createdByName': createdByName,
+      });
+      if (res.data is Map) {
+        return Map<String, dynamic>.from(res.data as Map);
+      }
+    } catch (e) {
+      debugPrint('[ApiService] Error creating benchmark: $e');
+    }
+    return null;
+  }
+
+  Future<Map<String, dynamic>?> createArea({
+    required String namaArea,
+    String? createdByNik,
+    String? createdByName,
+  }) async {
+    try {
+      if (_token != null && _token!.isNotEmpty) {
+        dio.options.headers['Authorization'] = 'Bearer $getToken';
+      }
+      final res = await dio.post('/master/areas', data: {
+        'namaArea': namaArea,
+        'createdByNik': createdByNik,
+        'createdByName': createdByName,
+      });
+      if (res.data is Map) {
+        return Map<String, dynamic>.from(res.data as Map);
+      }
+    } catch (e) {
+      debugPrint('[ApiService] Error creating area: $e');
+    }
+    return null;
   }
 
   dynamic errorHandler(DioException err) {

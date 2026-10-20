@@ -20,6 +20,9 @@ namespace Indexsafe.Api.Services
         [JsonPropertyName("permit_nomor")]
         public string? PermitNomor { get; set; }
 
+        [JsonPropertyName("masa_aktif_permit")]
+        public string? MasaAktifPermit { get; set; }
+
         [JsonPropertyName("permit_status")]
         public string? PermitStatus { get; set; }
 
@@ -198,14 +201,14 @@ namespace Indexsafe.Api.Services
             {
                 try
                 {
-                    // 1. Ambil data TERBARU dari public.tb_permit berdasarkan NIK (ORDER BY id DESC)
+                    // 1. Ambil data TERBARU dari public.tb_permit berdasarkan NIK (ORDER BY created_at DESC NULLS LAST, id DESC)
                     const string sqlPermit = @"
-                        SELECT id, nomor, status, pengajuan, akses_lokasi, mulai_kerja, berakhir_kerja, last_expired, tercetak, waktu_tercetak, created_at, updated_at
+                        SELECT id, nomor, status, pengajuan, (tanggal + INTERVAL '1 year')::date AS masa_aktif_permit, akses_lokasi, mulai_kerja, berakhir_kerja, last_expired, tercetak, waktu_tercetak, created_at, updated_at
                         FROM public.tb_permit
                         WHERE TRIM(nik) = @nikClean 
                            OR TRIM(employee_id) = @nikClean
                            OR (@nikNoZero <> '' AND (TRIM(nik) = @nikNoZero OR TRIM(employee_id) = @nikNoZero))
-                        ORDER BY id DESC
+                        ORDER BY created_at DESC NULLS LAST, id DESC
                         LIMIT 1;";
 
                     long? permitId = null;
@@ -225,6 +228,23 @@ namespace Indexsafe.Api.Services
                             result.PermitNomor = reader.IsDBNull(reader.GetOrdinal("nomor")) ? null : reader.GetString(reader.GetOrdinal("nomor"));
                             result.PermitPengajuan = reader.IsDBNull(reader.GetOrdinal("pengajuan")) ? null : reader.GetString(reader.GetOrdinal("pengajuan"));
                             result.AksesLokasi = reader.IsDBNull(reader.GetOrdinal("akses_lokasi")) ? null : reader.GetString(reader.GetOrdinal("akses_lokasi"));
+
+                            if (!reader.IsDBNull(reader.GetOrdinal("masa_aktif_permit")))
+                            {
+                                var mapVal = reader.GetValue(reader.GetOrdinal("masa_aktif_permit"));
+                                if (mapVal is DateTime dt)
+                                {
+                                    result.MasaAktifPermit = dt.ToString("yyyy-MM-dd");
+                                }
+                                else if (mapVal is DateOnly dOnly)
+                                {
+                                    result.MasaAktifPermit = dOnly.ToString("yyyy-MM-dd");
+                                }
+                                else if (mapVal != null)
+                                {
+                                    result.MasaAktifPermit = mapVal.ToString();
+                                }
+                            }
 
                             if (!reader.IsDBNull(reader.GetOrdinal("mulai_kerja")))
                             {
@@ -408,6 +428,7 @@ namespace Indexsafe.Api.Services
         {
             if (val == null || val == DBNull.Value) return null;
             if (val is DateTime dt) return dt;
+            if (val is DateOnly dOnly) return dOnly.ToDateTime(TimeOnly.MinValue);
             var str = val.ToString()?.Trim();
             if (string.IsNullOrEmpty(str)) return null;
 
@@ -422,5 +443,188 @@ namespace Indexsafe.Api.Services
             }
             return null;
         }
+
+        public async Task<PermitFullDetailDto?> GetFullPermitDetailAsync(string nik)
+        {
+            if (string.IsNullOrWhiteSpace(nik)) return null;
+
+            var nikClean = nik.Trim();
+            var nikNoZero = nikClean.TrimStart('0');
+
+            NpgsqlConnection? activeConn = null;
+            foreach (var host in _candidateHosts)
+            {
+                var dbsToTry = new List<string> { "Bima", "BimaTest", "sysinteg_indexsafe2", "postgres" };
+                foreach (var db in dbsToTry)
+                {
+                    try
+                    {
+                        var builder = new NpgsqlConnectionStringBuilder
+                        {
+                            Host = host,
+                            Port = 5432,
+                            Database = db,
+                            Username = User,
+                            Password = Pass,
+                            Timeout = 3,
+                            CommandTimeout = 5
+                        };
+                        var conn = new NpgsqlConnection(builder.ConnectionString);
+                        await conn.OpenAsync();
+
+                        await using (var checkCmd = new NpgsqlCommand("SELECT to_regclass('public.tb_permit')::text;", conn))
+                        {
+                            var reg = await checkCmd.ExecuteScalarAsync();
+                            if (reg != null && reg != DBNull.Value && !string.IsNullOrWhiteSpace(reg.ToString()))
+                            {
+                                activeConn = conn;
+                                break;
+                            }
+                        }
+                        await conn.DisposeAsync();
+                    }
+                    catch { }
+                }
+                if (activeConn != null) break;
+            }
+
+            if (activeConn == null) return null;
+
+            await using (activeConn)
+            {
+                try
+                {
+                    const string sql = @"
+                        SELECT DISTINCT ON (nik)
+                            nik,
+                            tanggal,
+                            (tanggal + INTERVAL '1 year')::date AS masa_aktif_permit,
+                            nomor,
+                            akses_lokasi, perusahaan, nama, email, departemen, jabatan, posisi,
+                            status,
+                            pengajuan,
+                            berakhir_kerja
+                        FROM public.tb_permit
+                        WHERE (TRIM(nik) = @nikClean OR TRIM(employee_id) = @nikClean OR (@nikNoZero <> '' AND (TRIM(nik) = @nikNoZero OR TRIM(employee_id) = @nikNoZero)))
+                        ORDER BY nik, created_at DESC NULLS LAST, id DESC
+                        LIMIT 1;";
+
+                    await using var cmd = new NpgsqlCommand(sql, activeConn);
+                    cmd.Parameters.AddWithValue("@nikClean", nikClean);
+                    cmd.Parameters.AddWithValue("@nikNoZero", nikNoZero);
+
+                    await using var r = await cmd.ExecuteReaderAsync();
+                    if (await r.ReadAsync())
+                    {
+                        var dto = new PermitFullDetailDto
+                        {
+                            Nik = r.IsDBNull(r.GetOrdinal("nik")) ? nikClean : r.GetString(r.GetOrdinal("nik")),
+                            Nama = r.IsDBNull(r.GetOrdinal("nama")) ? null : r.GetString(r.GetOrdinal("nama")),
+                            Nomor = r.IsDBNull(r.GetOrdinal("nomor")) ? null : r.GetString(r.GetOrdinal("nomor")),
+                            AksesLokasi = r.IsDBNull(r.GetOrdinal("akses_lokasi")) ? null : r.GetString(r.GetOrdinal("akses_lokasi")),
+                            Perusahaan = r.IsDBNull(r.GetOrdinal("perusahaan")) ? null : r.GetString(r.GetOrdinal("perusahaan")),
+                            Email = r.IsDBNull(r.GetOrdinal("email")) ? null : r.GetString(r.GetOrdinal("email")),
+                            Departemen = r.IsDBNull(r.GetOrdinal("departemen")) ? null : r.GetString(r.GetOrdinal("departemen")),
+                            Jabatan = r.IsDBNull(r.GetOrdinal("jabatan")) ? null : r.GetString(r.GetOrdinal("jabatan")),
+                            Posisi = r.IsDBNull(r.GetOrdinal("posisi")) ? null : r.GetString(r.GetOrdinal("posisi")),
+                            Status = r.IsDBNull(r.GetOrdinal("status")) ? null : r.GetString(r.GetOrdinal("status")),
+                            Pengajuan = r.IsDBNull(r.GetOrdinal("pengajuan")) ? null : r.GetString(r.GetOrdinal("pengajuan"))
+                        };
+
+                        if (!r.IsDBNull(r.GetOrdinal("tanggal")))
+                        {
+                            var tVal = r.GetValue(r.GetOrdinal("tanggal"));
+                            var dt = ParseDateFlexible(tVal);
+                            dto.Tanggal = dt?.ToString("yyyy-MM-dd") ?? tVal.ToString();
+                        }
+
+                        if (!r.IsDBNull(r.GetOrdinal("berakhir_kerja")))
+                        {
+                            var bVal = r.GetValue(r.GetOrdinal("berakhir_kerja"));
+                            var dt = ParseDateFlexible(bVal);
+                            dto.BerakhirKerja = dt?.ToString("yyyy-MM-dd") ?? bVal.ToString();
+                        }
+
+                        if (!r.IsDBNull(r.GetOrdinal("masa_aktif_permit")))
+                        {
+                            var mapVal = r.GetValue(r.GetOrdinal("masa_aktif_permit"));
+                            var expDt = ParseDateFlexible(mapVal);
+                            if (expDt.HasValue)
+                            {
+                                dto.MasaAktifPermit = expDt.Value.ToString("yyyy-MM-dd");
+                                dto.DaysLeft = (expDt.Value.Date - DateTime.Today).Days;
+                                dto.IsExpired = DateTime.Today > expDt.Value.Date;
+                            }
+                            else
+                            {
+                                dto.MasaAktifPermit = mapVal?.ToString();
+                            }
+                        }
+
+                        return dto;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "[PermitService] Error querying GetFullPermitDetailAsync: {Msg}", ex.Message);
+                }
+            }
+
+            return null;
+        }
+    }
+
+    public class PermitFullDetailDto
+    {
+        [JsonPropertyName("nik")]
+        public string Nik { get; set; } = string.Empty;
+
+        [JsonPropertyName("nama")]
+        public string? Nama { get; set; }
+
+        [JsonPropertyName("nomor")]
+        public string? Nomor { get; set; }
+
+        [JsonPropertyName("tanggal")]
+        public string? Tanggal { get; set; }
+
+        [JsonPropertyName("masa_aktif_permit")]
+        public string? MasaAktifPermit { get; set; }
+
+        [JsonPropertyName("days_left")]
+        public int DaysLeft { get; set; }
+
+        [JsonPropertyName("is_expired")]
+        public bool IsExpired { get; set; }
+
+        [JsonPropertyName("status")]
+        public string? Status { get; set; }
+
+        [JsonPropertyName("pengajuan")]
+        public string? Pengajuan { get; set; }
+
+        [JsonPropertyName("berakhir_kerja")]
+        public string? BerakhirKerja { get; set; }
+
+        [JsonPropertyName("perusahaan")]
+        public string? Perusahaan { get; set; }
+
+        [JsonPropertyName("departemen")]
+        public string? Departemen { get; set; }
+
+        [JsonPropertyName("jabatan")]
+        public string? Jabatan { get; set; }
+
+        [JsonPropertyName("posisi")]
+        public string? Posisi { get; set; }
+
+        [JsonPropertyName("email")]
+        public string? Email { get; set; }
+
+        [JsonPropertyName("akses_lokasi")]
+        public string? AksesLokasi { get; set; }
+
+        [JsonPropertyName("can_input_pelanggaran")]
+        public bool CanInputPelanggaran { get; set; }
     }
 }
