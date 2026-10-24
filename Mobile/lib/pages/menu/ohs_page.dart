@@ -68,7 +68,7 @@ class _OhsModuleCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final item = listMenuOhs1[index];
-    final style = _ohsStyles[index];
+    final style = _getOhsStyle(item.route);
     return Material(
       color: Colors.white,
       borderRadius: BorderRadius.circular(23),
@@ -143,11 +143,21 @@ class _OhsStyle {
   final IconData icon;
 }
 
-const _ohsStyles = [
-  _OhsStyle(Color(0xFF2677E8), Icons.manage_search_rounded),
-  _OhsStyle(Color(0xFF0AA99A), Icons.fact_check_rounded),
-  _OhsStyle(Color(0xFFEE5966), Icons.health_and_safety_rounded),
-  _OhsStyle(Color(0xFF7C4DE8), Icons.nights_stay_rounded),
-  _OhsStyle(Color(0xFFF59E0B), Icons.car_repair_rounded),
-  _OhsStyle(Color(0xFF159947), Icons.drive_eta_rounded),
-];
+_OhsStyle _getOhsStyle(String route) {
+  switch (route) {
+    case '/p5m':
+      return const _OhsStyle(Color(0xFFEE5966), Icons.health_and_safety_rounded);
+    case '/simama':
+      return const _OhsStyle(Color(0xFF7C4DE8), Icons.nights_stay_rounded);
+    case '/p2h':
+      return const _OhsStyle(Color(0xFFF59E0B), Icons.car_repair_rounded);
+    case '/dpa':
+      return const _OhsStyle(Color(0xFF159947), Icons.drive_eta_rounded);
+    case '/inspection':
+      return const _OhsStyle(Color(0xFF2677E8), Icons.manage_search_rounded);
+    case '/daily_inspection':
+      return const _OhsStyle(Color(0xFF0AA99A), Icons.fact_check_rounded);
+    default:
+      return const _OhsStyle(Color(0xFF0AA99A), Icons.work_outline_rounded);
+  }
+}

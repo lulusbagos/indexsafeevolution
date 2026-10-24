@@ -74,6 +74,8 @@ class _GlobalSearchPageState extends State<GlobalSearchPage> {
       if (menu.route.contains('achievement')) desc = 'Pencapaian KPI safety individu dan tim';
       if (menu.route.contains('quality')) desc = 'Indeks kualitas pelaporan SAP';
       if (menu.route.contains('action')) desc = 'Pelacakan penyelesaian rekomendasi tindakan';
+      if (menu.route.contains('reports')) desc = 'Pusat ekspor & rekapitulasi data keselamatan eksekutif';
+      if (menu.route.contains('dpa')) desc = 'Evaluasi kepatuhan dan performa berkendara pengemudi';
       return (name: 'Performance Hub', color: const Color(0xFFF08A00), desc: desc);
     }
   }

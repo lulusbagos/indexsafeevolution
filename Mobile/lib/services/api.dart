@@ -16,7 +16,13 @@ class ApiService {
   // Wi-Fi Kantor / LAN = http://192.168.130.236:5200
   // USB ADB Reverse = http://127.0.0.1:5200
   // PROD = https://indexsafeevolution.indexim.id
-  final baseUrl = 'http://127.0.0.1:5200';
+  static const List<String> _candidateUrls = [
+    'http://127.0.0.1:5200',
+    'http://192.168.137.1:5200',
+    'http://192.168.130.236:5200',
+  ];
+  static String _activeBaseUrl = 'http://127.0.0.1:5200';
+  String get baseUrl => _activeBaseUrl;
   bool get isLocalDev => baseUrl.contains('192.168.') || baseUrl.contains('127.0.0.1');
   final company = 'IC';
   late Dio dio;
@@ -24,7 +30,7 @@ class ApiService {
   ApiService() {
     dio = Dio(
       BaseOptions(
-        baseUrl: '$baseUrl/api',
+        baseUrl: '$_activeBaseUrl/api',
         headers: {
           'Accept': 'application/json',
           'Connection': 'Keep-Alive',
@@ -33,17 +39,52 @@ class ApiService {
         contentType: Headers.jsonContentType,
         responseType: ResponseType.json,
         receiveDataWhenStatusError: true,
-        connectTimeout: const Duration(seconds: 30),
-        receiveTimeout: const Duration(seconds: 30),
+        connectTimeout: const Duration(seconds: 15),
+        receiveTimeout: const Duration(seconds: 15),
       ),
-    )..interceptors.add(LogInterceptor(
-        request: false,
-        requestHeader: false,
-        requestBody: false,
-        responseHeader: false,
-        responseBody: false,
-        logPrint: (o) => debugPrint(o.toString(), wrapWidth: 1024),
-      ));
+    );
+
+    dio.interceptors.add(
+      InterceptorsWrapper(
+        onError: (DioException err, ErrorInterceptorHandler handler) async {
+          if (err.type == DioExceptionType.connectionError ||
+              err.type == DioExceptionType.connectionTimeout ||
+              (err.error != null && err.error is SocketException)) {
+            for (final candidate in _candidateUrls) {
+              if (candidate == _activeBaseUrl) continue;
+              try {
+                final options = Options(
+                  method: err.requestOptions.method,
+                  headers: err.requestOptions.headers,
+                  contentType: err.requestOptions.contentType,
+                  responseType: err.requestOptions.responseType,
+                  receiveTimeout: const Duration(seconds: 6),
+                  sendTimeout: const Duration(seconds: 6),
+                );
+                String pathOnly = err.requestOptions.path;
+                if (pathOnly.startsWith('http://') || pathOnly.startsWith('https://')) {
+                  pathOnly = pathOnly.replaceFirst(RegExp(r'^https?://[^/]+/api'), '');
+                }
+                if (!pathOnly.startsWith('/')) pathOnly = '/$pathOnly';
+                final newUrl = '$candidate/api$pathOnly';
+                final fallbackDio = Dio(BaseOptions(connectTimeout: const Duration(seconds: 4)));
+                final res = await fallbackDio.request(
+                  newUrl,
+                  data: err.requestOptions.data,
+                  queryParameters: err.requestOptions.queryParameters,
+                  options: options,
+                );
+                _activeBaseUrl = candidate;
+                dio.options.baseUrl = '$_activeBaseUrl/api';
+                debugPrint('[ApiService] Successfully switched activeBaseUrl to: $_activeBaseUrl');
+                return handler.resolve(res);
+              } catch (_) {}
+            }
+          }
+          return handler.next(err);
+        },
+      ),
+    );
   }
 
   static String? _token;
@@ -744,6 +785,186 @@ class ApiService {
           rethrow;
         }
       }
+      if (res.data is Map) {
+        return Right(Map<String, dynamic>.from(res.data as Map));
+      }
+      return const Right({});
+    } on DioException catch (err) {
+      return Left(errorHandler(err));
+    }
+  }
+
+  Future<Either<Map, Map<String, dynamic>>> getDepartmentLeague({
+    int? year,
+    int? month,
+    int? companyId,
+  }) async {
+    try {
+      Response res;
+      try {
+        res = await dio.get('/performance/league', queryParameters: {
+          if (month != null) 'month': month,
+          if (year != null) 'year': year,
+          if (companyId != null) 'companyId': companyId,
+        });
+      } on DioException catch (dioErr) {
+        if (dioErr.type == DioExceptionType.connectionTimeout ||
+            dioErr.type == DioExceptionType.connectionError ||
+            dioErr.type == DioExceptionType.unknown ||
+            dioErr.response?.statusCode == 404) {
+          final fallbackHost = baseUrl.contains('192.168.')
+              ? 'http://127.0.0.1:5200'
+              : baseUrl;
+          final fallbackDio = Dio(BaseOptions(
+            baseUrl: '$fallbackHost/api',
+            headers: dio.options.headers,
+            connectTimeout: const Duration(seconds: 6),
+          ));
+          res = await fallbackDio.get('/performance/league', queryParameters: {
+            if (month != null) 'month': month,
+            if (year != null) 'year': year,
+            if (companyId != null) 'companyId': companyId,
+          });
+        } else {
+          rethrow;
+        }
+      }
+      if (res.data is Map) {
+        return Right(Map<String, dynamic>.from(res.data as Map));
+      }
+      return const Right({});
+    } on DioException catch (err) {
+      return Left(errorHandler(err));
+    }
+  }
+
+  Future<Either<Map, Map<String, dynamic>>> getDepartmentSquad({
+    String? nik,
+    String? departmentName,
+    int? year,
+    int? month,
+    int? companyId,
+  }) async {
+    try {
+      Response res;
+      final qParams = <String, dynamic>{
+        if (nik != null && nik.isNotEmpty) 'nik': nik,
+        if (departmentName != null && departmentName.isNotEmpty) 'departmentName': departmentName,
+        if (month != null) 'month': month,
+        if (year != null) 'year': year,
+        if (companyId != null) 'companyId': companyId,
+      };
+      try {
+        res = await dio.get('/performance/department-squad', queryParameters: qParams);
+      } on DioException catch (dioErr) {
+        if (dioErr.type == DioExceptionType.connectionTimeout ||
+            dioErr.type == DioExceptionType.connectionError ||
+            dioErr.type == DioExceptionType.unknown ||
+            dioErr.response?.statusCode == 404) {
+          final fallbackHost = baseUrl.contains('192.168.')
+              ? 'http://127.0.0.1:5200'
+              : baseUrl;
+          final fallbackDio = Dio(BaseOptions(
+            baseUrl: '$fallbackHost/api',
+            headers: dio.options.headers,
+            connectTimeout: const Duration(seconds: 6),
+          ));
+          res = await fallbackDio.get('/performance/department-squad', queryParameters: qParams);
+        } else {
+          rethrow;
+        }
+      }
+      if (res.data is Map) {
+        return Right(Map<String, dynamic>.from(res.data as Map));
+      }
+      return const Right({});
+    } on DioException catch (err) {
+      return Left(errorHandler(err));
+    }
+  }
+
+  Future<Either<Map, Map<String, dynamic>>> getActionTracker({
+    String? nik,
+    String? filter,
+    String? status,
+    String? type,
+    String? search,
+    String? startDate,
+    String? endDate,
+    int limit = 150,
+  }) async {
+    try {
+      Response res;
+      final qParams = <String, dynamic>{
+        if (nik != null && nik.isNotEmpty) 'nik': nik,
+        if (filter != null && filter.isNotEmpty) 'filter': filter,
+        if (status != null && status.isNotEmpty) 'status': status,
+        if (type != null && type.isNotEmpty) 'type': type,
+        if (search != null && search.isNotEmpty) 'search': search,
+        if (startDate != null && startDate.isNotEmpty) 'startDate': startDate,
+        if (endDate != null && endDate.isNotEmpty) 'endDate': endDate,
+        'limit': limit,
+      };
+      try {
+        res = await dio.get('/performance/action-tracker', queryParameters: qParams);
+      } on DioException catch (dioErr) {
+        if (dioErr.type == DioExceptionType.connectionTimeout ||
+            dioErr.type == DioExceptionType.connectionError ||
+            dioErr.type == DioExceptionType.unknown ||
+            dioErr.response?.statusCode == 404) {
+          final fallbackHost = baseUrl.contains('192.168.')
+              ? 'http://127.0.0.1:5200'
+              : baseUrl;
+          final fallbackDio = Dio(BaseOptions(
+            baseUrl: '$fallbackHost/api',
+            headers: dio.options.headers,
+            connectTimeout: const Duration(seconds: 6),
+          ));
+          res = await fallbackDio.get('/performance/action-tracker', queryParameters: qParams);
+        } else {
+          rethrow;
+        }
+      }
+      if (res.data is Map) {
+        return Right(Map<String, dynamic>.from(res.data as Map));
+      }
+      return const Right({});
+    } on DioException catch (err) {
+      return Left(errorHandler(err));
+    }
+  }
+
+  Future<Either<Map, Map<String, dynamic>>> updateActionPlan({
+    required int id,
+    required String status,
+    String? pic,
+    String? nikPic,
+    String? departemenPic,
+    String? rencanaPerbaikan,
+    String? perbaikan,
+    String? photoPath,
+  }) async {
+    try {
+      final mapData = <String, dynamic>{
+        'id': id.toString(),
+        'action_id': id.toString(),
+        'status': status,
+        if (pic != null) 'pic': pic,
+        if (nikPic != null) 'nikPic': nikPic,
+        if (departemenPic != null) 'departemenPic': departemenPic,
+        if (rencanaPerbaikan != null) 'rencana_perbaikan': rencanaPerbaikan,
+        if (perbaikan != null) 'perbaikan': perbaikan,
+      };
+
+      if (photoPath != null && photoPath.isNotEmpty) {
+        mapData['repair_image'] = await MultipartFile.fromFile(
+          photoPath,
+          filename: 'repair_${DateTime.now().millisecondsSinceEpoch}.jpg',
+        );
+      }
+
+      final formData = FormData.fromMap(mapData);
+      final res = await dio.post('/action/hazard', data: formData);
       if (res.data is Map) {
         return Right(Map<String, dynamic>.from(res.data as Map));
       }
@@ -1505,4 +1726,526 @@ class ApiService {
       };
     }
   }
+
+  Future<Either<Map<String, dynamic>, Map<String, dynamic>>> getSapQualityDashboard({
+    String? nik,
+    int? year,
+    int? month,
+  }) async {
+    try {
+      final query = <String, dynamic>{};
+      if (nik != null && nik.isNotEmpty) query['nik'] = nik;
+      if (year != null) query['year'] = year;
+      if (month != null) query['month'] = month;
+
+      final res = await dio.get('/performance/sap-quality-dashboard', queryParameters: query);
+      if (res.statusCode == 200 && res.data != null) {
+        return Right(Map<String, dynamic>.from(res.data));
+      }
+      return Left({'message': 'Gagal mengambil data kualitas SAP.'});
+    } on DioException catch (e) {
+      return Left(errorHandler(e) as Map<String, dynamic>);
+    } catch (e) {
+      return Left({'message': e.toString()});
+    }
+  }
+
+  // ==================== DPA (Driver Performance Assessment) ====================
+  Future<Response> _dpaRequest(
+    String path, {
+    String method = 'GET',
+    dynamic data,
+    Map<String, dynamic>? queryParameters,
+  }) async {
+    final cleanPath = path.startsWith('/') ? path : '/$path';
+    final List<String> targets = [
+      'http://127.0.0.1:5200/api$cleanPath',
+      'http://192.168.130.236:5200/api$cleanPath',
+      'http://192.168.137.1:5200/api$cleanPath',
+      '$baseUrl/api$cleanPath',
+      '$baseUrl$cleanPath',
+    ];
+
+    DioException? lastDioError;
+    Exception? lastException;
+
+    for (final targetUrl in targets) {
+      try {
+        final client = Dio(BaseOptions(
+          headers: {
+            'Accept': 'application/json',
+            'Connection': 'Keep-Alive',
+            'company': company,
+            if (_token != null && _token!.isNotEmpty) 'Authorization': 'Bearer $_token',
+          },
+          contentType: Headers.jsonContentType,
+          responseType: ResponseType.json,
+          connectTimeout: const Duration(seconds: 4),
+          receiveTimeout: const Duration(seconds: 8),
+        ));
+
+        final res = await client.request(
+          targetUrl,
+          data: data,
+          queryParameters: queryParameters,
+          options: Options(method: method),
+        );
+
+        if (res.statusCode != null && res.statusCode! >= 200 && res.statusCode! < 300) {
+          return res;
+        }
+      } on DioException catch (e) {
+        lastDioError = e;
+        if (e.response?.statusCode == 404 ||
+            e.type == DioExceptionType.connectionTimeout ||
+            e.type == DioExceptionType.connectionError ||
+            e.type == DioExceptionType.unknown) {
+          continue;
+        }
+        rethrow;
+      } catch (e) {
+        lastException = e is Exception ? e : Exception(e.toString());
+      }
+    }
+
+    if (lastDioError != null) throw lastDioError;
+    throw lastException ?? Exception('Gagal menghubungi server DPA');
+  }
+
+  Future<Either<Map<String, dynamic>, Map<String, dynamic>>> getDpaList({
+    String? nik,
+    String? search,
+    int page = 1,
+    int pageSize = 50,
+  }) async {
+    try {
+      final query = <String, dynamic>{
+        'page': page,
+        'pageSize': pageSize,
+      };
+      if (nik != null && nik.isNotEmpty) query['nik'] = nik;
+      if (search != null && search.isNotEmpty) query['search'] = search;
+
+      final res = await _dpaRequest('/dpa', queryParameters: query);
+      if (res.data is Map) {
+        return Right(Map<String, dynamic>.from(res.data as Map));
+      }
+      return const Left({'message': 'Gagal mengambil data penilaian driver.'});
+    } on DioException catch (e) {
+      return Left(errorHandler(e) as Map<String, dynamic>);
+    } catch (e) {
+      return Left({'message': e.toString()});
+    }
+  }
+
+  Future<Either<Map<String, dynamic>, Map<String, dynamic>>> getDpaDetail(int id) async {
+    try {
+      final res = await _dpaRequest('/dpa/$id');
+      if (res.data is Map) {
+        return Right(Map<String, dynamic>.from(res.data as Map));
+      }
+      return const Left({'message': 'Gagal mengambil detail penilaian driver.'});
+    } on DioException catch (e) {
+      return Left(errorHandler(e) as Map<String, dynamic>);
+    } catch (e) {
+      return Left({'message': e.toString()});
+    }
+  }
+
+  Future<Either<Map<String, dynamic>, List<dynamic>>> searchDpaDriver(String query) async {
+    try {
+      final res = await _dpaRequest('/dpa/search-driver', queryParameters: {'query': query});
+      if (res.data is List) {
+        return Right(List<dynamic>.from(res.data as List));
+      }
+      return const Right([]);
+    } on DioException catch (e) {
+      return Left(errorHandler(e) as Map<String, dynamic>);
+    } catch (e) {
+      return Left({'message': e.toString()});
+    }
+  }
+
+  Future<Either<Map<String, dynamic>, Map<String, dynamic>>> addDpaDriver(String driverNama, {String? createdByNik}) async {
+    try {
+      final res = await _dpaRequest('/dpa/add-driver', method: 'POST', data: {
+        'driverNama': driverNama,
+        'createdByNik': createdByNik,
+      });
+      if (res.data is Map) {
+        return Right(Map<String, dynamic>.from(res.data as Map));
+      }
+      return const Left({'message': 'Gagal menambahkan driver.'});
+    } on DioException catch (e) {
+      return Left(errorHandler(e) as Map<String, dynamic>);
+    } catch (e) {
+      return Left({'message': e.toString()});
+    }
+  }
+
+  Future<Either<Map<String, dynamic>, Map<String, dynamic>>> saveDpaReport(Map<String, dynamic> data) async {
+    try {
+      final res = await _dpaRequest('/dpa', method: 'POST', data: data);
+      if (res.data is Map) {
+        return Right(Map<String, dynamic>.from(res.data as Map));
+      }
+      return const Left({'message': 'Gagal menyimpan penilaian driver.'});
+    } on DioException catch (e) {
+      return Left(errorHandler(e) as Map<String, dynamic>);
+    } catch (e) {
+      return Left({'message': e.toString()});
+    }
+  }
+
+  Future<Either<Map<String, dynamic>, Map<String, dynamic>>> deleteDpaReport(int id) async {
+    try {
+      final res = await _dpaRequest('/dpa/$id', method: 'DELETE');
+      if (res.data is Map) {
+        return Right(Map<String, dynamic>.from(res.data as Map));
+      }
+      return const Right({});
+    } on DioException catch (e) {
+      return Left(errorHandler(e) as Map<String, dynamic>);
+    } catch (e) {
+      return Left({'message': e.toString()});
+    }
+  }
+
+  // ==================== FCI (Front Condition Index) ====================
+  Future<Response> _fciRequest(
+    String path, {
+    String method = 'GET',
+    dynamic data,
+    Map<String, dynamic>? queryParameters,
+  }) async {
+    final cleanPath = path.startsWith('/') ? path : '/$path';
+    final List<String> targets = [
+      'http://127.0.0.1:5200/api$cleanPath',
+      'http://192.168.130.236:5200/api$cleanPath',
+      'http://192.168.137.1:5200/api$cleanPath',
+      '$baseUrl/api$cleanPath',
+      '$baseUrl$cleanPath',
+    ];
+
+    DioException? lastDioError;
+    Exception? lastException;
+
+    for (final targetUrl in targets) {
+      try {
+        final client = Dio(BaseOptions(
+          headers: {
+            'Accept': 'application/json',
+            'Connection': 'Keep-Alive',
+            'company': company,
+            if (_token != null && _token!.isNotEmpty) 'Authorization': 'Bearer $_token',
+          },
+          contentType: data is FormData ? 'multipart/form-data' : Headers.jsonContentType,
+          responseType: ResponseType.json,
+          connectTimeout: const Duration(seconds: 4),
+          receiveTimeout: const Duration(seconds: 10),
+        ));
+
+        final res = await client.request(
+          targetUrl,
+          data: data,
+          queryParameters: queryParameters,
+          options: Options(method: method),
+        );
+
+        if (res.statusCode != null && res.statusCode! >= 200 && res.statusCode! < 300) {
+          return res;
+        }
+      } on DioException catch (e) {
+        lastDioError = e;
+        if (e.response?.statusCode == 404 ||
+            e.type == DioExceptionType.connectionTimeout ||
+            e.type == DioExceptionType.connectionError ||
+            e.type == DioExceptionType.unknown) {
+          continue;
+        }
+        rethrow;
+      } catch (e) {
+        lastException = e is Exception ? e : Exception(e.toString());
+      }
+    }
+
+    if (lastDioError != null) throw lastDioError;
+    throw lastException ?? Exception('Gagal menghubungi server FCI');
+  }
+
+  Future<Either<Map<String, dynamic>, Map<String, dynamic>>> getFciList({
+    String? userNik,
+    String? userNama,
+    int? companyId,
+    String? companyName,
+    String? scope,
+    String? search,
+    String? pit,
+    String? kategori,
+    DateTime? startDate,
+    DateTime? endDate,
+    int page = 1,
+    int pageSize = 50,
+  }) async {
+    try {
+      final query = <String, dynamic>{
+        'page': page,
+        'pageSize': pageSize,
+      };
+      if (userNik != null && userNik.isNotEmpty) query['userNik'] = userNik;
+      if (userNama != null && userNama.isNotEmpty) query['userNama'] = userNama;
+      if (companyId != null && companyId > 0) query['companyId'] = companyId;
+      if (companyName != null && companyName.isNotEmpty) query['companyName'] = companyName;
+      if (scope != null && scope.isNotEmpty) query['scope'] = scope;
+      if (search != null && search.isNotEmpty) query['search'] = search;
+      if (pit != null && pit.isNotEmpty) query['pit'] = pit;
+      if (kategori != null && kategori.isNotEmpty) query['kategori'] = kategori;
+      if (startDate != null) query['startDate'] = startDate.toIso8601String();
+      if (endDate != null) query['endDate'] = endDate.toIso8601String();
+
+      final res = await _fciRequest('/fci', queryParameters: query);
+      if (res.data is Map) {
+        return Right(Map<String, dynamic>.from(res.data as Map));
+      }
+      return const Left({'message': 'Gagal mengambil data laporan FCI.'});
+    } on DioException catch (e) {
+      return Left(errorHandler(e) as Map<String, dynamic>);
+    } catch (e) {
+      return Left({'message': e.toString()});
+    }
+  }
+
+  Future<Either<Map<String, dynamic>, Map<String, dynamic>>> getFciDetail(int id) async {
+    try {
+      final res = await _fciRequest('/fci/$id');
+      if (res.data is Map) {
+        return Right(Map<String, dynamic>.from(res.data as Map));
+      }
+      return const Left({'message': 'Gagal mengambil detail laporan FCI.'});
+    } on DioException catch (e) {
+      return Left(errorHandler(e) as Map<String, dynamic>);
+    } catch (e) {
+      return Left({'message': e.toString()});
+    }
+  }
+
+  Future<Either<Map<String, dynamic>, Map<String, dynamic>>> saveFciReport(FormData data) async {
+    try {
+      final res = await _fciRequest('/fci', method: 'POST', data: data);
+      if (res.data is Map) {
+        return Right(Map<String, dynamic>.from(res.data as Map));
+      }
+      return const Left({'message': 'Gagal menyimpan laporan FCI.'});
+    } on DioException catch (e) {
+      return Left(errorHandler(e) as Map<String, dynamic>);
+    } catch (e) {
+      return Left({'message': e.toString()});
+    }
+  }
+
+  Future<Either<Map<String, dynamic>, Map<String, dynamic>>> deleteFciReport(int id) async {
+    try {
+      final res = await _fciRequest('/fci/$id', method: 'DELETE');
+      if (res.data is Map) {
+        return Right(Map<String, dynamic>.from(res.data as Map));
+      }
+      return const Right({});
+    } on DioException catch (e) {
+      return Left(errorHandler(e) as Map<String, dynamic>);
+    } catch (e) {
+      return Left({'message': e.toString()});
+    }
+  }
+
+  // ==================== RCI (Road Condition Index) ====================
+  Future<Response> _rciRequest(
+    String path, {
+    String method = 'GET',
+    dynamic data,
+    Map<String, dynamic>? queryParameters,
+  }) async {
+    final cleanPath = path.startsWith('/') ? path : '/$path';
+    final List<String> targets = [
+      'http://127.0.0.1:5200/api$cleanPath',
+      'http://192.168.130.236:5200/api$cleanPath',
+      'http://192.168.137.1:5200/api$cleanPath',
+      '$baseUrl/api$cleanPath',
+      '$baseUrl$cleanPath',
+    ];
+
+    DioException? lastDioError;
+    Exception? lastException;
+
+    for (final targetUrl in targets) {
+      try {
+        final client = Dio(BaseOptions(
+          headers: {
+            'Accept': 'application/json',
+            'Connection': 'Keep-Alive',
+            'company': company,
+            if (_token != null && _token!.isNotEmpty) 'Authorization': 'Bearer $_token',
+          },
+          contentType: data is FormData ? 'multipart/form-data' : Headers.jsonContentType,
+          responseType: ResponseType.json,
+          connectTimeout: const Duration(seconds: 4),
+          receiveTimeout: const Duration(seconds: 10),
+        ));
+
+        final res = await client.request(
+          targetUrl,
+          data: data,
+          queryParameters: queryParameters,
+          options: Options(method: method),
+        );
+
+        if (res.statusCode != null && res.statusCode! >= 200 && res.statusCode! < 300) {
+          return res;
+        }
+      } on DioException catch (e) {
+        lastDioError = e;
+        if (e.response?.statusCode == 404 ||
+            e.type == DioExceptionType.connectionTimeout ||
+            e.type == DioExceptionType.connectionError ||
+            e.type == DioExceptionType.unknown) {
+          continue;
+        }
+        rethrow;
+      } catch (e) {
+        lastException = e is Exception ? e : Exception(e.toString());
+      }
+    }
+
+    if (lastDioError != null) throw lastDioError;
+    throw lastException ?? Exception('Gagal menghubungi server RCI');
+  }
+
+  Future<Either<Map<String, dynamic>, Map<String, dynamic>>> getRciList({
+    String? userNik,
+    String? userNama,
+    int? companyId,
+    String? companyName,
+    String? scope,
+    String? search,
+    String? namaJalan,
+    String? kategori,
+    String? statusFilter,
+    DateTime? startDate,
+    DateTime? endDate,
+    int page = 1,
+    int pageSize = 50,
+  }) async {
+    try {
+      final query = <String, dynamic>{
+        'page': page,
+        'pageSize': pageSize,
+      };
+      if (userNik != null && userNik.isNotEmpty) query['userNik'] = userNik;
+      if (userNama != null && userNama.isNotEmpty) query['userNama'] = userNama;
+      if (companyId != null && companyId > 0) query['companyId'] = companyId;
+      if (companyName != null && companyName.isNotEmpty) query['companyName'] = companyName;
+      if (scope != null && scope.isNotEmpty) query['scope'] = scope;
+      if (search != null && search.isNotEmpty) query['search'] = search;
+      if (namaJalan != null && namaJalan.isNotEmpty) query['namaJalan'] = namaJalan;
+      if (kategori != null && kategori.isNotEmpty) query['kategori'] = kategori;
+      if (statusFilter != null && statusFilter.isNotEmpty) query['statusFilter'] = statusFilter;
+      if (startDate != null) query['startDate'] = startDate.toIso8601String();
+      if (endDate != null) query['endDate'] = endDate.toIso8601String();
+
+      final res = await _rciRequest('/rci', queryParameters: query);
+      if (res.data is Map) {
+        return Right(Map<String, dynamic>.from(res.data as Map));
+      }
+      return const Left({'message': 'Gagal mengambil data laporan RCI.'});
+    } on DioException catch (e) {
+      return Left(errorHandler(e) as Map<String, dynamic>);
+    } catch (e) {
+      return Left({'message': e.toString()});
+    }
+  }
+
+  Future<Either<Map<String, dynamic>, Map<String, dynamic>>> getRciDetail(int id) async {
+    try {
+      final res = await _rciRequest('/rci/$id');
+      if (res.data is Map) {
+        return Right(Map<String, dynamic>.from(res.data as Map));
+      }
+      return const Left({'message': 'Gagal mengambil detail laporan RCI.'});
+    } on DioException catch (e) {
+      return Left(errorHandler(e) as Map<String, dynamic>);
+    } catch (e) {
+      return Left({'message': e.toString()});
+    }
+  }
+
+  Future<Either<Map<String, dynamic>, Map<String, dynamic>>> saveRciReport(FormData data) async {
+    try {
+      final res = await _rciRequest('/rci', method: 'POST', data: data);
+      if (res.data is Map) {
+        return Right(Map<String, dynamic>.from(res.data as Map));
+      }
+      return const Left({'message': 'Gagal menyimpan laporan RCI.'});
+    } on DioException catch (e) {
+      return Left(errorHandler(e) as Map<String, dynamic>);
+    } catch (e) {
+      return Left({'message': e.toString()});
+    }
+  }
+
+  Future<Either<Map<String, dynamic>, Map<String, dynamic>>> approveRciReport(
+    int id, {
+    required String nik,
+    required String nama,
+    required String role,
+    String status = 'Approved',
+    String? notes,
+  }) async {
+    try {
+      final body = {
+        'nik': nik,
+        'nama': nama,
+        'role': role,
+        'status': status,
+        if (notes != null && notes.isNotEmpty) 'notes': notes,
+      };
+      final res = await _rciRequest('/rci/$id/approve', method: 'POST', data: body);
+      if (res.data is Map) {
+        return Right(Map<String, dynamic>.from(res.data as Map));
+      }
+      return const Left({'message': 'Gagal menyetujui laporan RCI.'});
+    } on DioException catch (e) {
+      return Left(errorHandler(e) as Map<String, dynamic>);
+    } catch (e) {
+      return Left({'message': e.toString()});
+    }
+  }
+
+  Future<Either<Map<String, dynamic>, Map<String, dynamic>>> deleteRciReport(int id) async {
+    try {
+      final res = await _rciRequest('/rci/$id', method: 'DELETE');
+      if (res.data is Map) {
+        return Right(Map<String, dynamic>.from(res.data as Map));
+      }
+      return const Right({});
+    } on DioException catch (e) {
+      return Left(errorHandler(e) as Map<String, dynamic>);
+    } catch (e) {
+      return Left({'message': e.toString()});
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> searchRciEmployees(String q) async {
+    try {
+      if (q.trim().length < 2) return [];
+      final res = await _rciRequest('/rci/search-employees', queryParameters: {'q': q.trim()});
+      if (res.data is Map && res.data['data'] is List) {
+        final list = res.data['data'] as List;
+        return list.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+      }
+      return [];
+    } catch (_) {
+      return [];
+    }
+  }
 }
+
+

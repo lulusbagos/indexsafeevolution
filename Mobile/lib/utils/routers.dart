@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../pages/bbs/bbs_page.dart';
 import '../pages/ci_assessment/ci_page.dart';
+import '../pages/ci_assessment/fci_form_page.dart';
+import '../pages/ci_assessment/fci_index_page.dart';
 import '../pages/coaching/coaching_form_page.dart';
 import '../pages/coaching/coaching_page.dart';
 import '../pages/coming_soon_page.dart';
@@ -19,7 +21,10 @@ import '../pages/p2h/p2h_form_page.dart';
 import '../pages/p2h/p2h_page.dart';
 import '../pages/p5m/p5m_form_page.dart';
 import '../pages/p5m/p5m_page.dart';
+import '../pages/performance/executive_reports_page.dart';
 import '../pages/performance/performance_hub_pages.dart';
+import '../pages/roster_settings_page.dart';
+import '../pages/safety_updates_page.dart';
 import '../pages/safetytalk/safetytalk_form_page.dart';
 import '../pages/safetytalk/safetytalk_page.dart';
 import '../pages/sap_report_page.dart';
@@ -33,6 +38,22 @@ void routePage(BuildContext ctx, String route, {String? title}) {
       ctx,
       MaterialPageRoute(
         builder: (context) => const CiAssessmentPage(),
+      ),
+    );
+  }
+  if (route == '/fci') {
+    Navigator.push(
+      ctx,
+      MaterialPageRoute(
+        builder: (context) => const FciIndexPage(),
+      ),
+    );
+  }
+  if (route == '/form_fci') {
+    Navigator.push(
+      ctx,
+      MaterialPageRoute(
+        builder: (context) => const FciFormPage(),
       ),
     );
   }
@@ -68,6 +89,22 @@ void routePage(BuildContext ctx, String route, {String? title}) {
       ),
     );
   }
+  if (route == '/sap_employee_league') {
+    Navigator.push(
+      ctx,
+      MaterialPageRoute(
+        builder: (context) => const DepartmentEmployeeLeaguePage(),
+      ),
+    );
+  }
+  if (route == '/sap_reports') {
+    Navigator.push(
+      ctx,
+      MaterialPageRoute(
+        builder: (context) => const ExecutiveReportsPage(),
+      ),
+    );
+  }
   if (route == '/sap_action_plan') {
     Navigator.push(
       ctx,
@@ -76,11 +113,11 @@ void routePage(BuildContext ctx, String route, {String? title}) {
       ),
     );
   }
-  if (route == '/sap_incident_information') {
+  if (route == '/sap_incident_information' || route == '/safety_updates') {
     Navigator.push(
       ctx,
       MaterialPageRoute(
-        builder: (context) => const IncidentInformationPage(),
+        builder: (context) => const SafetyUpdatesPage(),
       ),
     );
   }
@@ -96,7 +133,7 @@ void routePage(BuildContext ctx, String route, {String? title}) {
     Navigator.push(
       ctx,
       MaterialPageRoute(
-        builder: (context) => const WorkRosterPage(),
+        builder: (context) => const RosterSettingsPage(),
       ),
     );
   }
@@ -104,7 +141,7 @@ void routePage(BuildContext ctx, String route, {String? title}) {
     Navigator.push(
       ctx,
       MaterialPageRoute(
-        builder: (context) => const DriverPerformanceAssessmentPage(),
+        builder: (context) => const DpaPage(),
       ),
     );
   }

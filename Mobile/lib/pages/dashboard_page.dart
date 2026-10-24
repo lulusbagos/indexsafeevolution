@@ -11,11 +11,14 @@ import 'package:flutter/services.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:webview_flutter/webview_flutter.dart';
+import 'package:webview_flutter_android/webview_flutter_android.dart';
+import 'package:webview_flutter_platform_interface/webview_flutter_platform_interface.dart';
 
 import '../models/incident_news_model.dart';
 import '../models/link_model.dart';
 import '../services/api.dart';
 import '../services/database.dart';
+import '../services/notification.dart';
 import '../services/preference.dart';
 import '../utils/links.dart';
 import '../widgets/snackbar_msg.dart';
@@ -253,6 +256,27 @@ Future<void> _injectCurrentPosition(WebViewController controller) async {
   }
 }
 
+Widget buildSafeMapWebView(WebViewController controller) {
+  PlatformWebViewWidgetCreationParams params =
+      PlatformWebViewWidgetCreationParams(
+    controller: controller.platform,
+    layoutDirection: TextDirection.ltr,
+    gestureRecognizers: {
+      Factory<OneSequenceGestureRecognizer>(() => EagerGestureRecognizer()),
+    },
+  );
+
+  if (WebViewPlatform.instance is AndroidWebViewPlatform) {
+    params = AndroidWebViewWidgetCreationParams
+        .fromPlatformWebViewWidgetCreationParams(
+      params,
+      displayWithHybridComposition: true,
+    );
+  }
+
+  return WebViewWidget.fromPlatformCreationParams(params: params);
+}
+
 class _FullscreenHazardMapPage extends StatefulWidget {
   const _FullscreenHazardMapPage({
     super.key,
@@ -343,7 +367,7 @@ class _FullscreenHazardMapPageState extends State<_FullscreenHazardMapPage>
           },
         ),
       )
-      ..loadHtmlString(widget.html);
+      ..loadHtmlString(widget.html, baseUrl: 'https://unpkg.com');
 
     _startLocationStream();
   }
@@ -368,8 +392,8 @@ class _FullscreenHazardMapPageState extends State<_FullscreenHazardMapPage>
 
       _posSub = Geolocator.getPositionStream(
         locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.high,
-          distanceFilter: 1,
+          accuracy: LocationAccuracy.medium, // Balanced accuracy to save battery & prevent overheating
+          distanceFilter: 10, // Only trigger if moved 10 meters
         ),
       ).listen(
         (pos) {
@@ -860,14 +884,7 @@ class _FullscreenHazardMapPageState extends State<_FullscreenHazardMapPage>
           // Map WebView
           Positioned.fill(
             child: SafeArea(
-              child: WebViewWidget(
-                controller: _controller,
-                gestureRecognizers: {
-                  Factory<OneSequenceGestureRecognizer>(
-                    () => EagerGestureRecognizer(),
-                  ),
-                },
-              ),
+              child: buildSafeMapWebView(_controller),
             ),
           ),
 
@@ -1398,7 +1415,7 @@ class DashboardPage extends StatefulWidget {
   State<DashboardPage> createState() => _DashboardPageState();
 }
 
-class _DashboardPageState extends State<DashboardPage> {
+class _DashboardPageState extends State<DashboardPage> with WidgetsBindingObserver {
   final _profile = PreferenceService.getProfile();
   final _api = ApiService();
   final _hazardMapCtrl = WebViewController();
@@ -1426,6 +1443,9 @@ class _DashboardPageState extends State<DashboardPage> {
   String _hazardMapMode = PreferenceService.getHazardMapMode();
   StreamSubscription<Position>? _positionStreamSub;
   Position? _lastUserPosition;
+  DateTime? _lastPosJsUpdateTime;
+  Position? _lastRadarCheckedPosition;
+  bool _isFetchingHazards = false;
   bool _hasPlacedNearbyDemoHazard = false;
   MapHazardItem? _nearbyAlertHazard;
   double _nearbyDistance = 0;
@@ -1469,6 +1489,8 @@ class _DashboardPageState extends State<DashboardPage> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    print('===> DASHBOARD INIT STATE RUNNING <===');
 
     _unclosedHazards = [];
 
@@ -1485,6 +1507,11 @@ class _DashboardPageState extends State<DashboardPage> {
                 ? data['id'] as int
                 : int.tryParse(data['id']?.toString() ?? '0') ?? 0;
             final matches = _unclosedHazards.where((h) => h.id == id);
+            if (action == 'log') {
+              debugPrint('[SafeMap JS Log] ${data['message']}');
+            } else if (action == 'error') {
+              debugPrint('[SafeMap JS Error] ${data['error']}');
+            }
             if (matches.isNotEmpty) {
               final hazard = matches.first;
               if (action == 'detail') {
@@ -1500,13 +1527,16 @@ class _DashboardPageState extends State<DashboardPage> {
       )
       ..setNavigationDelegate(
         NavigationDelegate(
-          onPageFinished: (_) => _injectCurrentPosition(_hazardMapCtrl),
+          onPageStarted: (url) => debugPrint('[SafeMap] Page started: $url'),
+          onPageFinished: (url) {
+            debugPrint('[SafeMap] Page finished: $url');
+            _injectCurrentPosition(_hazardMapCtrl);
+          },
+          onWebResourceError: (error) {
+            debugPrint('[SafeMap] Resource error: code=${error.errorCode}, desc=${error.description}, url=${error.url}');
+          },
         ),
-      )
-      ..loadHtmlString(_hazardMapHtml(
-        mapMode: _hazardMapMode,
-        userPosition: _lastUserPosition,
-      ));
+      );
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       setState(() {
@@ -1522,7 +1552,23 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.hidden) {
+      // Shuts down GPS hardware immediately when screen is locked or app is in background to keep phone cool
+      _positionStreamSub?.cancel();
+      _positionStreamSub = null;
+    } else if (state == AppLifecycleState.resumed) {
+      if (_positionStreamSub == null) {
+        _initLocationAndProximity();
+      }
+    }
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _positionStreamSub?.cancel();
     _bannerTimer?.cancel();
     _bannerController.dispose();
@@ -1530,6 +1576,8 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   Future<void> _fetchHazardPointsFromApi([Position? pos]) async {
+    if (_isFetchingHazards) return;
+    _isFetchingHazards = true;
     try {
       // Ambil hazard aktif 1 periode berjalan (30 hari), hanya yang belum closed, dibatasi 80 titik teratas agar sangat ringan
       final res = await _api.getSafeMapHazardPoints(
@@ -1619,6 +1667,8 @@ class _DashboardPageState extends State<DashboardPage> {
       );
     } catch (e) {
       debugPrint('Error _fetchHazardPointsFromApi: $e');
+    } finally {
+      _isFetchingHazards = false;
     }
   }
 
@@ -1635,15 +1685,15 @@ class _DashboardPageState extends State<DashboardPage> {
       }
 
       final pos = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
+        desiredAccuracy: LocationAccuracy.medium,
       );
       _onUserPositionUpdated(pos);
 
       _positionStreamSub?.cancel();
       _positionStreamSub = Geolocator.getPositionStream(
         locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.high,
-          distanceFilter: 1,
+          accuracy: LocationAccuracy.medium, // Hemat baterai & suhu dingin
+          distanceFilter: 15, // Hanya update jika berpindah 15 meter (tidak jitter di meja)
         ),
       ).listen((pos) {
         _onUserPositionUpdated(pos);
@@ -1657,16 +1707,33 @@ class _DashboardPageState extends State<DashboardPage> {
     final isFirstLoc = _lastUserPosition == null;
     _lastUserPosition = pos;
 
-    _hazardMapCtrl.runJavaScript(
-      'if(window.setUserLocation) window.setUserLocation(${pos.latitude}, ${pos.longitude}, ${pos.accuracy});',
-    );
+    final now = DateTime.now();
+    // Throttle JS bridge update to at most once every 3 seconds to save GPU/CPU
+    if (isFirstLoc || _lastPosJsUpdateTime == null || now.difference(_lastPosJsUpdateTime!).inSeconds >= 3) {
+      _lastPosJsUpdateTime = now;
+      _hazardMapCtrl.runJavaScript(
+        'if(window.setUserLocation) window.setUserLocation(${pos.latitude}, ${pos.longitude}, ${pos.accuracy});',
+      );
+    }
 
-    if (isFirstLoc) {
+    if (isFirstLoc && _unclosedHazards.isEmpty) {
       _fetchHazardPointsFromApi(pos);
     }
 
     // Jika mode 'off', jangan lakukan deteksi radar dan jangan bergetar
-    if (_hazardMapMode == 'off') return;
+    if (_hazardMapMode == 'off' || _unclosedHazards.isEmpty) return;
+
+    // Throttle deteksi radar proximity: hanya jika berpindah minimal 8 meter dari titik check terakhir
+    if (_lastRadarCheckedPosition != null) {
+      final moved = Geolocator.distanceBetween(
+        _lastRadarCheckedPosition!.latitude,
+        _lastRadarCheckedPosition!.longitude,
+        pos.latitude,
+        pos.longitude,
+      );
+      if (moved < 8.0) return;
+    }
+    _lastRadarCheckedPosition = pos;
 
     // Deteksi radar proximity jarak <= 20 meter (Getar perangkat saat masuk area temuan)
     for (final hazard in _unclosedHazards) {
@@ -1719,6 +1786,7 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   void _reloadMap() {
+    print('===> DASHBOARD RELOAD MAP: length=${_unclosedHazards.length} <===');
     _hazardMapCtrl.loadHtmlString(
       _hazardMapHtml(
         mapMode: _hazardMapMode,
@@ -2531,18 +2599,27 @@ class _DashboardPageState extends State<DashboardPage> {
       int count = 0;
       final counts = await _api.getNotificationCounts();
       count = counts['total'] ?? counts['unread'] ?? 0;
+      final activeHazardCount = (counts['active_hazard_count'] as num?)?.toInt() ?? 0;
+      final activeActionPlanCount = (counts['active_action_plan_count'] as num?)?.toInt() ?? 0;
+      final unactionedCount = (counts['unactioned_count'] as num?)?.toInt() ?? 0;
 
       // Juga periksa apakah ada action_plans lokal di SQLite yang mengarah ke user
+      int localCnt = 0;
       try {
         final db = DatabaseService();
         final localPlans = await db.rawQuery(
             '''select count(*) as cnt from action_plans 
                where deleted_at is null and ((pja_id=${_profile?.id} and status<1) or (pic_id=${_profile?.id} and status<2))''');
         if (localPlans.isNotEmpty && localPlans.first['cnt'] != null) {
-          final localCnt = (localPlans.first['cnt'] as num).toInt();
+          localCnt = (localPlans.first['cnt'] as num).toInt();
           count = count > localCnt ? count : localCnt;
         }
       } catch (_) {}
+
+      // GETARAN FISIK: Jika user dijadikan PIC / PJA temuan K3 (Hazard, Inspeksi, Action Plan)
+      if (activeHazardCount > 0 || activeActionPlanCount > 0 || localCnt > 0 || unactionedCount > 0) {
+        NotificationService.vibrateForPicAssignment();
+      }
 
       await PreferenceService.setNotif(count);
       if (mounted) {
@@ -3325,14 +3402,7 @@ class _DashboardPageState extends State<DashboardPage> {
                       child: Stack(
                         children: [
                           Positioned.fill(
-                            child: WebViewWidget(
-                              controller: _hazardMapCtrl,
-                              gestureRecognizers: {
-                                Factory<OneSequenceGestureRecognizer>(
-                                  () => EagerGestureRecognizer(),
-                                ),
-                              },
-                            ),
+                            child: buildSafeMapWebView(_hazardMapCtrl),
                           ),
                           // Tombol Cepat Masuk Mode Hazard Hunter
                           Positioned(
@@ -3519,7 +3589,24 @@ class _DashboardPageState extends State<DashboardPage> {
     <head>
       <meta charset="utf-8" />
       <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+      <script>
+        window.onerror = function(msg, url, line, col, err) {
+          if (window.HazardBridge) {
+            window.HazardBridge.postMessage(JSON.stringify({action: 'error', error: msg + ' at ' + url + ':' + line}));
+          }
+        };
+        console.log = function() {
+          var str = Array.prototype.slice.call(arguments).join(' ');
+          if (window.HazardBridge) {
+            window.HazardBridge.postMessage(JSON.stringify({action: 'log', message: str}));
+          }
+        };
+      </script>
+      <link rel="stylesheet" href="http://127.0.0.1:5200/leaflet/leaflet.css" />
+      <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
       <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+      <script src="http://127.0.0.1:5200/leaflet/leaflet.js"></script>
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
       <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
       <style>
         html, body, #map {
@@ -3686,16 +3773,9 @@ class _DashboardPageState extends State<DashboardPage> {
           position: absolute;
           inset: -4px;
           border-radius: 50%;
-          border: 2px solid #38bdf8;
-          animation: clusterPulse 2s cubic-bezier(0, 0, 0.2, 1) infinite;
-          opacity: 0.75;
+          border: 1.5px solid #38bdf8;
+          opacity: 0.6;
           pointer-events: none;
-        }
-        @keyframes clusterPulse {
-          70%, 100% {
-            transform: scale(1.7);
-            opacity: 0;
-          }
         }
         .pin-cluster-subtag {
           position: absolute;
@@ -3725,14 +3805,8 @@ class _DashboardPageState extends State<DashboardPage> {
           width: 14px;
           height: 14px;
           border-radius: 50%;
-          animation: hazardPing 1.9s cubic-bezier(0, 0, 0.2, 1) infinite;
-          opacity: 0.85;
-        }
-        @keyframes hazardPing {
-          70%, 100% {
-            transform: scale(2.8);
-            opacity: 0;
-          }
+          opacity: 0.5;
+          pointer-events: none;
         }
         .hazard-pin-badge {
           width: 24px;
@@ -3759,83 +3833,18 @@ class _DashboardPageState extends State<DashboardPage> {
     <body>
       <div id="map"></div>
       <script>
-        // Google Hybrid Satellite (resolusi tinggi, stabil di area tambang Kalimantan, tidak ada tile error)
-        const googleSat = L.tileLayer('https://mt{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
-          subdomains: ['0', '1', '2', '3'],
-          maxZoom: 20,
-          maxNativeZoom: 19,
-          keepBuffer: 6,
-          updateWhenIdle: false,
-          attribution: ''
-        });
-
-        // Fallback ESRI Satelit dengan batas maxNativeZoom 16 agar tidak pernah menampilkan "Map data not yet available"
-        const esriSat = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-          maxZoom: 20,
-          maxNativeZoom: 16,
-          keepBuffer: 4,
-          updateWhenIdle: false,
-          attribution: ''
-        });
-
-        const hasUserPos = $hasUserPos;
-        const initialUserLat = $userLat;
-        const initialUserLng = $userLng;
-        const initialAccuracy = $userAccuracy;
-
-        // Inisialisasi map langsung ke lokasi pengguna jika tersedia agar area sekitarnya langsung terlihat
-        const map = L.map('map', {
-          center: hasUserPos ? [initialUserLat, initialUserLng] : [1.0564, 117.7265],
-          zoom: hasUserPos ? 16 : 13.5,
-          maxZoom: 19,
-          minZoom: 10,
-          layers: [googleSat],
-          preferCanvas: true,
-          zoomControl: false,
-          attributionControl: false,
-          dragging: true,
-          scrollWheelZoom: true,
-          doubleClickZoom: true,
-          touchZoom: true,
-          closePopupOnClick: true,
-          zoomAnimation: true,
-          fadeAnimation: true,
-          markerZoomAnimation: true,
-          inertia: true,
-          inertiaDeceleration: 2600,
-          easeLinearity: .22,
-          zoomSnap: .5,
-          zoomDelta: .5,
-          wheelPxPerZoomLevel: 90
-        });
-
-        googleSat.on('tileerror', function() {
-          if (!map.hasLayer(esriSat)) {
-            map.addLayer(esriSat);
-          }
-        });
-
-        if (map.attributionControl) {
-          map.attributionControl.setPrefix(false);
-        }
-
-        map.on('preclick', function() {
-          map.closePopup();
-        });
-
-        const hazardPoints = $pointsJson;
-
-        const heatLayer = L.layerGroup();
-        const markerLayer = L.layerGroup();
-
-        if ('$mapMode' === 'heatmap') {
-          heatLayer.addTo(map);
-          markerLayer.addTo(map);
-        } else if ('$mapMode' === 'points') {
-          markerLayer.addTo(map);
-        }
+        let map = null;
+        let heatLayer = null;
+        let markerLayer = null;
+        let userMarker = null;
+        let userAccuracyCircle = null;
+        let userCoordinates = $hasUserPos ? [$userLat, $userLng] : null;
+        let targetGuideLine = null;
+        let currentMode = '$mapMode';
 
         window.setMapMode = function(mode) {
+          currentMode = mode;
+          if (!map || !heatLayer || !markerLayer) return;
           if (mode === 'heatmap') {
             if (!map.hasLayer(heatLayer)) map.addLayer(heatLayer);
             if (!map.hasLayer(markerLayer)) map.addLayer(markerLayer);
@@ -3852,65 +3861,18 @@ class _DashboardPageState extends State<DashboardPage> {
           window.setMapMode(active ? 'heatmap' : 'points');
         };
 
-        let userMarker = null;
-        let userAccuracyCircle = null;
-        let userCoordinates = hasUserPos ? [initialUserLat, initialUserLng] : null;
-
-        function renderUserMarker(lat, lng, accuracy, autoFly, heading) {
-          userCoordinates = [lat, lng];
-          if (userMarker) map.removeLayer(userMarker);
-          if (userAccuracyCircle) map.removeLayer(userAccuracyCircle);
-
-          const userIcon = L.divIcon({
-            className: '',
-            html: '<div class="user-location-arrow"><svg id="user-heading-arrow" style="transform:rotate(' + (heading || 18) + 'deg); transition: transform 0.3s ease-out;" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 4.5 20.29l.71.71L12 18l6.79 3 .71-.71L12 2z"/></svg></div>',
-            iconSize: [38, 38],
-            iconAnchor: [19, 19]
-          });
-          userAccuracyCircle = L.circle(userCoordinates, {
-            radius: Math.min(Math.max(accuracy || 10, 6), 15),
-            color: '#2563eb',
-            weight: 1,
-            fillColor: '#60a5fa',
-            fillOpacity: .12
-          }).addTo(map);
-          userMarker = L.marker(userCoordinates, {
-            icon: userIcon,
-            zIndexOffset: 1000
-          }).addTo(map);
-          userMarker.bindPopup(`
-            <div style="min-width:170px">
-              <strong style="font-size:13px;color:#1d4ed8">Posisi Saya</strong>
-              <p style="margin:5px 0 2px;font-size:11px;color:#4b5563">Lokasi perangkat saat ini</p>
-              <p style="margin:2px 0;font-size:10.5px;color:#64748b">\${lat.toFixed(6)}, \${lng.toFixed(6)}</p>
-              <p style="margin:2px 0;font-size:10.5px;color:#64748b">Akurasi ±\${Math.round(accuracy || 0)} meter</p>
-            </div>
-          `);
-
-          if (autoFly) {
-            map.setView(userCoordinates, 16);
-          }
-        }
-
-        if (hasUserPos) {
-          renderUserMarker(initialUserLat, initialUserLng, initialAccuracy, true);
-        }
-
         window.setUserLocation = function(lat, lng, accuracy, heading) {
-          renderUserMarker(lat, lng, accuracy, true, heading);
+          if (window.renderUserMarker) {
+            window.renderUserMarker(lat, lng, accuracy, true, heading);
+          }
         };
 
-        
-        let targetGuideLine = null;
-
         window.updateGuideLine = function(uLat, uLng, tLat, tLng, color) {
-          if (targetGuideLine) {
+          if (targetGuideLine && map) {
             map.removeLayer(targetGuideLine);
             targetGuideLine = null;
           }
-          if (!uLat || !uLng || !tLat || !tLng) return;
-
-          // Garis laser navigasi tunggal (elegan dan tidak menumpuk panah kedua di user marker)
+          if (!uLat || !uLng || !tLat || !tLng || !map) return;
           targetGuideLine = L.polyline([[uLat, uLng], [tLat, tLng]], {
             color: color || '#38bdf8',
             weight: 4,
@@ -3921,17 +3883,148 @@ class _DashboardPageState extends State<DashboardPage> {
         };
 
         window.clearGuideLine = function() {
-          if (targetGuideLine) { map.removeLayer(targetGuideLine); targetGuideLine = null; }
+          if (targetGuideLine && map) { map.removeLayer(targetGuideLine); targetGuideLine = null; }
         };
 
         window.locateMe = function() {
-          if (userCoordinates) {
+          if (userCoordinates && map) {
             map.flyTo(userCoordinates, 16.5, { animate: true, duration: .55 });
             if (userMarker) setTimeout(() => userMarker.openPopup(), 600);
           }
         };
 
-        // Spiderfy & Proximity Grouping Engine (Anti-Pin Bertumpuk)
+        function initSafeMapEngine() {
+          console.log('[SafeMap] initSafeMapEngine called, L is ' + (typeof L));
+          if (typeof L === 'undefined') {
+            setTimeout(initSafeMapEngine, 60);
+            return;
+          }
+          if (window._safeMapStarted) return;
+          window._safeMapStarted = true;
+          console.log('[SafeMap] initSafeMapEngine proceeding to L.map');
+
+          // Google Hybrid Satellite
+          const googleSat = L.tileLayer('https://mt{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
+            subdomains: ['0', '1', '2', '3'],
+            maxZoom: 20,
+            maxNativeZoom: 19,
+            keepBuffer: 1,
+            updateWhenIdle: true,
+            attribution: ''
+          });
+
+          // Fallback ESRI Satelit
+          const esriSat = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+            maxZoom: 20,
+            maxNativeZoom: 17,
+            keepBuffer: 1,
+            updateWhenIdle: true,
+            attribution: ''
+          });
+
+          // OpenStreetMap Base Fallback
+          const osm = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: ''
+          });
+
+          const hasUserPos = $hasUserPos;
+          const initialUserLat = $userLat;
+          const initialUserLng = $userLng;
+          const initialAccuracy = $userAccuracy;
+
+          // Inisialisasi map langsung ke lokasi pengguna jika tersedia agar area sekitarnya langsung terlihat
+          map = L.map('map', {
+            center: hasUserPos ? [initialUserLat, initialUserLng] : [1.0564, 117.7265],
+            zoom: hasUserPos ? 16 : 13.5,
+            maxZoom: 19,
+            minZoom: 10,
+            layers: [googleSat],
+            preferCanvas: true,
+            zoomControl: false,
+            attributionControl: false,
+            dragging: true,
+            scrollWheelZoom: true,
+            doubleClickZoom: true,
+            touchZoom: true,
+            closePopupOnClick: true,
+            zoomAnimation: true,
+            fadeAnimation: true,
+            markerZoomAnimation: true,
+            inertia: true,
+            inertiaDeceleration: 2600,
+            easeLinearity: .22,
+            zoomSnap: .5,
+            zoomDelta: .5,
+            wheelPxPerZoomLevel: 90
+          });
+
+          googleSat.on('tileerror', function() {
+            if (!map.hasLayer(esriSat)) {
+              map.addLayer(esriSat);
+            }
+          });
+
+          esriSat.on('tileerror', function() {
+            if (!map.hasLayer(osm)) {
+              map.addLayer(osm);
+            }
+          });
+
+          if (map.attributionControl) {
+            map.attributionControl.setPrefix(false);
+          }
+
+          map.on('preclick', function() {
+            map.closePopup();
+          });
+
+          const hazardPoints = $pointsJson;
+
+          heatLayer = L.layerGroup();
+          markerLayer = L.layerGroup();
+
+          window.renderUserMarker = function(lat, lng, accuracy, autoFly, heading) {
+            userCoordinates = [lat, lng];
+            if (userMarker) map.removeLayer(userMarker);
+            if (userAccuracyCircle) map.removeLayer(userAccuracyCircle);
+
+            const userIcon = L.divIcon({
+              className: '',
+              html: '<div class="user-location-arrow"><svg id="user-heading-arrow" style="transform:rotate(' + (heading || 18) + 'deg); transition: transform 0.3s ease-out;" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 4.5 20.29l.71.71L12 18l6.79 3 .71-.71L12 2z"/></svg></div>',
+              iconSize: [38, 38],
+              iconAnchor: [19, 19]
+            });
+            userAccuracyCircle = L.circle(userCoordinates, {
+              radius: Math.min(Math.max(accuracy || 10, 6), 15),
+              color: '#2563eb',
+              weight: 1,
+              fillColor: '#60a5fa',
+              fillOpacity: .12
+            }).addTo(map);
+            userMarker = L.marker(userCoordinates, {
+              icon: userIcon,
+              zIndexOffset: 1000
+            }).addTo(map);
+            userMarker.bindPopup(`
+              <div style="min-width:170px">
+                <strong style="font-size:13px;color:#1d4ed8">Posisi Saya</strong>
+                <p style="margin:5px 0 2px;font-size:11px;color:#4b5563">Lokasi perangkat saat ini</p>
+                <p style="margin:2px 0;font-size:10.5px;color:#64748b">\${lat.toFixed(6)}, \${lng.toFixed(6)}</p>
+                <p style="margin:2px 0;font-size:10.5px;color:#64748b">Akurasi ±\${Math.round(accuracy || 0)} meter</p>
+              </div>
+            `);
+
+            if (autoFly) {
+              map.setView(userCoordinates, 16);
+            }
+          };
+
+          if (hasUserPos) {
+            window.renderUserMarker(initialUserLat, initialUserLng, initialAccuracy, true);
+          }
+
+          // Spiderfy & Proximity Grouping Engine (Anti-Pin Bertumpuk)
         const clusters = [];
         hazardPoints.forEach((point, index) => {
           point._origIndex = index;
@@ -4227,7 +4320,17 @@ class _DashboardPageState extends State<DashboardPage> {
         };
         legend.addTo(map);
 
-        setTimeout(() => map.invalidateSize(), 250);
+          setTimeout(() => map && map.invalidateSize(), 200);
+          setTimeout(() => map && map.invalidateSize(), 600);
+        }
+
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', initSafeMapEngine);
+        } else {
+          initSafeMapEngine();
+        }
+        window.addEventListener('load', initSafeMapEngine);
+        setTimeout(initSafeMapEngine, 250);
       </script>
     </body>
     </html>

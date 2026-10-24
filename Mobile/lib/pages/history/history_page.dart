@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
@@ -12,6 +13,10 @@ import '../../utils/helpers.dart';
 import '../../widgets/sap_module_ui.dart';
 import '../../widgets/snackbar_msg.dart';
 import '../../widgets/top_bar.dart';
+import '../../services/p2h_pdf_service.dart';
+import '../../services/p5m_share_service.dart';
+import '../simama/simama_form_page.dart';
+import '../p5m/p5m_form_page.dart';
 import 'history_detail_page.dart';
 
 class HistoryPage extends StatefulWidget {
@@ -63,7 +68,7 @@ class _HistoryPageState extends State<HistoryPage> {
     super.initState();
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _getData();
+      _fetchAndRefresh();
       if (widget.lastId == null) {
         Future.delayed(const Duration(seconds: 2), () => _getData());
         Future.delayed(const Duration(seconds: 4), () => _getData());
@@ -116,6 +121,95 @@ class _HistoryPageState extends State<HistoryPage> {
                     await _db.insert('hazard_trans', row);
                   } else {
                     await _db.update('hazard_trans', row, id);
+                  }
+                }
+              }
+            }
+          }
+        } catch (_) {}
+      } else if (widget.history == History.summary && widget.module == Module.p2h) {
+        try {
+          final res = await _api.dio.get('/p2h?limit=100');
+          if (res.data != null && res.data['data'] is List) {
+            for (var raw in (res.data['data'] as List)) {
+              if (raw is Map) {
+                final item = Map<String, dynamic>.from(raw);
+                final id = item['id'];
+                if (id is int) {
+                  final row = <String, dynamic>{
+                    'code': item['code'] ?? 'P2H-$id',
+                    'title': 'P2H Unit ${item['noLambung'] ?? ''}',
+                    'date': item['tanggal'] ?? '',
+                    'time': item['waktu'] ?? '',
+                    'no_lambung': item['noLambung'] ?? '',
+                    'jenis_kendaraan': item['jenisKendaraan'] ?? '',
+                    'merek': item['merek'] ?? '',
+                    'km': item['kilometer'] ?? 0,
+                    'simper_kimper': item['simperKimper'] ?? 'YA',
+                    'simper': (item['simperKimper'] == 'YA') ? 1 : 0,
+                    'image': item['fotoSpeedometer'],
+                    'foto_speedometer': item['fotoSpeedometer'],
+                    'gol_a_json': item['golA'],
+                    'gol_b_json': item['golB'],
+                    'gol_c_json': item['golC'],
+                    'sync_id': id,
+                    'employee_id': profileId,
+                    'nik': item['nik'] ?? userNik,
+                    'nama': item['nama'] ?? _profile?.namaLengkap ?? '',
+                    'created_at': item['createdAt'] ?? DateTime.now().toString(),
+                  };
+                  final existing = await _db.rawQuery('SELECT id FROM p2h_trans WHERE sync_id = $id OR id = $id LIMIT 1');
+                  if (existing.isEmpty) {
+                    row['id'] = id;
+                    await _db.insert('p2h_trans', row);
+                  } else {
+                    final localId = existing.first['id'] as int;
+                    await _db.update('p2h_trans', row, localId);
+                  }
+                }
+              }
+            }
+          }
+        } catch (_) {}
+      } else if (widget.history == History.summary && widget.module == Module.p5m) {
+        try {
+          final res = await _api.dio.get('/tran/p5m?limit=100');
+          if (res.data != null && res.data['data'] is List) {
+            for (var raw in (res.data['data'] as List)) {
+              if (raw is Map) {
+                final item = Map<String, dynamic>.from(raw);
+                final id = item['id'];
+                if (id is int) {
+                  final row = <String, dynamic>{
+                    'code': item['code'] ?? 'P5M-$id',
+                    'title': item['title'] ?? item['judul'] ?? 'P5M & Fit to Work',
+                    'date': item['date'] ?? '',
+                    'time': item['time'] ?? '',
+                    'area': item['area'] ?? '',
+                    'lokasi': item['lokasi'] ?? '',
+                    'detil_lokasi': item['detil_lokasi'] ?? '',
+                    'topik': item['topik'] ?? '',
+                    'judul': item['judul'] ?? '',
+                    'catatan': item['catatan'] ?? '',
+                    'remark': item['catatan'] ?? '',
+                    'foto_kegiatan': item['foto_kegiatan'] ?? item['image'],
+                    'image': item['foto_kegiatan'] ?? item['image'],
+                    'fit_status': item['fit_status'] ?? 'FIT TO WORK',
+                    'questions_json': (item['checklist'] != null) ? jsonEncode((item['checklist'] as List).map((e) => e['question']).toList()) : null,
+                    'answers_json': (item['checklist'] != null) ? jsonEncode((item['checklist'] as List).map((e) => e['answer']).toList()) : null,
+                    'sync_id': id,
+                    'employee_id': profileId,
+                    'nik': item['nik'] ?? userNik,
+                    'nama': item['nama'] ?? _profile?.namaLengkap ?? '',
+                    'created_at': item['created_at'] ?? DateTime.now().toString(),
+                  };
+                  final existing = await _db.rawQuery('SELECT id FROM p5m_trans WHERE sync_id = $id OR id = $id LIMIT 1');
+                  if (existing.isEmpty) {
+                    row['id'] = id;
+                    await _db.insert('p5m_trans', row);
+                  } else {
+                    final localId = existing.first['id'] as int;
+                    await _db.update('p5m_trans', row, localId);
                   }
                 }
               }
@@ -175,6 +269,7 @@ class _HistoryPageState extends State<HistoryPage> {
 
   void _getData() {
     final profileId = _profile?.id ?? 0;
+    final userNik = _profile?.noNik ?? '';
     var qry = '';
     var select =
         '''select tr.*, me1.name as area_name, me2.name as location_name''';
@@ -226,18 +321,24 @@ class _HistoryPageState extends State<HistoryPage> {
         _table = 'observation_trans';
         break;
       case Module.p2h:
-        qry = '''select tr.*, mv.code as area_name, mv.type as location_name, 
-        mv.type as jenis_kendaraan, mv.code as no_lambung_kendaraan, mv."name" as merek_kendaraan
+        qry = '''select tr.*, 
+        COALESCE(tr.no_lambung, mv.code, '') as no_lambung_kendaraan,
+        COALESCE(tr.jenis_kendaraan, mv.type, '') as jenis_kendaraan,
+        COALESCE(tr.merek, mv."name", '') as merek_kendaraan,
+        COALESCE(tr.no_lambung, mv.code, '') as area_name,
+        COALESCE(tr.jenis_kendaraan, mv.type, '') as location_name
         from p2h_trans tr
         left join vehicle_masters mv on mv.id=tr.vehicle_id and mv.deleted_at is null
-        where tr.deleted_at is null and (tr.employee_id=$profileId or tr.employee_id=0 or tr.employee_id is null) order by tr.id desc''';
+        where tr.deleted_at is null and (tr.employee_id=$profileId or tr.employee_id=0 or tr.employee_id is null or tr.nik='$userNik') order by tr.id desc''';
         _table = 'p2h_trans';
         break;
       case Module.p5m:
-        qry = '''$select,
-        (select pm."name" from p5m_masters pm where pm."type"='topic-p5m' and pm.id=tr.topic_id) as topic_name
+        qry = '''select tr.*,
+        COALESCE(tr.area, me1.name, '-') as area_name,
+        COALESCE(tr.lokasi, me2.name, '-') as location_name,
+        COALESCE(tr.topik, tr.judul, (select pm."name" from p5m_masters pm where pm."type"='topic-p5m' and pm.id=tr.topic_id), 'P5M & Fit to Work') as topic_name
         from p5m_trans tr $joinArea
-        where tr.deleted_at is null and (tr.employee_id=$profileId or tr.employee_id=0 or tr.employee_id is null) order by tr.id desc''';
+        where tr.deleted_at is null and (tr.employee_id=$profileId or tr.employee_id=0 or tr.employee_id is null or tr.nik='$userNik') order by tr.id desc''';
         _table = 'p5m_trans';
         break;
       case Module.safety:
@@ -327,7 +428,7 @@ class _HistoryPageState extends State<HistoryPage> {
       useSafeArea: true,
       showDragHandle: true,
       constraints: const BoxConstraints(
-        maxHeight: 350,
+        maxHeight: 440,
       ),
       builder: (_) {
         return Padding(
@@ -363,6 +464,101 @@ class _HistoryPageState extends State<HistoryPage> {
                   );
                 },
               ),
+              if (widget.module == Module.simama)
+                ListTile(
+                  title: const Text(
+                    'Edit Laporan',
+                    style: TextStyle(
+                      color: Colors.black87,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  trailing: const Icon(
+                    Icons.edit_note_rounded,
+                    color: Color(0xFF7C3AED),
+                  ),
+                  contentPadding: const EdgeInsets.fromLTRB(0, 10, 0, 10),
+                  shape: Border(bottom: BorderSide(color: Colors.indigo.shade100)),
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => SimamaFormPage(
+                          widget.module,
+                          editData: _rawData[index] as Map<String, dynamic>,
+                        ),
+                      ),
+                    ).then((_) => _getData());
+                  },
+                ),
+              if (widget.module == Module.p2h)
+                ListTile(
+                  title: const Text(
+                    'Bagikan Laporan (Share PDF / WA)',
+                    style: TextStyle(
+                      color: Colors.black87,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  trailing: const Icon(
+                    Icons.share_rounded,
+                    color: Color(0xFF0284C7),
+                  ),
+                  contentPadding: const EdgeInsets.fromLTRB(0, 10, 0, 10),
+                  shape: Border(bottom: BorderSide(color: Colors.indigo.shade100)),
+                  onTap: () {
+                    Navigator.pop(context);
+                    P2hShareService.showShareModal(context, _rawData[index] as Map<String, dynamic>);
+                  },
+                ),
+              if (widget.module == Module.p5m)
+                ListTile(
+                  title: const Text(
+                    'Edit Laporan P5M',
+                    style: TextStyle(
+                      color: Colors.black87,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  trailing: const Icon(
+                    Icons.edit_note_rounded,
+                    color: Color(0xFF0D9488),
+                  ),
+                  contentPadding: const EdgeInsets.fromLTRB(0, 10, 0, 10),
+                  shape: Border(bottom: BorderSide(color: Colors.indigo.shade100)),
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => P5MFormPage(
+                          editData: _rawData[index] as Map<String, dynamic>,
+                        ),
+                      ),
+                    ).then((_) => _getData());
+                  },
+                ),
+              if (widget.module == Module.p5m)
+                ListTile(
+                  title: const Text(
+                    'Bagikan Laporan Fit to Work (PDF / WA)',
+                    style: TextStyle(
+                      color: Colors.black87,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  trailing: const Icon(
+                    Icons.share_rounded,
+                    color: Color(0xFF0D9488),
+                  ),
+                  contentPadding: const EdgeInsets.fromLTRB(0, 10, 0, 10),
+                  shape: Border(bottom: BorderSide(color: Colors.indigo.shade100)),
+                  onTap: () {
+                    Navigator.pop(context);
+                    P5mShareService.showShareModal(context, _rawData[index] as Map<String, dynamic>);
+                  },
+                ),
               ListTile(
                 title: Text(
                   'Sinkron',
@@ -382,10 +578,14 @@ class _HistoryPageState extends State<HistoryPage> {
                     ? null
                     : () {
                         switch (widget.module) {
+                          case Module.simama:
+                            syncTran(_db, _api, 'simama',
+                                    _rawData[index]['id'] as int)
+                                .then((val) => _feedBack(val));
+                            break;
                           case Module.inspection:
                           case Module.inspectionDaily:
                           case Module.inspectionWeekly:
-                          case Module.simama:
                             syncTran(_db, _api, 'inspection',
                                     _rawData[index]['id'] as int)
                                 .then((val) => _feedBack(val));
@@ -412,62 +612,57 @@ class _HistoryPageState extends State<HistoryPage> {
                   color: (sync) ? Colors.indigo.shade200 : Colors.indigo,
                 ),
                 contentPadding: const EdgeInsets.fromLTRB(0, 10, 0, 10),
-                onTap: (sync)
-                    ? null
-                    : () {
-                        Navigator.pop(context);
-                        showDialog(
-                          context: context,
-                          builder: (BuildContext context) {
-                            return AlertDialog(
-                              title: const Text('Delete Data'),
-                              content: const Text(
-                                'Apakah anda akan menghapus data?',
-                              ),
-                              actions: [
-                                TextButton(
-                                  style: TextButton.styleFrom(
-                                    textStyle:
-                                        Theme.of(context).textTheme.labelLarge,
-                                  ),
-                                  child: const Text('Cancel'),
-                                  onPressed: () {
-                                    Navigator.pop(context);
-                                  },
-                                ),
-                                TextButton(
-                                  style: TextButton.styleFrom(
-                                    textStyle:
-                                        Theme.of(context).textTheme.labelLarge,
-                                  ),
-                                  child: const Text('Ok'),
-                                  onPressed: () {
-                                    Navigator.pop(context);
-                                    _db
-                                        .delete(_table,
-                                            _rawData[index]['id'] as int)
-                                        .then((val) {
-                                      if (!mounted) return;
-                                      if (val > 0) {
-                                        _db.execute(
-                                            '''delete from ${_table.replaceAll('_trans', '')}_details 
-                                            where tran_id=${_rawData[index]['id'] as int}''');
-                                        setState(
-                                            () => _rawData.removeAt(index));
-                                        SnackBarMsg.success(this.context,
-                                            'Data berhasil dihapus!');
-                                      } else {
-                                        SnackBarMsg.danger(this.context,
-                                            'Data gagal dihapus!');
-                                      }
-                                    });
-                                  },
-                                ),
-                              ],
-                            );
-                          },
-                        );
-                      },
+                onTap: () {
+                  Navigator.pop(context);
+                  showDialog(
+                    context: context,
+                    builder: (BuildContext context) {
+                      return AlertDialog(
+                        title: const Text('Delete Data'),
+                        content: const Text(
+                          'Apakah anda akan menghapus data ini?',
+                        ),
+                        actions: [
+                          TextButton(
+                            style: TextButton.styleFrom(
+                              textStyle: Theme.of(context).textTheme.labelLarge,
+                            ),
+                            child: const Text('Cancel'),
+                            onPressed: () => Navigator.pop(context),
+                          ),
+                          TextButton(
+                            style: TextButton.styleFrom(
+                              textStyle: Theme.of(context).textTheme.labelLarge,
+                            ),
+                            child: const Text('Ok'),
+                            onPressed: () {
+                              Navigator.pop(context);
+                              final rowItem = _rawData[index];
+                              final id = rowItem['id'] as int;
+                              final syncId = rowItem['sync_id'];
+                              _db.delete(_table, id).then((val) {
+                                if (!mounted) return;
+                                if (val > 0) {
+                                  _db.execute(
+                                      '''delete from ${_table.replaceAll('_trans', '')}_details 
+                                      where tran_id=$id''');
+                                  setState(() => _rawData.removeAt(index));
+                                  SnackBarMsg.success(this.context, 'Data berhasil dihapus!');
+                                  if (syncId != null) {
+                                    final modName = (widget.module == Module.simama) ? 'simama' : widget.module.name;
+                                    _api.dio.delete('/tran/$modName/$syncId').then((_) {}, onError: (_) {});
+                                  }
+                                } else {
+                                  SnackBarMsg.danger(this.context, 'Data gagal dihapus!');
+                                }
+                              });
+                            },
+                          ),
+                        ],
+                      );
+                    },
+                  );
+                },
               ),
             ],
           ),
@@ -577,7 +772,10 @@ class _HistoryPageState extends State<HistoryPage> {
       floatingActionButton: FloatingActionButton.extended(
         backgroundColor: accent,
         foregroundColor: Colors.white,
-        onPressed: () => openPage(context, widget.module),
+        onPressed: () {
+          openPage(context, widget.module);
+          Future.delayed(const Duration(seconds: 1), () => _fetchAndRefresh());
+        },
         icon: const Icon(Icons.add_rounded),
         label: const Text('Buat Baru'),
       ),
@@ -704,13 +902,181 @@ class _HistoryRecordCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 10),
-          SapInfoLine(icon: Icons.notes_rounded, text: 'Note: $remark'),
-          SapInfoLine(icon: Icons.map_rounded, text: 'Area: $area'),
-          SapInfoLine(icon: Icons.place_rounded, text: 'Lokasi: $location'),
-          if (pjaName != null && pjaName.toString().isNotEmpty && pjaName != '-')
-            SapInfoLine(icon: Icons.person_outline_rounded, text: 'PJA: $pjaName'),
-          if (picName != null && picName.toString().isNotEmpty && picName != '-')
-            SapInfoLine(icon: Icons.assignment_ind_outlined, text: 'PIC: $picName'),
+          if (module == Module.p2h) ...[
+            SapInfoLine(
+              icon: Icons.directions_car_rounded,
+              text: 'Unit: ${row['no_lambung_kendaraan'] ?? row['no_lambung'] ?? '-'} • ${row['merek_kendaraan'] ?? row['merek'] ?? '-'}',
+            ),
+            SapInfoLine(
+              icon: Icons.category_rounded,
+              text: 'Jenis: ${row['jenis_kendaraan'] ?? '-'}',
+            ),
+            SapInfoLine(
+              icon: Icons.speed_rounded,
+              text: 'Odometer: ${NumberFormat("#,##0", "id_ID").format(row['km'] ?? 0)} KM',
+            ),
+            SapInfoLine(
+              icon: Icons.badge_rounded,
+              text: 'SIMPER: ${(row['simper'] == 1 || row['simper_kimper'] == 'YA') ? 'Aktif' : 'Tidak Aktif'}',
+            ),
+            const SizedBox(height: 8),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                _buildP2hConditionBadge(row),
+                InkWell(
+                  onTap: () => P2hShareService.showShareModal(context, row),
+                  borderRadius: BorderRadius.circular(8),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF0284C7).withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: const Color(0xFF0284C7).withValues(alpha: 0.3)),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.share_rounded, size: 14, color: Color(0xFF0284C7)),
+                        SizedBox(width: 4),
+                        Text(
+                          'Bagikan',
+                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF0284C7)),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ] else if (module == Module.p5m) ...[
+            SapInfoLine(
+              icon: Icons.topic_rounded,
+              text: 'Topik: ${row['topic_name'] ?? row['topik'] ?? row['topic'] ?? row['judul'] ?? 'K3 Operasional'}',
+            ),
+            SapInfoLine(
+              icon: Icons.map_rounded,
+              text: 'Area: ${row['area_name'] ?? row['area'] ?? '-'}',
+            ),
+            SapInfoLine(
+              icon: Icons.place_rounded,
+              text: 'Detail Lokasi: ${row['location_name'] ?? row['lokasi'] ?? row['detil_lokasi'] ?? '-'}',
+            ),
+            if ((row['catatan'] ?? row['remark'] ?? '').toString().isNotEmpty && row['catatan'] != '-')
+              SapInfoLine(
+                icon: Icons.notes_rounded,
+                text: 'Catatan: ${row['catatan'] ?? row['remark']}',
+              ),
+            const SizedBox(height: 8),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                _buildP5mConditionBadge(row),
+                InkWell(
+                  onTap: () => P5mShareService.showShareModal(context, row),
+                  borderRadius: BorderRadius.circular(8),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF0D9488).withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: const Color(0xFF0D9488).withValues(alpha: 0.3)),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.share_rounded, size: 14, color: Color(0xFF0D9488)),
+                        SizedBox(width: 4),
+                        Text(
+                          'Bagikan',
+                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF0D9488)),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ] else ...[
+            SapInfoLine(icon: Icons.notes_rounded, text: 'Note: $remark'),
+            SapInfoLine(icon: Icons.map_rounded, text: 'Area: $area'),
+            SapInfoLine(icon: Icons.place_rounded, text: 'Lokasi: $location'),
+            if (pjaName != null && pjaName.toString().isNotEmpty && pjaName != '-')
+              SapInfoLine(icon: Icons.person_outline_rounded, text: 'PJA: $pjaName'),
+            if (picName != null && picName.toString().isNotEmpty && picName != '-')
+              SapInfoLine(icon: Icons.assignment_ind_outlined, text: 'PIC: $picName'),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildP2hConditionBadge(Map<String, dynamic> row) {
+    final eval = P2hShareService.evaluateVehicleCondition(row);
+    final isStop = eval['defectsA'].isNotEmpty;
+    final isWarning = eval['totalDefects'] > 0;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: isStop ? const Color(0xFFFEF2F2) : (isWarning ? const Color(0xFFFFFBEB) : const Color(0xFFF0FDF4)),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(
+          color: isStop ? const Color(0xFFFCA5A5) : (isWarning ? const Color(0xFFFDE68A) : const Color(0xFF86EFAC)),
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            isStop ? Icons.cancel_rounded : (isWarning ? Icons.warning_amber_rounded : Icons.check_circle_rounded),
+            size: 13,
+            color: isStop ? const Color(0xFFDC2626) : (isWarning ? const Color(0xFFD97706) : const Color(0xFF16A34A)),
+          ),
+          const SizedBox(width: 4),
+          Text(
+            eval['statusText'] as String,
+            style: TextStyle(
+              fontSize: 10.5,
+              fontWeight: FontWeight.bold,
+              color: isStop ? const Color(0xFFB91C1C) : (isWarning ? const Color(0xFFB45309) : const Color(0xFF15803D)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildP5mConditionBadge(Map<String, dynamic> row) {
+    final eval = P5mShareService.evaluateFitStatus(row);
+    final isFit = eval['isFit'] as bool;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: isFit ? const Color(0xFFF0FDF4) : const Color(0xFFFEF2F2),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(
+          color: isFit ? const Color(0xFF86EFAC) : const Color(0xFFFCA5A5),
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            isFit ? Icons.check_circle_rounded : Icons.warning_rounded,
+            size: 13,
+            color: isFit ? const Color(0xFF16A34A) : const Color(0xFFDC2626),
+          ),
+          const SizedBox(width: 4),
+          Text(
+            isFit ? 'FIT TO WORK' : 'UNFIT',
+            style: TextStyle(
+              fontSize: 10.5,
+              fontWeight: FontWeight.bold,
+              color: isFit ? const Color(0xFF15803D) : const Color(0xFFB91C1C),
+            ),
+          ),
         ],
       ),
     );

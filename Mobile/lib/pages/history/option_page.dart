@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 
 import '../../services/api.dart';
@@ -55,6 +56,18 @@ class _OptionPageState extends State<OptionPage> {
         select count(1) as jml from inspection_trans tr
         where tr.deleted_at is null and (tr.employee_id=$profileId or tr.employee_id is null or tr.employee_id=0)
           and (tr.category='${widget.module.name}' or tr.category is null)
+        ''';
+        break;
+      case Module.p5m:
+        summaryQry = '''
+        select count(1) as jml from p5m_trans tr
+        where tr.deleted_at is null and (tr.employee_id=$profileId or tr.employee_id is null or tr.employee_id=0 or tr.nik='${_profile?.noNik ?? ""}')
+        ''';
+        break;
+      case Module.p2h:
+        summaryQry = '''
+        select count(1) as jml from p2h_trans tr
+        where tr.deleted_at is null and (tr.employee_id=$profileId or tr.employee_id is null or tr.employee_id=0)
         ''';
         break;
       default:
@@ -128,7 +141,11 @@ class _OptionPageState extends State<OptionPage> {
               widget.module == Module.inspectionWeekly ||
               widget.module == Module.simama)
           ? 'inspection_trans'
-          : 'hazard_trans';
+          : (widget.module == Module.p5m)
+              ? 'p5m_trans'
+              : (widget.module == Module.p2h)
+                  ? 'p2h_trans'
+                  : 'hazard_trans';
       final offVal = await _db.rawQuery(
         "select count(1) as jml from $table where deleted_at is null and sync_id is null",
       );
@@ -280,9 +297,11 @@ class _OptionPageState extends State<OptionPage> {
         } catch (e) {
           debugPrint('[OptionPage] Error fetching hazard_trans: $e');
         }
-      } else if (widget.module == Module.inspection) {
+      } else if (widget.module == Module.inspection || widget.module == Module.simama) {
         try {
-          final res = await _api.dio.get('/tran/inspection?limit=100');
+          final isSimama = widget.module == Module.simama;
+          final endpoint = isSimama ? '/tran/simama?limit=100' : '/tran/inspection?limit=100';
+          final res = await _api.dio.get(endpoint);
           if (res.data != null && res.data['data'] is List) {
             for (var raw in (res.data['data'] as List)) {
               if (raw is Map) {
@@ -291,8 +310,8 @@ class _OptionPageState extends State<OptionPage> {
                 if (id is int) {
                   final row = <String, dynamic>{
                     'id': id,
-                    'code': item['code'] ?? 'INSP-$id',
-                    'title': item['jenisInspeksi'] ?? item['title'] ?? 'Inspeksi K3',
+                    'code': item['code'] ?? (isSimama ? 'SIMAMA-$id' : 'INSP-$id'),
+                    'title': item['jenisInspeksi'] ?? item['title'] ?? (isSimama ? 'Sidak Malam Management (SiMaMa)' : 'Inspeksi K3'),
                     'area': item['area'] ?? '',
                     'lokasi': item['lokasi'] ?? '',
                     'location_detail': item['detilLokasi'] ?? item['lokasi'] ?? '',
@@ -303,7 +322,7 @@ class _OptionPageState extends State<OptionPage> {
                     'remark': item['catatan'] ?? '',
                     'image': item['lampiranJson'] ?? item['image'],
                     'status': 1,
-                    'category': 'inspection',
+                    'category': isSimama ? 'simama' : 'inspection',
                     'pja': item['pja'] ?? '',
                     'nik_pja': item['nikPja'] ?? '',
                     'departemen_pja': item['departemenPja'] ?? '',
@@ -325,6 +344,57 @@ class _OptionPageState extends State<OptionPage> {
           }
         } catch (e) {
           debugPrint('[OptionPage] Error fetching inspection_trans: $e');
+        }
+      } else if (widget.module == Module.p5m) {
+        try {
+          final res = await _api.dio.get('/tran/p5m?limit=100');
+          if (res.data != null && res.data['data'] is List) {
+            for (var raw in (res.data['data'] as List)) {
+              if (raw is Map) {
+                final item = Map<String, dynamic>.from(raw);
+                final id = item['id'];
+                if (id is int) {
+                  final row = <String, dynamic>{
+                    'code': item['code'] ?? 'P5M-$id',
+                    'title': item['title'] ?? item['judul'] ?? 'P5M & Fit to Work',
+                    'date': item['date'] ?? '',
+                    'time': item['time'] ?? '',
+                    'area': item['area'] ?? '',
+                    'lokasi': item['lokasi'] ?? '',
+                    'detil_lokasi': item['detil_lokasi'] ?? '',
+                    'topik': item['topik'] ?? '',
+                    'judul': item['judul'] ?? '',
+                    'catatan': item['catatan'] ?? '',
+                    'remark': item['catatan'] ?? '',
+                    'foto_kegiatan': item['foto_kegiatan'] ?? item['image'],
+                    'image': item['foto_kegiatan'] ?? item['image'],
+                    'fit_status': item['fit_status'] ?? 'FIT TO WORK',
+                    'questions_json': (item['checklist'] != null)
+                        ? jsonEncode((item['checklist'] as List).map((e) => e['question']).toList())
+                        : null,
+                    'answers_json': (item['checklist'] != null)
+                        ? jsonEncode((item['checklist'] as List).map((e) => e['answer']).toList())
+                        : null,
+                    'sync_id': id,
+                    'employee_id': profileId,
+                    'nik': item['nik'] ?? userNik,
+                    'nama': item['nama'] ?? _profile?.namaLengkap ?? '',
+                    'created_at': item['created_at'] ?? DateTime.now().toString(),
+                  };
+                  final existing = await _db.rawQuery('SELECT id FROM p5m_trans WHERE sync_id = $id OR id = $id LIMIT 1');
+                  if (existing.isEmpty) {
+                    row['id'] = id;
+                    await _db.insert('p5m_trans', row);
+                  } else {
+                    final localId = existing.first['id'] as int;
+                    await _db.update('p5m_trans', row, localId);
+                  }
+                }
+              }
+            }
+          }
+        } catch (e) {
+          debugPrint('[OptionPage] Error fetching p5m_trans: $e');
         }
       }
 

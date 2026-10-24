@@ -88,23 +88,16 @@ List<LinkMenuModel> listMenuSap = <LinkMenuModel>[
     route: '/ci_assessment',
     opacity: 1,
   ),
+  LinkMenuModel(
+    title: 'Weekly\nInspection',
+    icon: Icons.calendar_view_week_rounded,
+    image: '',
+    route: '/weekly_inspection',
+    opacity: 1,
+  ),
 ];
 
 List<LinkMenuModel> listMenuOhs1 = <LinkMenuModel>[
-  LinkMenuModel(
-    title: 'Management\nInspection',
-    icon: Icons.manage_search_sharp,
-    image: 'assets/icons/ohs-01.png',
-    route: '/inspection',
-    opacity: 1,
-  ),
-  LinkMenuModel(
-    title: 'Daily\nInspection',
-    icon: Icons.fact_check_rounded,
-    image: 'assets/icons/ohs-02.png',
-    route: '/daily_inspection',
-    opacity: 1,
-  ),
   LinkMenuModel(
     title: 'Fit to Work\nP5M',
     icon: Icons.health_and_safety_rounded,
@@ -139,38 +132,38 @@ List<LinkMenuModel> listMenuOhs2 = <LinkMenuModel>[];
 
 List<LinkMenuModel> listMenuExtra = <LinkMenuModel>[
   LinkMenuModel(
-    title: 'Pencapaian\nSAP',
-    icon: Icons.track_changes_rounded,
+    title: 'Performa\nIndividu',
+    icon: Icons.person_pin_rounded,
     image: '',
     route: '/sap_achievement',
     opacity: 1,
   ),
   LinkMenuModel(
-    title: 'Klasemen\nLeague SAP',
+    title: 'Klasemen\nDepartemen',
     icon: Icons.emoji_events_rounded,
     image: '',
     route: '/sap_league',
     opacity: 1,
   ),
   LinkMenuModel(
-    title: 'Informasi\nInsiden',
-    icon: Icons.newspaper_rounded,
+    title: 'Klasemen\nKaryawan',
+    icon: Icons.groups_rounded,
     image: '',
-    route: '/sap_incident_information',
+    route: '/sap_employee_league',
     opacity: 1,
   ),
   LinkMenuModel(
-    title: 'Roster Kerja',
-    icon: Icons.calendar_month_rounded,
-    image: '',
-    route: '/sap_work_roster',
-    opacity: 1,
-  ),
-  LinkMenuModel(
-    title: 'Kualitas SAP',
+    title: 'Kualitas\nLaporan SAP',
     icon: Icons.verified_rounded,
     image: '',
     route: '/sap_quality',
+    opacity: 1,
+  ),
+  LinkMenuModel(
+    title: 'Roster &\nJadwal Kerja',
+    icon: Icons.calendar_month_rounded,
+    image: '',
+    route: '/sap_work_roster',
     opacity: 1,
   ),
   LinkMenuModel(
@@ -178,6 +171,27 @@ List<LinkMenuModel> listMenuExtra = <LinkMenuModel>[
     icon: Icons.assignment_turned_in_rounded,
     image: '',
     route: '/sap_action_plan',
+    opacity: 1,
+  ),
+  LinkMenuModel(
+    title: 'Pusat Laporan\nK3 & SAP',
+    icon: Icons.assessment_rounded,
+    image: '',
+    route: '/sap_reports',
+    opacity: 1,
+  ),
+  LinkMenuModel(
+    title: 'Safety Updates\n(Info Insiden)',
+    icon: Icons.campaign_rounded,
+    image: '',
+    route: '/sap_incident_information',
+    opacity: 1,
+  ),
+  LinkMenuModel(
+    title: 'Driver Assessment\n(DPA)',
+    icon: Icons.drive_eta_rounded,
+    image: '',
+    route: '/dpa',
     opacity: 1,
   ),
 ];

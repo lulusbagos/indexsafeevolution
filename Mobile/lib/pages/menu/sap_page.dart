@@ -1,14 +1,11 @@
 import 'package:flutter/material.dart';
 
 import '../../pages/home_page.dart';
-import '../../pages/notif_page.dart';
-import '../../services/offline_sync_service.dart';
 import '../../utils/globals.dart' as globals;
 import '../../utils/links.dart';
 import '../../utils/routers.dart';
 
 const _ink = Color(0xFF0D2F31);
-const _green = Color(0xFF0AA45A);
 
 class SapPage extends StatelessWidget {
   const SapPage({super.key});
@@ -95,7 +92,7 @@ class SapPage extends StatelessWidget {
 
   Widget _moduleCard(BuildContext context, int index) {
     final item = listMenuSap[index];
-    final style = _styles[index];
+    final style = _styles[index % _styles.length];
     return Material(
       color: Colors.white,
       borderRadius: BorderRadius.circular(23),
@@ -218,4 +215,6 @@ const _styles = [
       'Perilaku aman di tempat kerja'),
   _ModuleStyle(Color(0xFF159947), Icons.analytics_rounded,
       'Pantau kondisi dan indikator'),
+  _ModuleStyle(Color(0xFF0F766E), Icons.calendar_view_week_rounded,
+      'Inspeksi mingguan berkala'),
 ];

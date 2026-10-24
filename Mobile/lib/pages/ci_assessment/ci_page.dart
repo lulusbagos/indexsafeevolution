@@ -11,6 +11,8 @@ import '../../services/offline_sync_service.dart';
 import '../../widgets/top_bar.dart';
 import 'ci_form_page.dart';
 import 'ci_model.dart';
+import 'fci_index_page.dart';
+import 'rci_index_page.dart';
 
 const _ciNavy = Color(0xFF123B63);
 const _ciBg = Color(0xFFF4F7FA);
@@ -170,7 +172,11 @@ class _CiAssessmentPageState extends State<CiAssessmentPage> {
           color: Colors.white,
           child: InkWell(
               borderRadius: BorderRadius.circular(16),
-              onTap: () => _open(CiFormPage(code)),
+              onTap: () => _open(code == 'FCI'
+                  ? const FciIndexPage()
+                  : (code == 'RCI'
+                      ? const RciIndexPage()
+                      : CiFormPage(code))),
               child: Padding(
                   padding: const EdgeInsets.all(15),
                   child: Row(children: [

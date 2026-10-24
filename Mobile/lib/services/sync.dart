@@ -13,7 +13,8 @@ import 'preference.dart';
 Future<bool> syncTran(
     DatabaseService db, ApiService api, String name, int id) async {
   debugPrint('--- sync tran: $name id: $id ---');
-  var row = await db.get('${name}_trans', id);
+  final tableName = (name == 'simama') ? 'inspection_trans' : '${name}_trans';
+  var row = await db.get(tableName, id);
   if (row == null) return false;
 
   var req = Map.of(row as Map<String, dynamic>);
@@ -118,7 +119,7 @@ Future<bool> syncTran(
           },
         ),
       );
-    } else if (name == 'inspection') {
+    } else if (name == 'inspection' || name == 'simama') {
       final cleanMap = <String, dynamic>{};
       if (row['payload_json'] != null && row['payload_json'].toString().isNotEmpty) {
         try {
@@ -131,9 +132,10 @@ Future<bool> syncTran(
         } catch (_) {}
       }
 
+      final defaultJenis = (name == 'simama') ? 'Sidak Malam Management (SiMaMa)' : 'INSPEKSI K3 LAPANGAN';
       cleanMap['tanggal'] ??= (row['date'] ?? DateTime.now().toString().substring(0, 10)).toString();
-      cleanMap['waktu'] ??= (row['time'] ?? '12:00').toString();
-      cleanMap['jenis_inspeksi'] ??= (row['jenis_inspeksi'] ?? row['title'] ?? 'INSPEKSI K3 LAPANGAN').toString();
+      cleanMap['waktu'] ??= (row['time'] ?? ((name == 'simama') ? '21:00' : '12:00')).toString();
+      cleanMap['jenis_inspeksi'] ??= (row['jenis_inspeksi'] ?? row['title'] ?? defaultJenis).toString();
       cleanMap['area'] ??= (row['area'] ?? 'AREA OPERASIONAL').toString();
       cleanMap['lokasi'] ??= (row['lokasi'] ?? row['location_detail'] ?? 'LOKASI KERJA').toString();
       cleanMap['detil_lokasi'] ??= (row['location_detail'] ?? '').toString();
@@ -142,7 +144,7 @@ Future<bool> syncTran(
       if (row['nik_pja'] != null) cleanMap['nik_pja'] = row['nik_pja'].toString();
       if (row['departemen_pja'] != null) cleanMap['departemen_pja'] = row['departemen_pja'].toString();
 
-      for (int m = 1; m <= 5; m++) {
+      for (int m = 1; m <= 6; m++) {
         for (int q = 1; q <= 3; q++) {
           final k = 'q${m}_$q';
           if (!cleanMap.containsKey(k) && row[k] != null) {
@@ -158,8 +160,103 @@ Future<bool> syncTran(
         }
       }
 
+      final endpoint = (name == 'simama') ? '/tran/simama' : '/tran/inspection';
       res = await api.dio.post(
-        '/tran/inspection',
+        endpoint,
+        data: FormData.fromMap(cleanMap),
+        options: Options(
+          headers: {
+            'Authorization': 'Bearer ${api.getToken}',
+          },
+        ),
+      );
+    } else if (name == 'p2h') {
+      final cleanMap = <String, dynamic>{};
+      cleanMap['tanggal'] = (row['date'] ?? DateTime.now().toString().substring(0, 10)).toString();
+      cleanMap['waktu'] = (row['time'] ?? '12:00').toString();
+      cleanMap['no_lambung'] = (row['no_lambung'] ?? 'LV-001').toString();
+      cleanMap['jenis_kendaraan'] = (row['jenis_kendaraan'] ?? 'LIGHT VEHICLE').toString();
+      cleanMap['merek'] = (row['merek'] ?? 'TOYOTA').toString();
+      cleanMap['kilometer'] = (row['km'] ?? 0).toString();
+      cleanMap['simper_kimper'] = (row['simper_kimper'] ?? ((row['simper'] == 1) ? 'YA' : 'TIDAK')).toString();
+      cleanMap['gol_a_json'] = (row['gol_a_json'] ?? '[]').toString();
+      cleanMap['gol_b_json'] = (row['gol_b_json'] ?? '[]').toString();
+      cleanMap['gol_c_json'] = (row['gol_c_json'] ?? '[]').toString();
+
+      // Foto Speedometer
+      final speedoPath = row['foto_speedometer'] ?? row['image'];
+      if (speedoPath != null && speedoPath.toString().isNotEmpty) {
+        final f = File(speedoPath.toString());
+        if (await f.exists()) {
+          cleanMap['foto_speedometer'] = await MultipartFile.fromFile(f.path);
+        }
+      }
+
+      // Check defect photos in Gol A, B, C
+      for (var group in ['golA', 'golB', 'golC']) {
+        final jsonStr = (group == 'golA' ? row['gol_a_json'] : (group == 'golB' ? row['gol_b_json'] : row['gol_c_json']))?.toString();
+        if (jsonStr != null && jsonStr.isNotEmpty) {
+          try {
+            final items = jsonDecode(jsonStr) as List;
+            for (int i = 0; i < items.length; i++) {
+              final it = items[i];
+              if (it is Map && it['photoUrl'] != null) {
+                final photoPath = it['photoUrl'].toString();
+                final f = File(photoPath);
+                if (await f.exists()) {
+                  cleanMap['${group}_photo_$i'] = await MultipartFile.fromFile(f.path);
+                }
+              }
+            }
+          } catch (_) {}
+        }
+      }
+
+      res = await api.dio.post(
+        '/p2h',
+        data: FormData.fromMap(cleanMap),
+        options: Options(
+          headers: {
+            'Authorization': 'Bearer ${api.getToken}',
+          },
+        ),
+      );
+    } else if (name == 'p5m') {
+      final cleanMap = <String, dynamic>{};
+      cleanMap['tanggal'] = (row['date'] ?? DateTime.now().toString().substring(0, 10)).toString();
+      cleanMap['waktu'] = (row['time'] ?? '08:00').toString();
+      cleanMap['area'] = (row['area'] ?? row['area_name'] ?? 'AREA OPERASIONAL').toString();
+      cleanMap['lokasi'] = (row['lokasi'] ?? row['location_name'] ?? row['location_detail'] ?? 'LOKASI KERJA').toString();
+      cleanMap['detil_lokasi'] = (row['location_detail'] ?? '').toString();
+      cleanMap['topik'] = (row['topik'] ?? row['topic'] ?? 'K3 Operasional').toString();
+      cleanMap['judul'] = (row['title'] ?? row['judul'] ?? 'P5M Awal Shift - Siap Bekerja').toString();
+      cleanMap['keterangan'] = (row['remark'] ?? row['keterangan'] ?? '.').toString();
+      cleanMap['catatan'] = (row['catatan'] ?? row['remark'] ?? '').toString();
+
+      // Attach questions & answers from p5m_details or row['questions_json']
+      final sqldb = await db.database;
+      final details = await sqldb.rawQuery('SELECT * FROM p5m_details WHERE tran_id = ? ORDER BY id ASC', [id]);
+      if (details.isNotEmpty) {
+        final questions = details.map((d) => d['name']?.toString() ?? '').toList();
+        final answers = details.map((d) => (d['yesno'] == 1 || d['status'] == 1) ? 'Yes' : 'No').toList();
+        cleanMap['questions_json'] = jsonEncode(questions);
+        cleanMap['answers_json'] = jsonEncode(answers);
+      } else if (row['questions_json'] != null) {
+        cleanMap['questions_json'] = row['questions_json'].toString();
+        cleanMap['answers_json'] = row['answers_json']?.toString() ?? '[]';
+      }
+
+      // Upload photo
+      final photoPath = row['foto_kegiatan'] ?? row['image'];
+      if (photoPath != null && photoPath.toString().isNotEmpty) {
+        final file = File(photoPath.toString());
+        if (await file.exists()) {
+          cleanMap['foto_kegiatan'] = await MultipartFile.fromFile(file.path);
+        }
+      }
+
+      res = await api.dio.post(
+        '/tran/p5m',
         data: FormData.fromMap(cleanMap),
         options: Options(
           headers: {
@@ -189,13 +286,14 @@ Future<bool> syncTran(
 
     final sqldb = await db.database;
     final sync = await sqldb.rawUpdate(
-      'UPDATE ${name}_trans SET sync_id = ? WHERE id = ?',
+      'UPDATE $tableName SET sync_id = ? WHERE id = ?',
       [syncedId ?? 1, id],
     );
     if (sync > 0) {
       if (name != 'hazard') {
+        final detailsTable = (name == 'simama') ? 'inspection_details' : '${name}_details';
         await sqldb.rawUpdate(
-          'UPDATE ${name}_details SET ref_id = ? WHERE tran_id = ?',
+          'UPDATE $detailsTable SET ref_id = ? WHERE tran_id = ?',
           [syncedId ?? id, id],
         );
       }

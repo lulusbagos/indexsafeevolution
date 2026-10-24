@@ -11,7 +11,6 @@ import '../pages/p2h/p2h_page.dart';
 import '../pages/performance/performance_hub_pages.dart';
 import '../pages/profile_page.dart';
 import '../pages/roster_settings_page.dart';
-import '../pages/safety_updates_page.dart';
 import '../utils/enums.dart';
 
 class NotificationService {
@@ -76,20 +75,38 @@ class NotificationService {
     }
   }
 
+  /// Getaran fisik berulang & intensif khusus ketika login / deteksi user ditugaskan sebagai PIC/PJA Hazard, Inspeksi, Action Plan, dll.
+  static Future<void> vibrateForPicAssignment({String? reason}) async {
+    try {
+      for (int i = 0; i < 4; i++) {
+        await HapticFeedback.heavyImpact();
+        await Future.delayed(const Duration(milliseconds: 180));
+        await HapticFeedback.vibrate();
+        await Future.delayed(const Duration(milliseconds: 220));
+      }
+    } catch (_) {}
+  }
+
   // Display notification, pop up heads-up banner, and VIBRATE phone!
   static Future<void> display({
     required String title,
     required String body,
     String? payload,
     String? notifType,
+    String? logo,
+    String? priority,
   }) async {
     final t = (notifType ?? '').toLowerCase();
+    final p = (priority ?? '').toLowerCase();
     final combined = '$title $body'.toLowerCase();
-    final bool isTemuanK3 = t.startsWith('hazard_') ||
+    final bool isTemuanK3 = p == 'urgent' ||
+        t.startsWith('hazard_') ||
         t.startsWith('inspection_') ||
         t.startsWith('actionplan_') ||
         combined.contains('temuan') ||
         combined.contains('penugasan') ||
+        combined.contains('pic') ||
+        combined.contains('pja') ||
         combined.contains('perlu mitigasi') ||
         combined.contains('tindakan perbaikan') ||
         combined.contains('action plan') ||

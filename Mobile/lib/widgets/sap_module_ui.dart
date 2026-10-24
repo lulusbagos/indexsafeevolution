@@ -14,8 +14,9 @@ Color moduleAccentColor(Module module) {
     case Module.inspection:
     case Module.inspectionDaily:
     case Module.inspectionWeekly:
-    case Module.simama:
       return const Color(0xFF0F766E);
+    case Module.simama:
+      return const Color(0xFF7C3AED);
     case Module.p2h:
       return const Color(0xFF0284C7);
     case Module.p5m:
@@ -38,8 +39,9 @@ IconData moduleIcon(Module module) {
     case Module.inspection:
     case Module.inspectionDaily:
     case Module.inspectionWeekly:
-    case Module.simama:
       return Icons.fact_check_rounded;
+    case Module.simama:
+      return Icons.nights_stay_rounded;
     case Module.p2h:
       return Icons.car_repair_rounded;
     case Module.p5m:

@@ -42,6 +42,29 @@ namespace Indexsafe.Api.Models
         [Column("notif_type")]
         public string? NotifType { get; set; } = "general";
 
+        [MaxLength(500)]
+        [Column("logo")]
+        public string? Logo { get; set; }
+
+        [MaxLength(100)]
+        [Column("category")]
+        public string? Category { get; set; }
+
+        [MaxLength(150)]
+        [Column("sender_name")]
+        public string? SenderName { get; set; }
+
+        [MaxLength(50)]
+        [Column("priority")]
+        public string? Priority { get; set; } = "normal";
+
+        [Column("payload")]
+        public string? Payload { get; set; }
+
+        [MaxLength(100)]
+        [Column("action_text")]
+        public string? ActionText { get; set; }
+
         [Column("created_at")]
         public DateTime CreatedAt { get; set; } = DateTime.Now;
     }

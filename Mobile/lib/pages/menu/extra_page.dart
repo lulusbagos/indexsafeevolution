@@ -26,14 +26,14 @@ class ExtraPage extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Performance Hub',
+                      Text('Modul Kinerja & Evaluasi',
                           style: TextStyle(
                               color: _hubInk,
                               fontSize: 18,
                               fontWeight: FontWeight.w900)),
                       SizedBox(height: 4),
                       Text(
-                          'Pantau pencapaian, tindak lanjut, dan informasi SAP.',
+                          'Pantau pencapaian, klasemen, dan tindak lanjut terpadu.',
                           style: TextStyle(
                               color: Color(0xFF68757B), fontSize: 12)),
                     ],
@@ -69,7 +69,7 @@ class _HubModuleCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final item = listMenuExtra[index];
-    final style = _hubStyles[index];
+    final style = _hubStyles[index % _hubStyles.length];
     return Material(
       color: Colors.white,
       borderRadius: BorderRadius.circular(23),
@@ -145,10 +145,13 @@ class _HubStyle {
 }
 
 const _hubStyles = [
-  _HubStyle(Color(0xFF16A34A), Icons.track_changes_rounded),
+  _HubStyle(Color(0xFF16A34A), Icons.person_pin_rounded),
   _HubStyle(Color(0xFFF59E0B), Icons.emoji_events_rounded),
-  _HubStyle(Color(0xFFEE5966), Icons.newspaper_rounded),
-  _HubStyle(Color(0xFF2677E8), Icons.calendar_month_rounded),
+  _HubStyle(Color(0xFF0284C7), Icons.groups_rounded),
   _HubStyle(Color(0xFF7C4DE8), Icons.verified_rounded),
-  _HubStyle(Color(0xFF0AA99A), Icons.assignment_turned_in_rounded),
+  _HubStyle(Color(0xFF2563EB), Icons.calendar_month_rounded),
+  _HubStyle(Color(0xFF0D9488), Icons.assignment_turned_in_rounded),
+  _HubStyle(Color(0xFFE11D48), Icons.assessment_rounded),
+  _HubStyle(Color(0xFFEA580C), Icons.campaign_rounded),
+  _HubStyle(Color(0xFF059669), Icons.drive_eta_rounded),
 ];

@@ -29,6 +29,9 @@ namespace Indexsafe.Api.Data
         public DbSet<P2hReport> P2hReports { get; set; } = null!;
         public DbSet<DpaReport> DpaReports { get; set; } = null!;
         public DbSet<DpaDriver> DpaDrivers { get; set; } = null!;
+        public DbSet<FciReport> FciReports { get; set; } = null!;
+        public DbSet<RciReport> RciReports { get; set; } = null!;
+        public DbSet<RciMember> RciMembers { get; set; } = null!;
         public DbSet<IncidentNews> IncidentNewsList { get; set; } = null!;
         public DbSet<AttendanceEvent> AttendanceEvents { get; set; } = null!;
         public DbSet<AttendanceRecord> AttendanceRecords { get; set; } = null!;
@@ -94,6 +97,19 @@ namespace Indexsafe.Api.Data
 
             modelBuilder.Entity<DpaReport>()
                 .ToTable("tbl_t_dpa_report");
+
+            modelBuilder.Entity<FciReport>()
+                .ToTable("tbl_t_fci_report");
+
+            modelBuilder.Entity<RciReport>()
+                .ToTable("tbl_t_rci_report")
+                .HasMany(r => r.Members)
+                .WithOne(m => m.RciReport)
+                .HasForeignKey(m => m.RciReportId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<RciMember>()
+                .ToTable("tbl_t_rci_member");
 
             modelBuilder.Entity<DpaDriver>()
                 .ToTable("tbl_m_dpa_driver");

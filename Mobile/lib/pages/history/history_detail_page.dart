@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -17,6 +18,8 @@ import '../../utils/globals.dart' as globals;
 import '../../utils/helpers.dart';
 import '../../widgets/button_app.dart';
 import '../../widgets/top_bar.dart';
+import '../../services/p2h_pdf_service.dart';
+import '../../services/p5m_share_service.dart';
 import '../action/action_plan_page.dart';
 
 class HistoryDetailPage extends StatefulWidget {
@@ -84,12 +87,14 @@ class _HistoryDetailPageState extends State<HistoryDetailPage> {
         break;
       case Module.simama:
         table = 'inspection_details';
-        _db.rawQuery(
-            '''select id, name from enum_masters where deleted_at is null and ref_id=${widget.data['area_id'] as int} order by id asc''').then((val) {
-          if (val.isNotEmpty) {
-            setState(() => _rawType = val.toList());
-          }
-        });
+        if (widget.data['area_id'] != null) {
+          _db.rawQuery(
+              '''select id, name from enum_masters where deleted_at is null and ref_id=${widget.data['area_id']} order by id asc''').then((val) {
+            if (val.isNotEmpty) {
+              setState(() => _rawType = val.toList());
+            }
+          });
+        }
         break;
       case Module.coaching:
         table = 'coaching_details';
@@ -377,9 +382,9 @@ class _HistoryDetailPageState extends State<HistoryDetailPage> {
 
   Future<Uint8List> _generatePdf(PdfPageFormat format) async {
     var tanggal = '${widget.data['date']} ${widget.data['time']}';
-    var area = widget.data['area_name'] ?? '';
-    var lokasi = widget.data['location_name'] ?? '';
-    var lokasiDetail = widget.data['location_detail'] ?? '';
+    var area = widget.data['area_name'] ?? widget.data['area'] ?? '';
+    var lokasi = widget.data['location_name'] ?? widget.data['lokasi'] ?? '';
+    var lokasiDetail = widget.data['location_detail'] ?? widget.data['detil_lokasi'] ?? '';
 
     final logo = await rootBundle.load('assets/images/indexsafe-logo-text.png');
     final logoBytes = logo.buffer.asUint8List();
@@ -690,48 +695,94 @@ class _HistoryDetailPageState extends State<HistoryDetailPage> {
                     style: fs1),
               ),
               pw.SizedBox(height: 5),
-              ..._rawType.map((type) {
-                int idx = 0;
-                return pw.Column(
-                  crossAxisAlignment: pw.CrossAxisAlignment.start,
-                  mainAxisAlignment: pw.MainAxisAlignment.start,
-                  children: [
-                    pw.Text((type['name'] ?? '').toUpperCase(), style: fs4),
-                    pw.SizedBox(height: 5),
-                    ..._rawData.asMap().entries.map((entry) {
-                      var val = entry.value;
-                      if (int.parse(val['type'] ?? 0) == type['id']) {
-                        idx++;
+              ...((widget.data['gol_a_json'] != null || widget.data['gol_b_json'] != null || widget.data['gol_c_json'] != null)
+                  ? [
+                      ...[
+                        {'name': 'GOLONGAN A (KRITIS - 16 ITEM)', 'json': widget.data['gol_a_json']},
+                        {'name': 'GOLONGAN B (PENTING - 10 ITEM)', 'json': widget.data['gol_b_json']},
+                        {'name': 'GOLONGAN C (UMUM - 11 ITEM)', 'json': widget.data['gol_c_json']},
+                      ].map((grp) {
+                        List<dynamic> items = [];
+                        try {
+                          if (grp['json'] != null && grp['json'].toString().isNotEmpty) {
+                            items = jsonDecode(grp['json'].toString()) as List;
+                          }
+                        } catch (_) {}
                         return pw.Column(
                           crossAxisAlignment: pw.CrossAxisAlignment.start,
-                          mainAxisAlignment: pw.MainAxisAlignment.start,
                           children: [
-                            pw.Text('$idx. ${titleCase(val['name'] ?? '')}',
-                                style: fs2),
-                            pw.SizedBox(height: 5),
-                            if (val['yesno'] != null) ...[
-                              pw.Text(globals.goodBad[val['yesno'] ?? 0]!,
-                                  style: fs3),
-                              pw.SizedBox(height: 5),
-                            ],
-                            if (val['yesno'] != null &&
-                                (val['yesno'] ?? 0) == 0 &&
-                                val['remark'] != null &&
-                                val['remark'] != '') ...[
-                              pw.Text(titleCase(val['remark'] ?? ''),
-                                  style: fs3),
-                              pw.SizedBox(height: 5),
-                            ],
-                            pw.SizedBox(height: 5),
+                            pw.Text(grp['name']!.toString(), style: fs4),
+                            pw.SizedBox(height: 4),
+                            ...items.asMap().entries.map((entry) {
+                              final item = entry.value as Map;
+                              final isGood = item['status'] == 'GOOD';
+                              return pw.Padding(
+                                padding: const pw.EdgeInsets.symmetric(vertical: 2),
+                                child: pw.Row(
+                                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    pw.Expanded(
+                                      child: pw.Text('${entry.key + 1}. ${item['name'] ?? ''}', style: fs2),
+                                    ),
+                                    pw.Text(
+                                      isGood ? 'BAIK' : 'RUSAK',
+                                      style: pw.TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: pw.FontWeight.bold,
+                                        color: isGood ? const PdfColor.fromInt(0xFF10B981) : const PdfColor.fromInt(0xFFE11D48),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            }),
+                            pw.SizedBox(height: 10),
                           ],
                         );
-                      }
-                      return pw.SizedBox(height: 0);
-                    }),
-                    pw.SizedBox(height: 10),
-                  ],
-                );
-              }),
+                      }),
+                    ]
+                  : _rawType.map((type) {
+                      int idx = 0;
+                      return pw.Column(
+                        crossAxisAlignment: pw.CrossAxisAlignment.start,
+                        mainAxisAlignment: pw.MainAxisAlignment.start,
+                        children: [
+                          pw.Text((type['name'] ?? '').toUpperCase(), style: fs4),
+                          pw.SizedBox(height: 5),
+                          ..._rawData.asMap().entries.map((entry) {
+                            var val = entry.value;
+                            if (int.parse(val['type'] ?? 0) == type['id']) {
+                              idx++;
+                              return pw.Column(
+                                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                                mainAxisAlignment: pw.MainAxisAlignment.start,
+                                children: [
+                                  pw.Text('$idx. ${titleCase(val['name'] ?? '')}',
+                                      style: fs2),
+                                  pw.SizedBox(height: 5),
+                                  if (val['yesno'] != null) ...[
+                                    pw.Text(globals.goodBad[val['yesno'] ?? 0]!,
+                                        style: fs3),
+                                    pw.SizedBox(height: 5),
+                                  ],
+                                  if (val['yesno'] != null &&
+                                      (val['yesno'] ?? 0) == 0 &&
+                                      val['remark'] != null &&
+                                      val['remark'] != '') ...[
+                                    pw.Text(titleCase(val['remark'] ?? ''),
+                                        style: fs3),
+                                    pw.SizedBox(height: 5),
+                                  ],
+                                  pw.SizedBox(height: 5),
+                                ],
+                              );
+                            }
+                            return pw.SizedBox(height: 0);
+                          }),
+                          pw.SizedBox(height: 10),
+                        ],
+                      );
+                    })),
             ],
             if (widget.history == History.summary &&
                 widget.module == Module.safety) ...[
@@ -1047,28 +1098,76 @@ class _HistoryDetailPageState extends State<HistoryDetailPage> {
         ),
         pdfFileName:
             '${pageTitle(widget.module).replaceAll(' ', '-')}-${widget.data['code']}.pdf',
-        build: (format) => _generatePdf(format),
+        build: (format) => (widget.module == Module.p2h)
+            ? P2hShareService.generateP2hPdfBytes(widget.data)
+            : (widget.module == Module.p5m)
+                ? P5mShareService.generateP5mPdfBytes(widget.data)
+                : _generatePdf(format),
       ),
-      bottomNavigationBar: (widget.history == History.action && _isPJA != null)
+      bottomNavigationBar: (widget.module == Module.p2h)
           ? Container(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
-              child: buttonApp(
-                label: (_isPJA == true) ? 'Tentukan PIC' : 'Perbaikan',
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => ActionPlanPage(
-                        widget.module,
-                        widget.data,
-                        _isPJA!,
-                      ),
-                    ),
-                  );
-                },
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.08),
+                    blurRadius: 10,
+                    offset: const Offset(0, -4),
+                  ),
+                ],
+              ),
+              child: SafeArea(
+                top: false,
+                child: buttonApp(
+                  label: 'BAGIKAN LAPORAN P2H (SHARE)',
+                  bgColor: const Color(0xFF0284C7),
+                  onPressed: () => P2hShareService.showShareModal(context, widget.data),
+                ),
               ),
             )
-          : null,
+          : (widget.module == Module.p5m)
+              ? Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.08),
+                        blurRadius: 10,
+                        offset: const Offset(0, -4),
+                      ),
+                    ],
+                  ),
+                  child: SafeArea(
+                    top: false,
+                    child: buttonApp(
+                      label: 'BAGIKAN LAPORAN P5M (SHARE)',
+                      bgColor: const Color(0xFF0D9488),
+                      onPressed: () => P5mShareService.showShareModal(context, widget.data),
+                    ),
+                  ),
+                )
+          : (widget.history == History.action && _isPJA != null)
+              ? Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+                  child: buttonApp(
+                    label: (_isPJA == true) ? 'Tentukan PIC' : 'Perbaikan',
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => ActionPlanPage(
+                            widget.module,
+                            widget.data,
+                            _isPJA!,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                )
+              : null,
     );
   }
 

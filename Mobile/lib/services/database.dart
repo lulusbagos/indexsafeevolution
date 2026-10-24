@@ -19,6 +19,8 @@ class DatabaseService {
     await _ensureInspectionTransColumns(_database!);
     await _ensureEmployeeColumns(_database!);
     await _ensureBenchmarkTable(_database!);
+    await _ensureP2hTransColumns(_database!);
+    await _ensureP5mTransColumns(_database!);
     return _database!;
   }
 
@@ -39,6 +41,63 @@ class DatabaseService {
     await _ensureInspectionTransColumns(db);
     await _ensureEmployeeColumns(db);
     await _ensureBenchmarkTable(db);
+    await _ensureP2hTransColumns(db);
+    await _ensureP5mTransColumns(db);
+  }
+
+  static Future<void> _ensureP5mTransColumns(Database db) async {
+    final cols = [
+      'area',
+      'lokasi',
+      'topik',
+      'judul',
+      'catatan',
+      'foto_kegiatan',
+      'questions_json',
+      'answers_json',
+      'fit_status',
+      'nik',
+      'nama',
+    ];
+    for (var col in cols) {
+      try {
+        await db.execute('ALTER TABLE p5m_trans ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  }
+
+  static Future<void> _ensureP2hTransColumns(Database db) async {
+    final cols = [
+      'jenis_kendaraan',
+      'simper_kimper',
+      'foto_speedometer',
+      'gol_a_json',
+      'gol_b_json',
+      'gol_c_json',
+      'nik',
+      'nama',
+    ];
+    for (var col in cols) {
+      try {
+        await db.execute('ALTER TABLE p2h_trans ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+
+    try {
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS p2h_vehicles (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          no_lambung TEXT,
+          jenis_kendaraan TEXT,
+          merek TEXT,
+          last_km REAL DEFAULT 0
+        );
+      ''');
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN last_km REAL DEFAULT 0;');
+      } catch (_) {}
+      await db.execute('CREATE INDEX IF NOT EXISTS idx_p2h_veh_nl ON p2h_vehicles (no_lambung);');
+    } catch (_) {}
   }
 
   static Future<void> _ensureInspectionTransColumns(Database db) async {

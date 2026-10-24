@@ -13,6 +13,7 @@ namespace Indexsafe.Api.Controllers
 {
     [ApiController]
     [Route("api/roster")]
+    [Route("roster")]
     [Authorize]
     public class RosterController : ControllerBase
     {
@@ -98,26 +99,37 @@ namespace Indexsafe.Api.Controllers
             {
                 if (r.TipeRoster == "TUGAS")
                 {
-                    var overlapStartT = r.AwalDinas > startOfMonth ? r.AwalDinas : startOfMonth;
-                    var overlapEndT = r.AkhirDinas < endOfMonth ? r.AkhirDinas : endOfMonth;
-                    if (overlapStartT <= overlapEndT)
+                    if (r.AwalDinas.Date <= endOfMonth.Date && r.AkhirDinas.Date >= startOfMonth.Date)
                     {
                         isTugasExempt = true;
                     }
                     continue;
                 }
 
-                var overlapStart = r.AwalDinas > startOfMonth ? r.AwalDinas : startOfMonth;
-                var overlapEnd = r.AkhirDinas < endOfMonth ? r.AkhirDinas : endOfMonth;
-                if (overlapStart <= overlapEnd)
+                if (r.AwalDinas.Date <= endOfMonth.Date && r.AkhirDinas.Date >= startOfMonth.Date)
                 {
-                    computedOnsiteDays += (overlapEnd - overlapStart).Days + 1;
-                    hasRoster = true;
+                    var overlapStart = r.AwalDinas.Date > startOfMonth.Date ? r.AwalDinas.Date : startOfMonth.Date;
+                    var overlapEnd = r.AkhirDinas.Date < endOfMonth.Date ? r.AkhirDinas.Date : endOfMonth.Date;
+                    if (overlapStart <= overlapEnd)
+                    {
+                        computedOnsiteDays += (overlapEnd - overlapStart).Days + 1;
+                        hasRoster = true;
+                    }
                 }
             }
 
             var activeRoster = historyRaw.FirstOrDefault(r => today >= r.AwalDinas.Date && today <= r.AkhirCuti.Date);
             var latestRoster = historyRaw.FirstOrDefault();
+
+            double ratio = 1.0;
+            if (isTugasExempt)
+            {
+                ratio = 0.0;
+            }
+            else if (hasRoster)
+            {
+                ratio = Math.Min(1.0, (double)computedOnsiteDays / totalDaysInMonth);
+            }
 
             return Ok(new
             {
@@ -146,7 +158,7 @@ namespace Indexsafe.Api.Controllers
                 isTugasExempt,
                 computedOnsiteDays,
                 totalDaysInMonth,
-                ratio = hasRoster ? Math.Min(1.0, (double)computedOnsiteDays / totalDaysInMonth) : 1.0,
+                ratio,
                 defaultOnsite = 42
             });
         }
@@ -176,19 +188,19 @@ namespace Indexsafe.Api.Controllers
                     return BadRequest(new { message = "Tanggal mulai tugas tidak boleh lebih besar dari akhir tugas." });
                 }
 
+                int durasiTugas = (akhirTugas - awalTugas).Days + 1;
+                bool isEdit = req.Id.HasValue && req.Id.Value > 0;
                 Roster? rosterTugasToUpdate = null;
-                if (req.Id.HasValue && req.Id.Value > 0)
-                {
-                    rosterTugasToUpdate = await _context.Rosters
-                        .FirstOrDefaultAsync(r => r.Id == req.Id.Value && r.Nik == userNik);
-                }
 
-                if (rosterTugasToUpdate == null)
+                if (isEdit)
                 {
                     rosterTugasToUpdate = await _context.Rosters
-                        .Where(r => r.Nik == userNik && r.AkhirCuti >= DateTime.Today)
-                        .OrderByDescending(r => r.AkhirCuti)
-                        .FirstOrDefaultAsync();
+                        .FirstOrDefaultAsync(r => r.Id == req.Id!.Value && r.Nik == userNik);
+
+                    if (rosterTugasToUpdate == null)
+                    {
+                        return NotFound(new { message = "Data periode tugas tidak ditemukan atau bukan milik Anda." });
+                    }
                 }
 
                 if (rosterTugasToUpdate != null)
@@ -218,6 +230,20 @@ namespace Indexsafe.Api.Controllers
                     };
                     _context.Rosters.Add(newRosterTugas);
                 }
+
+                // Kirim notifikasi sistem ke user
+                var notifTugas = new Notification
+                {
+                    RecipientNik = userNik,
+                    Title = isEdit ? "Perubahan Periode Tugas Khusus" : "Periode Tugas Baru Berhasil Disimpan",
+                    Message = $"Periode tugas {durasiTugas} hari ({awalTugas:dd MMM yyyy} - {akhirTugas:dd MMM yyyy}) aktif. Bebas target SAP: Kewajiban laporan K3 ditiadakan selama masa tugas.",
+                    Url = "/roster",
+                    NotifType = "roster_tugas",
+                    IsRead = false,
+                    IsActioned = false,
+                    CreatedAt = DateTime.Now
+                };
+                _context.Notifications.Add(notifTugas);
 
                 await _context.SaveChangesAsync();
                 return Ok(new { success = true, message = "Periode Tugas berhasil disimpan. Anda dibebaskan dari kewajiban target SAP selama masa penugasan." });
@@ -258,19 +284,18 @@ namespace Indexsafe.Api.Controllers
                 return BadRequest(new { message = "Durasi cuti (offsite) harus antara 1 sampai 180 hari." });
             }
 
+            bool isEditReguler = req.Id.HasValue && req.Id.Value > 0;
             Roster? rosterRegulerToUpdate = null;
-            if (req.Id.HasValue && req.Id.Value > 0)
-            {
-                rosterRegulerToUpdate = await _context.Rosters
-                    .FirstOrDefaultAsync(r => r.Id == req.Id.Value && r.Nik == userNik);
-            }
 
-            if (rosterRegulerToUpdate == null)
+            if (isEditReguler)
             {
                 rosterRegulerToUpdate = await _context.Rosters
-                    .Where(r => r.Nik == userNik && r.AkhirCuti >= DateTime.Today)
-                    .OrderByDescending(r => r.AkhirCuti)
-                    .FirstOrDefaultAsync();
+                    .FirstOrDefaultAsync(r => r.Id == req.Id!.Value && r.Nik == userNik);
+
+                if (rosterRegulerToUpdate == null)
+                {
+                    return NotFound(new { message = "Data roster tidak ditemukan atau bukan milik Anda." });
+                }
             }
 
             if (rosterRegulerToUpdate != null)
@@ -301,6 +326,20 @@ namespace Indexsafe.Api.Controllers
                 _context.Rosters.Add(newRoster);
             }
 
+            // Kirim notifikasi sistem ke user
+            var notifReguler = new Notification
+            {
+                RecipientNik = userNik,
+                Title = isEditReguler ? "Perubahan Pengaturan Roster" : "Pengaturan Roster Baru Berhasil Disimpan",
+                Message = $"Jadwal roster dinas {actualOnsite} hari ({awalDinas:dd MMM yyyy} - {akhirDinas:dd MMM yyyy}) & cuti {actualOffsite} hari ({awalCuti:dd MMM yyyy} - {akhirCuti:dd MMM yyyy}) aktif. Target SAP disesuaikan proporsional.",
+                Url = "/roster",
+                NotifType = "roster_reguler",
+                IsRead = false,
+                IsActioned = false,
+                CreatedAt = DateTime.Now
+            };
+            _context.Notifications.Add(notifReguler);
+
             await _context.SaveChangesAsync();
             return Ok(new { success = true, message = "Roster kerja berhasil disimpan dan target SAP diperbarui." });
         }
@@ -317,8 +356,25 @@ namespace Indexsafe.Api.Controllers
                 return NotFound(new { message = "Data roster tidak ditemukan atau bukan milik Anda." });
             }
 
-            string tipeLabel = roster.TipeRoster == "TUGAS" ? "Periode Tugas" : "Roster";
+            string tipeLabel = roster.TipeRoster == "TUGAS" ? "Periode Tugas" : "Roster Reguler";
+            string rentang = $"{roster.AwalDinas:dd MMM yyyy} - {roster.AkhirDinas:dd MMM yyyy}";
+
             _context.Rosters.Remove(roster);
+
+            // Simpan notifikasi penghapusan
+            var notifDelete = new Notification
+            {
+                RecipientNik = userNik,
+                Title = $"{tipeLabel} Dihapus",
+                Message = $"Data jadwal {tipeLabel.ToLower()} ({rentang}) telah berhasil dihapus dari sistem.",
+                Url = "/roster",
+                NotifType = "roster_deleted",
+                IsRead = false,
+                IsActioned = false,
+                CreatedAt = DateTime.Now
+            };
+            _context.Notifications.Add(notifDelete);
+
             await _context.SaveChangesAsync();
 
             return Ok(new { success = true, message = $"{tipeLabel} berhasil dihapus." });

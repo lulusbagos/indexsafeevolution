@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import '../models/roster_model.dart';
 import '../services/api.dart';
+import '../services/notification.dart';
 
 class RosterSettingsPage extends StatefulWidget {
   const RosterSettingsPage({super.key});
@@ -16,6 +17,7 @@ class _RosterSettingsPageState extends State<RosterSettingsPage>
   final ApiService _api = ApiService();
   bool _isLoading = true;
   bool _isSaving = false;
+  bool _isFirstLoad = true;
 
   // Selected Tab: 0 = Reguler, 1 = Tugas
   int _selectedTab = 0;
@@ -81,8 +83,8 @@ class _RosterSettingsPageState extends State<RosterSettingsPage>
           _totalDaysInMonth = info.totalDaysInMonth;
           _ratio = info.ratio;
 
-          // Default initial fields if there's active/latest roster
-          if (_editingId == null) {
+          // Default initial fields if there's active/latest roster on initial page load
+          if (_isFirstLoad && _editingId == null) {
             final target = info.activeRoster ?? info.latestRoster;
             if (target != null) {
               final isTugas = target['tipeRoster'] == 'TUGAS';
@@ -106,6 +108,7 @@ class _RosterSettingsPageState extends State<RosterSettingsPage>
                     DateTime.now().add(const Duration(days: 56));
               }
             }
+            _isFirstLoad = false;
           }
 
           _isLoading = false;
@@ -245,6 +248,22 @@ class _RosterSettingsPageState extends State<RosterSettingsPage>
         );
       },
       (successData) {
+        final hariDinas = _akhirDinas.difference(_awalDinas).inDays + 1;
+        final hariCuti = _akhirCuti.difference(_awalCuti).inDays + 1;
+        final hariTugas = _akhirTugas.difference(_awalTugas).inDays + 1;
+
+        // Tampilkan Heads-Up Notification & Getaran
+        NotificationService.display(
+          title: isTugas
+              ? (_editingId != null ? 'Periode Tugas Diperbarui' : 'Periode Tugas Berhasil Disimpan')
+              : (_editingId != null ? 'Pengaturan Roster Diperbarui' : 'Pengaturan Roster Berhasil Disimpan'),
+          body: isTugas
+              ? 'Periode tugas aktif (${_displayFormat.format(_awalTugas)} - ${_displayFormat.format(_akhirTugas)}, $hariTugas hari). Bebas target SAP selama bertugas.'
+              : 'Jadwal onsite $hariDinas hari & cuti $hariCuti hari aktif. Target kepatuhan SAP disesuaikan proporsional.',
+          payload: '/roster',
+          notifType: isTugas ? 'roster_tugas' : 'roster_reguler',
+        );
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(successData['message'] ?? 'Roster berhasil disimpan!'),
@@ -320,6 +339,14 @@ class _RosterSettingsPageState extends State<RosterSettingsPage>
         );
       },
       (data) {
+        // Tampilkan notifikasi lokal penghapusan
+        NotificationService.display(
+          title: item.isTugas ? 'Periode Tugas Dihapus' : 'Roster Reguler Dihapus',
+          body: 'Data jadwal ${item.isTugas ? "periode tugas" : "roster"} (${item.awalDinasFormatted} - ${item.akhirDinasFormatted}) telah dihapus.',
+          payload: '/roster',
+          notifType: 'roster_deleted',
+        );
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(data['message'] ?? 'Pengaturan berhasil dihapus'),
@@ -1142,7 +1169,9 @@ class _RosterSettingsPageState extends State<RosterSettingsPage>
                 ),
               )
             : Text(
-                _editingId != null ? 'Perbarui Pengaturan' : 'Simpan Pengaturan Roster',
+                _editingId != null
+                    ? (_selectedTab == 1 ? 'Perbarui Periode Tugas' : 'Perbarui Pengaturan Roster')
+                    : (_selectedTab == 1 ? 'Simpan Periode Tugas' : 'Simpan Pengaturan Roster'),
                 style: const TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w800,

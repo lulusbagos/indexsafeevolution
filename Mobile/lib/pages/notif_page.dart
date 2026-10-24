@@ -11,6 +11,7 @@ import '../utils/globals.dart' as globals;
 import '../utils/helpers.dart';
 import 'hazard/hazard_hub_page.dart';
 import 'history/history_detail_page.dart';
+import 'roster_settings_page.dart';
 
 class NotifPage extends StatefulWidget {
   const NotifPage({super.key});
@@ -185,6 +186,11 @@ class _NotifPageState extends State<NotifPage> {
                 msgLower.contains('pembinaan') ||
                 urlLower.contains('performance');
 
+            final isRoster = typeLower.contains('roster') ||
+                urlLower.contains('roster') ||
+                titleLower.contains('roster') ||
+                titleLower.contains('periode tugas');
+
             // Sesuai permintaan pengguna:
             // "dan akan hilang 7 hari berikutnya di notifikasi"
             if (isCoaching && n.createdAt != null) {
@@ -194,31 +200,38 @@ class _NotifPageState extends State<NotifPage> {
               }
             }
 
-            final isHazard = !isCoaching && (typeLower.contains('hazard') || urlLower.contains('hazard'));
-            final isInspect = !isCoaching && (typeLower.contains('inspect') || urlLower.contains('inspect'));
+            final isHazard = !isCoaching && !isRoster && (typeLower.contains('hazard') || urlLower.contains('hazard'));
+            final isInspect = !isCoaching && !isRoster && (typeLower.contains('inspect') || urlLower.contains('inspect'));
 
             final String category = isCoaching
                 ? 'coaching'
-                : (isHazard ? 'hazard' : (isInspect ? 'inspection' : 'general'));
+                : (isRoster
+                    ? 'roster'
+                    : (isHazard ? 'hazard' : (isInspect ? 'inspection' : 'general')));
 
             combined.add({
               'id': n.id,
               'is_server_notif': true,
               'title': n.title,
               'remark': n.message,
-              'category': category,
+              'category': (n.category != null && n.category!.isNotEmpty) ? n.category : category,
               'notif_type': isCoaching ? 'coaching' : n.notifType,
               'url': n.url,
+              'logo': n.logo,
+              'sender_name': n.senderName,
+              'priority': n.priority,
+              'payload': n.payload,
+              'action_text': n.actionText,
               'is_read': n.isRead,
               'is_actioned': n.isActioned,
-              'is_action_required': isCoaching ? false : n.isActionRequired,
+              'is_action_required': (isCoaching || isRoster) ? false : n.isActionRequired,
               'date': n.createdAt != null ? DateFormat('yyyy-MM-dd').format(n.createdAt!) : '',
               'time': n.createdAt != null ? DateFormat('HH:mm').format(n.createdAt!) : '',
               'created_at_dt': n.createdAt ?? DateTime.now(),
-              // Coaching tidak ada statusnya (status = -1)
-              'status': isCoaching ? -1 : (n.isActioned ? 2 : (n.isRead ? 1 : 0)),
-              'area_name': isCoaching ? 'Kinerja & Pembinaan' : (isHazard ? 'K3 Temuan Lapangan' : 'Sistem SAP'),
-              'location_name': n.url ?? '',
+              // Coaching / Roster informasi tidak ada penalty status (-1)
+              'status': isCoaching ? -1 : (isRoster ? (n.isRead ? 1 : 0) : (n.isActioned ? 2 : (n.isRead ? 1 : 0))),
+              'area_name': isCoaching ? 'Kinerja & Pembinaan' : (isRoster ? 'Jadwal Kerja & SAP' : (isHazard ? 'K3 Temuan Lapangan' : 'Sistem SAP')),
+              'location_name': isRoster ? 'Pengaturan Roster' : (n.url ?? ''),
             });
           }
         },
@@ -239,6 +252,18 @@ class _NotifPageState extends State<NotifPage> {
         final m = Map<String, dynamic>.from(row);
         m['is_server_notif'] = false;
         combined.add(m);
+      }
+
+      // GETARAN FISIK: Pastikan bergetar jika ada notifikasi penugasan PIC/PJA atau prioritas urgent
+      final hasPicAssignments = combined.any((item) {
+        final isActionReq = item['is_action_required'] == true;
+        final isRead = item['is_read'] == true;
+        final status = (item['status'] as num?)?.toInt() ?? 0;
+        final p = (item['priority'] ?? '').toString().toLowerCase();
+        return (isActionReq && (!isRead || status < 2)) || p == 'urgent';
+      });
+      if (hasPicAssignments) {
+        NotificationService.vibrateForPicAssignment();
       }
 
       await PreferenceService.setNotif(combined.length);
@@ -518,6 +543,17 @@ class _NotifPageState extends State<NotifPage> {
       }
 
       final url = (item['url'] ?? '').toString().toLowerCase();
+      final notifType = (item['notif_type'] ?? '').toString().toLowerCase();
+
+      // Jika Notifikasi Roster / Periode Tugas, buka halaman Pengaturan Roster
+      if (cat.contains('roster') || url.contains('roster') || notifType.contains('roster')) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const RosterSettingsPage()),
+        ).then((_) => _getData());
+        return;
+      }
+
       if (cat.contains('hazard') || url.contains('hazard')) {
         HazardHubTab targetTab = HazardHubTab.action;
         final t = (item['notif_type'] ?? '').toString().toLowerCase();
@@ -532,6 +568,11 @@ class _NotifPageState extends State<NotifPage> {
           context,
           MaterialPageRoute(builder: (_) => HazardHubPage(initialTab: targetTab)),
         ).then((_) => _getData());
+        return;
+      }
+
+      if (!cat.contains('hazard') && !cat.contains('inspect') && !cat.contains('simama') && !url.contains('hazard') && !url.contains('inspect')) {
+        _showGeneralNotificationDialog(item);
         return;
       }
     } else if (isCoaching) {
@@ -739,6 +780,183 @@ class _NotifPageState extends State<NotifPage> {
     );
   }
 
+  Widget _buildNotifLogo(String? logo, Color fallbackColor) {
+    if (logo == null || logo.trim().isEmpty) return const SizedBox.shrink();
+    final clean = logo.trim();
+    if (clean.startsWith('http://') || clean.startsWith('https://')) {
+      return Container(
+        width: 32,
+        height: 32,
+        margin: const EdgeInsets.only(right: 8),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: const Color(0xFFE2E8F0)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.04),
+              blurRadius: 4,
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(7),
+          child: Image.network(
+            clean,
+            fit: BoxFit.cover,
+            errorBuilder: (_, __, ___) => Icon(Icons.notifications_active_rounded, size: 16, color: fallbackColor),
+          ),
+        ),
+      );
+    } else if (clean.startsWith('/') || clean.startsWith('uploads/')) {
+      final fullUrl = clean.startsWith('/') ? '${_api.baseUrl}$clean' : '${_api.baseUrl}/$clean';
+      return Container(
+        width: 32,
+        height: 32,
+        margin: const EdgeInsets.only(right: 8),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: const Color(0xFFE2E8F0)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.04),
+              blurRadius: 4,
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(7),
+          child: Image.network(
+            fullUrl,
+            fit: BoxFit.cover,
+            errorBuilder: (_, __, ___) => Icon(Icons.notifications_active_rounded, size: 16, color: fallbackColor),
+          ),
+        ),
+      );
+    } else {
+      IconData iconData = Icons.notifications_active_rounded;
+      Color iconColor = fallbackColor;
+      if (clean.contains('hazard')) {
+        iconData = Icons.warning_amber_rounded;
+        iconColor = const Color(0xFFEA580C);
+      } else if (clean.contains('inspect') || clean.contains('simama')) {
+        iconData = Icons.fact_check_outlined;
+        iconColor = const Color(0xFF0284C7);
+      } else if (clean.contains('p5m')) {
+        iconData = Icons.groups_rounded;
+        iconColor = const Color(0xFF0D9488);
+      } else if (clean.contains('p2h')) {
+        iconData = Icons.car_repair_rounded;
+        iconColor = const Color(0xFF0284C7);
+      } else if (clean.contains('trophy') || clean.contains('reward')) {
+        iconData = Icons.emoji_events_rounded;
+        iconColor = const Color(0xFFEAB308);
+      } else if (clean.contains('broadcast') || clean.contains('announcement') || clean.contains('info')) {
+        iconData = Icons.campaign_rounded;
+        iconColor = const Color(0xFF6366F1);
+      }
+
+      return Container(
+        width: 32,
+        height: 32,
+        margin: const EdgeInsets.only(right: 8),
+        decoration: BoxDecoration(
+          color: iconColor.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Icon(iconData, size: 16, color: iconColor),
+      );
+    }
+  }
+
+  void _showGeneralNotificationDialog(Map<String, dynamic> item) {
+    final title = item['title']?.toString() ?? 'Pemberitahuan';
+    final message = item['remark']?.toString() ?? '';
+    final sender = item['sender_name']?.toString() ?? '';
+    final priority = item['priority']?.toString().toLowerCase() ?? 'normal';
+    final logo = item['logo']?.toString();
+    final url = item['url']?.toString() ?? '';
+    final actionText = item['action_text']?.toString() ?? 'Buka Tautan';
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        titlePadding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
+        contentPadding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+        title: Row(
+          children: [
+            _buildNotifLogo(logo, const Color(0xFF0D9488)),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                  ),
+                  if (sender.isNotEmpty) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      'Dari: $sender',
+                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF0D9488)),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            if (priority == 'urgent')
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFEE2E2),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: const Text('URGENT', style: TextStyle(color: Color(0xFFDC2626), fontSize: 9.5, fontWeight: FontWeight.bold)),
+              ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Divider(height: 16),
+            Text(
+              message,
+              style: const TextStyle(fontSize: 13, height: 1.45, color: Color(0xFF334155)),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('Tutup', style: TextStyle(color: Color(0xFF64748B))),
+                ),
+                if (url.isNotEmpty) ...[
+                  const SizedBox(width: 8),
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF0D9488),
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    onPressed: () {
+                      Navigator.pop(ctx);
+                      NotificationService.navigateToUrl(url);
+                    },
+                    child: Text(actionText),
+                  ),
+                ],
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildNotificationCard(Map<String, dynamic> item) {
     final category = (item['category'] ?? '').toString().toLowerCase();
     final isCoaching = category.contains('coaching') ||
@@ -746,24 +964,33 @@ class _NotifPageState extends State<NotifPage> {
         (item['title'] ?? '').toString().toLowerCase().contains('pembinaan') ||
         (item['remark'] ?? '').toString().toLowerCase().contains('coaching') ||
         (item['remark'] ?? '').toString().toLowerCase().contains('pembinaan');
-    final isHazard = !isCoaching && category.contains('hazard');
-    final isInspection = !isCoaching && (category.contains('inspect') || category.contains('simama'));
+
+    final isRoster = category.contains('roster') ||
+        (item['notif_type'] ?? '').toString().toLowerCase().contains('roster') ||
+        (item['url'] ?? '').toString().toLowerCase().contains('roster');
+
+    final isHazard = !isCoaching && !isRoster && category.contains('hazard');
+    final isInspection = !isCoaching && !isRoster && (category.contains('inspect') || category.contains('simama'));
 
     final primaryTheme = isCoaching
         ? const Color(0xFF7C3AED)
-        : (isHazard
-            ? const Color(0xFFE65100)
-            : (isInspection
-                ? const Color(0xFF0288D1)
-                : const Color(0xFF00897B)));
+        : (isRoster
+            ? const Color(0xFF7C3AED)
+            : (isHazard
+                ? const Color(0xFFE65100)
+                : (isInspection
+                    ? const Color(0xFF0288D1)
+                    : const Color(0xFF00897B))));
 
     final bgTheme = isCoaching
         ? const Color(0xFFF5F3FF)
-        : (isHazard
-            ? const Color(0xFFFFF3E0)
-            : (isInspection
-                ? const Color(0xFFE1F5FE)
-                : const Color(0xFFE0F2F1)));
+        : (isRoster
+            ? const Color(0xFFF3E8FF)
+            : (isHazard
+                ? const Color(0xFFFFF3E0)
+                : (isInspection
+                    ? const Color(0xFFE1F5FE)
+                    : const Color(0xFFE0F2F1))));
 
     final statusInt = (item['status'] as int?) ?? (isCoaching ? -1 : 0);
     final String statusText = (statusInt >= 0 && statusInt < globals.status.length)
@@ -806,9 +1033,10 @@ class _NotifPageState extends State<NotifPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Top header: Module Pill + Timestamp
+                // Top header: Logo + Module Pill + Priority + Timestamp
                 Row(
                   children: [
+                    _buildNotifLogo(item['logo']?.toString(), primaryTheme),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
@@ -821,9 +1049,13 @@ class _NotifPageState extends State<NotifPage> {
                           Icon(
                             isCoaching
                                 ? Icons.psychology_outlined
-                                : (isHazard
-                                    ? Icons.warning_amber_rounded
-                                    : Icons.fact_check_outlined),
+                                : (isRoster
+                                    ? (item['notif_type']?.toString().contains('tugas') == true
+                                        ? Icons.flight_takeoff_rounded
+                                        : Icons.calendar_month_rounded)
+                                    : (isHazard
+                                        ? Icons.warning_amber_rounded
+                                        : Icons.fact_check_outlined)),
                             size: 13,
                             color: primaryTheme,
                           ),
@@ -831,11 +1063,15 @@ class _NotifPageState extends State<NotifPage> {
                           Text(
                             isCoaching
                                 ? 'COACHING'
-                                : (item['is_server_notif'] == true && (item['notif_type']?.toString().contains('assigned') == true)
-                                    ? 'TUGAS PJA HAZARD'
-                                    : (isHazard
-                                        ? 'HAZARD'
-                                        : (category.contains('simama') ? 'SIMAMA' : 'INSPEKSI'))),
+                                : (isRoster
+                                    ? (item['notif_type']?.toString().contains('tugas') == true
+                                        ? 'PERIODE TUGAS'
+                                        : 'ROSTER KERJA')
+                                    : (item['is_server_notif'] == true && (item['notif_type']?.toString().contains('assigned') == true)
+                                        ? 'TUGAS PJA HAZARD'
+                                        : (isHazard
+                                            ? 'HAZARD'
+                                            : (category.contains('simama') ? 'SIMAMA' : (category.contains('broadcast') ? 'PENGUMUMAN' : 'INSPEKSI'))))),
                             style: TextStyle(
                               fontSize: 10,
                               fontWeight: FontWeight.w800,
@@ -846,6 +1082,24 @@ class _NotifPageState extends State<NotifPage> {
                         ],
                       ),
                     ),
+                    if (item['priority']?.toString().toLowerCase() == 'urgent') ...[
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFEE2E2),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.bolt_rounded, size: 11, color: Color(0xFFDC2626)),
+                            SizedBox(width: 2),
+                            Text('URGENT', style: TextStyle(color: Color(0xFFDC2626), fontSize: 9.5, fontWeight: FontWeight.bold)),
+                          ],
+                        ),
+                      ),
+                    ],
                     const Spacer(),
                     Row(
                       children: [
@@ -867,6 +1121,13 @@ class _NotifPageState extends State<NotifPage> {
                     ),
                   ],
                 ),
+                if (item['sender_name'] != null && item['sender_name'].toString().isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    'Pengirim: ${item['sender_name']}',
+                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF0D9488)),
+                  ),
+                ],
                 const SizedBox(height: 10),
 
                 // Title

@@ -7,6 +7,12 @@ class NotificationItemModel {
   bool isActioned;
   final bool isActionRequired;
   final String notifType;
+  final String? logo;
+  final String? category;
+  final String? senderName;
+  final String priority;
+  final String? payload;
+  final String? actionText;
   final DateTime? createdAt;
   final String? rawCreatedAt;
 
@@ -19,6 +25,12 @@ class NotificationItemModel {
     this.isActioned = false,
     this.isActionRequired = false,
     this.notifType = 'general',
+    this.logo,
+    this.category,
+    this.senderName,
+    this.priority = 'normal',
+    this.payload,
+    this.actionText,
     this.createdAt,
     this.rawCreatedAt,
   });
@@ -76,6 +88,12 @@ class NotificationItemModel {
       isActioned: json['is_actioned'] == true || json['is_actioned'] == 1,
       isActionRequired: actionReq,
       notifType: nType,
+      logo: json['logo']?.toString(),
+      category: json['category']?.toString(),
+      senderName: json['sender_name']?.toString(),
+      priority: json['priority']?.toString() ?? 'normal',
+      payload: json['payload']?.toString(),
+      actionText: json['action_text']?.toString(),
       createdAt: dt,
       rawCreatedAt: dateStr,
     );
@@ -91,6 +109,12 @@ class NotificationItemModel {
       'is_actioned': isActioned,
       'is_action_required': isActionRequired,
       'notif_type': notifType,
+      'logo': logo,
+      'category': category,
+      'sender_name': senderName,
+      'priority': priority,
+      'payload': payload,
+      'action_text': actionText,
       'created_at': rawCreatedAt,
     };
   }

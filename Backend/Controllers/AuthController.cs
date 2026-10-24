@@ -400,36 +400,38 @@ namespace Indexsafe.Api.Controllers
                 .OrderByDescending(r => r.AkhirCuti)
                 .ToListAsync();
 
-            if (rosterHistory != null && rosterHistory.Any())
+            var relevantRoster = rosterHistory?
+                .Where(r => r.AwalDinas.Date <= endOfMonth.Date && (r.AkhirCuti.Date >= startOfMonth.Date || r.AkhirDinas.Date >= startOfMonth.Date))
+                .ToList();
+
+            if (relevantRoster != null && relevantRoster.Any())
             {
                 int computedOnsite = 0;
-                bool hasAnyRoster = false;
-                foreach (var r in rosterHistory)
+                int tugasDays = 0;
+                for (var cur = startOfMonth.Date; cur <= endOfMonth.Date; cur = cur.AddDays(1))
                 {
-                    hasAnyRoster = true;
-                    if (r.TipeRoster == "TUGAS")
+                    bool isTugas = relevantRoster.Any(r => r.TipeRoster == "TUGAS" && r.AwalDinas.Date <= cur && cur <= r.AkhirDinas.Date);
+                    if (isTugas)
                     {
-                        var overlapStartT = r.AwalDinas > startOfMonth ? r.AwalDinas : startOfMonth;
-                        var overlapEndT = r.AkhirDinas < endOfMonth ? r.AkhirDinas : endOfMonth;
-                        if (overlapStartT <= overlapEndT)
+                        tugasDays++;
+                    }
+                    else
+                    {
+                        bool isDinas = relevantRoster.Any(r => r.TipeRoster != "TUGAS" && r.AwalDinas.Date <= cur && cur <= r.AkhirDinas.Date);
+                        if (isDinas)
                         {
-                            isTugasExempt = true;
+                            computedOnsite++;
                         }
-                        continue;
                     }
+                }
 
-                    var overlapStart = r.AwalDinas > startOfMonth ? r.AwalDinas : startOfMonth;
-                    var overlapEnd = r.AkhirDinas < endOfMonth ? r.AkhirDinas : endOfMonth;
-                    if (overlapStart <= overlapEnd)
-                    {
-                        computedOnsite += (overlapEnd - overlapStart).Days + 1;
-                    }
-                }
-                if (hasAnyRoster)
+                if (tugasDays > 0 && computedOnsite == 0)
                 {
-                    hasRoster = true;
-                    computedOnsiteDays = computedOnsite;
+                    isTugasExempt = true;
                 }
+
+                hasRoster = true;
+                computedOnsiteDays = Math.Min(computedOnsite, totalDaysInMonth);
             }
 
             double ratio = hasRoster ? (double)computedOnsiteDays / totalDaysInMonth : 1.0;

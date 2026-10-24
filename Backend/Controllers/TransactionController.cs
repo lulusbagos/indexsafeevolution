@@ -370,10 +370,16 @@ namespace Indexsafe.Api.Controllers
                     });
                 }
 
-                // 2. INSPECTION
-                if (targetName == "inspection")
+                // 2. INSPECTION & SIMAMA
+                if (targetName == "inspection" || targetName == "simama")
                 {
-                    var jenisInspeksi = form["jenis_inspeksi"].FirstOrDefault() ?? form["category"].FirstOrDefault() ?? "Inspeksi K3 Lapangan";
+                    if (targetName == "simama" && tanggal < DateTime.Today)
+                    {
+                        return BadRequest(new { status = false, message = "Tanggal SiMaMa tidak boleh backdate (kurang dari hari ini)." });
+                    }
+
+                    var defaultJenis = targetName == "simama" ? "Sidak Malam Management (SiMaMa)" : "Inspeksi K3 Lapangan";
+                    var jenisInspeksi = form["jenis_inspeksi"].FirstOrDefault() ?? form["category"].FirstOrDefault() ?? form["title"].FirstOrDefault() ?? defaultJenis;
                     var catatan = form["catatan"].FirstOrDefault() ?? form["remark"].FirstOrDefault();
 
                     var (pja, nikPja, deptPja) = await ResolvePjaAsync(
@@ -467,20 +473,51 @@ namespace Indexsafe.Api.Controllers
                 // 3. P2H ALAT / KENDARAAN
                 if (targetName == "p2h")
                 {
+                    if (tanggal < DateTime.Today)
+                    {
+                        return BadRequest(new { status = false, message = "Tanggal P2H tidak boleh backdate (kurang dari hari ini)." });
+                    }
+
                     var jenisKendaraan = form["jenis_kendaraan"].FirstOrDefault() ?? form["unit"].FirstOrDefault() ?? "LV";
                     var noLambung = form["no_lambung"].FirstOrDefault() ?? "LV-001";
                     var merek = form["merek"].FirstOrDefault() ?? form["brand"].FirstOrDefault() ?? "Toyota";
                     var kmStr = form["kilometer"].FirstOrDefault() ?? form["km"].FirstOrDefault() ?? form["hm"].FirstOrDefault() ?? "0";
+                    double.TryParse(kmStr, NumberStyles.Any, CultureInfo.InvariantCulture, out var kmVal);
                     var simper = form["simper_kimper"].FirstOrDefault() ?? (form["simper"].FirstOrDefault() == "1" ? "YA" : "TIDAK");
 
-                    double.TryParse(kmStr, NumberStyles.Any, CultureInfo.InvariantCulture, out var kmVal);
+                    noLambung = noLambung.Trim().ToUpper();
+
+                    // Manage Vehicle Master
+                    var existingVeh = await _context.P2hVehicles
+                        .FirstOrDefaultAsync(v => v.NoLambung.ToLower() == noLambung.ToLower() && !v.IsDeleted);
+                    if (existingVeh == null)
+                    {
+                        existingVeh = new P2hVehicle
+                        {
+                            NoLambung = noLambung,
+                            JenisKendaraan = jenisKendaraan,
+                            Merek = merek,
+                            CreatedAt = DateTime.Now
+                        };
+                        _context.P2hVehicles.Add(existingVeh);
+                        await _context.SaveChangesAsync();
+                    }
 
                     var fotoSpeedo = form.Files["foto_speedometer"] ?? form.Files["image"];
                     string? fotoSpeedoUrl = null;
                     if (fotoSpeedo != null)
                     {
-                        fotoSpeedoUrl = await _imageUploadService.UploadAndCompressImageAsync(fotoSpeedo, "p2h", "p2h");
+                        fotoSpeedoUrl = await _imageUploadService.UploadAndCompressImageAsync(fotoSpeedo, "p2h", "speedo");
                     }
+
+                    var golAJson = form["gol_a_json"].FirstOrDefault();
+                    var golBJson = form["gol_b_json"].FirstOrDefault();
+                    var golCJson = form["gol_c_json"].FirstOrDefault();
+
+                    // Upload defect photos if files are attached
+                    golAJson = await ProcessSyncGroupPhotosAsync("golA", golAJson, form);
+                    golBJson = await ProcessSyncGroupPhotosAsync("golB", golBJson, form);
+                    golCJson = await ProcessSyncGroupPhotosAsync("golC", golCJson, form);
 
                     var p2h = new P2hReport
                     {
@@ -494,9 +531,9 @@ namespace Indexsafe.Api.Controllers
                         Kilometer = kmVal,
                         SimperKimper = simper,
                         FotoSpeedometer = fotoSpeedoUrl,
-                        GolA_Json = form["gol_a_json"].FirstOrDefault(),
-                        GolB_Json = form["gol_b_json"].FirstOrDefault(),
-                        GolC_Json = form["gol_c_json"].FirstOrDefault(),
+                        GolA_Json = golAJson,
+                        GolB_Json = golBJson,
+                        GolC_Json = golCJson,
                         IsDeleted = false,
                         CreatedAt = DateTime.Now
                     };
@@ -770,12 +807,18 @@ namespace Indexsafe.Api.Controllers
                     });
                 }
 
-                // 7. P5M
+                // 7. P5M (Fit to Work & Kelayakan Kerja)
                 if (targetName == "p5m")
                 {
+                    if (tanggal < DateTime.Today)
+                    {
+                        return BadRequest(new { status = false, message = "Tanggal P5M tidak boleh backdate (kurang dari hari ini)." });
+                    }
+
                     var topik = form["topik"].FirstOrDefault() ?? form["topic_id"].FirstOrDefault() ?? "K3 Operasional";
-                    var judul = form["judul"].FirstOrDefault() ?? form["title"].FirstOrDefault() ?? "P5M Awal Shift";
+                    var judul = form["judul"].FirstOrDefault() ?? form["title"].FirstOrDefault() ?? "P5M Awal Shift - Siap Bekerja";
                     var keterangan = form["keterangan"].FirstOrDefault() ?? form["remark"].FirstOrDefault();
+                    var catatan = form["catatan"].FirstOrDefault() ?? keterangan;
 
                     var fotoKegiatan = form.Files["foto_kegiatan"] ?? form.Files["image"];
                     string? fotoKegiatanUrl = null;
@@ -784,35 +827,111 @@ namespace Indexsafe.Api.Controllers
                         fotoKegiatanUrl = await _imageUploadService.UploadAndCompressImageAsync(fotoKegiatan, "p5m", "p5m");
                     }
 
-                    var p5m = new P5m
-                    {
-                        Tanggal = tanggal,
-                        Waktu = waktu,
-                        Nama = userName,
-                        Nik = userNik,
-                        Departemen = dept,
-                        Area = area,
-                        Lokasi = lokasi,
-                        DetilLokasi = detilLokasi,
-                        Topik = topik,
-                        Judul = judul,
-                        Keterangan = keterangan,
-                        FotoKegiatan = fotoKegiatanUrl,
-                        PerusahaanId = companyId,
-                        IsDeleted = false,
-                        CreatedAt = DateTime.Now
-                    };
+                    // Parse Fit to Work questions & answers if provided
+                    var questionsJson = form["questions_json"].FirstOrDefault();
+                    var answersJson = form["answers_json"].FirstOrDefault();
+                    List<string>? questionsList = null;
+                    List<string>? answersList = null;
 
-                    _context.P5ms.Add(p5m);
-                    await _context.SaveChangesAsync();
+                    if (!string.IsNullOrEmpty(questionsJson))
+                    {
+                        try { questionsList = JsonSerializer.Deserialize<List<string>>(questionsJson); } catch {}
+                    }
+                    if (!string.IsNullOrEmpty(answersJson))
+                    {
+                        try { answersList = JsonSerializer.Deserialize<List<string>>(answersJson); } catch {}
+                    }
+
+                    // Also check form indexed keys (e.g. questions[0], answers[0])
+                    if (questionsList == null || questionsList.Count == 0)
+                    {
+                        var qKeys = form.Keys.Where(k => k.StartsWith("questions[", StringComparison.OrdinalIgnoreCase)).OrderBy(k => k).ToList();
+                        if (qKeys.Count > 0)
+                        {
+                            questionsList = qKeys.Select(k => form[k].FirstOrDefault() ?? "").ToList();
+                            var aKeys = form.Keys.Where(k => k.StartsWith("answers[", StringComparison.OrdinalIgnoreCase)).OrderBy(k => k).ToList();
+                            answersList = aKeys.Select(k => form[k].FirstOrDefault() ?? "No").ToList();
+                        }
+                    }
+
+                    int primaryId = 0;
+                    bool hasUnfit = false;
+
+                    if (questionsList != null && questionsList.Count > 0)
+                    {
+                        for (int i = 0; i < questionsList.Count; i++)
+                        {
+                            var q = questionsList[i];
+                            var a = (answersList != null && i < answersList.Count) ? answersList[i] : "No";
+
+                            if (a.Equals("No", StringComparison.OrdinalIgnoreCase) || a.Equals("Tidak", StringComparison.OrdinalIgnoreCase) || a == "0")
+                            {
+                                hasUnfit = true;
+                            }
+
+                            var p5mRecord = new P5m
+                            {
+                                FotoKegiatan = fotoKegiatanUrl,
+                                Tanggal = tanggal,
+                                Waktu = waktu,
+                                Nama = userName,
+                                Nik = userNik,
+                                Departemen = dept,
+                                Area = area,
+                                Lokasi = lokasi,
+                                DetilLokasi = detilLokasi,
+                                Topik = topik,
+                                Judul = judul,
+                                Keterangan = keterangan,
+                                ListPertanyaan = q,
+                                Jawaban = a,
+                                Catatan = catatan,
+                                PerusahaanId = companyId,
+                                IsDeleted = false,
+                                CreatedAt = DateTime.Now
+                            };
+
+                            _context.P5ms.Add(p5mRecord);
+                            await _context.SaveChangesAsync();
+                            if (i == 0) primaryId = p5mRecord.Id;
+                        }
+                    }
+                    else
+                    {
+                        var p5m = new P5m
+                        {
+                            Tanggal = tanggal,
+                            Waktu = waktu,
+                            Nama = userName,
+                            Nik = userNik,
+                            Departemen = dept,
+                            Area = area,
+                            Lokasi = lokasi,
+                            DetilLokasi = detilLokasi,
+                            Topik = topik,
+                            Judul = judul,
+                            Keterangan = keterangan,
+                            FotoKegiatan = fotoKegiatanUrl,
+                            ListPertanyaan = "Fit to Work",
+                            Jawaban = "Yes",
+                            Catatan = catatan,
+                            PerusahaanId = companyId,
+                            IsDeleted = false,
+                            CreatedAt = DateTime.Now
+                        };
+
+                        _context.P5ms.Add(p5m);
+                        await _context.SaveChangesAsync();
+                        primaryId = p5m.Id;
+                    }
 
                     sw.Stop();
                     _monitor.RecordTransaction(new TransactionEvent
                     {
                         Type = "P5M",
                         Source = "Offline Outbox Sync",
-                        ServerId = p5m.Id,
-                        Code = $"P5M-{p5m.Id}",
+                        ServerId = primaryId,
+                        Code = $"P5M-{primaryId}",
                         Nik = userNik,
                         Nama = userName,
                         Perusahaan = User.FindFirst("Company")?.Value ?? "PT INDEXIM COALINDO",
@@ -827,7 +946,7 @@ namespace Indexsafe.Api.Controllers
                         InspectionDate = tanggal,
                         DurationMs = sw.ElapsedMilliseconds,
                         Status = "Success",
-                        Summary = $"[{topik}] {judul}"
+                        Summary = $"[{topik}] {judul} - {(hasUnfit ? "UNFIT" : "FIT TO WORK")}"
                     });
 
                     return Ok(new
@@ -835,8 +954,8 @@ namespace Indexsafe.Api.Controllers
                         status = true,
                         data = new SyncResultDto
                         {
-                            Id = p5m.Id,
-                            Code = $"P5M-{p5m.Id}",
+                            Id = primaryId,
+                            Code = $"P5M-{primaryId}",
                             UpdatedAt = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")
                         }
                     });
@@ -977,15 +1096,18 @@ namespace Indexsafe.Api.Controllers
                 return Ok(new { status = true, data = mapped });
             }
 
-            if (targetName == "inspection")
+            if (targetName == "inspection" || targetName == "simama")
             {
                 var query = _context.Inspections
                     .AsNoTracking()
-                    .Where(i => !i.IsDeleted && (i.Nik == userNik || (i.PerusahaanId.HasValue && allowedCompanyIds.Contains(i.PerusahaanId.Value))))
-                    .OrderByDescending(i => i.CreatedAt)
-                    .Take(limit);
+                    .Where(i => !i.IsDeleted && (i.Nik == userNik || (i.PerusahaanId.HasValue && allowedCompanyIds.Contains(i.PerusahaanId.Value))));
 
-                var list = await query.ToListAsync();
+                if (targetName == "simama")
+                {
+                    query = query.Where(i => i.JenisInspeksi.Contains("SIMAMA") || i.JenisInspeksi.Contains("Sidak") || i.JenisInspeksi.Contains("Malam"));
+                }
+
+                var list = await query.OrderByDescending(i => i.CreatedAt).Take(limit).ToListAsync();
                 return Ok(new { status = true, data = list });
             }
 
@@ -1040,9 +1162,47 @@ namespace Indexsafe.Api.Controllers
                     .AsNoTracking()
                     .Where(p => !p.IsDeleted && (p.Nik == userNik || (p.PerusahaanId.HasValue && allowedCompanyIds.Contains(p.PerusahaanId.Value))))
                     .OrderByDescending(p => p.CreatedAt)
-                    .Take(limit)
+                    .Take(limit * 4)
                     .ToListAsync();
-                return Ok(new { status = true, data = list });
+
+                // Group by session (Tanggal, Waktu, Nik, Judul) matching web P5M grouping
+                var grouped = list
+                    .GroupBy(p => new { p.Tanggal.Date, p.Waktu.Hours, p.Waktu.Minutes, p.Nik, p.Judul, p.Area, p.Lokasi })
+                    .Select(g =>
+                    {
+                        var first = g.First();
+                        var hasUnfit = g.Any(q => q.Jawaban != null && (q.Jawaban.Equals("No", StringComparison.OrdinalIgnoreCase) || q.Jawaban.Equals("Tidak", StringComparison.OrdinalIgnoreCase) || q.Jawaban == "0"));
+                        return new
+                        {
+                            id = first.Id,
+                            code = $"P5M-{first.Id}",
+                            title = first.Judul ?? "P5M & Fit to Work",
+                            date = first.Tanggal.ToString("yyyy-MM-dd"),
+                            time = first.Waktu.ToString(@"hh\:mm"),
+                            nik = first.Nik,
+                            nama = first.Nama,
+                            departemen = first.Departemen,
+                            area = first.Area,
+                            lokasi = first.Lokasi,
+                            detil_lokasi = first.DetilLokasi,
+                            area_name = first.Area ?? "-",
+                            location_name = first.Lokasi ?? "-",
+                            topik = first.Topik,
+                            judul = first.Judul,
+                            keterangan = first.Keterangan,
+                            catatan = first.Catatan,
+                            foto_kegiatan = first.FotoKegiatan,
+                            image = first.FotoKegiatan,
+                            is_fit = !hasUnfit,
+                            fit_status = hasUnfit ? "UNFIT" : "FIT TO WORK",
+                            checklist = g.Select(x => new { question = x.ListPertanyaan, answer = x.Jawaban }).ToList(),
+                            created_at = first.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss")
+                        };
+                    })
+                    .Take(limit)
+                    .ToList();
+
+                return Ok(new { status = true, data = grouped });
             }
 
             if (targetName == "p2h")
@@ -1372,6 +1532,81 @@ namespace Indexsafe.Api.Controllers
                     url = url
                 }
             });
+        }
+
+        private async Task<string?> ProcessSyncGroupPhotosAsync(string groupKey, string? jsonInput, IFormCollection form)
+        {
+            if (string.IsNullOrEmpty(jsonInput)) return jsonInput;
+            try
+            {
+                var list = JsonSerializer.Deserialize<List<P2hController.ChecklistItem>>(jsonInput, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                if (list == null) return jsonInput;
+
+                for (int i = 0; i < list.Count; i++)
+                {
+                    var file = form.Files[$"{groupKey}_photo_{i}"] ?? form.Files[$"photo_{groupKey}_{i}"] ?? form.Files[$"{groupKey}_photo_{list[i].Id - 1}"];
+                    if (file != null && file.Length > 0)
+                    {
+                        var url = await _imageUploadService.UploadAndCompressImageAsync(file, "p2h", $"{groupKey}_{i}");
+                        if (url != null)
+                        {
+                            list[i].PhotoUrl = url;
+                        }
+                    }
+                }
+                return JsonSerializer.Serialize(list);
+            }
+            catch
+            {
+                return jsonInput;
+            }
+        }
+        [HttpDelete("tran/{name}/{id:int}")]
+        [HttpDelete("api/tran/{name}/{id:int}")]
+        public async Task<IActionResult> DeleteTransaction(string name, int id)
+        {
+            var targetName = (name ?? string.Empty).ToLowerInvariant().Trim();
+            if (targetName == "inspection" || targetName == "simama")
+            {
+                var item = await _context.Inspections.FindAsync(id);
+                if (item != null)
+                {
+                    item.IsDeleted = true;
+                    await _context.SaveChangesAsync();
+                    return Ok(new { status = true, message = "Inspeksi berhasil dihapus" });
+                }
+            }
+            else if (targetName == "hazard" || targetName == "hazard_report")
+            {
+                var item = await _context.HazardReports.FindAsync(id);
+                if (item != null)
+                {
+                    item.IsDeleted = true;
+                    await _context.SaveChangesAsync();
+                    return Ok(new { status = true, message = "Hazard berhasil dihapus" });
+                }
+            }
+            else if (targetName == "p2h")
+            {
+                var item = await _context.P2hReports.FindAsync(id);
+                if (item != null)
+                {
+                    item.IsDeleted = true;
+                    await _context.SaveChangesAsync();
+                    return Ok(new { status = true, message = "P2H berhasil dihapus" });
+                }
+            }
+            else if (targetName == "p5m")
+            {
+                var item = await _context.P5ms.FindAsync(id);
+                if (item != null)
+                {
+                    item.IsDeleted = true;
+                    await _context.SaveChangesAsync();
+                    return Ok(new { status = true, message = "P5M berhasil dihapus" });
+                }
+            }
+            return Ok(new { status = true, message = "Data berhasil dihapus" });
         }
     }
 }

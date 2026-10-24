@@ -34,6 +34,30 @@ namespace Indexsafe.Api.Controllers
                     BEGIN
                         ALTER TABLE [tbl_t_notifications] ADD [is_actioned] BIT NOT NULL CONSTRAINT DF_tbl_t_notifications_is_actioned DEFAULT (0);
                     END
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[tbl_t_notifications]') AND name = 'logo')
+                    BEGIN
+                        ALTER TABLE [tbl_t_notifications] ADD [logo] NVARCHAR(500) NULL;
+                    END
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[tbl_t_notifications]') AND name = 'category')
+                    BEGIN
+                        ALTER TABLE [tbl_t_notifications] ADD [category] NVARCHAR(100) NULL;
+                    END
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[tbl_t_notifications]') AND name = 'sender_name')
+                    BEGIN
+                        ALTER TABLE [tbl_t_notifications] ADD [sender_name] NVARCHAR(150) NULL;
+                    END
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[tbl_t_notifications]') AND name = 'priority')
+                    BEGIN
+                        ALTER TABLE [tbl_t_notifications] ADD [priority] NVARCHAR(50) NULL CONSTRAINT DF_tbl_t_notifications_priority DEFAULT ('normal');
+                    END
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[tbl_t_notifications]') AND name = 'payload')
+                    BEGIN
+                        ALTER TABLE [tbl_t_notifications] ADD [payload] NVARCHAR(MAX) NULL;
+                    END
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[tbl_t_notifications]') AND name = 'action_text')
+                    BEGIN
+                        ALTER TABLE [tbl_t_notifications] ADD [action_text] NVARCHAR(100) NULL;
+                    END
                 ");
                 _schemaEnsured = true;
             }
@@ -51,6 +75,12 @@ namespace Indexsafe.Api.Controllers
 
             // Coaching / Pembinaan adalah notifikasi informasi penerimaan coaching dari PIC yang TIDAK membutuhkan status / tindak lanjut
             if (combined.Contains("coaching") || combined.Contains("pembinaan") || t.Contains("coaching"))
+            {
+                return false;
+            }
+
+            // Notifikasi jadwal Roster & Periode Tugas adalah notifikasi informasi (bukan temuan yang butuh tindak lanjut mitigasi)
+            if (t.StartsWith("roster") || combined.Contains("roster") || combined.Contains("periode tugas"))
             {
                 return false;
             }
@@ -166,6 +196,12 @@ namespace Indexsafe.Api.Controllers
                     is_actioned = n.IsActioned,
                     is_action_required = actionRequired,
                     notif_type = isCoaching ? "coaching" : (n.NotifType ?? "general"),
+                    logo = n.Logo,
+                    category = n.Category ?? (isCoaching ? "coaching" : (n.NotifType ?? "general")),
+                    sender_name = n.SenderName,
+                    priority = n.Priority ?? "normal",
+                    payload = n.Payload,
+                    action_text = n.ActionText,
                     created_at = n.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss")
                 };
             }).ToList();
@@ -328,5 +364,97 @@ namespace Indexsafe.Api.Controllers
             await _context.SaveChangesAsync();
             return Ok(new { status = true, message = "Semua tindakan temuan berhasil ditandai selesai." });
         }
+
+        [HttpPost("notifications/send")]
+        public async Task<IActionResult> SendNotification([FromBody] SendNotificationDto dto)
+        {
+            await EnsureSchemaAsync();
+            if (string.IsNullOrWhiteSpace(dto.Title) || string.IsNullOrWhiteSpace(dto.Message))
+            {
+                return BadRequest(new { status = false, message = "Judul (Title) dan Pesan (Message) wajib diisi." });
+            }
+
+            var notificationsToAdd = new System.Collections.Generic.List<Indexsafe.Api.Models.Notification>();
+
+            if (dto.IsBroadcast || (dto.RecipientNiks == null || dto.RecipientNiks.Count == 0))
+            {
+                // Kirim broadcast ke semua karyawan aktif
+                var allActiveNiks = await _context.Karyawans
+                    .Where(k => k.StatusAktif && !string.IsNullOrEmpty(k.NoNik))
+                    .Select(k => k.NoNik)
+                    .Distinct()
+                    .ToListAsync();
+
+                foreach (var nik in allActiveNiks)
+                {
+                    notificationsToAdd.Add(new Indexsafe.Api.Models.Notification
+                    {
+                        RecipientNik = nik.Trim(),
+                        Title = dto.Title,
+                        Message = dto.Message,
+                        Url = dto.Url,
+                        NotifType = dto.NotifType ?? "announcement",
+                        Logo = dto.Logo,
+                        Category = dto.Category ?? "broadcast",
+                        SenderName = dto.SenderName ?? "Pusat Informasi K3",
+                        Priority = dto.Priority ?? "normal",
+                        Payload = dto.Payload,
+                        ActionText = dto.ActionText,
+                        CreatedAt = DateTime.Now
+                    });
+                }
+            }
+            else
+            {
+                foreach (var nik in dto.RecipientNiks)
+                {
+                    if (string.IsNullOrWhiteSpace(nik)) continue;
+                    notificationsToAdd.Add(new Indexsafe.Api.Models.Notification
+                    {
+                        RecipientNik = nik.Trim(),
+                        Title = dto.Title,
+                        Message = dto.Message,
+                        Url = dto.Url,
+                        NotifType = dto.NotifType ?? "general",
+                        Logo = dto.Logo,
+                        Category = dto.Category ?? "direct",
+                        SenderName = dto.SenderName ?? "Pusat Informasi K3",
+                        Priority = dto.Priority ?? "normal",
+                        Payload = dto.Payload,
+                        ActionText = dto.ActionText,
+                        CreatedAt = DateTime.Now
+                    });
+                }
+            }
+
+            if (notificationsToAdd.Count > 0)
+            {
+                await _context.Notifications.AddRangeAsync(notificationsToAdd);
+                await _context.SaveChangesAsync();
+            }
+
+            return Ok(new
+            {
+                status = true,
+                message = $"Berhasil mengirim notifikasi ke {notificationsToAdd.Count} penerima.",
+                total_sent = notificationsToAdd.Count
+            });
+        }
+    }
+
+    public class SendNotificationDto
+    {
+        public System.Collections.Generic.List<string>? RecipientNiks { get; set; }
+        public bool IsBroadcast { get; set; } = false;
+        public string Title { get; set; } = string.Empty;
+        public string Message { get; set; } = string.Empty;
+        public string? Url { get; set; }
+        public string? NotifType { get; set; }
+        public string? Logo { get; set; }
+        public string? Category { get; set; }
+        public string? SenderName { get; set; }
+        public string? Priority { get; set; }
+        public string? Payload { get; set; }
+        public string? ActionText { get; set; }
     }
 }
