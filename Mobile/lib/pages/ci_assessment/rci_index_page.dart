@@ -1,9 +1,12 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../services/api.dart';
+import '../../services/database.dart';
 import '../../services/preference.dart';
 import '../../widgets/top_bar.dart';
 import 'rci_form_page.dart';
@@ -67,6 +70,75 @@ class _RciIndexPageState extends State<RciIndexPage> {
     }
   }
 
+  Future<List<RciReportItem>> _loadPendingRciJobs() async {
+    final List<RciReportItem> pending = [];
+    try {
+      final rows = await DatabaseService().rawQuery(
+        "SELECT payload FROM offline_sync_jobs WHERE feature = 'rci' ORDER BY created_at DESC",
+      );
+      for (final r in rows) {
+        final payloadRaw = r['payload']?.toString();
+        if (payloadRaw == null || payloadRaw.isEmpty) continue;
+        final payload = jsonDecode(payloadRaw) as Map<String, dynamic>;
+        final map = Map<String, dynamic>.from(payload['map'] as Map? ?? {});
+        final date = DateTime.tryParse(map['tanggal']?.toString() ?? '') ?? DateTime.now();
+        pending.add(
+          RciReportItem(
+            id: -1,
+            tanggal: date,
+            waktu: map['waktu']?.toString() ?? '12:00',
+            nik: map['nik']?.toString() ?? '',
+            nama: map['nama']?.toString() ?? '',
+            departemen: map['departemen']?.toString(),
+            perusahaan: map['perusahaan']?.toString(),
+            perusahaanId: map['perusahaan_id'] as int?,
+            area: map['area']?.toString() ?? 'Area Tambang',
+            lokasi: map['lokasi']?.toString() ?? '',
+            detilLokasi: map['detil_lokasi']?.toString(),
+            namaJalan: map['nama_jalan']?.toString() ?? map['segmen_jalan']?.toString() ?? 'Jalur Tambang',
+            segmentJalan: map['segmen_jalan']?.toString(),
+            shift: map['shift']?.toString(),
+            latitude: map['latitude']?.toString(),
+            longitude: map['longitude']?.toString(),
+            panjangSegment: double.tryParse(map['panjang_segment']?.toString() ?? '') ?? 100.0,
+            defisitSurfacing: 0.0,
+            defisitUndulation: 0.0,
+            defisitSpoil: 0.0,
+            defisitSafetyBerm: 0.0,
+            defisitRoadAttachment: 0.0,
+            defisitDust: 0.0,
+            defisitCrossfall: 0.0,
+            defisitDrainage: 0.0,
+            skorSurfacing: double.tryParse(map['skor_surfacing']?.toString() ?? '') ?? 4.0,
+            skorUndulation: double.tryParse(map['skor_undulation']?.toString() ?? '') ?? 4.0,
+            skorSpoil: double.tryParse(map['skor_spoil']?.toString() ?? '') ?? 4.0,
+            skorSafetyBerm: double.tryParse(map['skor_safety_berm']?.toString() ?? '') ?? 4.0,
+            skorRoadAttachment: double.tryParse(map['skor_road_attachment']?.toString() ?? '') ?? 4.0,
+            skorDust: double.tryParse(map['skor_dust']?.toString() ?? '') ?? 4.0,
+            skorCrossfall: double.tryParse(map['skor_crossfall']?.toString() ?? '') ?? 4.0,
+            skorDrainage: double.tryParse(map['skor_drainage']?.toString() ?? '') ?? 4.0,
+            skorPermukaanGroup: 4.0,
+            skorSafetyBermGroup: 4.0,
+            skorDrainageGroup: 4.0,
+            actualRoadScore: 4.0,
+            targetScore: 4.0,
+            achievement: 100.0,
+            totalScore: 4.0,
+            kategoriIndex: 'PENDING SYNC',
+            catatan: map['catatan']?.toString(),
+            tindakanPerbaikan: map['tindakan_perbaikan']?.toString(),
+            pic: map['pic']?.toString(),
+            fotoUrl: payload['photoPath']?.toString(),
+            status: 'Pending',
+            createdAt: DateTime.now(),
+            members: [],
+          ),
+        );
+      }
+    } catch (_) {}
+    return pending;
+  }
+
   Future<void> _fetchData() async {
     setState(() {
       _isLoading = true;
@@ -85,29 +157,54 @@ class _RciIndexPageState extends State<RciIndexPage> {
         scope: _selectedScope,
       );
 
+      final pendingJobs = await _loadPendingRciJobs();
+
       res.fold(
-        (err) {
+        (err) async {
+          final prefs = await SharedPreferences.getInstance();
+          final cacheRaw = prefs.getString('rci_cache_list');
+          if (cacheRaw != null && cacheRaw.isNotEmpty) {
+            try {
+              final cachedData = jsonDecode(cacheRaw) as Map<String, dynamic>;
+              final rawList = cachedData['data'] as List<dynamic>? ?? [];
+              final reports = rawList.map((e) => RciReportItem.fromJson(Map<String, dynamic>.from(e as Map))).toList();
+              final stats = RciSummaryStats.fromJson(cachedData['stats'] as Map<String, dynamic>? ?? {});
+              final roads = (cachedData['roads'] as List<dynamic>? ?? []).map((e) => e.toString()).toList();
+              if (mounted) {
+                setState(() {
+                  _reports = [...pendingJobs, ...reports];
+                  _stats = stats;
+                  _roads = roads;
+                  _isLoading = false;
+                  _errorMessage = null;
+                });
+                return;
+              }
+            } catch (_) {}
+          }
           if (mounted) {
             setState(() {
+              _reports = pendingJobs;
               _isLoading = false;
-              _errorMessage = err['message']?.toString() ?? 'Gagal memuat data RCI';
+              _errorMessage = pendingJobs.isNotEmpty ? null : (err['message']?.toString() ?? 'Gagal memuat data RCI');
             });
           }
         },
-        (data) {
+        (data) async {
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setString('rci_cache_list', jsonEncode(data));
+
           if (mounted) {
             final rawList = data['data'] as List<dynamic>? ?? [];
             final reports = rawList.map((e) => RciReportItem.fromJson(Map<String, dynamic>.from(e as Map))).toList();
-
             final rawStats = data['stats'] as Map<String, dynamic>? ?? {};
             final stats = RciSummaryStats.fromJson(rawStats);
-
             final rawRoads = data['roads'] as List<dynamic>? ?? [];
             final roads = rawRoads.map((e) => e.toString()).toList();
 
             setState(() {
               _isLoading = false;
-              _reports = reports;
+              _reports = [...pendingJobs, ...reports];
               _stats = stats;
               _roads = roads;
             });
@@ -115,10 +212,33 @@ class _RciIndexPageState extends State<RciIndexPage> {
         },
       );
     } catch (e) {
+      final pendingJobs = await _loadPendingRciJobs();
+      final prefs = await SharedPreferences.getInstance();
+      final cacheRaw = prefs.getString('rci_cache_list');
+      if (cacheRaw != null && cacheRaw.isNotEmpty) {
+        try {
+          final cachedData = jsonDecode(cacheRaw) as Map<String, dynamic>;
+          final rawList = cachedData['data'] as List<dynamic>? ?? [];
+          final reports = rawList.map((e) => RciReportItem.fromJson(Map<String, dynamic>.from(e as Map))).toList();
+          final stats = RciSummaryStats.fromJson(cachedData['stats'] as Map<String, dynamic>? ?? {});
+          final roads = (cachedData['roads'] as List<dynamic>? ?? []).map((e) => e.toString()).toList();
+          if (mounted) {
+            setState(() {
+              _reports = [...pendingJobs, ...reports];
+              _stats = stats;
+              _roads = roads;
+              _isLoading = false;
+              _errorMessage = null;
+            });
+            return;
+          }
+        } catch (_) {}
+      }
       if (mounted) {
         setState(() {
+          _reports = pendingJobs;
           _isLoading = false;
-          _errorMessage = e.toString();
+          _errorMessage = pendingJobs.isNotEmpty ? null : 'Mode Offline: Sambungkan jaringan untuk memuat riwayat terbaru.';
         });
       }
     }

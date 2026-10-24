@@ -3,6 +3,7 @@ using System.Linq;
 using System.Security.Claims;
 using System.Threading.Tasks;
 using Indexsafe.Api.Data;
+using Indexsafe.Api.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -99,11 +100,171 @@ namespace Indexsafe.Api.Controllers
                    combined.Contains("reassign");
         }
 
+        private async Task EnsurePendingTagNotificationsAsync(string userNik)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(userNik)) return;
+                userNik = userNik.Trim();
+                bool hasNew = false;
+
+                // 1. Hazard Reports where user is assigned as PJA and not Closed
+                var activeHazards = await _context.HazardReports
+                    .AsNoTracking()
+                    .Where(h => !h.IsDeleted && h.NikPja != null && h.NikPja.Trim() == userNik && h.StatusTemuan != "Closed")
+                    .OrderByDescending(h => h.Id)
+                    .Take(25)
+                    .ToListAsync();
+
+                foreach (var h in activeHazards)
+                {
+                    bool exists = await _context.Notifications
+                        .AnyAsync(n => n.RecipientNik == userNik && !n.IsActioned &&
+                            (n.Url == $"/Hazard/Detail/{h.Id}" || n.Message.Contains($"#{h.Id}")));
+                    if (!exists)
+                    {
+                        _context.Notifications.Add(new Notification
+                        {
+                            RecipientNik = userNik,
+                            Title = "Penugasan PJA Temuan Hazard",
+                            Message = $"Anda ditunjuk sebagai PJA untuk temuan Hazard #{h.Id} di {h.Lokasi ?? h.Area}. Segera tindaklanjuti (Take Up) atau alihkan ke PJA lain jika salah sasaran.",
+                            Url = $"/Hazard/Detail/{h.Id}",
+                            NotifType = "hazard_assigned",
+                            Category = "hazard",
+                            SenderName = h.Nama ?? "Pelapor K3",
+                            Priority = "urgent",
+                            ActionText = "Tindak Lanjut PJA",
+                            IsRead = false,
+                            IsActioned = false,
+                            CreatedAt = h.CreatedAt
+                        });
+                        hasNew = true;
+                    }
+                }
+
+                // 2. Action Plans where user is assigned as PIC and not Closed
+                var activePics = await _context.ActionPlans
+                    .AsNoTracking()
+                    .Where(a => !a.IsDeleted && a.NikPic != null && a.NikPic.Trim() == userNik && a.Status != "Closed")
+                    .OrderByDescending(a => a.Id)
+                    .Take(25)
+                    .ToListAsync();
+
+                foreach (var ap in activePics)
+                {
+                    bool exists = await _context.Notifications
+                        .AnyAsync(n => n.RecipientNik == userNik && !n.IsActioned &&
+                            (n.Url == $"/ActionPlan/Detail/{ap.Id}" || n.Message.Contains($"AP-#{ap.Id}") || n.Message.Contains($"#{ap.Id}")));
+                    if (!exists)
+                    {
+                        _context.Notifications.Add(new Notification
+                        {
+                            RecipientNik = userNik,
+                            Title = "Penugasan PIC Tindak Lanjut (Action Plan)",
+                            Message = $"Anda ditugaskan sebagai PIC untuk tindakan perbaikan di {ap.Lokasi ?? ap.Area} (AP-#{ap.Id}). Segera selesaikan dan laporkan bukti perbaikan.",
+                            Url = $"/ActionPlan/Detail/{ap.Id}",
+                            NotifType = "actionplan_assigned",
+                            Category = "actionplan",
+                            SenderName = ap.Pja ?? "PJA Area",
+                            Priority = "urgent",
+                            ActionText = "Lapor Perbaikan",
+                            IsRead = false,
+                            IsActioned = false,
+                            CreatedAt = ap.CreatedAt
+                        });
+                        hasNew = true;
+                    }
+                }
+
+                // 3. Action Plans where user is assigned as PJA and not Closed (needs PIC assignment)
+                var activePjas = await _context.ActionPlans
+                    .AsNoTracking()
+                    .Where(a => !a.IsDeleted && a.NikPja != null && a.NikPja.Trim() == userNik && (a.NikPic == null || a.NikPic == "") && a.Status != "Closed")
+                    .OrderByDescending(a => a.Id)
+                    .Take(25)
+                    .ToListAsync();
+
+                foreach (var ap in activePjas)
+                {
+                    bool exists = await _context.Notifications
+                        .AnyAsync(n => n.RecipientNik == userNik && !n.IsActioned &&
+                            (n.Url == $"/ActionPlan/Detail/{ap.Id}" || n.Message.Contains($"AP-#{ap.Id}") || n.Message.Contains($"#{ap.Id}")));
+                    if (!exists)
+                    {
+                        _context.Notifications.Add(new Notification
+                        {
+                            RecipientNik = userNik,
+                            Title = "Penugasan PJA Action Plan",
+                            Message = $"Anda ditunjuk sebagai PJA untuk temuan K3 di {ap.Lokasi ?? ap.Area} (AP-#{ap.Id}). Silakan tentukan PIC dan rencana perbaikan.",
+                            Url = $"/ActionPlan/Detail/{ap.Id}",
+                            NotifType = "actionplan_pja_assigned",
+                            Category = "actionplan",
+                            SenderName = ap.Nama ?? "Pelapor K3",
+                            Priority = "urgent",
+                            ActionText = "Tentukan PIC",
+                            IsRead = false,
+                            IsActioned = false,
+                            CreatedAt = ap.CreatedAt
+                        });
+                        hasNew = true;
+                    }
+                }
+
+                // 4. Inspeksi where user is assigned as PJA
+                var cutoffInsp = DateTime.Now.AddDays(-30);
+                var activeInspections = await _context.Inspections
+                    .AsNoTracking()
+                    .Where(i => !i.IsDeleted && i.NikPja != null && i.NikPja.Trim() == userNik && i.CreatedAt >= cutoffInsp)
+                    .OrderByDescending(i => i.Id)
+                    .Take(25)
+                    .ToListAsync();
+
+                foreach (var insp in activeInspections)
+                {
+                    bool exists = await _context.Notifications
+                        .AnyAsync(n => n.RecipientNik == userNik && !n.IsActioned &&
+                            (n.Url == $"/Inspection/Detail/{insp.Id}" || n.Message.Contains($"INSP-#{insp.Id}") || n.Message.Contains($"#{insp.Id}")));
+                    if (!exists)
+                    {
+                        _context.Notifications.Add(new Notification
+                        {
+                            RecipientNik = userNik,
+                            Title = "Penugasan PJA Temuan Inspeksi",
+                            Message = $"Anda ditunjuk sebagai PJA untuk temuan Inspeksi ({insp.JenisInspeksi}) di {insp.Area} - {insp.Lokasi} (INSP-#{insp.Id}).",
+                            Url = $"/Inspection/Detail/{insp.Id}",
+                            NotifType = "inspection_assigned",
+                            Category = "inspection",
+                            SenderName = insp.Nama ?? "Auditor Inspeksi",
+                            Priority = "urgent",
+                            ActionText = "Lihat Inspeksi",
+                            IsRead = false,
+                            IsActioned = false,
+                            CreatedAt = insp.CreatedAt
+                        });
+                        hasNew = true;
+                    }
+                }
+
+                if (hasNew)
+                {
+                    await _context.SaveChangesAsync();
+                }
+            }
+            catch
+            {
+                // Jangan menggagalkan request jika ada kendala seeding
+            }
+        }
+
         [HttpGet("notifications/count")]
         public async Task<IActionResult> GetNotificationCounts()
         {
             await EnsureSchemaAsync();
             var userNik = GetCurrentNik()?.Trim() ?? "";
+            if (!string.IsNullOrEmpty(userNik))
+            {
+                await EnsurePendingTagNotificationsAsync(userNik);
+            }
             var coachingCutoff = DateTime.Now.AddDays(-7);
 
             // Sesuai permintaan pengguna:
@@ -160,6 +321,10 @@ namespace Indexsafe.Api.Controllers
         {
             await EnsureSchemaAsync();
             var userNik = GetCurrentNik()?.Trim() ?? "";
+            if (!string.IsNullOrEmpty(userNik))
+            {
+                await EnsurePendingTagNotificationsAsync(userNik);
+            }
             var coachingCutoff = DateTime.Now.AddDays(-7);
 
             // Sesuai permintaan pengguna:

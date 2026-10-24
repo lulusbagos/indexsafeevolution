@@ -1,18 +1,12 @@
-import 'dart:io';
-
-import 'package:date_time_picker/date_time_picker.dart';
 import 'package:dropdown_search/dropdown_search.dart';
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
-import 'package:video_player/video_player.dart';
 
 import '../../models/observation_tran_model.dart';
 import '../../models/observation_detail_model.dart';
 import '../../services/database.dart';
 import '../../services/api.dart';
 import '../../services/preference.dart';
-import '../../widgets/button_app.dart';
 import '../../widgets/sap_form_widgets.dart';
 import '../../widgets/top_bar.dart';
 import 'observation_detail_page.dart';
@@ -53,9 +47,6 @@ class _ObservationFormPageState extends State<ObservationFormPage> {
   List<MapEntry<int, dynamic>> _companyOptions = [];
   List<ObservationDetailModel> _editDetails = [];
   bool _loadingEditDetails = false;
-  VideoPlayerController? _videoPlayer;
-  File? _videoFile;
-  bool _isVideo = false;
   bool _loadingOptions = true;
   String? _optionsError;
 
@@ -198,7 +189,59 @@ class _ObservationFormPageState extends State<ObservationFormPage> {
     final onlineData =
         await _api.getObservationOptions(perusahaanId: companyId);
     if (!mounted) return;
-    final data = onlineData ?? PreferenceService.getObservationOptionsCache();
+    Map<String, dynamic>? data = onlineData ?? PreferenceService.getObservationOptionsCache();
+    if (data == null) {
+      try {
+        final depts = await _db.rawQuery('''select me.id, me."name" 
+          from enum_masters me 
+          where me.deleted_at is null and me."type" = 'dept' order by me."name"''');
+        final docs = await _db.rawQuery('''select om.id, om."name" 
+          from observation_masters om 
+          where om.deleted_at is null and om.type = 'document' order by om."name"''');
+        final risks = await _db.rawQuery('''select om.id, om."name" 
+          from observation_masters om 
+          where om.deleted_at is null and om.type = 'risk' order by om."name"''');
+        final areasRows = await _db.rawQuery('''select me.id, me."name" 
+          from enum_masters me 
+          where me.deleted_at is null and me."type" = 'area' and me."name" not like 'Inspeksi%' and me."name" not like 'Area%' order by me."name"''');
+        final locRows = await _db.rawQuery('''select me2.id, me2."name", me."name" as area 
+          from enum_masters me 
+          join enum_masters me2 on me2.ref_id = me.id and me2.deleted_at is null 
+          where me.deleted_at is null and me."type" = 'area' order by me2."name"''');
+        final comps = await _db.rawQuery('''select c.id, c."name" 
+          from enum_masters c 
+          where c.deleted_at is null and c."type" = 'company' order by c."name"''');
+        final subjects = await _db.rawQuery('''select om.id, om."name" 
+          from observation_masters om 
+          where om.deleted_at is null and om.type = 'subject' order by om."name"''');
+
+        if (depts.isNotEmpty || docs.isNotEmpty || areasRows.isNotEmpty) {
+          data = {
+            'departments': depts.map((r) => {'id': r['id'], 'name': r['name']}).toList(),
+            'documents': docs.map((r) => {'id': r['id'], 'name': r['name']}).toList(),
+            'criticalRisks': risks.map((r) => {'id': r['id'], 'name': r['name']}).toList(),
+            'areas': areasRows.map((r) => {'id': r['id'], 'name': r['name']}).toList(),
+            'locations': locRows.map((r) => {'id': r['id'], 'name': r['name'], 'area': r['area']}).toList(),
+            'companies': comps.isNotEmpty
+                ? comps.map((r) => {'id': r['id'], 'name': r['name']}).toList()
+                : [{'id': 1, 'name': 'PT INDEXIM COALINDO'}],
+            'riskLevels': [
+              {'id': 1, 'name': 'Low'},
+              {'id': 2, 'name': 'Medium'},
+              {'id': 3, 'name': 'High'},
+              {'id': 4, 'name': 'Critical'},
+            ],
+            'subjects': subjects.isNotEmpty
+                ? subjects.map((r) => {'id': r['id'], 'name': r['name']}).toList()
+                : [{'id': 1, 'name': 'Pengoperasian Kendaraan / Unit'}, {'id': 2, 'name': 'Bekerja di Ketinggian'}, {'id': 3, 'name': 'Housekeeping'}],
+            'results': [
+              {'id': 1, 'name': 'Aman (Safe)'},
+              {'id': 2, 'name': 'Tidak Aman (At Risk)'},
+            ],
+          };
+        }
+      } catch (_) {}
+    }
     if (data == null) {
       setState(() {
         _loadingOptions = false;
@@ -207,10 +250,11 @@ class _ObservationFormPageState extends State<ObservationFormPage> {
       });
       return;
     }
-    final locations = _entries(data, 'locations');
-    final areas = _entries(data, 'areas');
+    final options = data;
+    final locations = _entries(options, 'locations');
+    final areas = _entries(options, 'areas');
     final rawLocations = locations.map((location) {
-      final source = (data['locations'] as List).whereType<Map>().firstWhere(
+      final source = (options['locations'] as List).whereType<Map>().firstWhere(
             (item) => item['id'].toString() == location.key.toString(),
             orElse: () => <String, dynamic>{},
           );
@@ -228,25 +272,25 @@ class _ObservationFormPageState extends State<ObservationFormPage> {
     setState(() {
       _deptList
         ..clear()
-        ..addAll(_entries(data, 'departments'));
-      _companyOptions = _entries(data, 'companies');
+        ..addAll(_entries(options, 'departments'));
+      _companyOptions = _entries(options, 'companies');
       _docList
         ..clear()
-        ..addAll(_entries(data, 'documents'));
+        ..addAll(_entries(options, 'documents'));
       _riskList
         ..clear()
-        ..addAll(_entries(data, 'criticalRisks'));
+        ..addAll(_entries(options, 'criticalRisks'));
       _areaList
         ..clear()
         ..addAll(areas);
       _rawData
         ..clear()
         ..addAll(rawLocations);
-      _penilaianList = _entries(data, 'riskLevels')
+      _penilaianList = _entries(options, 'riskLevels')
           .map((entry) => MapEntry(entry.value.toString(), entry.value))
           .toList();
-      _perihalOptions = _entries(data, 'subjects');
-      _hasilOptions = _entries(data, 'results');
+      _perihalOptions = _entries(options, 'subjects');
+      _hasilOptions = _entries(options, 'results');
       _deptId = _docId = _riskId = _areaId = _locationId = null;
       _penilaianId = null;
       _locationList = [];
@@ -355,582 +399,366 @@ class _ObservationFormPageState extends State<ObservationFormPage> {
                   )
                 : SingleChildScrollView(
                     controller: _scrollCtrl,
-                    padding: const EdgeInsets.all(20),
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const SapFormIntroCard(
-                          title: 'Observasi Lapangan',
-                          subtitle:
-                              'Laporkan aktivitas, perilaku, dan kondisi operasional yang diamati.',
-                          icon: Icons.visibility_rounded,
-                          color: Color(0xFF2563EB),
+                        const SapHeaderCard(
+                          title: 'Formulir Laporan Observasi',
+                          subtitle: 'Catat observasi perilaku, kondisi lingkungan, dan kepatuhan K3.',
+                          icon: Icons.fact_check_rounded,
+                          accentColor: Color(0xFF0284C7),
+                          badgeBgColor: Color(0xFFF0F9FF),
+                          badgeBorderColor: Color(0xFFE0F2FE),
                         ),
-                        const SapFormSectionTitle(
-                          title: 'Waktu Observasi',
-                          subtitle: 'Tanggal dan jam observasi lapangan.',
-                          icon: Icons.schedule_rounded,
-                          color: Color(0xFF2563EB),
-                        ),
-                        const Text(
-                          'Tanggal Observasi',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        DateTimePicker(
-                          decoration: InputDecoration(
-                            prefixIcon: Padding(
-                              padding: const EdgeInsets.only(left: 10),
-                              child: Icon(
-                                Icons.calendar_month,
-                                size: 24,
-                                color: Colors.indigo.shade400,
-                              ),
+
+                        // SECTION 1: Waktu & Lokasi
+                        SapSectionCard(
+                          stepNumber: '1',
+                          title: 'WAKTU & LOKASI OBSERVASI',
+                          subtitle: 'Tanggal, jam, perusahaan dan titik lokasi pengamatan',
+                          icon: Icons.location_on_rounded,
+                          accentColor: const Color(0xFF0284C7),
+                          children: [
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: SapDatePickerTile(
+                                    label: 'Tanggal Observasi',
+                                    date: _date ?? DateTime.now(),
+                                    onTap: () async {
+                                      final picked = await showDatePicker(
+                                        context: context,
+                                        initialDate: _date ?? DateTime.now(),
+                                        firstDate: DateTime(2020),
+                                        lastDate: DateTime.now(),
+                                      );
+                                      if (picked != null) setState(() => _date = picked);
+                                    },
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: SapTimePickerTile(
+                                    label: 'Waktu Observasi',
+                                    timeText: _time ?? DateFormat('HH:mm').format(DateTime.now()),
+                                    onTap: () async {
+                                      final now = TimeOfDay.now();
+                                      final picked = await showTimePicker(
+                                        context: context,
+                                        initialTime: now,
+                                      );
+                                      if (picked != null) {
+                                        final hh = picked.hour.toString().padLeft(2, '0');
+                                        final mm = picked.minute.toString().padLeft(2, '0');
+                                        setState(() => _time = '$hh:$mm');
+                                      }
+                                    },
+                                  ),
+                                ),
+                              ],
                             ),
-                          ),
-                          style: const TextStyle(fontSize: 16),
-                          type: DateTimePickerType.date,
-                          dateMask: 'dd/MM/yyyy',
-                          controller: null,
-                          initialValue: _date != null
-                              ? '${_date!.day}/${_date!.month}/${_date!.year}'
-                              : null,
-                          firstDate: DateTime.now(),
-                          lastDate: DateTime(2100),
-                          dateLabelText: 'Date',
-                          timeLabelText: 'Hour',
-                          onChanged: (val) => {
-                            setState(() => _date = DateTime.parse(val)),
-                          },
-                        ),
-                        const SizedBox(height: 15),
-                        const Text(
-                          'Waktu Observasi',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        DateTimePicker(
-                          decoration: InputDecoration(
-                            prefixIcon: Padding(
-                              padding: const EdgeInsets.only(left: 10),
-                              child: Icon(
-                                Icons.access_time,
-                                size: 24,
-                                color: Colors.indigo.shade400,
-                              ),
-                            ),
-                          ),
-                          style: const TextStyle(fontSize: 16),
-                          type: DateTimePickerType.time,
-                          dateMask: 'dd/MM/yyyy',
-                          controller: null,
-                          initialValue: _time,
-                          firstDate: DateTime.now(),
-                          lastDate: DateTime(2100),
-                          dateLabelText: 'Date',
-                          timeLabelText: 'Hour',
-                          onChanged: (val) => {
-                            setState(() => _time = val),
-                          },
-                        ),
-                        const SizedBox(height: 15),
-                        DropdownSearch<MapEntry<int, dynamic>>(
-                          selectedItem: _companyOptions
-                              .where((item) => item.key == _companyId)
-                              .firstOrNull,
-                          items: _companyOptions,
-                          itemAsString: (item) => item.value.toString(),
-                          dropdownDecoratorProps: const DropDownDecoratorProps(
-                            dropdownSearchDecoration: InputDecoration(
-                              labelText: 'Perusahaan yang Diamati',
-                              prefixIcon: Icon(Icons.business_rounded),
-                            ),
-                          ),
-                          popupProps: const PopupProps.menu(
-                            fit: FlexFit.loose,
-                            showSearchBox: true,
-                            searchFieldProps: TextFieldProps(
-                              decoration: InputDecoration(
-                                hintText: 'Cari perusahaan...',
-                                prefixIcon: Icon(Icons.search_rounded),
-                              ),
-                            ),
-                          ),
-                          onChanged: (item) {
-                            if (item == null) return;
-                            setState(() => _companyId = item.key);
-                            _loadObservationOptions(item.key);
-                          },
-                        ),
-                        const SapFormSectionTitle(
-                          title: 'Lokasi Observasi',
-                          subtitle:
-                              'Isi area utama, benchmark, dan lokasi spesifik/GPS.',
-                          icon: Icons.place_rounded,
-                          color: Color(0xFF2563EB),
-                        ),
-                        const Text(
-                          'Area Utama',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        DropdownButtonFormField(
-                          initialValue: _areaId,
-                          isExpanded: true,
-                          decoration: InputDecoration(
-                            prefixIcon: Padding(
-                              padding: const EdgeInsets.only(left: 10),
-                              child: Icon(
-                                Icons.map,
-                                size: 24,
-                                color: Colors.indigo.shade400,
-                              ),
-                            ),
-                          ),
-                          style: const TextStyle(fontSize: 16),
-                          icon: const Icon(Icons.arrow_drop_down),
-                          items: _areaList.map((item) {
-                            return DropdownMenuItem<int>(
-                              value: item.key,
-                              child: Text(
-                                item.value.toString(),
-                                style: const TextStyle(
-                                  fontSize: 16,
-                                  color: Colors.black,
-                                  overflow: TextOverflow.ellipsis,
+                            const SizedBox(height: 14),
+
+                            const Text('PERUSAHAAN YANG DIAMATI *', style: TextStyle(color: Color(0xFF0F172A), fontSize: 11.5, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+                            const SizedBox(height: 6),
+                            DropdownSearch<MapEntry<int, dynamic>>(
+                              selectedItem: _companyOptions
+                                  .where((item) => item.key == _companyId)
+                                  .firstOrNull,
+                              items: _companyOptions,
+                              itemAsString: (item) => item.value.toString(),
+                              dropdownDecoratorProps: DropDownDecoratorProps(
+                                dropdownSearchDecoration: InputDecoration(
+                                  hintText: 'Pilih perusahaan...',
+                                  hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
+                                  prefixIcon: const Icon(Icons.business_rounded, color: Color(0xFF0284C7), size: 20),
+                                  filled: true,
+                                  fillColor: const Color(0xFFF8FAFC),
+                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
                                 ),
                               ),
-                            );
-                          }).toList(),
-                          onChanged: (int? val) {
-                            setState(() {
-                              _getLocation(val!);
-                            });
-                          },
-                        ),
-                        const SizedBox(height: 15),
-                        const Text(
-                          'Detail Lokasi / Benchmark',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        DropdownButtonFormField(
-                          initialValue: _locationId,
-                          isExpanded: true,
-                          decoration: InputDecoration(
-                            prefixIcon: Padding(
-                              padding: const EdgeInsets.only(left: 10),
-                              child: Icon(
-                                Icons.layers_outlined,
-                                size: 24,
-                                color: Colors.indigo.shade400,
-                              ),
-                            ),
-                          ),
-                          style: const TextStyle(fontSize: 16),
-                          icon: const Icon(Icons.arrow_drop_down),
-                          items: _locationList.map((item) {
-                            return DropdownMenuItem<int>(
-                              value: item.key,
-                              child: Text(
-                                item.value.toString(),
-                                style: const TextStyle(
-                                  fontSize: 16,
-                                  color: Colors.black,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                            );
-                          }).toList(),
-                          onChanged: (int? val) {
-                            setState(() {
-                              _locationId = val!;
-                            });
-                          },
-                        ),
-                        AddCustomLocationButton(onPressed: _addCustomLocation),
-                        const SizedBox(height: 15),
-                        const Text(
-                          'Lokasi Spesifik',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        TextFormField(
-                          controller: _locationDetail,
-                          decoration: gpsInputDecoration(
-                            context: context,
-                            onPressed: () => _fillGpsFromDevice(),
-                            iconColor: Colors.indigo.shade400,
-                          ),
-                          style: const TextStyle(fontSize: 16),
-                          onChanged: (String val) => setState(() {}),
-                        ),
-                        const SizedBox(height: 15),
-                        const Text(
-                          'Kegiatan yang Diamati',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        TextFormField(
-                          controller: _subject,
-                          decoration: InputDecoration(
-                            prefixIcon: Padding(
-                              padding: const EdgeInsets.only(left: 10),
-                              child: Icon(
-                                Icons.content_paste_search,
-                                size: 24,
-                                color: Colors.indigo.shade400,
-                              ),
-                            ),
-                          ),
-                          style: const TextStyle(fontSize: 16),
-                          onChanged: (String val) => setState(() {}),
-                        ),
-                        const SizedBox(height: 15),
-                        const Text(
-                          'Departemen Pekerjaan yang Diamati',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        DropdownSearch<MapEntry<int, dynamic>>(
-                          selectedItem: null,
-                          dropdownDecoratorProps: DropDownDecoratorProps(
-                            baseStyle: const TextStyle(fontSize: 16),
-                            dropdownSearchDecoration: InputDecoration(
-                              prefixIcon: Padding(
-                                padding: const EdgeInsets.only(left: 10),
-                                child: Icon(
-                                  Icons.image_search,
-                                  size: 24,
-                                  color: Colors.indigo.shade400,
-                                ),
-                              ),
-                            ),
-                          ),
-                          items: _deptList.toList(),
-                          itemAsString: (MapEntry<int, dynamic>? e) => e?.value,
-                          popupProps: const PopupProps.menu(
-                            fit: FlexFit.loose,
-                            showSearchBox: true,
-                          ),
-                          onChanged: (val) {
-                            setState(() => _deptId = val!.key);
-                          },
-                        ),
-                        const SizedBox(height: 15),
-                        const Text(
-                          'Dokumen Pendukung',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        DropdownButtonFormField(
-                          initialValue: _docId,
-                          isExpanded: true,
-                          decoration: InputDecoration(
-                            prefixIcon: Padding(
-                              padding: const EdgeInsets.only(left: 10),
-                              child: Icon(
-                                Icons.event_note,
-                                size: 24,
-                                color: Colors.indigo.shade400,
-                              ),
-                            ),
-                          ),
-                          style: const TextStyle(fontSize: 16),
-                          icon: const Icon(Icons.arrow_drop_down),
-                          items: _docList.map((item) {
-                            return DropdownMenuItem<int>(
-                              value: item.key,
-                              child: Text(
-                                item.value.toString(),
-                                style: const TextStyle(
-                                  fontSize: 16,
-                                  color: Colors.black,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                            );
-                          }).toList(),
-                          onChanged: (int? val) {
-                            setState(() {
-                              _docId = val!;
-                            });
-                          },
-                        ),
-                        const SizedBox(height: 15),
-                        const Text(
-                          'Risiko Kritis',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        DropdownButtonFormField(
-                          initialValue: _riskId,
-                          isExpanded: true,
-                          decoration: InputDecoration(
-                            prefixIcon: Padding(
-                              padding: const EdgeInsets.only(left: 10),
-                              child: Icon(
-                                Icons.broken_image_outlined,
-                                size: 24,
-                                color: Colors.indigo.shade400,
-                              ),
-                            ),
-                          ),
-                          style: const TextStyle(fontSize: 16),
-                          icon: const Icon(Icons.arrow_drop_down),
-                          items: _riskList.map((item) {
-                            return DropdownMenuItem<int>(
-                              value: item.key,
-                              child: Text(
-                                item.value.toString(),
-                                style: const TextStyle(
-                                  fontSize: 16,
-                                  color: Colors.black,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                            );
-                          }).toList(),
-                          onChanged: (int? val) {
-                            setState(() {
-                              _riskId = val!;
-                            });
-                          },
-                        ),
-                        const SizedBox(height: 15),
-                        const Text(
-                          'Penilaian Risiko',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        DropdownButtonFormField(
-                          initialValue: _penilaianId,
-                          isExpanded: true,
-                          decoration: InputDecoration(
-                            prefixIcon: Padding(
-                              padding: const EdgeInsets.only(left: 10),
-                              child: Icon(
-                                Icons.star_half,
-                                size: 24,
-                                color: Colors.indigo.shade400,
-                              ),
-                            ),
-                          ),
-                          style: const TextStyle(fontSize: 16),
-                          icon: const Icon(Icons.arrow_drop_down),
-                          items: _penilaianList.map((item) {
-                            return DropdownMenuItem<String>(
-                              value: item.key,
-                              child: Text(
-                                item.value.toString(),
-                                style: const TextStyle(
-                                  fontSize: 16,
-                                  color: Colors.black,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                            );
-                          }).toList(),
-                          onChanged: (String? val) {
-                            setState(() {
-                              _penilaianId = val!;
-                            });
-                          },
-                        ),
-                        const SizedBox(height: 15),
-                        Visibility(
-                          visible: false,
-                          child: Row(
-                            children: [
-                              const Expanded(
-                                child: Text(
-                                  'Apakah ada video hazard?',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w600,
+                              popupProps: const PopupProps.menu(
+                                fit: FlexFit.loose,
+                                showSearchBox: true,
+                                searchFieldProps: TextFieldProps(
+                                  decoration: InputDecoration(
+                                    hintText: 'Cari perusahaan...',
+                                    prefixIcon: Icon(Icons.search_rounded),
                                   ),
                                 ),
                               ),
-                              const SizedBox(width: 10),
-                              Switch(
-                                value: _isVideo,
-                                activeThumbColor: Colors.indigo,
-                                onChanged: (value) {
-                                  setState(() => _isVideo = value);
+                              onChanged: (item) {
+                                if (item == null) return;
+                                setState(() => _companyId = item.key);
+                                _loadObservationOptions(item.key);
+                              },
+                            ),
+                            const SizedBox(height: 14),
 
-                                  Future.delayed(
-                                      const Duration(milliseconds: 200), () {
-                                    _scrollCtrl.animateTo(
-                                      _scrollCtrl.position.maxScrollExtent,
-                                      duration:
-                                          const Duration(milliseconds: 500),
-                                      curve: Curves.easeOut,
-                                    );
-                                  });
-                                },
+                            const Text('AREA UTAMA *', style: TextStyle(color: Color(0xFF0F172A), fontSize: 11.5, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+                            const SizedBox(height: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF8FAFC),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: const Color(0xFFE2E8F0)),
                               ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        _isVideo == true
-                            ? Center(
-                                child: _videoFile != null
-                                    ? Column(
-                                        children: [
-                                          InkWell(
-                                            onTap: () {
-                                              setState(() {
-                                                if (_videoPlayer!
-                                                    .value.isPlaying) {
-                                                  _videoPlayer!.pause();
-                                                } else {
-                                                  _videoPlayer!.play();
-                                                }
-                                              });
-                                            },
-                                            child: Container(
-                                              width: MediaQuery.of(context)
-                                                  .size
-                                                  .width,
-                                              height: 200,
-                                              decoration: BoxDecoration(
-                                                borderRadius:
-                                                    BorderRadius.circular(10),
-                                                border: Border.all(
-                                                    color:
-                                                        Colors.indigo.shade200),
-                                                color: Colors.white54,
-                                              ),
-                                              child: ClipRRect(
-                                                borderRadius:
-                                                    BorderRadius.circular(10),
-                                                child: AspectRatio(
-                                                  aspectRatio: _videoPlayer!
-                                                      .value.aspectRatio,
-                                                  child: VideoPlayer(
-                                                    _videoPlayer!,
-                                                  ),
-                                                ),
-                                              ),
-                                            ),
-                                          ),
-                                          const SizedBox(height: 15),
-                                          buttonApp(
-                                            label: 'Ganti Video',
-                                            onPressed: () async {
-                                              final ImagePicker picker =
-                                                  ImagePicker();
-                                              final File videoPicked =
-                                                  File((await picker.pickVideo(
-                                                source: ImageSource.camera,
-                                                maxDuration:
-                                                    const Duration(seconds: 10),
-                                              ))!
-                                                      .path);
-                                              setState(() {
-                                                _videoFile =
-                                                    File(videoPicked.path);
-                                                _videoPlayer =
-                                                    VideoPlayerController.file(
-                                                        _videoFile!)
-                                                      ..initialize().then((_) {
-                                                        setState(() {});
-                                                      });
-                                              });
-                                            },
-                                          )
-                                        ],
-                                      )
-                                    : Container(
-                                        width:
-                                            MediaQuery.of(context).size.width,
-                                        height: 200,
-                                        decoration: BoxDecoration(
-                                          borderRadius:
-                                              BorderRadius.circular(10),
-                                          border: Border.all(
-                                              color: Colors.indigo.shade200),
-                                          color: Colors.white54,
-                                        ),
-                                        child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.center,
-                                          mainAxisAlignment:
-                                              MainAxisAlignment.center,
-                                          children: [
-                                            IconButton(
-                                              icon: Icon(
-                                                Icons.video_collection,
-                                                size: 30,
-                                                color: Colors.indigo.shade400,
-                                              ),
-                                              onPressed: () async {
-                                                final ImagePicker picker =
-                                                    ImagePicker();
-                                                final File videoPicked = File(
-                                                    (await picker.pickVideo(
-                                                  source: ImageSource.camera,
-                                                  maxDuration: const Duration(
-                                                      seconds: 10),
-                                                ))!
-                                                        .path);
-                                                setState(() {
-                                                  _videoFile =
-                                                      File(videoPicked.path);
-                                                  _videoPlayer =
-                                                      VideoPlayerController
-                                                          .file(_videoFile!)
-                                                        ..initialize()
-                                                            .then((_) {
-                                                          setState(() {});
-                                                        });
-                                                });
-                                              },
-                                            ),
-                                            const Text('Pilih Video'),
-                                          ],
-                                        ),
+                              child: DropdownButtonHideUnderline(
+                                child: DropdownButton<int>(
+                                  value: _areaId,
+                                  isExpanded: true,
+                                  hint: const Text('Pilih Area Utama', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 13)),
+                                  items: _areaList.map((item) {
+                                    return DropdownMenuItem<int>(
+                                      value: item.key,
+                                      child: Text(
+                                        item.value.toString(),
+                                        style: const TextStyle(fontSize: 13, color: Color(0xFF0F172A), fontWeight: FontWeight.w600),
+                                        overflow: TextOverflow.ellipsis,
                                       ),
-                              )
-                            : const SizedBox(),
+                                    );
+                                  }).toList(),
+                                  onChanged: (int? val) {
+                                    if (val != null) setState(() => _getLocation(val));
+                                  },
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 14),
+
+                            const Text('DETAIL LOKASI / BENCHMARK *', style: TextStyle(color: Color(0xFF0F172A), fontSize: 11.5, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+                            const SizedBox(height: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF8FAFC),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: const Color(0xFFE2E8F0)),
+                              ),
+                              child: DropdownButtonHideUnderline(
+                                child: DropdownButton<int>(
+                                  value: _locationId,
+                                  isExpanded: true,
+                                  hint: const Text('Pilih Detail Lokasi', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 13)),
+                                  items: _locationList.map((item) {
+                                    return DropdownMenuItem<int>(
+                                      value: item.key,
+                                      child: Text(
+                                        item.value.toString(),
+                                        style: const TextStyle(fontSize: 13, color: Color(0xFF0F172A), fontWeight: FontWeight.w600),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    );
+                                  }).toList(),
+                                  onChanged: (int? val) {
+                                    if (val != null) setState(() => _locationId = val);
+                                  },
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            AddCustomLocationButton(onPressed: _addCustomLocation),
+                            const SizedBox(height: 12),
+
+                            const Text('LOKASI SPESIFIK / GPS', style: TextStyle(color: Color(0xFF0F172A), fontSize: 11.5, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+                            const SizedBox(height: 6),
+                            TextFormField(
+                              controller: _locationDetail,
+                              decoration: gpsInputDecoration(
+                                context: context,
+                                onPressed: () => _fillGpsFromDevice(),
+                                iconColor: const Color(0xFF0284C7),
+                              ).copyWith(
+                                filled: true,
+                                fillColor: const Color(0xFFF8FAFC),
+                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                              ),
+                              style: const TextStyle(fontSize: 13, color: Color(0xFF0F172A)),
+                              onChanged: (_) => setState(() {}),
+                            ),
+                          ],
+                        ),
+
+                        // SECTION 2: Kegiatan & Risiko
+                        SapSectionCard(
+                          stepNumber: '2',
+                          title: 'KEGIATAN & KLASIFIKASI RISIKO',
+                          subtitle: 'Aktivitas yang diamati, departemen terkait dan tingkat risiko',
+                          icon: Icons.shield_outlined,
+                          accentColor: const Color(0xFFD97706),
+                          children: [
+                            const Text('KEGIATAN YANG DIAMATI *', style: TextStyle(color: Color(0xFF0F172A), fontSize: 11.5, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+                            const SizedBox(height: 6),
+                            TextFormField(
+                              controller: _subject,
+                              decoration: InputDecoration(
+                                hintText: 'Contoh: Pengelasan pipa di Workshop Mitra',
+                                hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
+                                prefixIcon: const Icon(Icons.content_paste_search_rounded, color: Color(0xFFD97706), size: 20),
+                                filled: true,
+                                fillColor: const Color(0xFFF8FAFC),
+                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                              ),
+                              style: const TextStyle(fontSize: 13, color: Color(0xFF0F172A), fontWeight: FontWeight.w600),
+                              onChanged: (_) => setState(() {}),
+                            ),
+                            const SizedBox(height: 14),
+
+                            const Text('DEPARTEMEN PEKERJAAN *', style: TextStyle(color: Color(0xFF0F172A), fontSize: 11.5, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+                            const SizedBox(height: 6),
+                            DropdownSearch<MapEntry<int, dynamic>>(
+                              selectedItem: _deptList.where((e) => e.key == _deptId).firstOrNull,
+                              items: _deptList.toList(),
+                              itemAsString: (MapEntry<int, dynamic>? e) => e?.value ?? '',
+                              dropdownDecoratorProps: DropDownDecoratorProps(
+                                dropdownSearchDecoration: InputDecoration(
+                                  hintText: 'Pilih Departemen...',
+                                  hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
+                                  prefixIcon: const Icon(Icons.corporate_fare_rounded, color: Color(0xFFD97706), size: 20),
+                                  filled: true,
+                                  fillColor: const Color(0xFFF8FAFC),
+                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                                ),
+                              ),
+                              popupProps: const PopupProps.menu(
+                                fit: FlexFit.loose,
+                                showSearchBox: true,
+                              ),
+                              onChanged: (val) {
+                                if (val != null) setState(() => _deptId = val.key);
+                              },
+                            ),
+                            const SizedBox(height: 14),
+
+                            const Text('DOKUMEN PENDUKUNG *', style: TextStyle(color: Color(0xFF0F172A), fontSize: 11.5, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+                            const SizedBox(height: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF8FAFC),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: const Color(0xFFE2E8F0)),
+                              ),
+                              child: DropdownButtonHideUnderline(
+                                child: DropdownButton<int>(
+                                  value: _docId,
+                                  isExpanded: true,
+                                  hint: const Text('Pilih Dokumen', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 13)),
+                                  items: _docList.map((item) {
+                                    return DropdownMenuItem<int>(
+                                      value: item.key,
+                                      child: Text(
+                                        item.value.toString(),
+                                        style: const TextStyle(fontSize: 13, color: Color(0xFF0F172A), fontWeight: FontWeight.w600),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    );
+                                  }).toList(),
+                                  onChanged: (int? val) {
+                                    if (val != null) setState(() => _docId = val);
+                                  },
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 14),
+
+                            const Text('RISIKO KRITIS *', style: TextStyle(color: Color(0xFF0F172A), fontSize: 11.5, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+                            const SizedBox(height: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF8FAFC),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: const Color(0xFFE2E8F0)),
+                              ),
+                              child: DropdownButtonHideUnderline(
+                                child: DropdownButton<int>(
+                                  value: _riskId,
+                                  isExpanded: true,
+                                  hint: const Text('Pilih Risiko Kritis', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 13)),
+                                  items: _riskList.map((item) {
+                                    return DropdownMenuItem<int>(
+                                      value: item.key,
+                                      child: Text(
+                                        item.value.toString(),
+                                        style: const TextStyle(fontSize: 13, color: Color(0xFF0F172A), fontWeight: FontWeight.w600),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    );
+                                  }).toList(),
+                                  onChanged: (int? val) {
+                                    if (val != null) setState(() => _riskId = val);
+                                  },
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 14),
+
+                            const Text('PENILAIAN TINGKAT RISIKO *', style: TextStyle(color: Color(0xFF0F172A), fontSize: 11.5, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+                            const SizedBox(height: 6),
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: _penilaianList.map((item) {
+                                final isSel = _penilaianId == item.key;
+                                Color badgeColor = const Color(0xFF0284C7);
+                                final lower = item.value.toString().toLowerCase();
+                                if (lower.contains('critical') || lower.contains('high')) {
+                                  badgeColor = const Color(0xFFDC2626);
+                                } else if (lower.contains('medium')) {
+                                  badgeColor = const Color(0xFFD97706);
+                                } else if (lower.contains('low')) {
+                                  badgeColor = const Color(0xFF16A34A);
+                                }
+
+                                return InkWell(
+                                  onTap: () => setState(() => _penilaianId = item.key),
+                                  borderRadius: BorderRadius.circular(10),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                    decoration: BoxDecoration(
+                                      color: isSel ? badgeColor : const Color(0xFFF8FAFC),
+                                      borderRadius: BorderRadius.circular(10),
+                                      border: Border.all(color: isSel ? badgeColor : const Color(0xFFE2E8F0)),
+                                    ),
+                                    child: Text(
+                                      item.value.toString(),
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: isSel ? FontWeight.bold : FontWeight.w600,
+                                        color: isSel ? Colors.white : const Color(0xFF334155),
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              }).toList(),
+                            ),
+                          ],
+                        ),
                       ],
                     ),
                   ),
-        bottomNavigationBar: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
-          child: buttonApp(
-            label: 'Lanjut',
+        bottomNavigationBar: SafeArea(
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 14),
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              border: Border(top: BorderSide(color: Color(0xFFE2E8F0))),
+            ),
+            child: FilledButton.icon(
+              icon: const Icon(Icons.arrow_forward_rounded),
+              label: const Text('Lanjut ke Detail Temuan', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+              style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFF0284C7),
+                minimumSize: const Size.fromHeight(50),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              ),
             onPressed: (_deptId == null ||
                     _docId == null ||
                     _riskId == null ||
@@ -1028,6 +856,7 @@ class _ObservationFormPageState extends State<ObservationFormPage> {
                       ),
                     );
                   },
+            ),
           ),
         ),
       ),

@@ -10,6 +10,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../services/api.dart';
 import '../../services/database.dart';
+import '../../services/offline_sync_service.dart';
 import '../../services/preference.dart';
 import '../../widgets/top_bar.dart';
 import 'fci_model.dart';
@@ -924,59 +925,82 @@ class _FciFormPageState extends State<FciFormPage> {
         'perusahaan_id': userCompanyId,
       };
 
-      if (_fotoFile != null) {
-        map['foto'] = await MultipartFile.fromFile(_fotoFile!.path);
+      final cleanMap = Map<String, dynamic>.from(map);
+      bool isSavedOnline = false;
+
+      try {
+        if (_fotoFile != null) {
+          map['foto'] = await MultipartFile.fromFile(_fotoFile!.path);
+        }
+        final formData = FormData.fromMap(map);
+        final res = await _api.saveFciReport(formData);
+        res.fold(
+          (err) => isSavedOnline = false,
+          (succ) => isSavedOnline = true,
+        );
+      } catch (_) {
+        isSavedOnline = false;
       }
 
-      final formData = FormData.fromMap(map);
-      final res = await _api.saveFciReport(formData);
+      if (!isSavedOnline) {
+        final localId = 'fci_${DateTime.now().millisecondsSinceEpoch}';
+        await OfflineSyncService.instance.enqueue(
+          feature: 'fci',
+          localId: localId,
+          payload: {
+            'map': cleanMap,
+            if (_fotoFile != null) 'photoPath': _fotoFile!.path,
+          },
+        );
+      }
 
       setState(() => _isSaving = false);
 
-      res.fold(
-        (err) => _showSnack(err['message']?.toString() ?? 'Gagal menyimpan laporan FCI'),
-        (succ) async {
-          try {
-            await HapticFeedback.heavyImpact();
-          } catch (_) {}
+      try {
+        await HapticFeedback.heavyImpact();
+      } catch (_) {}
 
-          if (mounted) {
-            await showDialog(
-              context: context,
-              barrierDismissible: false,
-              builder: (ctx) => AlertDialog(
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                title: const Row(
-                  children: [
-                    Icon(Icons.check_circle, color: Color(0xFF10B981), size: 28),
-                    SizedBox(width: 10),
-                    Text('Berhasil Disimpan!'),
-                  ],
+      if (mounted) {
+        await showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (ctx) => AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            title: Row(
+              children: [
+                Icon(
+                  isSavedOnline ? Icons.check_circle : Icons.cloud_off_rounded,
+                  color: isSavedOnline ? const Color(0xFF10B981) : const Color(0xFFF59E0B),
+                  size: 28,
                 ),
-                content: Text(
-                  widget.editData != null
-                      ? 'Laporan FCI berhasil diperbarui.'
-                      : 'Laporan FCI baru berhasil dikirim dan tersimpan di sistem.',
+                const SizedBox(width: 10),
+                Text(isSavedOnline ? 'Berhasil Disimpan!' : 'Disimpan Offline'),
+              ],
+            ),
+            content: Text(
+              isSavedOnline
+                  ? (widget.editData != null
+                      ? 'Laporan FCI berhasil diperbarui di server.'
+                      : 'Laporan FCI baru berhasil dikirim dan tersimpan di server.')
+                  : 'Laporan FCI tersimpan di perangkat (Mode Offline) dan akan disinkronkan otomatis saat ada koneksi.',
+            ),
+            actions: [
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _tealColor,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 ),
-                actions: [
-                  ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: _tealColor,
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    ),
-                    onPressed: () {
-                      Navigator.pop(ctx);
-                      Navigator.pop(context, true);
-                    },
-                    child: const Text('OK'),
-                  ),
-                ],
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  Navigator.pop(context, true);
+                },
+                child: const Text('OK'),
               ),
-            );
-          }
-        },
-      );
+            ],
+          ),
+        );
+      }
     } catch (e) {
       setState(() => _isSaving = false);
       _showSnack('Terjadi kesalahan: $e');

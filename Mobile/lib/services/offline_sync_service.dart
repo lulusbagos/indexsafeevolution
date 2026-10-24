@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -239,6 +241,66 @@ class OfflineSyncService {
     return (success: success, failed: failed);
   }
 
+  Future<({int success, int failed})> syncFciPending() async {
+    if (!state.value.isOnline) return (success: 0, failed: 0);
+    var success = 0;
+    var failed = 0;
+    for (final job in await _jobs()) {
+      if (job.feature != 'fci') continue;
+      try {
+        final map = Map<String, dynamic>.from(job.payload['map'] as Map);
+        final photoPath = job.payload['photoPath']?.toString();
+        if (photoPath != null && await File(photoPath).exists()) {
+          map['foto'] = await MultipartFile.fromFile(photoPath);
+        }
+        final formData = FormData.fromMap(map);
+        final res = await _api.saveFciReport(formData);
+        bool ok = false;
+        res.fold((err) => ok = false, (succ) => ok = true);
+        if (ok) {
+          await discard(feature: job.feature, localId: job.localId);
+          success++;
+        } else {
+          failed++;
+        }
+      } catch (_) {
+        failed++;
+      }
+    }
+    await refresh();
+    return (success: success, failed: failed);
+  }
+
+  Future<({int success, int failed})> syncRciPending() async {
+    if (!state.value.isOnline) return (success: 0, failed: 0);
+    var success = 0;
+    var failed = 0;
+    for (final job in await _jobs()) {
+      if (job.feature != 'rci') continue;
+      try {
+        final map = Map<String, dynamic>.from(job.payload['map'] as Map);
+        final photoPath = job.payload['photoPath']?.toString();
+        if (photoPath != null && await File(photoPath).exists()) {
+          map['foto'] = await MultipartFile.fromFile(photoPath);
+        }
+        final formData = FormData.fromMap(map);
+        final res = await _api.saveRciReport(formData);
+        bool ok = false;
+        res.fold((err) => ok = false, (succ) => ok = true);
+        if (ok) {
+          await discard(feature: job.feature, localId: job.localId);
+          success++;
+        } else {
+          failed++;
+        }
+      } catch (_) {
+        failed++;
+      }
+    }
+    await refresh();
+    return (success: success, failed: failed);
+  }
+
   Future<void> refresh() async {
     int pending = (await _jobs()).length;
     for (final name in const [
@@ -299,6 +361,8 @@ class OfflineSyncService {
       }
 
       await syncBbsPending();
+      await syncFciPending();
+      await syncRciPending();
 
     } finally {
       _syncing = false;
@@ -544,6 +608,58 @@ class OfflineSyncService {
           rawData: Map<String, dynamic>.from(row),
         ));
       }
+      // 8. Offline Queue Jobs (BBS, FCI, RCI)
+      final jobs = await _jobs();
+      for (final job in jobs) {
+        if (job.feature == 'bbs') {
+          final form = Map<String, dynamic>.from(job.payload['form'] as Map? ?? {});
+          items.add(PendingSyncItem(
+            id: job.id.hashCode,
+            tableKey: 'bbs',
+            moduleTitle: 'BBS (Behavior Based Safety)',
+            title: form['category']?.toString() ?? 'Observasi BBS',
+            date: form['observedAt']?.toString().split('T')[0] ?? '',
+            time: '',
+            location: '${form['area'] ?? ''} ${form['benchmark'] ?? ''}',
+            icon: Icons.groups_2_rounded,
+            color: const Color(0xFF075985),
+            detailText: 'Target: ${form['observedPerson'] ?? ''}',
+            rawData: job.payload,
+          ));
+        } else if (job.feature == 'fci') {
+          final map = Map<String, dynamic>.from(job.payload['map'] as Map? ?? {});
+          items.add(PendingSyncItem(
+            id: job.id.hashCode,
+            tableKey: 'fci',
+            moduleTitle: 'Front Condition Index (FCI)',
+            title: 'FCI - ${map['nama_front'] ?? map['pit'] ?? 'Front Tambang'}',
+            date: map['tanggal']?.toString() ?? '',
+            time: map['waktu']?.toString() ?? '',
+            location: '${map['area'] ?? ''} ${map['pit'] ?? ''}',
+            icon: Icons.terrain_rounded,
+            color: const Color(0xFF0F766E),
+            detailText: 'PIC: ${map['pic'] ?? ''}',
+            imagePath: job.payload['photoPath']?.toString(),
+            rawData: map,
+          ));
+        } else if (job.feature == 'rci') {
+          final map = Map<String, dynamic>.from(job.payload['map'] as Map? ?? {});
+          items.add(PendingSyncItem(
+            id: job.id.hashCode,
+            tableKey: 'rci',
+            moduleTitle: 'Road Condition Index (RCI)',
+            title: 'RCI - ${map['segmen_jalan'] ?? map['area'] ?? 'Jalur Tambang'}',
+            date: map['tanggal']?.toString() ?? '',
+            time: map['waktu']?.toString() ?? '',
+            location: '${map['area'] ?? ''} ${map['segmen_jalan'] ?? ''}',
+            icon: Icons.add_road_rounded,
+            color: const Color(0xFFD97706),
+            detailText: 'PIC: ${map['pic'] ?? ''}',
+            imagePath: job.payload['photoPath']?.toString(),
+            rawData: map,
+          ));
+        }
+      }
     } catch (e) {
       debugPrint('[OfflineSyncService] Error getPendingItems: $e');
     }
@@ -574,6 +690,7 @@ class OfflineSyncService {
         }
       }
 
+      total += (await _jobs()).length;
     } catch (e) {
       debugPrint('[OfflineSyncService] Error getPendingCount: $e');
     }
@@ -583,6 +700,17 @@ class OfflineSyncService {
   /// Sinkronkan satu item ke server
   Future<bool> syncItem(PendingSyncItem item) async {
     try {
+      if (item.tableKey == 'bbs') {
+        final res = await syncBbsPending();
+        return res.success > 0;
+      } else if (item.tableKey == 'fci') {
+        final res = await syncFciPending();
+        return res.success > 0;
+      } else if (item.tableKey == 'rci') {
+        final res = await syncRciPending();
+        return res.success > 0;
+      }
+
       if (_api.getToken.isEmpty || _api.getToken.startsWith('offline_token_')) {
         final auth = PreferenceService.getAuth();
         if (auth != null && auth.token != null && auth.token!.isNotEmpty && !auth.token!.startsWith('offline_token_')) {
@@ -636,6 +764,14 @@ class OfflineSyncService {
     final bbsResult = await syncBbsPending();
     success += bbsResult.success;
     failed += bbsResult.failed;
+
+    final fciResult = await syncFciPending();
+    success += fciResult.success;
+    failed += fciResult.failed;
+
+    final rciResult = await syncRciPending();
+    success += rciResult.success;
+    failed += rciResult.failed;
 
     await refreshPendingCount();
     return (success: success, failed: failed);

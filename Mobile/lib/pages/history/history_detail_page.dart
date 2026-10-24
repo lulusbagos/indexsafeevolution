@@ -52,9 +52,16 @@ class _HistoryDetailPageState extends State<HistoryDetailPage> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (widget.history == History.action) {
         var profile = PreferenceService.getProfile();
-        if ((widget.data['pja_id'] ?? 0) == profile?.id) {
+        final pjaId = (widget.data['pja_id'] as num?)?.toInt() ?? 0;
+        final picId = (widget.data['pic_id'] as num?)?.toInt() ?? 0;
+        final nikPja = (widget.data['nik_pja'] ?? widget.data['nikPja'])?.toString().trim();
+        final nikPic = (widget.data['nik_pic'] ?? widget.data['nikPic'])?.toString().trim();
+        final userNik = profile?.noNik?.trim();
+        final userId = profile?.id ?? 0;
+
+        if ((userId > 0 && pjaId == userId) || (userNik != null && userNik.isNotEmpty && nikPja == userNik)) {
           setState(() => _isPJA = true);
-        } else if ((widget.data['pic_id'] ?? 0) == profile?.id) {
+        } else if ((userId > 0 && picId == userId) || (userNik != null && userNik.isNotEmpty && nikPic == userNik)) {
           setState(() => _isPJA = false);
         }
       }

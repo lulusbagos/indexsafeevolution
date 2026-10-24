@@ -1,11 +1,9 @@
 import 'dart:io';
 
-import 'package:date_time_picker/date_time_picker.dart';
 import 'package:dropdown_search/dropdown_search.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
-import 'package:video_player/video_player.dart';
 
 import '../../models/coaching_tran_model.dart';
 import '../../models/coaching_detail_model.dart';
@@ -14,7 +12,6 @@ import '../../services/database.dart';
 import '../../services/preference.dart';
 import '../../services/sync.dart';
 import '../../utils/helpers.dart';
-import '../../widgets/button_app.dart';
 import '../../widgets/snackbar_msg.dart';
 import '../../widgets/sap_form_widgets.dart';
 import '../../widgets/top_bar.dart';
@@ -52,9 +49,6 @@ class _CoachingFormPageState extends State<CoachingFormPage> {
   int? _companyId;
   int? _areaId;
   int? _locationId;
-  VideoPlayerController? _videoPlayer;
-  File? _videoFile;
-  bool _isVideo = false;
   String? _image;
   final List<Map<String, dynamic>> _traineeResults = [];
   final List<Map<String, dynamic>> _selectedTrainees = [];
@@ -132,7 +126,6 @@ class _CoachingFormPageState extends State<CoachingFormPage> {
     _title.dispose();
     _feedback.dispose();
     _traineeQuery.dispose();
-    _videoPlayer?.dispose();
     super.dispose();
   }
 
@@ -441,6 +434,112 @@ class _CoachingFormPageState extends State<CoachingFormPage> {
     );
   }
 
+  Widget _buildPhotoBox({
+    required String label,
+    required String? localPath,
+    required VoidCallback onPick,
+    required VoidCallback onRemove,
+  }) {
+    final hasImage = localPath != null && localPath.isNotEmpty;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            color: Color(0xFF0F172A),
+            fontSize: 11.5,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 0.5,
+          ),
+        ),
+        const SizedBox(height: 6),
+        InkWell(
+          onTap: hasImage ? null : onPick,
+          borderRadius: BorderRadius.circular(12),
+          child: Container(
+            width: double.infinity,
+            height: 160,
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: hasImage ? const Color(0xFFA855F7) : const Color(0xFFCBD5E1),
+              ),
+            ),
+            child: hasImage
+                ? Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(11),
+                        child: Image.file(
+                          File(localPath),
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                      Positioned(
+                        top: 8,
+                        right: 8,
+                        child: InkWell(
+                          onTap: onRemove,
+                          child: Container(
+                            padding: const EdgeInsets.all(6),
+                            decoration: const BoxDecoration(
+                              color: Colors.black54,
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(Icons.close_rounded, size: 18, color: Colors.white),
+                          ),
+                        ),
+                      ),
+                    ],
+                  )
+                : const Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.add_a_photo_rounded, size: 34, color: Color(0xFF94A3B8)),
+                      SizedBox(height: 8),
+                      Text(
+                        'Ambil Foto Kegiatan / Dari Galeri',
+                        style: TextStyle(color: Color(0xFF64748B), fontSize: 12, fontWeight: FontWeight.w600),
+                      ),
+                    ],
+                  ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _pickPhoto() async {
+    final source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+      builder: (ctx) => SafeArea(
+        child: Wrap(
+          children: [
+            ListTile(
+              leading: const Icon(Icons.camera_alt_rounded, color: Color(0xFFA855F7)),
+              title: const Text('Ambil dari Kamera', style: TextStyle(fontWeight: FontWeight.w600)),
+              onTap: () => Navigator.pop(ctx, ImageSource.camera),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library_rounded, color: Color(0xFFA855F7)),
+              title: const Text('Pilih dari Galeri', style: TextStyle(fontWeight: FontWeight.w600)),
+              onTap: () => Navigator.pop(ctx, ImageSource.gallery),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (source == null) return;
+    final file = await pickImage(source: source);
+    if (file != null) {
+      setState(() => _image = file.path);
+    }
+  }
+
   Widget _masterPicker({
     required String label,
     required String hint,
@@ -459,19 +558,26 @@ class _CoachingFormPageState extends State<CoachingFormPage> {
       }
     }
     final normalBorder = OutlineInputBorder(
-      borderRadius: BorderRadius.circular(14),
-      borderSide: BorderSide.none,
+      borderRadius: BorderRadius.circular(12),
+      borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
     );
     final focusedBorder = OutlineInputBorder(
-      borderRadius: BorderRadius.circular(14),
-      borderSide: const BorderSide(color: Color(0xFF2563EB), width: 1.25),
+      borderRadius: BorderRadius.circular(12),
+      borderSide: const BorderSide(color: Color(0xFFA855F7), width: 1.5),
     );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label,
-            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
-        const SizedBox(height: 10),
+        Text(
+          label.toUpperCase(),
+          style: const TextStyle(
+            color: Color(0xFF0F172A),
+            fontSize: 11.5,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 0.5,
+          ),
+        ),
+        const SizedBox(height: 6),
         DropdownSearch<MapEntry<int, dynamic>>(
           enabled: enabled,
           items: items,
@@ -479,9 +585,6 @@ class _CoachingFormPageState extends State<CoachingFormPage> {
           itemAsString: (item) => item.value.toString(),
           popupProps: PopupProps.menu(
             showSearchBox: searchable,
-            // Tema hanya mempunyai tiga pilihan. Panel pendek tanpa kolom
-            // pencarian membuatnya terasa seperti pemilih biasa, bukan daftar
-            // master perusahaan yang panjang.
             constraints: searchable
                 ? const BoxConstraints(maxHeight: 440)
                 : const BoxConstraints(maxHeight: 168),
@@ -489,16 +592,16 @@ class _CoachingFormPageState extends State<CoachingFormPage> {
           dropdownDecoratorProps: DropDownDecoratorProps(
             dropdownSearchDecoration: InputDecoration(
               hintText: hint,
-              hintStyle: const TextStyle(color: Color(0xFF94A3B8)),
-              prefixIcon: Icon(icon, color: const Color(0xFF475569), size: 21),
+              hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
+              prefixIcon: Icon(icon, color: const Color(0xFFA855F7), size: 20),
               suffixIconColor: const Color(0xFF64748B),
               filled: true,
               fillColor: enabled
-                  ? const Color(0xFFF1F5F9)
-                  : const Color(0xFFE2E8F0),
+                  ? const Color(0xFFF8FAFC)
+                  : const Color(0xFFF1F5F9),
               isDense: true,
               contentPadding:
-                  const EdgeInsets.symmetric(vertical: 16, horizontal: 14),
+                  const EdgeInsets.symmetric(vertical: 14, horizontal: 14),
               border: normalBorder,
               enabledBorder: normalBorder,
               disabledBorder: normalBorder,
@@ -516,544 +619,390 @@ class _CoachingFormPageState extends State<CoachingFormPage> {
     return PopScope(
       canPop: false,
       child: Scaffold(
+        backgroundColor: Colors.white,
         appBar: const TopBar(title: 'Coaching & Pembinaan', back: 2),
         body: SingleChildScrollView(
           controller: _scrollCtrl,
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Row(
+              const SapHeaderCard(
+                title: 'Formulir Sesi Coaching',
+                subtitle: 'Pendampingan, pembinaan & peningkatan kompetensi keselamatan kerja.',
+                icon: Icons.groups_rounded,
+                accentColor: Color(0xFFA855F7),
+                badgeBgColor: Color(0xFFFAF5FF),
+                badgeBorderColor: Color(0xFFF3E8FF),
+              ),
+
+              // SECTION 1: Waktu & Lokasi Kegiatan
+              SapSectionCard(
+                stepNumber: '1',
+                title: 'WAKTU & LOKASI KEGIATAN',
+                subtitle: 'Waktu pelaksanaan dan titik lokasi kegiatan coaching',
+                icon: Icons.location_on_rounded,
+                accentColor: const Color(0xFF0284C7),
                 children: [
-                  Icon(Icons.groups_rounded, color: Color(0xFFA855F7)),
-                  SizedBox(width: 8),
-                  Text('Catat Sesi Coaching Baru',
-                      style:
-                          TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
-                ],
-              ),
-              const SizedBox(height: 18),
-              const Text(
-                'Tanggal Kegiatan',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const SizedBox(height: 10),
-              DateTimePicker(
-                decoration: InputDecoration(
-                  prefixIcon: Padding(
-                    padding: const EdgeInsets.only(left: 10),
-                    child: Icon(
-                      Icons.calendar_month,
-                      size: 24,
-                      color: Colors.indigo.shade400,
-                    ),
-                  ),
-                ),
-                style: const TextStyle(fontSize: 16),
-                type: DateTimePickerType.date,
-                dateMask: 'dd/MM/yyyy',
-                controller: null,
-                initialValue: _date != null
-                    ? '${_date!.day}/${_date!.month}/${_date!.year}'
-                    : null,
-                firstDate: DateTime.now(),
-                lastDate: DateTime(2100),
-                dateLabelText: 'Date',
-                timeLabelText: 'Hour',
-                onChanged: (val) => {
-                  setState(() => _date = DateTime.parse(val)),
-                },
-              ),
-              const SizedBox(height: 15),
-              const Text(
-                'Waktu Mulai',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const SizedBox(height: 10),
-              DateTimePicker(
-                decoration: InputDecoration(
-                  prefixIcon: Padding(
-                    padding: const EdgeInsets.only(left: 10),
-                    child: Icon(
-                      Icons.access_time,
-                      size: 24,
-                      color: Colors.indigo.shade400,
-                    ),
-                  ),
-                ),
-                style: const TextStyle(fontSize: 16),
-                type: DateTimePickerType.time,
-                dateMask: 'dd/MM/yyyy',
-                controller: null,
-                initialValue: _time,
-                firstDate: DateTime.now(),
-                lastDate: DateTime(2100),
-                dateLabelText: 'Date',
-                timeLabelText: 'Hour',
-                onChanged: (val) => {
-                  setState(() => _time = val),
-                },
-              ),
-              const SizedBox(height: 15),
-              _masterPicker(
-                label: 'Area Utama',
-                hint: 'Cari area',
-                icon: Icons.map_outlined,
-                items: _areaList,
-                selectedId: _areaId,
-                onChanged: (item) {
-                  if (item != null) _getLocation(item.key);
-                },
-              ),
-              const SizedBox(height: 15),
-              _masterPicker(
-                label: 'Detail Lokasi / Benchmark',
-                hint: _areaId == null
-                    ? 'Pilih area utama terlebih dahulu'
-                    : 'Cari detail lokasi',
-                icon: Icons.layers_outlined,
-                items: _locationList,
-                selectedId: _locationId,
-                enabled: _areaId != null,
-                onChanged: (item) => setState(() => _locationId = item?.key),
-              ),
-              AddCustomLocationButton(onPressed: _addCustomLocation),
-              const SizedBox(height: 15),
-              const Text(
-                'Lokasi Spesifik',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const SizedBox(height: 10),
-              TextFormField(
-                controller: _locationDetail,
-                decoration: gpsInputDecoration(
-                  context: context,
-                  onPressed: () => _fillGpsFromDevice(),
-                  iconColor: Colors.indigo.shade400,
-                ),
-                style: const TextStyle(fontSize: 16),
-                onChanged: (String val) => setState(() {}),
-              ),
-              const SizedBox(height: 15),
-              const SizedBox(height: 8),
-              _masterPicker(
-                label: 'Tema Coaching',
-                hint: 'Pilih tema coaching',
-                icon: Icons.menu_book_outlined,
-                items: _temaList,
-                selectedId: _temaId,
-                searchable: false,
-                onChanged: (item) => setState(() => _temaId = item?.key),
-              ),
-              const SizedBox(height: 24),
-              const Text('Pilih Peserta Coaching (Trainee)',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
-              const SizedBox(height: 6),
-              const Text(
-                  'Tentukan perusahaan, lalu cari berdasarkan nama atau NIK.',
-                  style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
-              const SizedBox(height: 18),
-              _masterPicker(
-                label: 'Perusahaan / Kontraktor',
-                hint: 'Cari perusahaan atau kontraktor',
-                icon: Icons.apartment_rounded,
-                items: _companyList,
-                selectedId: _companyId,
-                onChanged: (item) => setState(() {
-                  _companyId = item?.key;
-                  _traineeResults.clear();
-                  _selectedTrainees.clear();
-                  _traineeQuery.clear();
-                }),
-              ),
-              const SizedBox(height: 18),
-              const Text('Cari Peserta',
-                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-              const SizedBox(height: 8),
-              TextField(
-                controller: _traineeQuery,
-                onChanged: _searchTrainees,
-                decoration: const InputDecoration(
-                  prefixIcon: Icon(Icons.search_rounded),
-                  hintText: 'Ketik nama atau NIK peserta (min. 2 karakter)',
-                ),
-              ),
-              if (_traineeResults.isNotEmpty)
-                Container(
-                  margin: const EdgeInsets.only(top: 6),
-                  constraints: const BoxConstraints(maxHeight: 210),
-                  decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: const Color(0xFFE2E8F0))),
-                  child: ListView.builder(
-                    shrinkWrap: true,
-                    itemCount: _traineeResults.length,
-                    itemBuilder: (context, index) {
-                      final trainee = _traineeResults[index];
-                      final picked = _selectedTrainees
-                          .any((item) => item['id'] == trainee['id']);
-                      return ListTile(
-                        leading: const Icon(Icons.person_outline_rounded),
-                        title: Text(
-                            '${trainee['no_nik']} - ${trainee['nama_lengkap']}'),
-                        subtitle: Text(
-                          [
-                            trainee['posisi'],
-                            trainee['departemen'],
-                            trainee['perusahaan'],
-                          ]
-                              .where((value) =>
-                                  value != null &&
-                                  value.toString().trim().isNotEmpty)
-                              .join(' • '),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: SapDatePickerTile(
+                          label: 'Tanggal',
+                          date: _date ?? DateTime.now(),
+                          onTap: () async {
+                            final picked = await showDatePicker(
+                              context: context,
+                              initialDate: _date ?? DateTime.now(),
+                              firstDate: DateTime(2020),
+                              lastDate: DateTime(2100),
+                            );
+                            if (picked != null) setState(() => _date = picked);
+                          },
                         ),
-                        trailing: picked
-                            ? const Icon(Icons.check_circle_rounded,
-                                color: Color(0xFF059669))
-                            : null,
-                        onTap: picked
-                            ? null
-                            : () => setState(() {
-                                  _selectedTrainees.add(trainee);
-                                  _traineeResults.clear();
-                                  _traineeQuery.clear();
-                                }),
-                      );
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: SapTimePickerTile(
+                          label: 'Jam Mulai',
+                          timeText: _time ?? DateFormat('HH:mm').format(DateTime.now()),
+                          onTap: () async {
+                            final now = TimeOfDay.now();
+                            final picked = await showTimePicker(
+                              context: context,
+                              initialTime: now,
+                            );
+                            if (picked != null) {
+                              final hh = picked.hour.toString().padLeft(2, '0');
+                              final mm = picked.minute.toString().padLeft(2, '0');
+                              setState(() => _time = '$hh:$mm');
+                            }
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+
+                  _masterPicker(
+                    label: 'Area Utama *',
+                    hint: 'Cari area utama',
+                    icon: Icons.map_outlined,
+                    items: _areaList,
+                    selectedId: _areaId,
+                    onChanged: (item) {
+                      if (item != null) _getLocation(item.key);
                     },
                   ),
-                ),
-              Container(
-                width: double.infinity,
-                margin: const EdgeInsets.only(top: 8),
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                    color: const Color(0xFFF1F5F9),
-                    borderRadius: BorderRadius.circular(12)),
-                child: _selectedTrainees.isEmpty
-                    ? const Text(
-                        'Belum ada peserta yang dipilih. Cari dan pilih dari hasil pencarian di atas.',
-                        style:
-                            TextStyle(color: Color(0xFF64748B), fontSize: 12))
-                    : Wrap(
-                        spacing: 8,
-                        runSpacing: 6,
-                        children: _selectedTrainees
-                            .map((trainee) => InputChip(
-                                  label: Text('${trainee['nama_lengkap']}'),
-                                  onDeleted: () => setState(
-                                      () => _selectedTrainees.remove(trainee)),
-                                ))
-                            .toList(),
-                      ),
-              ),
-              const SizedBox(height: 15),
-              const Text(
-                'Komitmen Bersama',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const SizedBox(height: 10),
-              TextFormField(
-                controller: _title,
-                decoration: InputDecoration(
-                  prefixIcon: Padding(
-                    padding: const EdgeInsets.only(left: 10),
-                    child: Icon(
-                      Icons.text_fields,
-                      size: 24,
-                      color: Colors.indigo.shade400,
+                  const SizedBox(height: 14),
+
+                  _masterPicker(
+                    label: 'Detail Lokasi / Benchmark *',
+                    hint: _areaId == null
+                        ? 'Pilih area utama terlebih dahulu'
+                        : 'Cari detail lokasi / benchmark',
+                    icon: Icons.layers_outlined,
+                    items: _locationList,
+                    selectedId: _locationId,
+                    enabled: _areaId != null,
+                    onChanged: (item) => setState(() => _locationId = item?.key),
+                  ),
+                  AddCustomLocationButton(onPressed: _addCustomLocation),
+                  const SizedBox(height: 14),
+
+                  const Text(
+                    'LOKASI SPESIFIK / GPS *',
+                    style: TextStyle(
+                      color: Color(0xFF0F172A),
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0.5,
                     ),
                   ),
-                ),
-                style: const TextStyle(fontSize: 16),
-                onChanged: (String val) => setState(() {}),
+                  const SizedBox(height: 6),
+                  TextFormField(
+                    controller: _locationDetail,
+                    decoration: gpsInputDecoration(
+                      context: context,
+                      onPressed: () => _fillGpsFromDevice(),
+                      iconColor: const Color(0xFFA855F7),
+                    ),
+                    style: const TextStyle(fontSize: 13, color: Color(0xFF0F172A)),
+                    onChanged: (String val) => setState(() {}),
+                  ),
+                ],
               ),
-              const SizedBox(height: 15),
-              const Text(
-                'Umpan Balik (Feedback)',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const SizedBox(height: 10),
-              TextFormField(
-                controller: _feedback,
-                minLines: 3,
-                maxLines: 3,
-                decoration: InputDecoration(
-                  prefixIcon: Padding(
-                    padding: const EdgeInsets.only(left: 10),
-                    child: Icon(
-                      Icons.textsms_outlined,
-                      size: 24,
-                      color: Colors.indigo.shade400,
+
+              // SECTION 2: Tema & Materi Coaching
+              SapSectionCard(
+                stepNumber: '2',
+                title: 'TEMA & MATERI COACHING',
+                subtitle: 'Topik pembinaan, evaluasi feedback dan komitmen bersama',
+                icon: Icons.menu_book_rounded,
+                accentColor: const Color(0xFFA855F7),
+                children: [
+                  _masterPicker(
+                    label: 'Tema Coaching *',
+                    hint: 'Pilih tema coaching',
+                    icon: Icons.menu_book_outlined,
+                    items: _temaList,
+                    selectedId: _temaId,
+                    searchable: false,
+                    onChanged: (item) => setState(() => _temaId = item?.key),
+                  ),
+                  const SizedBox(height: 14),
+
+                  const Text(
+                    'KOMITMEN BERSAMA *',
+                    style: TextStyle(
+                      color: Color(0xFF0F172A),
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0.5,
                     ),
                   ),
-                ),
-                style: const TextStyle(fontSize: 16),
-                onChanged: (String val) => setState(() {}),
+                  const SizedBox(height: 6),
+                  TextFormField(
+                    controller: _title,
+                    decoration: InputDecoration(
+                      hintText: 'Contoh: Pekerja berkomitmen mematuhi SOP & APD',
+                      hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
+                      prefixIcon: const Icon(Icons.handshake_outlined, color: Color(0xFFA855F7), size: 20),
+                      filled: true,
+                      fillColor: const Color(0xFFF8FAFC),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                    ),
+                    style: const TextStyle(fontSize: 13, color: Color(0xFF0F172A), fontWeight: FontWeight.w600),
+                    onChanged: (String val) => setState(() {}),
+                  ),
+                  const SizedBox(height: 14),
+
+                  const Text(
+                    'UMPAN BALIK (FEEDBACK) *',
+                    style: TextStyle(
+                      color: Color(0xFF0F172A),
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  TextFormField(
+                    controller: _feedback,
+                    minLines: 3,
+                    maxLines: 4,
+                    decoration: InputDecoration(
+                      hintText: 'Tuliskan catatan evaluasi dan umpan balik pelaksanaan tugas...',
+                      hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
+                      filled: true,
+                      fillColor: const Color(0xFFF8FAFC),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                    ),
+                    style: const TextStyle(fontSize: 13, color: Color(0xFF0F172A)),
+                    onChanged: (String val) => setState(() {}),
+                  ),
+                ],
               ),
-              const SizedBox(height: 15),
-              const Text(
-                'Foto Kegiatan Coaching',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const SizedBox(height: 10),
-              InkWell(
-                onTap: () async {
-                  await showDialog(
-                    context: context,
-                    builder: (context) => AlertDialog(
-                      content: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          ListTile(
-                            leading: const Icon(Icons.camera_alt,
-                                color: Colors.grey),
-                            title: const Text('Camera'),
-                            onTap: () {
-                              Navigator.pop(context);
-                              Future<File?> imageFile =
-                                  pickImage(source: ImageSource.camera);
-                              imageFile.then((value) {
-                                if (value != null) {
-                                  setState(() => _image = value.path);
-                                }
-                              });
-                            },
-                          ),
-                          ListTile(
-                            leading:
-                                const Icon(Icons.image, color: Colors.grey),
-                            title: const Text('Gallery'),
-                            onTap: () {
-                              Navigator.pop(context);
-                              Future<File?> imageFile =
-                                  pickImage(source: ImageSource.gallery);
-                              imageFile.then((value) {
-                                if (value != null) {
-                                  setState(() => _image = value.path);
-                                }
-                              });
-                            },
+
+              // SECTION 3: Peserta Coaching (Trainee)
+              SapSectionCard(
+                stepNumber: '3',
+                title: 'PESERTA COACHING (TRAINEE)',
+                subtitle: 'Daftar pekerja yang menerima sesi coaching & bimbingan',
+                icon: Icons.person_search_rounded,
+                accentColor: const Color(0xFF059669),
+                children: [
+                  _masterPicker(
+                    label: 'Perusahaan / Kontraktor *',
+                    hint: 'Cari perusahaan atau kontraktor',
+                    icon: Icons.apartment_rounded,
+                    items: _companyList,
+                    selectedId: _companyId,
+                    onChanged: (item) => setState(() {
+                      _companyId = item?.key;
+                      _traineeResults.clear();
+                      _selectedTrainees.clear();
+                      _traineeQuery.clear();
+                    }),
+                  ),
+                  const SizedBox(height: 14),
+
+                  const Text(
+                    'CARI PESERTA (NAMA / NIK) *',
+                    style: TextStyle(
+                      color: Color(0xFF0F172A),
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  TextField(
+                    controller: _traineeQuery,
+                    onChanged: _searchTrainees,
+                    decoration: InputDecoration(
+                      prefixIcon: const Icon(Icons.search_rounded, color: Color(0xFFA855F7), size: 20),
+                      hintText: 'Ketik nama atau NIK peserta (min. 2 karakter)',
+                      hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
+                      filled: true,
+                      fillColor: const Color(0xFFF8FAFC),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                    ),
+                    style: const TextStyle(fontSize: 13, color: Color(0xFF0F172A)),
+                  ),
+                  if (_traineeResults.isNotEmpty)
+                    Container(
+                      margin: const EdgeInsets.only(top: 8),
+                      constraints: const BoxConstraints(maxHeight: 210),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.04),
+                            blurRadius: 6,
+                            offset: const Offset(0, 2),
                           ),
                         ],
                       ),
-                    ),
-                  );
-                },
-                child: Container(
-                  width: MediaQuery.of(context).size.width,
-                  height: 150,
-                  decoration: BoxDecoration(
-                    border: Border.all(color: Colors.grey),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: _image == null || _image == ''
-                      ? const Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.camera_alt,
-                              color: Colors.grey,
-                            ),
-                            SizedBox(height: 5),
-                            Text(
-                              'Foto Kegiatan Coaching',
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w400,
+                      child: ListView.separated(
+                        shrinkWrap: true,
+                        itemCount: _traineeResults.length,
+                        separatorBuilder: (_, __) => const Divider(height: 1, color: Color(0xFFF1F5F9)),
+                        itemBuilder: (context, index) {
+                          final trainee = _traineeResults[index];
+                          final picked = _selectedTrainees.any((item) => item['id'] == trainee['id']);
+                          return ListTile(
+                            dense: true,
+                            leading: Container(
+                              padding: const EdgeInsets.all(6),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFFAF5FF),
+                                borderRadius: BorderRadius.circular(8),
                               ),
+                              child: const Icon(Icons.person_outline_rounded, color: Color(0xFFA855F7), size: 18),
                             ),
-                          ],
-                        )
-                      : Image.file(File(_image!)),
-                ),
-              ),
-              if (_image != null) const UploadFiles('CoachingForm', null),
-              const SizedBox(height: 15),
-              Visibility(
-                visible: false,
-                child: Row(
-                  children: [
-                    const Expanded(
-                      child: Text(
-                        'Apakah ada video hazard?',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                        ),
+                            title: Text(
+                              '${trainee['no_nik']} - ${trainee['nama_lengkap']}',
+                              style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                            ),
+                            subtitle: Text(
+                              [
+                                trainee['posisi'],
+                                trainee['departemen'],
+                                trainee['perusahaan'],
+                              ].where((value) => value != null && value.toString().trim().isNotEmpty).join(' • '),
+                              style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                            ),
+                            trailing: picked
+                                ? const Icon(Icons.check_circle_rounded, color: Color(0xFF059669), size: 20)
+                                : const Icon(Icons.add_circle_outline_rounded, color: Color(0xFFA855F7), size: 20),
+                            onTap: picked
+                                ? null
+                                : () => setState(() {
+                                      _selectedTrainees.add(trainee);
+                                      _traineeResults.clear();
+                                      _traineeQuery.clear();
+                                    }),
+                          );
+                        },
                       ),
                     ),
-                    const SizedBox(width: 10),
-                    Switch(
-                      value: _isVideo,
-                      activeThumbColor: Colors.indigo,
-                      onChanged: (value) {
-                        setState(() => _isVideo = value);
-
-                        Future.delayed(const Duration(milliseconds: 200), () {
-                          _scrollCtrl.animateTo(
-                            _scrollCtrl.position.maxScrollExtent,
-                            duration: const Duration(milliseconds: 500),
-                            curve: Curves.easeOut,
-                          );
-                        });
-                      },
+                  const SizedBox(height: 10),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
                     ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 10),
-              _isVideo == true
-                  ? Center(
-                      child: _videoFile != null
-                          ? Column(
-                              children: [
-                                InkWell(
-                                  onTap: () {
-                                    setState(() {
-                                      if (_videoPlayer!.value.isPlaying) {
-                                        _videoPlayer!.pause();
-                                      } else {
-                                        _videoPlayer!.play();
-                                      }
-                                    });
-                                  },
-                                  child: Container(
-                                    width: MediaQuery.of(context).size.width,
-                                    height: 200,
-                                    decoration: BoxDecoration(
-                                      borderRadius: BorderRadius.circular(10),
-                                      border: Border.all(
-                                          color: Colors.indigo.shade200),
-                                      color: Colors.white54,
-                                    ),
-                                    child: ClipRRect(
-                                      borderRadius: BorderRadius.circular(10),
-                                      child: AspectRatio(
-                                        aspectRatio:
-                                            _videoPlayer!.value.aspectRatio,
-                                        child: VideoPlayer(
-                                          _videoPlayer!,
-                                        ),
+                    child: _selectedTrainees.isEmpty
+                        ? const Text(
+                            'Belum ada peserta yang dipilih. Cari dan pilih dari hasil pencarian di atas.',
+                            style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
+                          )
+                        : Wrap(
+                            spacing: 8,
+                            runSpacing: 6,
+                            children: _selectedTrainees
+                                .map((trainee) => Chip(
+                                      backgroundColor: const Color(0xFFFAF5FF),
+                                      side: const BorderSide(color: Color(0xFFE9D5FF)),
+                                      avatar: const Icon(Icons.check_circle_rounded, size: 16, color: Color(0xFFA855F7)),
+                                      label: Text(
+                                        '${trainee['nama_lengkap']}',
+                                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF6B21A8)),
                                       ),
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(height: 15),
-                                buttonApp(
-                                  label: 'Ganti Video',
-                                  onPressed: () async {
-                                    final ImagePicker picker = ImagePicker();
-                                    final File videoPicked =
-                                        File((await picker.pickVideo(
-                                      source: ImageSource.camera,
-                                      maxDuration: const Duration(seconds: 10),
-                                    ))!
-                                            .path);
-                                    setState(() {
-                                      _videoFile = File(videoPicked.path);
-                                      _videoPlayer = VideoPlayerController.file(
-                                          _videoFile!)
-                                        ..initialize().then((_) {
-                                          setState(() {});
-                                        });
-                                    });
-                                  },
-                                )
-                              ],
-                            )
-                          : Container(
-                              width: MediaQuery.of(context).size.width,
-                              height: 200,
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(10),
-                                border:
-                                    Border.all(color: Colors.indigo.shade200),
-                                color: Colors.white54,
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.center,
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  IconButton(
-                                    icon: Icon(
-                                      Icons.video_collection,
-                                      size: 30,
-                                      color: Colors.indigo.shade400,
-                                    ),
-                                    onPressed: () async {
-                                      final ImagePicker picker = ImagePicker();
-                                      final File videoPicked =
-                                          File((await picker.pickVideo(
-                                        source: ImageSource.camera,
-                                        maxDuration:
-                                            const Duration(seconds: 10),
-                                      ))!
-                                              .path);
-                                      setState(() {
-                                        _videoFile = File(videoPicked.path);
-                                        _videoPlayer = VideoPlayerController
-                                            .file(_videoFile!)
-                                          ..initialize().then((_) {
-                                            setState(() {});
-                                          });
-                                      });
-                                    },
-                                  ),
-                                  const Text('Pilih Video'),
-                                ],
-                              ),
-                            ),
-                    )
-                  : const SizedBox(),
+                                      deleteIcon: const Icon(Icons.close_rounded, size: 16, color: Color(0xFF9333EA)),
+                                      onDeleted: () => setState(() => _selectedTrainees.remove(trainee)),
+                                    ))
+                                .toList(),
+                          ),
+                  ),
+                ],
+              ),
+
+              // SECTION 4: Dokumentasi Foto Kegiatan
+              SapSectionCard(
+                stepNumber: '4',
+                title: 'DOKUMENTASI FOTO KEGIATAN',
+                subtitle: 'Foto bukti pelaksanaan sesi coaching bersama peserta',
+                icon: Icons.camera_alt_rounded,
+                accentColor: const Color(0xFFEAB308),
+                children: [
+                  _buildPhotoBox(
+                    label: 'FOTO KEGIATAN COACHING *',
+                    localPath: _image,
+                    onPick: _pickPhoto,
+                    onRemove: () => setState(() => _image = null),
+                  ),
+                  if (_image != null) const UploadFiles('CoachingForm', null),
+                ],
+              ),
             ],
           ),
         ),
-        bottomNavigationBar: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
-          child: FilledButton(
-            style: FilledButton.styleFrom(
-              minimumSize: const Size.fromHeight(52),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14)),
+        bottomNavigationBar: SafeArea(
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              border: Border(top: BorderSide(color: Color(0xFFE2E8F0))),
             ),
-            onPressed: (_temaId == null ||
-                    _areaId == null ||
-                    _locationId == null ||
-                    _locationDetail.text == '' ||
-                    _title.text == '' ||
-                    _feedback.text == '' ||
-                    _image == null ||
-                    _selectedTrainees.isEmpty ||
-                    _saving)
-                ? null
-                : _saveCoaching,
-            child: _saving
-                ? const SizedBox(
-                    width: 22,
-                    height: 22,
-                    child: CircularProgressIndicator(
-                        color: Colors.white, strokeWidth: 2.5),
-                  )
-                : const Text('Simpan Coaching'),
+            child: FilledButton.icon(
+              style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFFA855F7),
+                minimumSize: const Size.fromHeight(50),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              ),
+              onPressed: (_temaId == null ||
+                      _areaId == null ||
+                      _locationId == null ||
+                      _locationDetail.text.trim().isEmpty ||
+                      _title.text.trim().isEmpty ||
+                      _feedback.text.trim().isEmpty ||
+                      _image == null ||
+                      _selectedTrainees.isEmpty ||
+                      _saving)
+                  ? null
+                  : _saveCoaching,
+              icon: _saving
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.2),
+                    )
+                  : const Icon(Icons.check_circle_rounded, size: 20),
+              label: Text(
+                _saving ? 'Menyimpan...' : 'Simpan Coaching',
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+              ),
+            ),
           ),
         ),
       ),

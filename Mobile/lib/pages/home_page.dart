@@ -10,7 +10,6 @@ import '../services/preference.dart';
 import '../utils/globals.dart' as globals;
 import 'dashboard_page.dart';
 import 'hazard/hazard_create_page.dart';
-import 'hazard/hazard_form_page.dart';
 import 'profile_page.dart';
 import 'safety_updates_page.dart';
 import 'scan_page.dart';
@@ -36,6 +35,7 @@ class _HomePageState extends State<HomePage> {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('bgToken', _api.getToken);
       await prefs.setInt('bgProfile', (_profile?.id ?? 0));
+      await prefs.setString('bgNik', (_profile?.noNik ?? ''));
     });
   }
 

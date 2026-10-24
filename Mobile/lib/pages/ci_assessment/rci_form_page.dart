@@ -9,6 +9,7 @@ import 'package:intl/intl.dart';
 
 import '../../services/api.dart';
 import '../../services/database.dart';
+import '../../services/offline_sync_service.dart';
 import '../../services/preference.dart';
 import '../../widgets/top_bar.dart';
 import 'rci_model.dart';
@@ -779,60 +780,83 @@ class _RciFormPageState extends State<RciFormPage> {
         'approverNiks': approverNiks,
       };
 
-      if (_fotoFile != null) {
-        final filename = _fotoFile!.path.split(Platform.pathSeparator).last;
-        map['foto'] = await MultipartFile.fromFile(_fotoFile!.path, filename: filename);
+      final cleanMap = Map<String, dynamic>.from(map);
+      bool isSavedOnline = false;
+
+      try {
+        if (_fotoFile != null) {
+          final filename = _fotoFile!.path.split(Platform.pathSeparator).last;
+          map['foto'] = await MultipartFile.fromFile(_fotoFile!.path, filename: filename);
+        }
+        final formData = FormData.fromMap(map);
+        final res = await _api.saveRciReport(formData);
+        res.fold(
+          (err) => isSavedOnline = false,
+          (_) => isSavedOnline = true,
+        );
+      } catch (_) {
+        isSavedOnline = false;
       }
 
-      final formData = FormData.fromMap(map);
-      final res = await _api.saveRciReport(formData);
+      if (!isSavedOnline) {
+        final localId = 'rci_${DateTime.now().millisecondsSinceEpoch}';
+        await OfflineSyncService.instance.enqueue(
+          feature: 'rci',
+          localId: localId,
+          payload: {
+            'map': cleanMap,
+            if (_fotoFile != null) 'photoPath': _fotoFile!.path,
+          },
+        );
+      }
 
       setState(() => _isSaving = false);
 
-      res.fold(
-        (err) => _showSnack(err['message']?.toString() ?? 'Gagal menyimpan laporan RCI.'),
-        (_) async {
-          try {
-            await HapticFeedback.heavyImpact();
-          } catch (_) {}
+      try {
+        await HapticFeedback.heavyImpact();
+      } catch (_) {}
 
-          if (mounted) {
-            await showDialog(
-              context: context,
-              barrierDismissible: false,
-              builder: (ctx) => AlertDialog(
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                title: const Row(
-                  children: [
-                    Icon(Icons.check_circle_rounded, color: _emeraldColor, size: 28),
-                    SizedBox(width: 10),
-                    Text('Berhasil Disimpan!'),
-                  ],
+      if (mounted) {
+        await showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (ctx) => AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            title: Row(
+              children: [
+                Icon(
+                  isSavedOnline ? Icons.check_circle_rounded : Icons.cloud_off_rounded,
+                  color: isSavedOnline ? _emeraldColor : const Color(0xFFF59E0B),
+                  size: 28,
                 ),
-                content: Text(
-                  widget.editItem != null
-                      ? 'Laporan RCI berhasil diperbarui.'
-                      : 'Laporan RCI baru berhasil disimpan dan dikirimkan ke Penyetuju.',
+                const SizedBox(width: 10),
+                Text(isSavedOnline ? 'Berhasil Disimpan!' : 'Disimpan Offline'),
+              ],
+            ),
+            content: Text(
+              isSavedOnline
+                  ? (widget.editItem != null
+                      ? 'Laporan RCI berhasil diperbarui di server.'
+                      : 'Laporan RCI baru berhasil disimpan dan dikirimkan ke Penyetuju.')
+                  : 'Laporan RCI tersimpan di perangkat (Mode Offline) dan akan disinkronkan otomatis saat ada koneksi.',
+            ),
+            actions: [
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _blueColor,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 ),
-                actions: [
-                  ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: _blueColor,
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    ),
-                    onPressed: () {
-                      Navigator.pop(ctx);
-                      Navigator.pop(context, true);
-                    },
-                    child: const Text('Selesai'),
-                  ),
-                ],
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  Navigator.pop(context, true);
+                },
+                child: const Text('Selesai'),
               ),
-            );
-          }
-        },
-      );
+            ],
+          ),
+        );
+      }
     } catch (e) {
       setState(() => _isSaving = false);
       _showSnack('Terjadi kesalahan: $e');

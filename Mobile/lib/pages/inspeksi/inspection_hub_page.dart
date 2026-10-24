@@ -258,9 +258,67 @@ class _InspectionHubPageState extends State<InspectionHubPage> {
   }
 
   void _openCreateInspeksi() async {
+    final module = await showModalBottomSheet<Module>(
+      context: context,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      backgroundColor: Colors.white,
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(color: const Color(0xFFCBD5E1), borderRadius: BorderRadius.circular(2)),
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text('Pilih Jenis Formulir Inspeksi', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+              const SizedBox(height: 4),
+              const Text('Inspeksi reguler dan mingguan terintegrasi dalam satu sistem', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+              const SizedBox(height: 16),
+              ListTile(
+                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14), side: const BorderSide(color: Color(0xFFE2E8F0))),
+                tileColor: const Color(0xFFF8FAFC),
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(color: const Color(0xFFECFDF5), borderRadius: BorderRadius.circular(10)),
+                  child: const Icon(Icons.fact_check_rounded, color: primaryGreen, size: 22),
+                ),
+                title: const Text('Inspeksi Rutin / Tematik', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF0F172A))),
+                subtitle: const Text('Checklist harian, observasi kondisi area & K3 berkala', style: TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Color(0xFF94A3B8)),
+                onTap: () => Navigator.pop(ctx, Module.inspection),
+              ),
+              const SizedBox(height: 10),
+              ListTile(
+                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14), side: const BorderSide(color: Color(0xFFE2E8F0))),
+                tileColor: const Color(0xFFF8FAFC),
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(color: const Color(0xFFF0FDF4), borderRadius: BorderRadius.circular(10)),
+                  child: const Icon(Icons.calendar_view_week_rounded, color: Color(0xFF16A34A), size: 22),
+                ),
+                title: const Text('Weekly Inspection (Inspeksi Mingguan)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF0F172A))),
+                subtitle: const Text('Evaluasi kepatuhan berkala mingguan area & perlengkapan', style: TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Color(0xFF94A3B8)),
+                onTap: () => Navigator.pop(ctx, Module.inspectionWeekly),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (module == null || !mounted) return;
     final result = await Navigator.push<bool>(
       context,
-      MaterialPageRoute(builder: (_) => const InspeksiFormPage(Module.inspection)),
+      MaterialPageRoute(builder: (_) => InspeksiFormPage(module)),
     );
     if (result == true && mounted) {
       setState(() {
@@ -1236,6 +1294,51 @@ class _InspectionHubPageState extends State<InspectionHubPage> {
                       child: item.image!.startsWith('http')
                           ? Image.network(item.image!, height: 160, width: double.infinity, fit: BoxFit.cover)
                           : Image.file(File(item.image!), height: 160, width: double.infinity, fit: BoxFit.cover),
+                    ),
+                  ],
+
+                  if (item.isOfflinePending) ...[
+                    const SizedBox(height: 24),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: const Color(0xFFDC2626),
+                          side: const BorderSide(color: Color(0xFFFECACA)),
+                          minimumSize: const Size.fromHeight(46),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        onPressed: () async {
+                          final messenger = ScaffoldMessenger.of(context);
+                          final confirm = await showDialog<bool>(
+                            context: ctx,
+                            builder: (dCtx) => AlertDialog(
+                              title: const Text('Hapus Draft Inspeksi?'),
+                              content: const Text('Laporan inspeksi offline ini akan dihapus dari perangkat.'),
+                              actions: [
+                                TextButton(onPressed: () => Navigator.pop(dCtx, false), child: const Text('Batal')),
+                                FilledButton(
+                                  style: FilledButton.styleFrom(backgroundColor: const Color(0xFFDC2626)),
+                                  onPressed: () => Navigator.pop(dCtx, true),
+                                  child: const Text('Hapus'),
+                                ),
+                              ],
+                            ),
+                          );
+                          if (confirm == true) {
+                            await _db.delete('inspection_trans', item.id);
+                            if (ctx.mounted) Navigator.pop(ctx);
+                            if (mounted) {
+                              _loadData();
+                              messenger.showSnackBar(
+                                const SnackBar(content: Text('Laporan inspeksi offline berhasil dihapus.')),
+                              );
+                            }
+                          }
+                        },
+                        icon: const Icon(Icons.delete_outline_rounded, size: 18),
+                        label: const Text('Hapus Draft Offline', style: TextStyle(fontWeight: FontWeight.bold)),
+                      ),
                     ),
                   ],
                 ],

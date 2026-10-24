@@ -11,6 +11,8 @@ import '../utils/globals.dart' as globals;
 import '../utils/helpers.dart';
 import 'hazard/hazard_hub_page.dart';
 import 'history/history_detail_page.dart';
+import 'inspeksi/inspection_hub_page.dart';
+import 'performance/action_tracker_page.dart';
 import 'roster_settings_page.dart';
 
 class NotifPage extends StatefulWidget {
@@ -71,18 +73,19 @@ class _NotifPageState extends State<NotifPage> {
                   _db.insert('action_plans', row).then((insertId) {
                     debugPrint('--- insert action_plans: $insertId ---');
                     var profileId = _profile?.id;
+                    var userNik = _profile?.noNik?.trim() ?? '';
                     var status = '';
                     if (row['employee_id'] != null &&
                         (row['employee_id'] as int) == profileId) {
                       status = 'Terkirim';
                     }
-                    if (row['pja_id'] != null &&
-                        (row['pja_id'] as int) == profileId) {
-                      status = 'Masuk';
+                    if ((row['pja_id'] != null && (row['pja_id'] as int) == profileId) ||
+                        (row['nik_pja'] != null && userNik.isNotEmpty && row['nik_pja'].toString().trim() == userNik)) {
+                      status = 'Ditugaskan ke Anda (PJA)';
                     }
-                    if (row['pic_id'] != null &&
-                        (row['pic_id'] as int) == profileId) {
-                      status = 'Masuk';
+                    if ((row['pic_id'] != null && (row['pic_id'] as int) == profileId) ||
+                        (row['nik_pic'] != null && userNik.isNotEmpty && row['nik_pic'].toString().trim() == userNik)) {
+                      status = 'Ditugaskan ke Anda (PIC)';
                     }
                     if (status != '') {
                       NotificationService.display(
@@ -101,21 +104,26 @@ class _NotifPageState extends State<NotifPage> {
                         debugPrint(
                             '--- update action_plans: ${row['id']} ---');
                         var profileId = _profile?.id;
+                        var userNik = _profile?.noNik?.trim() ?? '';
                         var status = '';
                         if (row['status'] as int == 1) {
                           if (row['employee_id'] != null &&
                               (row['employee_id'] as int) == profileId) {
                             status = 'Diproses PJA';
                           }
+                          if ((row['pic_id'] != null && (row['pic_id'] as int) == profileId) ||
+                              (row['nik_pic'] != null && userNik.isNotEmpty && row['nik_pic'].toString().trim() == userNik)) {
+                            status = 'Ditugaskan ke Anda (PIC)';
+                          }
                         }
                         if (row['status'] as int == 2) {
                           if (row['employee_id'] != null &&
                               (row['employee_id'] as int) == profileId) {
-                            status = 'Diproses PIC';
+                            status = 'Selesai Dikerjakan PIC';
                           }
-                          if (row['pja_id'] != null &&
-                              (row['pja_id'] as int) == profileId) {
-                            status = 'Diproses PIC';
+                          if ((row['pja_id'] != null && (row['pja_id'] as int) == profileId) ||
+                              (row['nik_pja'] != null && userNik.isNotEmpty && row['nik_pja'].toString().trim() == userNik)) {
+                            status = 'Selesai Dikerjakan PIC';
                           }
                         }
                         if (status != '') {
@@ -286,13 +294,15 @@ class _NotifPageState extends State<NotifPage> {
     if (_selectedFilter == 'hazard') {
       return _rawData.where((item) {
         final cat = (item['category'] ?? '').toString().toLowerCase();
-        return cat.contains('hazard');
+        final notifType = (item['notif_type'] ?? '').toString().toLowerCase();
+        return cat.contains('hazard') || cat.contains('action') || notifType.contains('hazard') || notifType.contains('action');
       }).toList();
     }
     if (_selectedFilter == 'inspection') {
       return _rawData.where((item) {
         final cat = (item['category'] ?? '').toString().toLowerCase();
-        return cat.contains('inspect') || cat.contains('simama');
+        final notifType = (item['notif_type'] ?? '').toString().toLowerCase();
+        return cat.contains('inspect') || cat.contains('simama') || notifType.contains('inspect');
       }).toList();
     }
     if (_selectedFilter == 'coaching') {
@@ -309,13 +319,15 @@ class _NotifPageState extends State<NotifPage> {
     if (type == 'hazard') {
       return _rawData.where((item) {
         final cat = (item['category'] ?? '').toString().toLowerCase();
-        return cat.contains('hazard');
+        final notifType = (item['notif_type'] ?? '').toString().toLowerCase();
+        return cat.contains('hazard') || cat.contains('action') || notifType.contains('hazard') || notifType.contains('action');
       }).length;
     }
     if (type == 'inspection') {
       return _rawData.where((item) {
         final cat = (item['category'] ?? '').toString().toLowerCase();
-        return cat.contains('inspect') || cat.contains('simama');
+        final notifType = (item['notif_type'] ?? '').toString().toLowerCase();
+        return cat.contains('inspect') || cat.contains('simama') || notifType.contains('inspect');
       }).length;
     }
     if (type == 'coaching') {
@@ -571,7 +583,23 @@ class _NotifPageState extends State<NotifPage> {
         return;
       }
 
-      if (!cat.contains('hazard') && !cat.contains('inspect') && !cat.contains('simama') && !url.contains('hazard') && !url.contains('inspect')) {
+      if (cat.contains('inspect') || url.contains('inspect') || cat.contains('simama')) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const InspectionHubPage(initialTab: InspectionHubTab.pjaArea)),
+        ).then((_) => _getData());
+        return;
+      }
+
+      if (cat.contains('action') || url.contains('action') || notifType.contains('action')) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const ActionTrackerPage()),
+        ).then((_) => _getData());
+        return;
+      }
+
+      if (!cat.contains('hazard') && !cat.contains('inspect') && !cat.contains('simama') && !cat.contains('action') && !url.contains('hazard') && !url.contains('inspect') && !url.contains('action')) {
         _showGeneralNotificationDialog(item);
         return;
       }
@@ -969,28 +997,41 @@ class _NotifPageState extends State<NotifPage> {
         (item['notif_type'] ?? '').toString().toLowerCase().contains('roster') ||
         (item['url'] ?? '').toString().toLowerCase().contains('roster');
 
-    final isHazard = !isCoaching && !isRoster && category.contains('hazard');
+    final isHazard = !isCoaching && !isRoster && (category.contains('hazard') || category.contains('action'));
     final isInspection = !isCoaching && !isRoster && (category.contains('inspect') || category.contains('simama'));
+
+    final notifType = (item['notif_type'] ?? '').toString().toLowerCase();
+    final itemTitleLower = (item['title'] ?? '').toString().toLowerCase();
+    final isPjaTag = notifType.contains('pja') || itemTitleLower.contains('pja');
+    final isPicTag = notifType.contains('pic') || itemTitleLower.contains('pic');
 
     final primaryTheme = isCoaching
         ? const Color(0xFF7C3AED)
         : (isRoster
             ? const Color(0xFF7C3AED)
-            : (isHazard
-                ? const Color(0xFFE65100)
-                : (isInspection
-                    ? const Color(0xFF0288D1)
-                    : const Color(0xFF00897B))));
+            : (isPicTag
+                ? const Color(0xFF2563EB)
+                : (isPjaTag
+                    ? (isInspection ? const Color(0xFF0F766E) : const Color(0xFFEA580C))
+                    : (isHazard
+                        ? const Color(0xFFE65100)
+                        : (isInspection
+                            ? const Color(0xFF0288D1)
+                            : const Color(0xFF00897B))))));
 
     final bgTheme = isCoaching
         ? const Color(0xFFF5F3FF)
         : (isRoster
             ? const Color(0xFFF3E8FF)
-            : (isHazard
-                ? const Color(0xFFFFF3E0)
-                : (isInspection
-                    ? const Color(0xFFE1F5FE)
-                    : const Color(0xFFE0F2F1))));
+            : (isPicTag
+                ? const Color(0xFFEFF6FF)
+                : (isPjaTag
+                    ? (isInspection ? const Color(0xFFF0FDF4) : const Color(0xFFFFF7ED))
+                    : (isHazard
+                        ? const Color(0xFFFFF3E0)
+                        : (isInspection
+                            ? const Color(0xFFE1F5FE)
+                            : const Color(0xFFE0F2F1))))));
 
     final statusInt = (item['status'] as int?) ?? (isCoaching ? -1 : 0);
     final String statusText = (statusInt >= 0 && statusInt < globals.status.length)
@@ -1005,6 +1046,25 @@ class _NotifPageState extends State<NotifPage> {
     final remark = item['remark']?.toString() ?? '';
     final areaName = titleCase(item['area_name']?.toString() ?? '-');
     final locName = titleCase(item['location_name']?.toString() ?? '-');
+
+    String moduleBadge;
+    if (isCoaching) {
+      moduleBadge = 'COACHING';
+    } else if (isRoster) {
+      moduleBadge = notifType.contains('tugas') ? 'PERIODE TUGAS' : 'ROSTER KERJA';
+    } else if (isPicTag) {
+      moduleBadge = 'PENUGASAN PIC';
+    } else if (isPjaTag) {
+      moduleBadge = isInspection ? 'PENUGASAN PJA INSPEKSI' : 'PENUGASAN PJA HAZARD';
+    } else if (isHazard) {
+      moduleBadge = 'HAZARD';
+    } else if (category.contains('simama')) {
+      moduleBadge = 'SIMAMA';
+    } else if (category.contains('broadcast')) {
+      moduleBadge = 'PENGUMUMAN';
+    } else {
+      moduleBadge = isInspection ? 'INSPEKSI' : 'TINDAK LANJUT';
+    }
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -1053,25 +1113,19 @@ class _NotifPageState extends State<NotifPage> {
                                     ? (item['notif_type']?.toString().contains('tugas') == true
                                         ? Icons.flight_takeoff_rounded
                                         : Icons.calendar_month_rounded)
-                                    : (isHazard
-                                        ? Icons.warning_amber_rounded
-                                        : Icons.fact_check_outlined)),
+                                    : (isPicTag
+                                        ? Icons.assignment_ind_rounded
+                                        : (isPjaTag
+                                            ? Icons.shield_rounded
+                                            : (isHazard
+                                                ? Icons.warning_amber_rounded
+                                                : Icons.fact_check_outlined)))),
                             size: 13,
                             color: primaryTheme,
                           ),
                           const SizedBox(width: 4),
                           Text(
-                            isCoaching
-                                ? 'COACHING'
-                                : (isRoster
-                                    ? (item['notif_type']?.toString().contains('tugas') == true
-                                        ? 'PERIODE TUGAS'
-                                        : 'ROSTER KERJA')
-                                    : (item['is_server_notif'] == true && (item['notif_type']?.toString().contains('assigned') == true)
-                                        ? 'TUGAS PJA HAZARD'
-                                        : (isHazard
-                                            ? 'HAZARD'
-                                            : (category.contains('simama') ? 'SIMAMA' : (category.contains('broadcast') ? 'PENGUMUMAN' : 'INSPEKSI'))))),
+                            moduleBadge,
                             style: TextStyle(
                               fontSize: 10,
                               fontWeight: FontWeight.w800,
@@ -1353,6 +1407,55 @@ class _NotifPageState extends State<NotifPage> {
                             ).then((_) => _getData());
                           },
                           child: const Text('Alihkan', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold)),
+                        ),
+                      ] else if (item['is_server_notif'] == true &&
+                          (item['notif_type'] == 'inspection_assigned') &&
+                          item['is_actioned'] != true) ...[
+                        ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF0F766E),
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                            minimumSize: const Size(60, 28),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          ),
+                          onPressed: () {
+                            final notifId = item['id'] as int? ?? 0;
+                            if (notifId > 0) _api.markNotificationRead(notifId);
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (_) => const InspectionHubPage(initialTab: InspectionHubTab.pjaArea)),
+                            ).then((_) => _getData());
+                          },
+                          icon: const Icon(Icons.shield_rounded, size: 12),
+                          label: const Text('Area PJA', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold)),
+                        ),
+                      ] else if (item['is_server_notif'] == true &&
+                          (item['notif_type'] == 'actionplan_assigned' || item['notif_type'] == 'actionplan_pja_assigned') &&
+                          item['is_actioned'] != true) ...[
+                        ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF2563EB),
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                            minimumSize: const Size(60, 28),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          ),
+                          onPressed: () {
+                            final notifId = item['id'] as int? ?? 0;
+                            if (notifId > 0) _api.markNotificationRead(notifId);
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (_) => const ActionTrackerPage()),
+                            ).then((_) => _getData());
+                          },
+                          icon: const Icon(Icons.assignment_ind_rounded, size: 12),
+                          label: Text(
+                            item['notif_type'] == 'actionplan_assigned' ? 'Perbaiki' : 'Pilih PIC',
+                            style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold),
+                          ),
                         ),
                       ] else ...[
                         InkWell(

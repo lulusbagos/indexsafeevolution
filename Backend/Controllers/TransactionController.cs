@@ -434,6 +434,27 @@ namespace Indexsafe.Api.Controllers
                     _context.Inspections.Add(inspection);
                     await _context.SaveChangesAsync();
 
+                    // Route notification to assigned PJA
+                    if (!string.IsNullOrWhiteSpace(nikPja))
+                    {
+                        _context.Notifications.Add(new Notification
+                        {
+                            RecipientNik = nikPja.Trim(),
+                            Title = "Penugasan PJA Temuan Inspeksi",
+                            Message = $"{userName} telah menetapkan Anda sebagai PJA untuk temuan Inspeksi ({jenisInspeksi}) di {area} - {lokasi}.",
+                            Url = $"/Inspection/Detail/{inspection.Id}",
+                            NotifType = "inspection_assigned",
+                            Category = "inspection",
+                            SenderName = userName,
+                            Priority = "urgent",
+                            ActionText = "Lihat Inspeksi",
+                            IsRead = false,
+                            IsActioned = false,
+                            CreatedAt = DateTime.Now
+                        });
+                        await _context.SaveChangesAsync();
+                    }
+
                     sw.Stop();
                     _monitor.RecordTransaction(new TransactionEvent
                     {
@@ -1395,6 +1416,40 @@ namespace Indexsafe.Api.Controllers
                 }
             }
 
+            var nikPicForm = form["nik_pic"].FirstOrDefault()?.Trim();
+            if (!string.IsNullOrEmpty(nikPicForm))
+            {
+                plan.NikPic = nikPicForm;
+                var picKaryawan = await (from k in _context.Karyawans.AsNoTracking()
+                                         join p in _context.Personals.AsNoTracking() on k.IdPersonal equals p.IdPersonal
+                                         where k.NoNik != null && k.NoNik.Trim() == nikPicForm
+                                         select p.NamaLengkap).FirstOrDefaultAsync();
+                if (picKaryawan != null)
+                {
+                    plan.Pic = picKaryawan;
+                }
+            }
+
+            // Notifikasi ke PIC yang ditunjuk
+            if (!string.IsNullOrWhiteSpace(plan.NikPic) && plan.NikPic.Trim() != userNik.Trim())
+            {
+                _context.Notifications.Add(new Notification
+                {
+                    RecipientNik = plan.NikPic.Trim(),
+                    Title = "Penugasan PIC Tindak Lanjut (Action Plan)",
+                    Message = $"Anda ditugaskan sebagai PIC untuk tindakan perbaikan di {plan.Lokasi ?? plan.Area} (AP-#{plan.Id}) oleh {userName}. Segera selesaikan dan laporkan bukti perbaikan.",
+                    Url = $"/ActionPlan/Detail/{plan.Id}",
+                    NotifType = "actionplan_assigned",
+                    Category = "actionplan",
+                    SenderName = userName,
+                    Priority = "urgent",
+                    ActionText = "Lapor Perbaikan",
+                    IsRead = false,
+                    IsActioned = false,
+                    CreatedAt = DateTime.Now
+                });
+            }
+
             await _context.SaveChangesAsync();
 
             _monitor.RecordTransaction(new TransactionEvent
@@ -1474,14 +1529,14 @@ namespace Indexsafe.Api.Controllers
                 .GroupBy(x => x.NoNik)
                 .ToDictionary(g => g.Key, g => g.OrderByDescending(x => x.StatusAktif).First());
 
-            var currentKaryawan = await _context.Karyawans.AsNoTracking().FirstOrDefaultAsync(k => k.NoNik == userNik);
+            var currentKaryawan = await _context.Karyawans.AsNoTracking().FirstOrDefaultAsync(k => k.NoNik != null && k.NoNik.Trim() == userNik.Trim());
             int currentEmpId = currentKaryawan?.IdKaryawan ?? 0;
 
             var mappedData = plans.Select(a =>
             {
-                int pjaId = (!string.IsNullOrEmpty(a.NikPja) && empMap.TryGetValue(a.NikPja, out var pInfo)) ? pInfo.IdKaryawan : (a.NikPja == userNik ? currentEmpId : 0);
-                int picId = (!string.IsNullOrEmpty(a.NikPic) && empMap.TryGetValue(a.NikPic, out var cInfo)) ? cInfo.IdKaryawan : (a.NikPic == userNik ? currentEmpId : 0);
-                int empId = (!string.IsNullOrEmpty(a.Nik) && empMap.TryGetValue(a.Nik, out var eInfo)) ? eInfo.IdKaryawan : (a.Nik == userNik ? currentEmpId : 0);
+                int pjaId = (!string.IsNullOrEmpty(a.NikPja) && empMap.TryGetValue(a.NikPja.Trim(), out var pInfo)) ? pInfo.IdKaryawan : (string.Equals(a.NikPja?.Trim(), userNik.Trim(), StringComparison.OrdinalIgnoreCase) ? (currentEmpId > 0 ? currentEmpId : 1) : 0);
+                int picId = (!string.IsNullOrEmpty(a.NikPic) && empMap.TryGetValue(a.NikPic.Trim(), out var cInfo)) ? cInfo.IdKaryawan : (string.Equals(a.NikPic?.Trim(), userNik.Trim(), StringComparison.OrdinalIgnoreCase) ? (currentEmpId > 0 ? currentEmpId : 1) : 0);
+                int empId = (!string.IsNullOrEmpty(a.Nik) && empMap.TryGetValue(a.Nik.Trim(), out var eInfo)) ? eInfo.IdKaryawan : (string.Equals(a.Nik?.Trim(), userNik.Trim(), StringComparison.OrdinalIgnoreCase) ? (currentEmpId > 0 ? currentEmpId : 1) : 0);
 
                 string pjaName = (!string.IsNullOrEmpty(a.NikPja) && empMap.TryGetValue(a.NikPja, out var pInfo2)) ? pInfo2.NamaLengkap : a.Pja ?? "";
                 string picName = (!string.IsNullOrEmpty(a.NikPic) && empMap.TryGetValue(a.NikPic, out var cInfo2)) ? cInfo2.NamaLengkap : a.Pic ?? "";
@@ -1513,6 +1568,8 @@ namespace Indexsafe.Api.Controllers
                     status = statusCode,
                     pja_id = pjaId,
                     pic_id = picId,
+                    nik_pja = a.NikPja,
+                    nik_pic = a.NikPic,
                     employee_id = empId,
                     plan = a.RencanaPerbaikan,
                     plan_date = a.TanggalRencanaPerbaikan?.ToString("yyyy-MM-dd"),

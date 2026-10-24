@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../pages/home_page.dart';
 import '../pages/notif_page.dart';
+import '../services/api.dart';
 import '../services/database.dart';
 import '../services/offline_sync_service.dart';
 import '../services/preference.dart';
@@ -30,6 +31,7 @@ class TopBar extends StatefulWidget implements PreferredSizeWidget {
 
 class _TopBarState extends State<TopBar> {
   final _db = DatabaseService();
+  final _api = ApiService();
   final _profile = PreferenceService.getProfile();
 
   Future<void> _syncReports() async {
@@ -69,11 +71,35 @@ class _TopBarState extends State<TopBar> {
     super.dispose();
   }
 
-  void _getData() {
-    _db.rawQuery('''select tr.id from action_plans tr
-      where tr.deleted_at is null and ((tr.pja_id=${_profile?.id} and tr.status<1) or (tr.pic_id=${_profile?.id} and tr.status<2))''').then((val) async {
-      await PreferenceService.setNotif(val.length);
-    });
+  Future<void> _getData() async {
+    try {
+      int count = 0;
+      final counts = await _api.getNotificationCounts();
+      count = counts['total'] ?? counts['unread'] ?? 0;
+      final unactioned = counts['unactioned'] ?? 0;
+      if (unactioned > count) count = unactioned;
+
+      final profile = _profile ?? PreferenceService.getProfile();
+      if (profile != null) {
+        final profileId = profile.id ?? 0;
+        final localPlans = await _db.rawQuery('''
+          select count(*) as cnt from action_plans tr
+          where tr.deleted_at is null and (
+            (tr.pja_id = $profileId and tr.status < 1) or 
+            (tr.pic_id = $profileId and tr.status < 2)
+          )
+        ''');
+        if (localPlans.isNotEmpty && localPlans.first['cnt'] != null) {
+          final localCnt = (localPlans.first['cnt'] as num).toInt();
+          if (localCnt > count) count = localCnt;
+        }
+      }
+
+      await PreferenceService.setNotif(count);
+      if (mounted) setState(() {});
+    } catch (_) {
+      if (mounted) setState(() {});
+    }
   }
 
   Future<bool> _showBackDialog() async {
@@ -293,6 +319,7 @@ class _TopBarState extends State<TopBar> {
                   context,
                   MaterialPageRoute(builder: (context) => const NotifPage()),
                 );
+                _getData();
               },
             ),
             if (notif > 0)

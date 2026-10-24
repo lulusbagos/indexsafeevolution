@@ -115,18 +115,19 @@ void onStart(ServiceInstance service) async {
                     db.insert('action_plans', row).then((insertId) {
                       debugPrint('--- insert action_plans: $insertId ---');
                       var profileId = prefs.getInt('bgProfile') ?? 0;
+                      var userNik = prefs.getString('bgNik')?.trim() ?? '';
                       var status = '';
                       if (row['employee_id'] != null &&
                           (row['employee_id'] as int) == profileId) {
                         status = 'Terkirim';
                       }
-                      if (row['pja_id'] != null &&
-                          (row['pja_id'] as int) == profileId) {
-                        status = 'Masuk';
+                      if ((row['pja_id'] != null && (row['pja_id'] as int) == profileId) ||
+                          (row['nik_pja'] != null && userNik.isNotEmpty && row['nik_pja'].toString().trim() == userNik)) {
+                        status = 'Ditugaskan ke Anda (PJA)';
                       }
-                      if (row['pic_id'] != null &&
-                          (row['pic_id'] as int) == profileId) {
-                        status = 'Masuk';
+                      if ((row['pic_id'] != null && (row['pic_id'] as int) == profileId) ||
+                          (row['nik_pic'] != null && userNik.isNotEmpty && row['nik_pic'].toString().trim() == userNik)) {
+                        status = 'Ditugaskan ke Anda (PIC)';
                       }
                       if (status != '') {
                         NotificationService.display(
@@ -144,21 +145,26 @@ void onStart(ServiceInstance service) async {
                           debugPrint(
                               '--- update action_plans: ${row['id']} ---');
                           var profileId = prefs.getInt('bgProfile') ?? 0;
+                          var userNik = prefs.getString('bgNik')?.trim() ?? '';
                           var status = '';
                           if (row['status'] as int == 1) {
                             if (row['employee_id'] != null &&
                                 (row['employee_id'] as int) == profileId) {
                               status = 'Diproses PJA';
                             }
+                            if ((row['pic_id'] != null && (row['pic_id'] as int) == profileId) ||
+                                (row['nik_pic'] != null && userNik.isNotEmpty && row['nik_pic'].toString().trim() == userNik)) {
+                              status = 'Ditugaskan ke Anda (PIC)';
+                            }
                           }
                           if (row['status'] as int == 2) {
                             if (row['employee_id'] != null &&
                                 (row['employee_id'] as int) == profileId) {
-                              status = 'Diproses PIC';
+                              status = 'Selesai Dikerjakan PIC';
                             }
-                            if (row['pja_id'] != null &&
-                                (row['pja_id'] as int) == profileId) {
-                              status = 'Diproses PIC';
+                            if ((row['pja_id'] != null && (row['pja_id'] as int) == profileId) ||
+                                (row['nik_pja'] != null && userNik.isNotEmpty && row['nik_pja'].toString().trim() == userNik)) {
+                              status = 'Selesai Dikerjakan PIC';
                             }
                           }
                           if (status != '') {

@@ -138,6 +138,9 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
   @override
   void initState() {
     super.initState();
+    if (widget.module == Module.inspectionWeekly) {
+      _jenisInspeksi = 'INSPEKSI MINGGUAN (WEEKLY)';
+    }
     _initCheckpoints();
     _loadAreasFromMaster();
     _fillGpsFromDevice(silent: true);
@@ -1480,6 +1483,7 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
                     runSpacing: 8,
                     children: [
                       'INSPEKSI TERENCANA (PLANNED)',
+                      'INSPEKSI MINGGUAN (WEEKLY)',
                       'INSPEKSI TIDAK TERENCANA',
                       'PEMERIKSAAN ALAT KERJA',
                       'INSPEKSI K3 LAPANGAN',

@@ -1,9 +1,12 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../services/api.dart';
+import '../../services/database.dart';
 import '../../services/preference.dart';
 import '../../widgets/top_bar.dart';
 import 'fci_form_page.dart';
@@ -66,6 +69,58 @@ class _FciIndexPageState extends State<FciIndexPage> {
     }
   }
 
+  Future<List<FciReportItem>> _loadPendingFciJobs() async {
+    final List<FciReportItem> pending = [];
+    try {
+      final rows = await DatabaseService().rawQuery(
+        "SELECT payload FROM offline_sync_jobs WHERE feature = 'fci' ORDER BY created_at DESC",
+      );
+      for (final r in rows) {
+        final payloadRaw = r['payload']?.toString();
+        if (payloadRaw == null || payloadRaw.isEmpty) continue;
+        final payload = jsonDecode(payloadRaw) as Map<String, dynamic>;
+        final map = Map<String, dynamic>.from(payload['map'] as Map? ?? {});
+        final date = DateTime.tryParse(map['tanggal']?.toString() ?? '') ?? DateTime.now();
+        pending.add(
+          FciReportItem(
+            id: -1,
+            tanggal: date,
+            waktu: map['waktu']?.toString() ?? '12:00',
+            nik: map['nik']?.toString() ?? '',
+            nama: map['nama']?.toString() ?? '',
+            departemen: map['departemen']?.toString(),
+            perusahaan: map['perusahaan']?.toString(),
+            perusahaanId: map['perusahaan_id'] as int?,
+            area: map['area']?.toString() ?? 'Area Tambang',
+            lokasi: map['lokasi']?.toString() ?? '',
+            detilLokasi: map['detil_lokasi']?.toString(),
+            pit: map['pit']?.toString(),
+            namaFront: map['nama_front']?.toString() ?? 'Front Offline',
+            shift: map['shift']?.toString(),
+            latitude: map['latitude']?.toString(),
+            longitude: map['longitude']?.toString(),
+            skorLantaiFront: int.tryParse(map['skor_lantai_front']?.toString() ?? '') ?? 100,
+            skorRuangManuver: int.tryParse(map['skor_ruang_manuver']?.toString() ?? '') ?? 100,
+            skorSafetyBerm: int.tryParse(map['skor_safety_berm']?.toString() ?? '') ?? 100,
+            skorKondisiDinding: int.tryParse(map['skor_kondisi_dinding']?.toString() ?? '') ?? 100,
+            skorDrainaseSump: int.tryParse(map['skor_drainase_sump']?.toString() ?? '') ?? 100,
+            skorKebersihanSpillage: int.tryParse(map['skor_kebersihan_spillage']?.toString() ?? '') ?? 100,
+            skorPosisiAlat: int.tryParse(map['skor_posisi_alat']?.toString() ?? '') ?? 100,
+            skorRambuPenerangan: int.tryParse(map['skor_rambu_penerangan']?.toString() ?? '') ?? 100,
+            totalScore: 100.0,
+            kategoriIndex: 'PENDING SYNC',
+            catatan: map['catatan']?.toString(),
+            tindakanPerbaikan: map['tindakan_perbaikan']?.toString(),
+            pic: map['pic']?.toString(),
+            fotoUrl: payload['photoPath']?.toString(),
+            createdAt: DateTime.now(),
+          ),
+        );
+      }
+    } catch (_) {}
+    return pending;
+  }
+
   Future<void> _fetchData() async {
     setState(() {
       _isLoading = true;
@@ -84,28 +139,51 @@ class _FciIndexPageState extends State<FciIndexPage> {
         scope: _selectedScope,
       );
 
+      final pendingJobs = await _loadPendingFciJobs();
+
       res.fold(
-        (err) {
+        (err) async {
+          final prefs = await SharedPreferences.getInstance();
+          final cacheRaw = prefs.getString('fci_cache_list');
+          if (cacheRaw != null && cacheRaw.isNotEmpty) {
+            try {
+              final cachedData = jsonDecode(cacheRaw) as Map<String, dynamic>;
+              final rawList = cachedData['data'] as List<dynamic>? ?? [];
+              final reports = rawList.map((e) => FciReportItem.fromJson(Map<String, dynamic>.from(e as Map))).toList();
+              final stats = FciSummaryStats.fromJson(cachedData['stats'] as Map<String, dynamic>?);
+              final pits = (cachedData['pits'] as List<dynamic>? ?? []).map((e) => e.toString()).toList();
+              if (mounted) {
+                setState(() {
+                  _reports = [...pendingJobs, ...reports];
+                  _stats = stats;
+                  _pits = pits;
+                  _isLoading = false;
+                  _errorMessage = null;
+                });
+                return;
+              }
+            } catch (_) {}
+          }
           if (mounted) {
             setState(() {
+              _reports = pendingJobs;
               _isLoading = false;
-              _errorMessage = err['message']?.toString() ?? 'Gagal memuat data FCI';
+              _errorMessage = pendingJobs.isNotEmpty ? null : (err['message']?.toString() ?? 'Gagal memuat data FCI');
             });
           }
         },
-        (data) {
+        (data) async {
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setString('fci_cache_list', jsonEncode(data));
+
           if (mounted) {
             final rawList = data['data'] as List<dynamic>? ?? [];
             final reports = rawList.map((e) => FciReportItem.fromJson(Map<String, dynamic>.from(e as Map))).toList();
-
-            final statsJson = data['stats'] as Map<String, dynamic>?;
-            final stats = FciSummaryStats.fromJson(statsJson);
-
-            final pitsRaw = data['pits'] as List<dynamic>? ?? [];
-            final pits = pitsRaw.map((e) => e.toString()).toList();
+            final stats = FciSummaryStats.fromJson(data['stats'] as Map<String, dynamic>?);
+            final pits = (data['pits'] as List<dynamic>? ?? []).map((e) => e.toString()).toList();
 
             setState(() {
-              _reports = reports;
+              _reports = [...pendingJobs, ...reports];
               _stats = stats;
               _pits = pits;
               _isLoading = false;
@@ -114,10 +192,33 @@ class _FciIndexPageState extends State<FciIndexPage> {
         },
       );
     } catch (e) {
+      final pendingJobs = await _loadPendingFciJobs();
+      final prefs = await SharedPreferences.getInstance();
+      final cacheRaw = prefs.getString('fci_cache_list');
+      if (cacheRaw != null && cacheRaw.isNotEmpty) {
+        try {
+          final cachedData = jsonDecode(cacheRaw) as Map<String, dynamic>;
+          final rawList = cachedData['data'] as List<dynamic>? ?? [];
+          final reports = rawList.map((e) => FciReportItem.fromJson(Map<String, dynamic>.from(e as Map))).toList();
+          final stats = FciSummaryStats.fromJson(cachedData['stats'] as Map<String, dynamic>?);
+          final pits = (cachedData['pits'] as List<dynamic>? ?? []).map((e) => e.toString()).toList();
+          if (mounted) {
+            setState(() {
+              _reports = [...pendingJobs, ...reports];
+              _stats = stats;
+              _pits = pits;
+              _isLoading = false;
+              _errorMessage = null;
+            });
+            return;
+          }
+        } catch (_) {}
+      }
       if (mounted) {
         setState(() {
+          _reports = pendingJobs;
           _isLoading = false;
-          _errorMessage = 'Terjadi kesalahan: $e';
+          _errorMessage = pendingJobs.isNotEmpty ? null : 'Mode Offline: Sambungkan jaringan untuk memuat riwayat terbaru.';
         });
       }
     }

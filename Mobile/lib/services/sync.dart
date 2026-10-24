@@ -371,6 +371,40 @@ Future<bool> syncTran(
           observationDetailServerIds[localDetailId] = serverId;
         }
       }
+    } else if (name == 'safety') {
+      final cleanMap = <String, dynamic>{};
+      cleanMap['tanggal'] = (row['date'] ?? DateTime.now().toString().substring(0, 10)).toString();
+      cleanMap['waktu'] = (row['time'] ?? '08:00').toString();
+      cleanMap['area'] = (row['area'] ?? row['area_name'] ?? 'AREA OPERASIONAL').toString();
+      cleanMap['lokasi'] = (row['lokasi'] ?? row['location_name'] ?? row['location_detail'] ?? 'LOKASI KERJA').toString();
+      cleanMap['detil_lokasi'] = (row['location_detail'] ?? '').toString();
+      cleanMap['judul'] = (row['title'] ?? 'Safety Talk Rutin').toString();
+      cleanMap['keterangan'] = (row['remark'] ?? '').toString();
+
+      final selfImg = row['self_image'] ?? row['image'];
+      if (selfImg != null && selfImg.toString().isNotEmpty) {
+        final f = File(selfImg.toString());
+        if (await f.exists()) {
+          cleanMap['foto_diri'] = await MultipartFile.fromFile(f.path);
+        }
+      }
+      final evtImg = row['event_image'] ?? row['repair_image'];
+      if (evtImg != null && evtImg.toString().isNotEmpty) {
+        final f = File(evtImg.toString());
+        if (await f.exists()) {
+          cleanMap['foto_kegiatan'] = await MultipartFile.fromFile(f.path);
+        }
+      }
+
+      res = await api.dio.post(
+        '/tran/safety',
+        data: FormData.fromMap(cleanMap),
+        options: Options(
+          headers: {
+            'Authorization': 'Bearer ${api.getToken}',
+          },
+        ),
+      );
     } else {
       res = await api.dio.post(
         '/tran/$name',

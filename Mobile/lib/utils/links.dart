@@ -40,7 +40,7 @@ List<LinkMenuModel> listMenuSap = <LinkMenuModel>[
     opacity: 1,
   ),
   LinkMenuModel(
-    title: 'Inspection',
+    title: 'Inspection\n& Weekly',
     icon: Icons.manage_search_sharp,
     image: 'assets/icons/sap-02.png',
     route: '/inspection',
@@ -86,13 +86,6 @@ List<LinkMenuModel> listMenuSap = <LinkMenuModel>[
     icon: Icons.analytics_rounded,
     image: '',
     route: '/ci_assessment',
-    opacity: 1,
-  ),
-  LinkMenuModel(
-    title: 'Weekly\nInspection',
-    icon: Icons.calendar_view_week_rounded,
-    image: '',
-    route: '/weekly_inspection',
     opacity: 1,
   ),
 ];

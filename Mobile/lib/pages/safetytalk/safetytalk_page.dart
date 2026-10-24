@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../services/database.dart';
 import '../../services/api.dart';
 import '../../widgets/top_bar.dart';
 import 'safetytalk_form_page.dart';
@@ -13,6 +14,7 @@ class SafetyTalkPage extends StatefulWidget {
 
 class _SafetyTalkPageState extends State<SafetyTalkPage> {
   final _api = ApiService();
+  final _db = DatabaseService();
   bool _loading = true;
   String? _error;
   List<Map<String, dynamic>> _talks = [];
@@ -23,11 +25,27 @@ class _SafetyTalkPageState extends State<SafetyTalkPage> {
   Future<void> _load() async {
     setState(() { _loading = true; _error = null; });
     final data = await _api.getSafetyTalkData();
+    List<Map<String, dynamic>> localItems = [];
+    try {
+      final rows = await _db.rawQuery(
+        'SELECT id, title as judul, remark as keterangan, location_detail as lokasi, date as tanggal, time as waktu, sync_id FROM safety_trans WHERE deleted_at IS NULL ORDER BY id DESC',
+      );
+      localItems = rows.map((r) => Map<String, dynamic>.from(r)).toList();
+    } catch (_) {}
+
     if (!mounted) return;
     setState(() {
       _loading = false;
-      _talks = List<Map<String, dynamic>>.from(data?['talks'] ?? const []);
-      _error = data == null ? 'Riwayat Safety Talk belum dapat dimuat. Periksa koneksi lalu tarik untuk mencoba lagi.' : null;
+      if (data != null) {
+        final serverList = List<Map<String, dynamic>>.from(data['talks'] ?? const []);
+        // Prepend pending offline items
+        final pending = localItems.where((item) => item['sync_id'] == null).toList();
+        _talks = [...pending, ...serverList];
+        _error = null;
+      } else {
+        _talks = localItems;
+        _error = localItems.isEmpty ? 'Riwayat Safety Talk belum dapat dimuat dari server. Periksa koneksi lalu tarik untuk mencoba lagi.' : null;
+      }
     });
   }
 
@@ -37,15 +55,46 @@ class _SafetyTalkPageState extends State<SafetyTalkPage> {
   }
 
   Future<void> _delete(Map<String, dynamic> item) async {
-    final ok = await showDialog<bool>(context: context, builder: (ctx) => AlertDialog(
-      title: const Text('Hapus Safety Talk?'),
-      content: Text('Laporan “${item['judul']}” akan dihapus dari MBS dan tidak dapat dikembalikan.'),
-      actions: [TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Batal')), FilledButton.tonal(style: FilledButton.styleFrom(foregroundColor: Colors.red), onPressed: () => Navigator.pop(ctx, true), child: const Text('Hapus'))],
-    ));
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Hapus Safety Talk?'),
+        content: Text('Laporan “${item['judul'] ?? item['title'] ?? ''}” akan dihapus dan tidak dapat dikembalikan.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Batal')),
+          FilledButton.tonal(
+            style: FilledButton.styleFrom(foregroundColor: Colors.red),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Hapus'),
+          ),
+        ],
+      ),
+    );
     if (ok != true) return;
-    final deleted = await _api.deleteSafetyTalk(item['id'] as int);
+
+    bool deleted = false;
+    final int? id = item['id'] as int?;
+    final int? syncId = item['sync_id'] as int?;
+
+    if (id != null) {
+      try {
+        await _db.update('safety_trans', {'deleted_at': DateTime.now().toIso8601String()}, id);
+        deleted = true;
+      } catch (_) {}
+    }
+
+    if (syncId != null) {
+      deleted = await _api.deleteSafetyTalk(syncId);
+    } else if (id != null && (item['sync_id'] == null || item['sync_id'] == 0)) {
+      deleted = true;
+    } else if (id != null) {
+      deleted = await _api.deleteSafetyTalk(id);
+    }
+
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(deleted ? 'Safety Talk berhasil dihapus.' : 'Gagal menghapus Safety Talk.')));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(deleted ? 'Safety Talk berhasil dihapus.' : 'Gagal menghapus Safety Talk.')),
+    );
     if (deleted) _load();
   }
 

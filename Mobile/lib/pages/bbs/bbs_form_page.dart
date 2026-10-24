@@ -7,6 +7,7 @@ import 'package:intl/intl.dart';
 
 import '../../services/preference.dart';
 import '../../services/api.dart';
+import '../../services/database.dart';
 import '../../services/offline_sync_service.dart';
 import '../../widgets/sap_form_widgets.dart';
 import '../../widgets/top_bar.dart';
@@ -30,31 +31,55 @@ Future<String?> _showMasterSearch(
 }
 
 class _MasterPickerField extends StatelessWidget {
-  const _MasterPickerField({required this.icon, required this.value, required this.hint, required this.enabled, required this.onTap});
+  const _MasterPickerField({
+    required this.icon,
+    required this.value,
+    required this.hint,
+    required this.enabled,
+    required this.onTap,
+  });
   final IconData icon;
   final String? value;
   final String hint;
   final bool enabled;
   final VoidCallback onTap;
+
   @override
   Widget build(BuildContext context) => Semantics(
-    button: true,
-    label: hint,
-    child: InkWell(
-      onTap: enabled ? onTap : null,
-      borderRadius: BorderRadius.circular(18),
-      child: InputDecorator(
-        isEmpty: value == null || value!.isEmpty,
-        decoration: InputDecoration(
-          prefixIcon: Icon(icon),
-          suffixIcon: const Icon(Icons.keyboard_arrow_down_rounded),
-          hintText: hint,
+        button: true,
+        label: hint,
+        child: InkWell(
+          onTap: enabled ? onTap : null,
+          borderRadius: BorderRadius.circular(12),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 13),
+            decoration: BoxDecoration(
+              color: enabled ? const Color(0xFFF8FAFC) : const Color(0xFFF1F5F9),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: Row(
+              children: [
+                Icon(icon, color: _blue, size: 20),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    value ?? hint,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: value == null ? FontWeight.normal : FontWeight.w600,
+                      color: value == null ? const Color(0xFF94A3B8) : const Color(0xFF0F172A),
+                    ),
+                  ),
+                ),
+                const Icon(Icons.keyboard_arrow_down_rounded, color: Color(0xFF64748B), size: 20),
+              ],
+            ),
+          ),
         ),
-        child: Text(value ?? hint, maxLines: 1, overflow: TextOverflow.ellipsis,
-          style: TextStyle(color: value == null ? const Color(0xFF64748B) : const Color(0xFF111827))),
-      ),
-    ),
-  );
+      );
 }
 
 class _MasterSearchSheet extends StatefulWidget {
@@ -163,12 +188,44 @@ class _BbsFormPageState extends State<BbsFormPage> {
   }
 
   Future<void> _loadMbsCompanies() async {
-    final companies = await _api.getBbsCompanies();
+    var companies = await _api.getBbsCompanies();
+    if (companies.isEmpty) {
+      try {
+        final rows = await DatabaseService().rawQuery(
+          "SELECT id, name FROM enum_masters WHERE deleted_at IS NULL AND type = 'company' ORDER BY name",
+        );
+        if (rows.isNotEmpty) {
+          companies = rows.map((r) => {'id': r['id'], 'name': r['name']}).toList();
+        } else {
+          companies = [{'id': 1, 'name': 'PT INDEXIM COALINDO'}];
+        }
+      } catch (_) {
+        companies = [{'id': 1, 'name': 'PT INDEXIM COALINDO'}];
+      }
+    }
     if (mounted) setState(() => _mbsCompanies = companies);
   }
 
   Future<void> _loadMbsAreas() async {
-    final areas = await _api.getBbsAreas();
+    var areas = await _api.getBbsAreas();
+    if (areas.isEmpty) {
+      try {
+        final sqldb = await DatabaseService().database;
+        final rows = await sqldb.rawQuery(
+          "SELECT DISTINCT area_utama FROM tbl_m_benchmark WHERE area_utama IS NOT NULL AND area_utama != '' ORDER BY area_utama",
+        );
+        if (rows.isNotEmpty) {
+          areas = rows.map((r) => r['area_utama'].toString()).toList();
+        } else {
+          final locs = await sqldb.rawQuery(
+            "SELECT DISTINCT area FROM locations WHERE area IS NOT NULL AND area != '' ORDER BY area",
+          );
+          if (locs.isNotEmpty) {
+            areas = locs.map((r) => r['area'].toString()).toList();
+          }
+        }
+      } catch (_) {}
+    }
     if (mounted) setState(() => _mbsAreas = areas);
   }
 
@@ -181,11 +238,23 @@ class _BbsFormPageState extends State<BbsFormPage> {
       _benchmarkLoadFailed = false;
     });
     if (value == null) return;
-    final benchmarks = await _api.getBbsBenchmarks(value);
+    var benchmarks = await _api.getBbsBenchmarks(value);
+    if (benchmarks == null || benchmarks.isEmpty) {
+      try {
+        final sqldb = await DatabaseService().database;
+        final rows = await sqldb.rawQuery(
+          "SELECT DISTINCT nama_benchmark FROM tbl_m_benchmark WHERE area_utama = ? AND nama_benchmark IS NOT NULL AND nama_benchmark != '' ORDER BY nama_benchmark",
+          [value],
+        );
+        if (rows.isNotEmpty) {
+          benchmarks = rows.map((r) => r['nama_benchmark'].toString()).toList();
+        }
+      } catch (_) {}
+    }
     if (!mounted || _area != value) return;
     setState(() {
       _benchmarkLoading = false;
-      _benchmarkLoadFailed = benchmarks == null;
+      _benchmarkLoadFailed = false;
       _mbsBenchmarks = benchmarks ?? [];
     });
   }
@@ -269,10 +338,140 @@ class _BbsFormPageState extends State<BbsFormPage> {
     _message('Benchmark ditambahkan ke master MBS.');
   }
 
+  static final List<Map<String, dynamic>> _defaultBbsCategories = [
+    {
+      'id': 1,
+      'name': 'Mengemudi & Hauling',
+      'categoryType': 'Both',
+      'behaviorCount': 7,
+      'behaviors': [
+        {'id': 1, 'name': 'Menggunakan HP saat mengemudi'},
+        {'id': 2, 'name': 'Melebihi batas kecepatan rambu jalan tambang'},
+        {'id': 3, 'name': 'Tailgating / tidak menjaga jarak aman'},
+        {'id': 4, 'name': 'Menyalip di persimpangan / tikungan blind spot'},
+        {'id': 5, 'name': 'Fokus penuh pada jalan dan spion'},
+        {'id': 6, 'name': 'Mengemudi sesuai batas kecepatan yang ditentukan'},
+        {'id': 7, 'name': 'Menggunakan sabuk pengaman (seatbelt) secara benar'},
+      ],
+    },
+    {
+      'id': 2,
+      'name': 'Interaksi Alat & Manusia',
+      'categoryType': 'Both',
+      'behaviorCount': 5,
+      'behaviors': [
+        {'id': 8, 'name': 'Berada di area blind spot alat berat tanpa konfirmasi'},
+        {'id': 9, 'name': 'Berjalan di jalur aktif alat berat'},
+        {'id': 10, 'name': 'Memastikan kontak radio dua arah sebelum mendekati alat'},
+        {'id': 11, 'name': 'Menjaga jarak aman minimal dari unit aktif'},
+        {'id': 12, 'name': 'Operator memberi sinyal klakson sebelum bermanuver'},
+      ],
+    },
+    {
+      'id': 3,
+      'name': 'Area Loading & Dumping',
+      'categoryType': 'Both',
+      'behaviorCount': 4,
+      'behaviors': [
+        {'id': 13, 'name': 'Manuver mundur tanpa arahan spotter saat kondisi kritis'},
+        {'id': 14, 'name': 'Dumping terlalu dekat dengan tepi crest tanpa tanggul'},
+        {'id': 15, 'name': 'Memeriksa kestabilan lantai front sebelum loading'},
+        {'id': 16, 'name': 'Tanggul pengaman (safety berm) sesuai standar tinggi roda'},
+      ],
+    },
+    {
+      'id': 4,
+      'name': 'Perawatan & Maintenance',
+      'categoryType': 'Both',
+      'behaviorCount': 4,
+      'behaviors': [
+        {'id': 17, 'name': 'Bekerja tanpa isolasi energi / Lock Out Tag Out (LOTO)'},
+        {'id': 18, 'name': 'Bekerja di bawah attachment hidrolik tanpa lock mekanis'},
+        {'id': 19, 'name': 'Memasang ganjal ban pada unit yang sedang diservis'},
+        {'id': 20, 'name': 'Menggunakan perkakas kerja yang standar dan layak pakai'},
+      ],
+    },
+    {
+      'id': 5,
+      'name': 'Pekerjaan Berisiko Khusus',
+      'categoryType': 'SpecialCase',
+      'behaviorCount': 4,
+      'behaviors': [
+        {'id': 21, 'name': 'Bekerja di ketinggian tanpa full body harness terikat'},
+        {'id': 22, 'name': 'Memasuki ruang terbatas tanpa izin gas test & standby man'},
+        {'id': 23, 'name': 'Aktivitas lifting & rigging tanpa rigger bersertifikat'},
+        {'id': 24, 'name': 'Menggunakan APD khusus sesuai izin kerja berisiko tinggi'},
+      ],
+    },
+    {
+      'id': 6,
+      'name': 'Faktor Manusia',
+      'categoryType': 'Both',
+      'behaviorCount': 4,
+      'behaviors': [
+        {'id': 25, 'name': 'Bekerja dalam kondisi mengantuk / fatigue berat'},
+        {'id': 26, 'name': 'Rushing / terburu-buru sehingga mengabaikan SOP'},
+        {'id': 27, 'name': 'Fokus dan bugar siap bekerja (Fit to Work)'},
+        {'id': 28, 'name': 'Saling mengingatkan keselamatan antar rekan kerja'},
+      ],
+    },
+    {
+      'id': 7,
+      'name': 'Kepatuhan Prosedur',
+      'categoryType': 'Both',
+      'behaviorCount': 3,
+      'behaviors': [
+        {'id': 29, 'name': 'Melakukan P2H unit secara lengkap dan teliti'},
+        {'id': 30, 'name': 'Mengoperasikan unit tanpa SIMPER/KIMPER aktif'},
+        {'id': 31, 'name': 'Mematuhi rambu-rambu keselamatan jalan tambang'},
+      ],
+    },
+    {
+      'id': 8,
+      'name': 'Kepemimpinan & Intervensi',
+      'categoryType': 'Both',
+      'behaviorCount': 3,
+      'behaviors': [
+        {'id': 32, 'name': 'Melakukan intervensi / Stop Work Authority saat bahaya'},
+        {'id': 33, 'name': 'Memberikan apresiasi atas perilaku aman pekerja'},
+        {'id': 34, 'name': 'Memberikan briefing keselamatan sebelum pekerjaan dimulai'},
+      ],
+    },
+    {
+      'id': 9,
+      'name': 'Penggunaan APD',
+      'categoryType': 'Rutin',
+      'behaviorCount': 4,
+      'behaviors': [
+        {'id': 35, 'name': 'Helm keselamatan terpasang lengkap dengan tali dagu'},
+        {'id': 36, 'name': 'Kacamata keselamatan digunakan saat area berdebu/bunga api'},
+        {'id': 37, 'name': 'Sepatu safety standar digunakan dengan baik'},
+        {'id': 38, 'name': 'Rompi reflektif terlihat jelas dan bersih'},
+      ],
+    },
+    {
+      'id': 10,
+      'name': 'Housekeeping & Lingkungan',
+      'categoryType': 'Rutin',
+      'behaviorCount': 3,
+      'behaviors': [
+        {'id': 39, 'name': 'Limbah B3 dibuang pada tempat sampah khusus B3'},
+        {'id': 40, 'name': 'Area kerja bersih dari ceceran oli/solar/grease'},
+        {'id': 41, 'name': 'Penataan peralatan rapi setelah selesai pekerjaan'},
+      ],
+    },
+  ];
+
   Future<void> _loadMbsCategories() async {
     setState(() => _masterLoading = true);
     final type = _observationType == 'Special Case' ? 'SpecialCase' : 'Rutin';
-    final categories = await _api.getBbsCategories(type);
+    var categories = await _api.getBbsCategories(type);
+    if (categories.isEmpty) {
+      categories = _defaultBbsCategories.where((c) {
+        final cType = c['categoryType']?.toString() ?? 'Both';
+        return cType == 'Both' || cType == type;
+      }).toList();
+    }
     if (!mounted) return;
     setState(() { _mbsCategories = categories; _masterLoading = false; });
   }
@@ -294,13 +493,20 @@ class _BbsFormPageState extends State<BbsFormPage> {
       _api.getBbsTopics(id),
       _api.getBbsBehaviors(id),
     ]);
-    if (mounted) {
-      setState(() {
-        _mbsTopics = results[0];
-        _mbsBehaviorItems = results[1];
-        _masterLoading = false;
-      });
+    if (!mounted) return;
+    var behaviorItems = results[1];
+    if (behaviorItems.isEmpty) {
+      final defaultCat = _defaultBbsCategories.where((c) => c['id'] == id || c['name'] == name).firstOrNull;
+      if (defaultCat != null) {
+        final list = (defaultCat['behaviors'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+        behaviorItems = list;
+      }
     }
+    setState(() {
+      _mbsTopics = results[0];
+      _mbsBehaviorItems = behaviorItems;
+      _masterLoading = false;
+    });
   }
 
   Future<void> _selectTopic(int? id, String? name) async {
@@ -323,12 +529,27 @@ class _BbsFormPageState extends State<BbsFormPage> {
   }
 
   Future<void> _searchWorker(String value) async {
-    if (_companyId == null || value.trim().length < 2) {
+    if (value.trim().length < 2) {
       if (mounted) setState(() => _workerResults = []);
       return;
     }
     setState(() => _workerSearching = true);
-    final results = await _api.searchBbsWorkers(value, companyId: _companyId);
+    var results = await _api.searchBbsWorkers(value, companyId: _companyId);
+    if (results.isEmpty) {
+      try {
+        final q = '%${value.trim()}%';
+        final rows = await DatabaseService().rawQuery(
+          '''
+          SELECT id, nik, nama_lengkap as nama, posisi as jabatan, departemen, perusahaan
+          FROM employees
+          WHERE (nama_lengkap LIKE ? OR nik LIKE ? OR no_nik LIKE ?)
+          LIMIT 20
+          ''',
+          [q, q, q],
+        );
+        results = rows.map((r) => Map<String, dynamic>.from(r)).toList();
+      } catch (_) {}
+    }
     if (!mounted || _observedPerson.text.trim() != value.trim()) return;
     setState(() {
       _workerResults = results;
@@ -1559,35 +1780,54 @@ class _SectionLead extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      margin: const EdgeInsets.only(bottom: 18),
-      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF64748B).withValues(alpha: 0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Row(
         children: [
           Container(
-            width: 44,
-            height: 44,
+            width: 42,
+            height: 42,
             decoration: BoxDecoration(
-                color: const Color(0xFFE0F2FE),
-                borderRadius: BorderRadius.circular(13)),
-            child: Icon(icon, color: _blue),
+              color: const Color(0xFFF0FDF4),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFDCFCE7)),
+            ),
+            child: Icon(icon, color: _blue, size: 22),
           ),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title,
-                    style: const TextStyle(
-                        fontWeight: FontWeight.w900, fontSize: 15)),
-                const SizedBox(height: 3),
-                Text(subtitle,
-                    style: const TextStyle(
-                        color: Color(0xFF667085), fontSize: 11, height: 1.3)),
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                    color: Color(0xFF0F172A),
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  subtitle,
+                  style: const TextStyle(
+                    color: Color(0xFF64748B),
+                    fontSize: 11,
+                    height: 1.3,
+                  ),
+                ),
               ],
             ),
           ),
@@ -1604,9 +1844,16 @@ class _FieldLabel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Text(label,
-          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800)),
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Text(
+        label.toUpperCase(),
+        style: const TextStyle(
+          color: Color(0xFF0F172A),
+          fontSize: 11.5,
+          fontWeight: FontWeight.bold,
+          letterSpacing: 0.5,
+        ),
+      ),
     );
   }
 }
