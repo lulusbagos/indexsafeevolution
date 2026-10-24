@@ -9,7 +9,9 @@ Aplikasi ini terhubung langsung ke basis data operasional pertambangan **`DB_SAP
 - **Database**: Microsoft SQL Server
   - Server: `172.16.1.93`
   - Database: `DB_SAP`
-- **Base URL Server API**: `http://localhost:5200` atau `http://<IP_KOMPUTER>:5200`
+- **Base URL produksi**: `https://indexsafeevolution.indexim.id`
+- **URL pengembangan lokal**: `http://localhost:5200`. Ini hanya untuk
+  pengujian developer; aplikasi rilis selalu menuju URL produksi di atas.
 - **Dokumentasi Interaktif (OpenAPI + Scalar UI)**: Buka di browser: `http://localhost:5200/scalar/v1`
 
 ---
@@ -23,6 +25,13 @@ Atau via terminal:
 ```bash
 cd Backend
 dotnet run
+```
+
+Untuk menguji aplikasi Android terhadap backend lokal, gunakan override saat
+menjalankan Flutter (bukan mengubah source atau APK rilis):
+
+```bash
+flutter run --dart-define=API_BASE_URL=http://127.0.0.1:5200
 ```
 
 ---

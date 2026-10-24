@@ -31,6 +31,7 @@ class BbsObservation {
     required this.evidencePaths,
     required this.status,
     required this.followUpNotes,
+    this.syncStatus = 'Synced',
   });
 
   final String id;
@@ -60,8 +61,13 @@ class BbsObservation {
   final List<String> evidencePaths;
   final String status;
   final String followUpNotes;
+  final String syncStatus;
 
-  BbsObservation copyWith({String? status, String? followUpNotes}) {
+  BbsObservation copyWith({
+    String? status,
+    String? followUpNotes,
+    String? syncStatus,
+  }) {
     return BbsObservation(
       id: id,
       observerName: observerName,
@@ -90,6 +96,7 @@ class BbsObservation {
       evidencePaths: evidencePaths,
       status: status ?? this.status,
       followUpNotes: followUpNotes ?? this.followUpNotes,
+      syncStatus: syncStatus ?? this.syncStatus,
     );
   }
 
@@ -121,6 +128,7 @@ class BbsObservation {
         'evidencePaths': evidencePaths,
         'status': status,
         'followUpNotes': followUpNotes,
+        'syncStatus': syncStatus,
       };
 
   factory BbsObservation.fromJson(Map<String, dynamic> json) {
@@ -158,9 +166,10 @@ class BbsObservation {
       dueDate: json['dueDate'] == null
           ? null
           : DateTime.tryParse('${json['dueDate']}'),
-      evidencePaths: evidencePaths.take(5).toList(),
+      evidencePaths: evidencePaths.take(1).toList(),
       status: '${json['status'] ?? 'Open'}',
       followUpNotes: '${json['followUpNotes'] ?? ''}',
+      syncStatus: '${json['syncStatus'] ?? 'Synced'}',
     );
   }
 }
@@ -197,6 +206,20 @@ class BbsStorage {
     final index = observations.indexWhere((item) => item.id == observation.id);
     if (index < 0) return;
     observations[index] = observation;
+    await _write(observations);
+  }
+
+  static Future<void> remove(String id) async {
+    final observations = await load();
+    observations.removeWhere((item) => item.id == id);
+    await _write(observations);
+  }
+
+  static Future<void> markSynced(String id) async {
+    final observations = await load();
+    final index = observations.indexWhere((item) => item.id == id);
+    if (index < 0) return;
+    observations[index] = observations[index].copyWith(syncStatus: 'Synced');
     await _write(observations);
   }
 

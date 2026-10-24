@@ -32,6 +32,37 @@ class PreferenceService {
     await prefs?.setString('authJson', CryptoUtil.encrypt(raw));
   }
 
+  static Future<void> setObservationOptionsCache(
+      Map<String, dynamic> value) async {
+    await prefs?.setString(
+        'observationOptionsCache', CryptoUtil.encrypt(jsonEncode(value)));
+  }
+
+  static Map<String, dynamic>? getObservationOptionsCache() {
+    final raw = prefs?.getString('observationOptionsCache');
+    if (raw == null || raw.isEmpty) return null;
+    try {
+      final decoded = jsonDecode(CryptoUtil.decrypt(raw));
+      return decoded is Map ? Map<String, dynamic>.from(decoded) : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Cookie sesi MBS SAP untuk request native yang memakai endpoint web resmi.
+  /// Disimpan terenkripsi seperti data autentikasi lain dan tidak pernah dicetak
+  /// ke log aplikasi.
+  static Future<void> setMbsSessionCookie(String value) async {
+    await prefs?.setString('mbsSessionCookie', CryptoUtil.encrypt(value));
+  }
+
+  static String? getMbsSessionCookie() {
+    final raw = prefs?.getString('mbsSessionCookie');
+    if (raw == null || raw.isEmpty) return null;
+    final decrypted = CryptoUtil.decrypt(raw);
+    return decrypted.isEmpty ? null : decrypted;
+  }
+
   static Future<void> setProfile(ProfileModel profile) async {
     final raw = jsonEncode(profile.toJson());
     await prefs?.setString('profileJson', CryptoUtil.encrypt(raw));
@@ -109,13 +140,15 @@ class PreferenceService {
     await prefs?.setInt('notif', total);
   }
 
-  static Future<void> setNotifCounts({required int unread, required int unactioned}) async {
+  static Future<void> setNotifCounts(
+      {required int unread, required int unactioned}) async {
     await prefs?.setInt('notif_unread', unread);
     await prefs?.setInt('notif_unactioned', unactioned);
     await prefs?.setInt('notif', unread + unactioned);
   }
 
-  static int getNotifUnread() => prefs?.getInt('notif_unread') ?? prefs?.getInt('notif') ?? 0;
+  static int getNotifUnread() =>
+      prefs?.getInt('notif_unread') ?? prefs?.getInt('notif') ?? 0;
   static int getNotifUnactioned() => prefs?.getInt('notif_unactioned') ?? 0;
   static int getTotalPendingNotif() => prefs?.getInt('notif') ?? 0;
 
@@ -123,7 +156,8 @@ class PreferenceService {
     await prefs?.setInt('last_seen_incident_id', id);
   }
 
-  static int getLastSeenIncidentId() => prefs?.getInt('last_seen_incident_id') ?? 0;
+  static int getLastSeenIncidentId() =>
+      prefs?.getInt('last_seen_incident_id') ?? 0;
 
   static String? getUser() {
     final val = prefs?.getString('userLogin');
@@ -143,6 +177,7 @@ class PreferenceService {
 
   static Future<void> removeAuth() async {
     await prefs?.remove('authJson');
+    await prefs?.remove('mbsSessionCookie');
   }
 
   static Future<void> removeProfile() async {
@@ -194,7 +229,8 @@ class PreferenceService {
   }
 
   static bool isBackgroundSyncEnabled() {
-    return prefs?.getBool('bg_sync_enabled') ?? false; // Default: false (Hemat baterai aktif)
+    return prefs?.getBool('bg_sync_enabled') ??
+        false; // Default: false (Hemat baterai aktif)
   }
 
   /// Pengaturan Hemat Baterai & Mencegah HP Panas (Default: TRUE / Hemat Baterai Aktif)
@@ -203,7 +239,8 @@ class PreferenceService {
   }
 
   static bool isPowerSaverEnabled() {
-    return prefs?.getBool('power_saver_enabled') ?? true; // Default: ON (Dingin & Hemat Baterai)
+    return prefs?.getBool('power_saver_enabled') ??
+        true; // Default: ON (Dingin & Hemat Baterai)
   }
 
   /// Pengaturan Notifikasi & Getar Otomatis Background (Default: FALSE / Mati)
@@ -212,7 +249,8 @@ class PreferenceService {
   }
 
   static bool isAutoNotifEnabled() {
-    return prefs?.getBool('auto_notif_enabled') ?? false; // Default: OFF (Mencegah panas)
+    return prefs?.getBool('auto_notif_enabled') ??
+        false; // Default: OFF (Mencegah panas)
   }
 
   /// Pengaturan Mode Peta Hazard ('heatmap', 'points', 'off')

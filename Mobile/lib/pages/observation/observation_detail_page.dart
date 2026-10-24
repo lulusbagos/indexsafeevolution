@@ -1,6 +1,8 @@
 import 'dart:io';
 
+import 'package:dropdown_search/dropdown_search.dart';
 import 'package:flutter/material.dart';
+import 'package:dio/dio.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../models/observation_detail_model.dart';
@@ -8,18 +10,30 @@ import '../../models/observation_tran_model.dart';
 import '../../services/api.dart';
 import '../../services/database.dart';
 import '../../services/sync.dart';
-import '../../utils/enums.dart';
 import '../../utils/helpers.dart';
-import '../../widgets/alert_app.dart';
 import '../../widgets/button_app.dart';
 import '../../widgets/snackbar_msg.dart';
 import '../../widgets/top_bar.dart';
-import '../../widgets/upload_files.dart';
+import '../home_page.dart';
+import '../../utils/globals.dart' as globals;
 
 class ObservationDetailPage extends StatefulWidget {
-  const ObservationDetailPage({this.observationTrnModel, super.key});
+  const ObservationDetailPage(
+      {this.observationTrnModel,
+      this.observationPoints = const [],
+      this.observationResults = const [],
+      this.editServerId,
+      this.initialDetails = const [],
+      this.initialDetail,
+      super.key});
 
   final ObservationTrnModel? observationTrnModel;
+  final List<MapEntry<int, dynamic>> observationPoints;
+  final List<MapEntry<int, dynamic>> observationResults;
+  final int? editServerId;
+  final List<ObservationDetailModel> initialDetails;
+  // Kept while older navigation callers are migrated to initialDetails.
+  final ObservationDetailModel? initialDetail;
 
   @override
   State<ObservationDetailPage> createState() => _ObservationDetailPageState();
@@ -37,13 +51,30 @@ class _ObservationDetailPageState extends State<ObservationDetailPage> {
   int? _hasilId;
   int _pointId = 0;
   String? _image;
+  bool _isSaving = false;
 
   @override
   void initState() {
     super.initState();
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _db.dropFiles('ObservationDetail');
+      if (widget.initialDetails.isNotEmpty) {
+        setState(() {
+          _itemList.addAll(widget.initialDetails.map(
+              (detail) => ObservationDetailModel.fromJson(detail.toJson())));
+        });
+      } else if (widget.initialDetail != null) {
+        setState(() => _itemList.add(widget.initialDetail!));
+      }
+
+      if (widget.observationPoints.isNotEmpty ||
+          widget.observationResults.isNotEmpty) {
+        setState(() {
+          _perihalList.addAll(widget.observationPoints);
+          _hasilList.addAll(widget.observationResults);
+        });
+        return;
+      }
 
       _db.rawQuery('''select
         id id_perihal_yang_diobservasi,
@@ -89,7 +120,75 @@ class _ObservationDetailPageState extends State<ObservationDetailPage> {
     super.dispose();
   }
 
-  Future<dynamic> _showBottomSheet() {
+  void _prepareNewDetail() {
+    _pointId++;
+    _perihalId = null;
+    _hasilId = null;
+    _remark.clear();
+    _image = null;
+  }
+
+  int? _findPointId(String? point) => _perihalList
+      .where((item) => item.value.toString() == (point ?? ''))
+      .firstOrNull
+      ?.key;
+
+  int? _findResultId(String? result) {
+    final value = (result ?? '').trim().toUpperCase();
+    return _hasilList
+        .where((item) {
+          final candidate = item.value.toString().trim().toUpperCase();
+          return candidate == value ||
+              (value.isNotEmpty && candidate.startsWith(value.substring(0, 1)));
+        })
+        .firstOrNull
+        ?.key;
+  }
+
+  Widget _observationImagePreview(String path, {double? height}) {
+    final source = path.trim();
+    // Foto dari image_picker disimpan sebagai path absolut Android
+    // (`/data/user/...`). Jangan anggap seluruh path yang diawali slash
+    // sebagai URL MBS; hanya folder publik web yang merupakan foto remote.
+    final remote = source.startsWith('http://') ||
+        source.startsWith('https://') ||
+        source.startsWith('/uploads/') ||
+        source.startsWith('uploads/') ||
+        source.startsWith('~/uploads/');
+    final remoteUrl =
+        source.startsWith('http://') || source.startsWith('https://')
+            ? source
+            : '${_api.mbsWebUrl}/${source.replaceFirst(RegExp(r'^~?/+'), '')}';
+    final image = remote
+        ? Image.network(
+            remoteUrl,
+            width: double.infinity,
+            height: height ?? double.infinity,
+            fit: BoxFit.cover,
+            errorBuilder: (_, __, ___) => const Center(
+                child: Icon(Icons.broken_image_outlined, color: Colors.grey)),
+          )
+        : Image.file(
+            File(source),
+            width: double.infinity,
+            height: height ?? double.infinity,
+            fit: BoxFit.cover,
+            errorBuilder: (_, __, ___) => const Center(
+                child: Icon(Icons.broken_image_outlined, color: Colors.grey)),
+          );
+    return ClipRRect(borderRadius: BorderRadius.circular(9), child: image);
+  }
+
+  Future<dynamic> _showBottomSheet({int? editIndex}) {
+    final editing = editIndex != null;
+    final oldDetail = editing ? _itemList[editIndex] : null;
+    if (editing) {
+      _perihalId = _findPointId(oldDetail?.point);
+      _hasilId = _findResultId(oldDetail?.type);
+      _remark.text = oldDetail?.remark ?? '';
+      _image = oldDetail?.image;
+      _pointId = oldDetail?.pointId ?? _pointId;
+    }
     return showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -98,200 +197,231 @@ class _ObservationDetailPageState extends State<ObservationDetailPage> {
       builder: (_) {
         return StatefulBuilder(builder: (context, setState_) {
           return FractionallySizedBox(
-            heightFactor:
-                0.95 + (MediaQuery.of(context).viewInsets.bottom / 530),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Perihal yang Diobservasi',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
+            // Foto tambahan membuat form lebih tinggi dari layar. Jangan
+            // biarkan Column statis mengunci tombol Tambah/Simpan di bawah.
+            heightFactor: 0.92,
+            child: SafeArea(
+              child: SingleChildScrollView(
+                keyboardDismissBehavior:
+                    ScrollViewKeyboardDismissBehavior.onDrag,
+                padding: EdgeInsets.fromLTRB(
+                  20,
+                  0,
+                  20,
+                  24 + MediaQuery.of(context).viewInsets.bottom,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Perihal yang Diobservasi',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 10),
-                  DropdownButtonFormField(
-                    initialValue: _perihalId,
-                    isExpanded: true,
-                    style: const TextStyle(fontSize: 16),
-                    icon: const Icon(Icons.arrow_drop_down),
-                    items: _perihalList.map((item) {
-                      return DropdownMenuItem<int>(
-                        value: item.key,
-                        child: Text(
-                          item.value.toString(),
-                          style: const TextStyle(
-                              fontSize: 16, color: Colors.black),
+                    const SizedBox(height: 10),
+                    DropdownSearch<MapEntry<int, dynamic>>(
+                      selectedItem: _perihalList
+                          .where((item) => item.key == _perihalId)
+                          .firstOrNull,
+                      items: _perihalList,
+                      itemAsString: (item) => item.value.toString(),
+                      dropdownDecoratorProps: const DropDownDecoratorProps(
+                        dropdownSearchDecoration: InputDecoration(
+                          hintText: 'Pilih perihal yang diamati',
+                          prefixIcon: Icon(Icons.visibility_outlined),
                         ),
-                      );
-                    }).toList(),
-                    onChanged: (int? val) {
-                      setState_(() {
-                        _perihalId = val!;
-                      });
-                    },
-                  ),
-                  const SizedBox(height: 15),
-                  const Text(
-                    'Hasil Observasi',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  DropdownButtonFormField(
-                    initialValue: _hasilId,
-                    isExpanded: true,
-                    style: const TextStyle(fontSize: 16),
-                    icon: const Icon(Icons.arrow_drop_down),
-                    items: _hasilList.map((item) {
-                      return DropdownMenuItem<int>(
-                        value: item.key,
-                        child: Text(
-                          item.value.toString(),
-                          style: const TextStyle(
-                              fontSize: 16, color: Colors.black),
-                        ),
-                      );
-                    }).toList(),
-                    onChanged: (int? val) {
-                      setState_(() {
-                        _hasilId = val!;
-                      });
-                    },
-                  ),
-                  const SizedBox(height: 15),
-                  const Text(
-                    'Keterangan',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  TextFormField(
-                    controller: _remark,
-                    minLines: 3,
-                    maxLines: 3,
-                    style: const TextStyle(fontSize: 16),
-                    onChanged: (String val) => setState_(() {}),
-                  ),
-                  const SizedBox(height: 15),
-                  InkWell(
-                    onTap: () async {
-                      await showDialog(
-                        context: context,
-                        builder: (context) => AlertDialog(
-                          content: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              ListTile(
-                                leading: const Icon(Icons.camera_alt,
-                                    color: Colors.grey),
-                                title: const Text('Camera'),
-                                onTap: () {
-                                  Navigator.pop(context);
-                                  Future<File?> imageFile =
-                                      pickImage(source: ImageSource.camera);
-                                  imageFile.then((value) {
-                                    if (value != null) {
-                                      setState_(() => _image = value.path);
-                                    }
-                                  });
-                                },
-                              ),
-                              ListTile(
-                                leading:
-                                    const Icon(Icons.image, color: Colors.grey),
-                                title: const Text('Gallery'),
-                                onTap: () {
-                                  Navigator.pop(context);
-                                  Future<File?> imageFile =
-                                      pickImage(source: ImageSource.gallery);
-                                  imageFile.then((value) {
-                                    if (value != null) {
-                                      setState_(() => _image = value.path);
-                                    }
-                                  });
-                                },
-                              ),
-                            ],
+                      ),
+                      popupProps: const PopupProps.menu(
+                        fit: FlexFit.loose,
+                        showSearchBox: true,
+                        searchFieldProps: TextFieldProps(
+                          decoration: InputDecoration(
+                            hintText: 'Cari perihal...',
+                            prefixIcon: Icon(Icons.search_rounded),
                           ),
                         ),
-                      );
-                    },
-                    child: Container(
-                      width: MediaQuery.of(context).size.width,
-                      height: 150,
-                      decoration: BoxDecoration(
-                        border: Border.all(color: Colors.grey),
-                        borderRadius: BorderRadius.circular(10),
                       ),
-                      child: _image == null || _image == ''
-                          ? const Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
+                      onChanged: (item) {
+                        if (item == null) return;
+                        setState_(() => _perihalId = item.key);
+                      },
+                    ),
+                    const SizedBox(height: 15),
+                    const Text(
+                      'Hasil Observasi',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    DropdownSearch<MapEntry<int, dynamic>>(
+                      selectedItem: _hasilList
+                          .where((item) => item.key == _hasilId)
+                          .firstOrNull,
+                      items: _hasilList,
+                      itemAsString: (item) => item.value.toString(),
+                      dropdownDecoratorProps: const DropDownDecoratorProps(
+                        dropdownSearchDecoration: InputDecoration(
+                          hintText: 'Pilih hasil observasi',
+                          prefixIcon: Icon(Icons.fact_check_outlined),
+                        ),
+                      ),
+                      popupProps: const PopupProps.menu(
+                        fit: FlexFit.loose,
+                        showSearchBox: true,
+                        searchFieldProps: TextFieldProps(
+                          decoration: InputDecoration(
+                            hintText: 'Cari hasil observasi...',
+                            prefixIcon: Icon(Icons.search_rounded),
+                          ),
+                        ),
+                      ),
+                      onChanged: (item) {
+                        if (item == null) return;
+                        setState_(() => _hasilId = item.key);
+                      },
+                    ),
+                    const SizedBox(height: 15),
+                    const Text(
+                      'Keterangan',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    TextFormField(
+                      controller: _remark,
+                      minLines: 3,
+                      maxLines: 3,
+                      style: const TextStyle(fontSize: 16),
+                      onChanged: (String val) => setState_(() {}),
+                    ),
+                    const SizedBox(height: 15),
+                    InkWell(
+                      onTap: () async {
+                        await showDialog(
+                          context: context,
+                          builder: (context) => AlertDialog(
+                            content: Column(
+                              mainAxisSize: MainAxisSize.min,
                               children: [
-                                Icon(
-                                  Icons.camera_alt,
-                                  color: Colors.grey,
+                                ListTile(
+                                  leading: const Icon(Icons.camera_alt,
+                                      color: Colors.grey),
+                                  title: const Text('Camera'),
+                                  onTap: () {
+                                    Navigator.pop(context);
+                                    Future<File?> imageFile =
+                                        pickImage(source: ImageSource.camera);
+                                    imageFile.then((value) {
+                                      if (value != null) {
+                                        setState_(() => _image = value.path);
+                                      }
+                                    });
+                                  },
                                 ),
-                                SizedBox(height: 5),
-                                Text(
-                                  'Upload Foto',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w400,
-                                  ),
+                                ListTile(
+                                  leading: const Icon(Icons.image,
+                                      color: Colors.grey),
+                                  title: const Text('Gallery'),
+                                  onTap: () {
+                                    Navigator.pop(context);
+                                    Future<File?> imageFile =
+                                        pickImage(source: ImageSource.gallery);
+                                    imageFile.then((value) {
+                                      if (value != null) {
+                                        setState_(() => _image = value.path);
+                                      }
+                                    });
+                                  },
                                 ),
                               ],
-                            )
-                          : Image.file(File(_image!)),
+                            ),
+                          ),
+                        );
+                      },
+                      child: Container(
+                        width: MediaQuery.of(context).size.width,
+                        height: 150,
+                        decoration: BoxDecoration(
+                          border: Border.all(color: Colors.grey),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: _image == null || _image == ''
+                            ? const Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.camera_alt,
+                                    color: Colors.grey,
+                                  ),
+                                  SizedBox(height: 5),
+                                  Text(
+                                    'Upload Foto',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w400,
+                                    ),
+                                  ),
+                                ],
+                              )
+                            : _observationImagePreview(_image!),
+                      ),
                     ),
-                  ),
-                  if (_image != null)
-                    UploadFiles('ObservationDetail', _pointId),
-                  const SizedBox(height: 25),
-                  SizedBox(
-                    width: MediaQuery.of(context).size.width,
-                    child: buttonApp(
-                      label: 'Tambah',
-                      onPressed: (_perihalId == null ||
-                              _hasilId == null ||
-                              _remark.text == '')
-                          ? null
-                          : () {
-                              var point = _perihalList
-                                  .where((i) => i.key == _perihalId)
-                                  .first
-                                  .value;
-                              var type = _hasilList
-                                  .where((i) => i.key == _hasilId)
-                                  .first
-                                  .value;
+                    const SizedBox(height: 25),
+                    SizedBox(
+                      width: MediaQuery.of(context).size.width,
+                      child: buttonApp(
+                        label: editing ? 'Simpan Perubahan' : 'Tambah',
+                        onPressed: (_perihalId == null ||
+                                _hasilId == null ||
+                                _remark.text == '')
+                            ? null
+                            : () {
+                                var point = _perihalList
+                                    .where((i) => i.key == _perihalId)
+                                    .first
+                                    .value;
+                                var type = _hasilList
+                                    .where((i) => i.key == _hasilId)
+                                    .first
+                                    .value;
 
-                              setState(() {
-                                _itemList.add(ObservationDetailModel(
+                                final detail = ObservationDetailModel(
                                   name: '$point - $type',
                                   point: point,
                                   type: type.substring(0, 1),
                                   image: _image,
                                   remark: _remark.text,
                                   pointId: _pointId,
-                                ));
-                                _perihalId = null;
-                                _hasilId = null;
-                                _image = null;
-                                _remark.text = '';
-                                Navigator.pop(context);
-                              });
-                            },
+                                  // Pertahankan identitas detail yang sudah
+                                  // tersinkron ketika pengguna mengeditnya.
+                                  id: oldDetail?.id,
+                                  tranId: oldDetail?.tranId,
+                                  refId: oldDetail?.refId,
+                                  syncId: oldDetail?.syncId,
+                                );
+                                setState(() {
+                                  if (editing) {
+                                    _itemList[editIndex] = detail;
+                                  } else {
+                                    _itemList.add(detail);
+                                  }
+                                  _perihalId = null;
+                                  _hasilId = null;
+                                  _image = null;
+                                  _remark.text = '';
+                                  Navigator.pop(context);
+                                });
+                              },
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           );
@@ -319,6 +449,16 @@ class _ObservationDetailPageState extends State<ObservationDetailPage> {
                 shadowColor: Colors.indigo,
                 margin: const EdgeInsets.only(bottom: 10),
                 child: ListTile(
+                  onTap: () => _showBottomSheet(editIndex: index),
+                  leading: (_itemList[index].image ?? '').trim().isEmpty
+                      ? null
+                      : SizedBox(
+                          width: 48,
+                          height: 48,
+                          child: _observationImagePreview(
+                              _itemList[index].image!,
+                              height: 48),
+                        ),
                   title: Text(
                     (_itemList[index].name ?? '').trim(),
                     style: const TextStyle(
@@ -331,18 +471,27 @@ class _ObservationDetailPageState extends State<ObservationDetailPage> {
                     (_itemList[index].remark ?? '').trim(),
                   ),
                   trailing: SizedBox(
-                    width: 20,
-                    child: IconButton(
-                      padding: const EdgeInsets.all(0),
-                      alignment: Alignment.centerRight,
-                      icon: Icon(
-                        Icons.cancel,
-                        color: Colors.red.shade400,
-                        size: 18,
-                      ),
-                      onPressed: () {
-                        setState(() => _itemList.removeAt(index));
-                      },
+                    width: 76,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          tooltip: 'Edit hasil',
+                          padding: EdgeInsets.zero,
+                          icon: const Icon(Icons.edit_rounded,
+                              color: Colors.indigo, size: 20),
+                          onPressed: () => _showBottomSheet(editIndex: index),
+                        ),
+                        IconButton(
+                          tooltip: 'Hapus hasil',
+                          padding: EdgeInsets.zero,
+                          icon: Icon(Icons.cancel,
+                              color: Colors.red.shade400, size: 20),
+                          onPressed: () {
+                            setState(() => _itemList.removeAt(index));
+                          },
+                        ),
+                      ],
                     ),
                   ),
                   contentPadding: const EdgeInsets.symmetric(horizontal: 10),
@@ -359,10 +508,10 @@ class _ObservationDetailPageState extends State<ObservationDetailPage> {
               SizedBox(
                 width: MediaQuery.of(context).size.width,
                 child: buttonApp(
-                  label: 'Masukkan Hasil Observasi',
+                  label: 'Tambah Hasil Observasi',
                   bgColor: Colors.green,
                   onPressed: () {
-                    setState(() => _pointId = _pointId + 1);
+                    setState(_prepareNewDetail);
                     _showBottomSheet();
                   },
                 ),
@@ -371,52 +520,10 @@ class _ObservationDetailPageState extends State<ObservationDetailPage> {
               SizedBox(
                 width: MediaQuery.of(context).size.width,
                 child: buttonApp(
-                  label: 'Simpan',
-                  onPressed: (_itemList.isEmpty)
+                  label: _isSaving ? 'Menyimpan...' : 'Simpan',
+                  onPressed: (_itemList.isEmpty || _isSaving)
                       ? null
-                      : () {
-                          widget.observationTrnModel?.createdAt =
-                              DateTime.now().toString();
-                          widget.observationTrnModel?.updatedAt =
-                              DateTime.now().toString();
-                          try {
-                            _db
-                                .insert('observation_trans',
-                                    widget.observationTrnModel!.toJson())
-                                .then((tranId) {
-                              if (tranId > 0) {
-                                syncTran(_db, _api, 'observation', tranId)
-                                    .then((sync) {
-                                  if (sync == true) {
-                                    SnackBarMsg.success(
-                                        context, 'Berhasil sinkron!');
-                                  } else {
-                                    SnackBarMsg.danger(
-                                        context, 'Gagal sinkron!');
-                                  }
-                                });
-                                for (var row in _itemList) {
-                                  row.tranId = tranId;
-                                  row.status = 0;
-                                  _db
-                                      .insert(
-                                          'observation_details', row.toJson())
-                                      .then((itemId) {
-                                    _db.saveFiles('ObservationDetail',
-                                        row.pointId!, tranId, itemId);
-                                  });
-                                }
-                                alertSuccess(context, Module.observation,
-                                    lastId: tranId);
-                              } else {
-                                alertFailed(context, Module.observation);
-                              }
-                            });
-                          } catch (e) {
-                            debugPrint(e.toString());
-                            alertFailed(context, Module.observation);
-                          }
-                        },
+                      : _saveObservation,
                 ),
               ),
             ],
@@ -424,5 +531,260 @@ class _ObservationDetailPageState extends State<ObservationDetailPage> {
         ),
       ),
     );
+  }
+
+  Future<void> _saveObservation() async {
+    if (_isSaving || _itemList.isEmpty) return;
+    setState(() => _isSaving = true);
+    SnackBarMsg.loader(context, true);
+
+    try {
+      widget.observationTrnModel?.createdAt = DateTime.now().toString();
+      widget.observationTrnModel?.updatedAt = DateTime.now().toString();
+
+      if (widget.editServerId != null) {
+        final updated = await _saveEditedObservation();
+        if (!mounted) return;
+        SnackBarMsg.loader(context, false);
+        if (updated) {
+          await _showSaveResult(
+            success: true,
+            title: 'Observasi diperbarui',
+            message: 'Perubahan berhasil disimpan ke sistem.',
+            goHome: true,
+          );
+          _goHome();
+        } else {
+          await _showSaveResult(
+            success: false,
+            title: 'Pembaruan belum berhasil',
+            message: 'Periksa koneksi internet lalu coba simpan kembali.',
+          );
+        }
+        return;
+      }
+
+      final observation = widget.observationTrnModel;
+      if (observation == null) {
+        throw StateError('Data observasi tidak tersedia.');
+      }
+      final tranId =
+          await _db.insert('observation_trans', observation.toJson());
+      if (tranId <= 0) {
+        if (mounted) {
+          SnackBarMsg.loader(context, false);
+          await _showSaveResult(
+            success: false,
+            title: 'Penyimpanan gagal',
+            message: 'Data belum dapat disimpan. Silakan coba lagi.',
+          );
+        }
+        return;
+      }
+
+      for (final row in _itemList) {
+        row.tranId = tranId;
+        row.status = 0;
+        await _db.insert('observation_details', row.toJson());
+      }
+
+      // Tunggu semua detail (termasuk foto) selesai dikirim sebelum kembali
+      // ke Beranda. Tombol tetap terkunci selama proses ini berjalan.
+      final synced = await syncTran(_db, _api, 'observation', tranId);
+      if (!mounted) return;
+      SnackBarMsg.loader(context, false);
+      await _showSaveResult(
+        success: synced,
+        title:
+            synced ? 'Observasi berhasil disimpan' : 'Data tersimpan offline',
+        message: synced
+            ? 'Semua hasil observasi dan foto telah diproses.'
+            : 'Data aman di perangkat dan akan disinkronkan otomatis saat ada jaringan.',
+        goHome: true,
+      );
+      if (!mounted) return;
+      _goHome();
+    } catch (e) {
+      debugPrint('Observation save failed: $e');
+      if (mounted) {
+        SnackBarMsg.loader(context, false);
+        await _showSaveResult(
+          success: false,
+          title: 'Penyimpanan gagal',
+          message: 'Terjadi kendala. Periksa data dan koneksi lalu coba lagi.',
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
+    }
+  }
+
+  void _goHome() {
+    if (!mounted) return;
+    SnackBarMsg.loader(context, false);
+    globals.currentPage = 0;
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(builder: (_) => const HomePage()),
+      (route) => false,
+    );
+  }
+
+  Future<void> _showSaveResult({
+    required bool success,
+    required String title,
+    required String message,
+    bool goHome = false,
+  }) async {
+    final color = success ? const Color(0xFF169B62) : const Color(0xFFE05252);
+    final icon = success ? Icons.check_rounded : Icons.error_outline_rounded;
+    final dialog = showGeneralDialog<void>(
+      context: context,
+      barrierDismissible: !goHome,
+      barrierLabel: 'Status penyimpanan observasi',
+      barrierColor: Colors.black54,
+      transitionDuration: const Duration(milliseconds: 260),
+      pageBuilder: (dialogContext, _, __) => Center(
+        child: Material(
+          color: Colors.transparent,
+          child: Container(
+            margin: const EdgeInsets.symmetric(horizontal: 28),
+            padding: const EdgeInsets.fromLTRB(24, 26, 24, 22),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(28),
+              boxShadow: const [
+                BoxShadow(
+                    color: Colors.black26,
+                    blurRadius: 30,
+                    offset: Offset(0, 12)),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 68,
+                  height: 68,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: color.withValues(alpha: .12),
+                  ),
+                  child: Icon(icon, color: color, size: 42),
+                ),
+                const SizedBox(height: 18),
+                Text(title,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF172033))),
+                const SizedBox(height: 8),
+                Text(message,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                        fontSize: 14, height: 1.4, color: Color(0xFF667085))),
+                const SizedBox(height: 20),
+                if (goHome)
+                  const Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      SizedBox(
+                          width: 17,
+                          height: 17,
+                          child: CircularProgressIndicator(strokeWidth: 2)),
+                      SizedBox(width: 10),
+                      Text('Mengarahkan ke Beranda...',
+                          style: TextStyle(color: Color(0xFF667085))),
+                    ],
+                  )
+                else
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton(
+                      style: FilledButton.styleFrom(
+                        backgroundColor: color,
+                        padding: const EdgeInsets.symmetric(vertical: 13),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14)),
+                      ),
+                      onPressed: () => Navigator.of(dialogContext).pop(),
+                      child: const Text('Mengerti'),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ),
+      transitionBuilder: (_, animation, __, child) => FadeTransition(
+        opacity: animation,
+        child: ScaleTransition(
+          scale: CurvedAnimation(parent: animation, curve: Curves.easeOutBack),
+          child: child,
+        ),
+      ),
+    );
+    if (goHome) {
+      await Future<void>.delayed(const Duration(milliseconds: 1500));
+      if (mounted) Navigator.of(context, rootNavigator: true).pop();
+    }
+    await dialog;
+  }
+
+  Future<bool> _saveEditedObservation() async {
+    for (var index = 0; index < _itemList.length; index++) {
+      final detail = _itemList[index];
+      // Observasi MBS menyimpan setiap hasil sebagai baris tersendiri. Gunakan
+      // ID sinkron per-detail supaya mengganti foto item kedua/ketiga tidak
+      // salah menimpa foto pada item pertama.
+      final serverId = detail.syncId ??
+          detail.refId ??
+          (index == 0 ? widget.editServerId : null);
+      if (serverId == null) return false;
+
+      final payload = <String, dynamic>{
+        'kegiatan_yang_diamati': widget.observationTrnModel?.subject ?? '',
+        'area': widget.observationTrnModel?.area ?? '',
+        'lokasi': widget.observationTrnModel?.lokasi ?? '',
+        'detil_lokasi': widget.observationTrnModel?.locationDetail ?? '',
+        'tanggal': widget.observationTrnModel?.date ?? '',
+        'waktu': widget.observationTrnModel?.time ?? '',
+        'perusahaan_id':
+            widget.observationTrnModel?.companyId?.toString() ?? '',
+        'perusahaan_yang_diamati':
+            widget.observationTrnModel?.companyName ?? '',
+        'departemen_yang_diamati': widget.observationTrnModel?.deptName ?? '',
+        'dokumen_pendukung': widget.observationTrnModel?.docName ?? '',
+        'resiko_kritis': widget.observationTrnModel?.riskName ?? '',
+        'tingkat_resiko': widget.observationTrnModel?.riskLevel ?? '',
+        'perihal_yang_diamati': detail.point ?? detail.name ?? '',
+        'hasil_observasi': detail.type ?? '',
+        'keterangan': detail.remark ?? '',
+      };
+      final imagePath = detail.image;
+      if (imagePath != null &&
+          imagePath.isNotEmpty &&
+          await File(imagePath).exists()) {
+        payload['image'] = await MultipartFile.fromFile(imagePath);
+      }
+      final updated = await _api.updateObservation(serverId, payload);
+      if (!updated) return false;
+
+      // Simpan path foto yang baru ke cache lokal juga. Ketika form dibuka
+      // ulang, preview mengambil data ini sehingga tidak kembali ke foto lama.
+      if (detail.id != null) {
+        await _db.update('observation_details', detail.toJson(), detail.id!);
+      }
+    }
+    // PDF observasi dibentuk dari cache History. Perbarui header lokal juga
+    // supaya perubahan form awal (tanggal, lokasi, risiko, dsb.) ikut tampil
+    // bersama foto detail yang baru saat PDF dibuka lagi.
+    final localObservationId = widget.observationTrnModel?.id;
+    if (localObservationId != null) {
+      await _db.update('observation_trans',
+          widget.observationTrnModel!.toJson(), localObservationId);
+    }
+    return true;
   }
 }

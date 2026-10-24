@@ -10,6 +10,21 @@ import 'api.dart';
 import 'database.dart';
 import 'preference.dart';
 
+Future<bool> _hasVerifiedInternet() async {
+  try {
+    final client = HttpClient()..connectionTimeout = const Duration(seconds: 4);
+    final request = await client
+        .getUrl(Uri.parse('https://clients3.google.com/generate_204'));
+    final response = await request.close().timeout(const Duration(seconds: 5));
+    final ok = response.statusCode >= 200 && response.statusCode < 400;
+    await response.drain();
+    client.close(force: true);
+    return ok;
+  } catch (_) {
+    return false;
+  }
+}
+
 Future<bool> syncTran(
     DatabaseService db, ApiService api, String name, int id) async {
   debugPrint('--- sync tran: $name id: $id ---');
@@ -47,14 +62,20 @@ Future<bool> syncTran(
         con.contains(ConnectivityResult.mobile) ||
         con.contains(ConnectivityResult.ethernet) ||
         con.contains(ConnectivityResult.vpn);
-    if (!api.isLocalDev && !hasNet) {
-      debugPrint('[syncTran] No internet access!');
+    // Never send an offline draft merely because a USB/localhost backend is
+    // reachable. The user must have an actual network transport first.
+    if (!hasNet || !await _hasVerifiedInternet()) {
+      debugPrint(
+          '[syncTran] Offline/unverified network: transaction remains in local outbox.');
       return false;
     }
 
     if (api.getToken.isEmpty || api.getToken.startsWith('offline_token_')) {
       final auth = PreferenceService.getAuth();
-      if (auth != null && auth.token != null && auth.token!.isNotEmpty && !auth.token!.startsWith('offline_token_')) {
+      if (auth != null &&
+          auth.token != null &&
+          auth.token!.isNotEmpty &&
+          !auth.token!.startsWith('offline_token_')) {
         api.setToken = auth.token!;
       } else {
         final bg = PreferenceService.getBgToken();
@@ -64,10 +85,12 @@ Future<bool> syncTran(
       }
     }
 
-    Response res;
+    Response? res;
+    final observationDetailServerIds = <int, int>{};
     if (name == 'hazard') {
       final cleanMap = <String, dynamic>{};
-      if (row['payload_json'] != null && row['payload_json'].toString().isNotEmpty) {
+      if (row['payload_json'] != null &&
+          row['payload_json'].toString().isNotEmpty) {
         try {
           final payload = jsonDecode(row['payload_json'].toString()) as Map;
           for (var kv in payload.entries) {
@@ -78,21 +101,41 @@ Future<bool> syncTran(
         } catch (_) {}
       }
 
-      cleanMap['tanggal'] ??= (row['date'] ?? DateTime.now().toString().substring(0, 10)).toString();
+      cleanMap['tanggal'] ??=
+          (row['date'] ?? DateTime.now().toString().substring(0, 10))
+              .toString();
       cleanMap['waktu'] ??= (row['time'] ?? '12:00').toString();
       cleanMap['area'] ??= (row['area'] ?? 'AREA OPERASIONAL').toString();
-      cleanMap['lokasi'] ??= (row['lokasi'] ?? row['location_detail'] ?? 'LOKASI KERJA').toString();
+      cleanMap['lokasi'] ??=
+          (row['lokasi'] ?? row['location_detail'] ?? 'LOKASI KERJA')
+              .toString();
       cleanMap['detil_lokasi'] ??= (row['location_detail'] ?? '').toString();
       cleanMap['temuan'] ??= (row['remark'] ?? row['title'] ?? '').toString();
-      cleanMap['kategori_bahaya'] ??= (row['kategori_bahaya'] ?? 'Kondisi Tidak Aman').toString();
-      cleanMap['jenis_bahaya'] ??= (row['jenis_bahaya'] ?? 'Dan lain-lain').toString();
-      if (row['jenis_ketidaksesuaian'] != null) cleanMap['jenis_ketidaksesuaian'] = row['jenis_ketidaksesuaian'].toString();
-      cleanMap['tingkat_resiko'] ??= (row['tingkat_resiko'] ?? 'Sedang').toString();
-      if (row['tindakan_perbaikan'] != null) cleanMap['tindakan_perbaikan'] = row['tindakan_perbaikan'].toString();
-      if (row['perbaikan'] != null) cleanMap['perbaikan'] = row['perbaikan'].toString();
-      if (row['pja'] != null) cleanMap['pja'] = row['pja'].toString();
-      if (row['nik_pja'] != null) cleanMap['nik_pja'] = row['nik_pja'].toString();
-      if (row['departemen_pja'] != null) cleanMap['departemen_pja'] = row['departemen_pja'].toString();
+      cleanMap['kategori_bahaya'] ??=
+          (row['kategori_bahaya'] ?? 'Kondisi Tidak Aman').toString();
+      cleanMap['jenis_bahaya'] ??=
+          (row['jenis_bahaya'] ?? 'Dan lain-lain').toString();
+      if (row['jenis_ketidaksesuaian'] != null) {
+        cleanMap['jenis_ketidaksesuaian'] =
+            row['jenis_ketidaksesuaian'].toString();
+      }
+      cleanMap['tingkat_resiko'] ??=
+          (row['tingkat_resiko'] ?? 'Sedang').toString();
+      if (row['tindakan_perbaikan'] != null) {
+        cleanMap['tindakan_perbaikan'] = row['tindakan_perbaikan'].toString();
+      }
+      if (row['perbaikan'] != null) {
+        cleanMap['perbaikan'] = row['perbaikan'].toString();
+      }
+      if (row['pja'] != null) {
+        cleanMap['pja'] = row['pja'].toString();
+      }
+      if (row['nik_pja'] != null) {
+        cleanMap['nik_pja'] = row['nik_pja'].toString();
+      }
+      if (row['departemen_pja'] != null) {
+        cleanMap['departemen_pja'] = row['departemen_pja'].toString();
+      }
       cleanMap['status_temuan'] ??= (row['status'] == 1 ? 'Closed' : 'Open');
 
       // Upload file foto (hanya 1 instance MultipartFile, jangan duplikat)
@@ -120,7 +163,8 @@ Future<bool> syncTran(
       );
     } else if (name == 'inspection') {
       final cleanMap = <String, dynamic>{};
-      if (row['payload_json'] != null && row['payload_json'].toString().isNotEmpty) {
+      if (row['payload_json'] != null &&
+          row['payload_json'].toString().isNotEmpty) {
         try {
           final payload = jsonDecode(row['payload_json'].toString()) as Map;
           for (var kv in payload.entries) {
@@ -131,16 +175,28 @@ Future<bool> syncTran(
         } catch (_) {}
       }
 
-      cleanMap['tanggal'] ??= (row['date'] ?? DateTime.now().toString().substring(0, 10)).toString();
+      cleanMap['tanggal'] ??=
+          (row['date'] ?? DateTime.now().toString().substring(0, 10))
+              .toString();
       cleanMap['waktu'] ??= (row['time'] ?? '12:00').toString();
-      cleanMap['jenis_inspeksi'] ??= (row['jenis_inspeksi'] ?? row['title'] ?? 'INSPEKSI K3 LAPANGAN').toString();
+      cleanMap['jenis_inspeksi'] ??=
+          (row['jenis_inspeksi'] ?? row['title'] ?? 'INSPEKSI K3 LAPANGAN')
+              .toString();
       cleanMap['area'] ??= (row['area'] ?? 'AREA OPERASIONAL').toString();
-      cleanMap['lokasi'] ??= (row['lokasi'] ?? row['location_detail'] ?? 'LOKASI KERJA').toString();
+      cleanMap['lokasi'] ??=
+          (row['lokasi'] ?? row['location_detail'] ?? 'LOKASI KERJA')
+              .toString();
       cleanMap['detil_lokasi'] ??= (row['location_detail'] ?? '').toString();
       cleanMap['catatan'] ??= (row['remark'] ?? '').toString();
-      if (row['pja'] != null) cleanMap['pja'] = row['pja'].toString();
-      if (row['nik_pja'] != null) cleanMap['nik_pja'] = row['nik_pja'].toString();
-      if (row['departemen_pja'] != null) cleanMap['departemen_pja'] = row['departemen_pja'].toString();
+      if (row['pja'] != null) {
+        cleanMap['pja'] = row['pja'].toString();
+      }
+      if (row['nik_pja'] != null) {
+        cleanMap['nik_pja'] = row['nik_pja'].toString();
+      }
+      if (row['departemen_pja'] != null) {
+        cleanMap['departemen_pja'] = row['departemen_pja'].toString();
+      }
 
       for (int m = 1; m <= 5; m++) {
         for (int q = 1; q <= 3; q++) {
@@ -167,6 +223,55 @@ Future<bool> syncTran(
           },
         ),
       );
+    } else if (name == 'observation') {
+      // MBS stores one result per tbl_t_observation row.  Preserve every
+      // mobile result (and its photo) by submitting the shared header once
+      // for each detail, just like the web form's result array.
+      final cleanMap = <String, dynamic>{
+        'tanggal': (row['date'] ?? DateTime.now().toString().substring(0, 10))
+            .toString(),
+        'waktu': (row['time'] ?? '12:00').toString(),
+        'area': (row['area'] ?? '').toString(),
+        'lokasi': (row['lokasi'] ?? row['location_detail'] ?? '').toString(),
+        'detil_lokasi': (row['location_detail'] ?? '').toString(),
+        'kegiatan_yang_diamati':
+            (row['subject'] ?? row['title'] ?? '').toString(),
+        'perusahaan_id': (row['company_id'] ?? '').toString(),
+        'perusahaan_yang_diamati': (row['company_name'] ?? '').toString(),
+        'departemen_yang_diamati': (row['dept_name'] ?? '').toString(),
+        'dokumen_pendukung':
+            (row['doc_name'] ?? row['remark'] ?? '').toString(),
+        'resiko_kritis': (row['risk_name'] ?? '').toString(),
+        'tingkat_resiko': (row['risk_level'] ?? '').toString(),
+      };
+      final details = await _observationDetails(db, id);
+      if (details.isEmpty) return false;
+      for (final detail in details) {
+        final detailMap = Map<String, dynamic>.from(cleanMap);
+        detailMap['perihal_yang_diamati'] =
+            (detail['point'] ?? detail['name'] ?? '').toString();
+        detailMap['hasil_observasi'] =
+            _observationResult((detail['type'] ?? '').toString());
+        detailMap['keterangan'] = (detail['remark'] ?? '').toString();
+        final image = detail['image']?.toString();
+        if (image != null && image.isNotEmpty && await File(image).exists()) {
+          detailMap['image'] = await MultipartFile.fromFile(image);
+        }
+        res = await api.dio.post('/tran/observation',
+            data: FormData.fromMap(detailMap),
+            options:
+                Options(headers: {'Authorization': 'Bearer ${api.getToken}'}));
+        final responseData = res.data is Map ? res.data['data'] : null;
+        final serverId = responseData is Map
+            ? int.tryParse(responseData['id'].toString())
+            : null;
+        final localDetailId = detail['id'] is int
+            ? detail['id'] as int
+            : int.tryParse(detail['id'].toString());
+        if (localDetailId != null && serverId != null) {
+          observationDetailServerIds[localDetailId] = serverId;
+        }
+      }
     } else {
       res = await api.dio.post(
         '/tran/$name',
@@ -180,8 +285,8 @@ Future<bool> syncTran(
     }
 
     int? syncedId;
-    if (res.data is Map) {
-      final dataObj = res.data['data'];
+    if (res?.data is Map) {
+      final dataObj = res!.data['data'];
       if (dataObj is Map && dataObj['id'] != null) {
         syncedId = int.tryParse(dataObj['id'].toString());
       }
@@ -199,6 +304,42 @@ Future<bool> syncTran(
           [syncedId ?? id, id],
         );
       }
+      if (name == 'observation') {
+        for (final entry in observationDetailServerIds.entries) {
+          await sqldb.update('observation_details',
+              {'ref_id': entry.value, 'sync_id': entry.value},
+              where: 'id = ?', whereArgs: [entry.key]);
+        }
+        // Foto tambahan dari UploadFiles disimpan sebagai lampiran per detail.
+        // Kirim setelah detail punya ref_id/sync_id server agar setiap foto
+        // melekat pada hasil Observasi yang benar.
+        final attachments = await sqldb.query('files',
+            columns: ['id'],
+            where: 'tran_id = ? AND sync_id IS NULL',
+            whereArgs: [id]);
+        for (final attachment in attachments) {
+          final fileId = attachment['id'] as int?;
+          if (fileId != null) {
+            await syncFiles(db, api, 'observation', fileId);
+          }
+        }
+      }
+      if (name == 'coaching') {
+        // Peserta Coaching disimpan sebagai detail. Kirim setelah transaksi
+        // memperoleh ID server agar setiap peserta melekat ke sesi yang benar.
+        final details = await sqldb.query(
+          'coaching_details',
+          columns: ['id'],
+          where: 'tran_id = ? AND sync_id IS NULL',
+          whereArgs: [id],
+        );
+        for (final detail in details) {
+          final detailId = detail['id'] as int?;
+          if (detailId != null) {
+            await syncDetail(db, api, 'coaching', detailId);
+          }
+        }
+      }
       debugPrint('[syncTran] Sync $name success! ID: $syncedId');
       return true;
     }
@@ -207,6 +348,26 @@ Future<bool> syncTran(
     debugPrint('[syncTran] Error syncing $name:$id -> $err');
     return false;
   }
+}
+
+String _observationResult(String value) {
+  switch (value.trim().toUpperCase()) {
+    case 'P':
+      return 'Positive';
+    case 'I':
+      return 'Improvement';
+    case 'V':
+      return 'Violation';
+    default:
+      return value;
+  }
+}
+
+Future<List<Map<String, Object?>>> _observationDetails(
+    DatabaseService db, int tranId) async {
+  final database = await db.database;
+  return database.query('observation_details',
+      where: 'tran_id = ?', whereArgs: [tranId], orderBy: 'id ASC');
 }
 
 Future<bool> syncDetail(
@@ -403,7 +564,8 @@ Future<bool> syncAllMasterData({
     var con = await Connectivity().checkConnectivity();
     if (con.contains(ConnectivityResult.wifi) == false &&
         con.contains(ConnectivityResult.mobile) == false) {
-      debugPrint('[Sync] Offline: tidak ada koneksi internet untuk download master data.');
+      debugPrint(
+          '[Sync] Offline: tidak ada koneksi internet untuk download master data.');
       return false;
     }
 
@@ -434,7 +596,8 @@ Future<bool> syncAllMasterData({
           ''');
           final res = await api.getMaster(name);
           await res.fold(
-            (err) async => debugPrint('[Sync] Info master $name: ${err['message']}'),
+            (err) async =>
+                debugPrint('[Sync] Info master $name: ${err['message']}'),
             (response) async {
               final items = (response['data'] as List?) ?? [];
               final batch = sqldb.batch();
@@ -443,10 +606,16 @@ Future<bool> syncAllMasterData({
                   if (name == 'areas') {
                     final areaName = item['name']?.toString().trim() ?? '';
                     final compId = item['company_id'] as int? ?? 1;
-                    if (areaName.isNotEmpty && !areaName.toUpperCase().contains('CAMP EKSPLORASI')) {
+                    if (areaName.isNotEmpty &&
+                        !areaName.toUpperCase().contains('CAMP EKSPLORASI')) {
                       batch.rawInsert(
                         'INSERT OR IGNORE INTO tbl_m_benchmark (perusahaan_id, area_utama, nama_benchmark, created_at) VALUES (?, ?, ?, ?)',
-                        [compId, areaName, '', DateTime.now().toIso8601String()],
+                        [
+                          compId,
+                          areaName,
+                          '',
+                          DateTime.now().toIso8601String()
+                        ],
                       );
                     }
                   } else {
@@ -456,7 +625,12 @@ Future<bool> syncAllMasterData({
                     if (benchName.isNotEmpty) {
                       batch.rawInsert(
                         'INSERT OR IGNORE INTO tbl_m_benchmark (perusahaan_id, area_utama, nama_benchmark, created_at) VALUES (?, ?, ?, ?)',
-                        [compId, areaName, benchName, DateTime.now().toIso8601String()],
+                        [
+                          compId,
+                          areaName,
+                          benchName,
+                          DateTime.now().toIso8601String()
+                        ],
                       );
                     }
                   }
@@ -512,11 +686,19 @@ Future<bool> syncAllMasterData({
                 row.remove('deleted_by');
 
                 if (name == 'employee' || name == 'employees') {
-                  final dept = (row['departemen'] ?? row['depart'])?.toString() ?? 'GENERAL';
-                  final jab = (row['jabatan'] ?? row['posisi'])?.toString() ?? 'Karyawan';
-                  final perush = (row['perusahaan'] ?? row['company'])?.toString() ?? 'PT INDEXIM COALINDO';
-                  final nikVal = (row['no_nik'] ?? row['nik'] ?? row['id'])?.toString() ?? '';
-                  final namaVal = (row['nama_lengkap'] ?? row['nama'])?.toString() ?? '';
+                  final dept =
+                      (row['departemen'] ?? row['depart'])?.toString() ??
+                          'GENERAL';
+                  final jab = (row['jabatan'] ?? row['posisi'])?.toString() ??
+                      'Karyawan';
+                  final perush =
+                      (row['perusahaan'] ?? row['company'])?.toString() ??
+                          'PT INDEXIM COALINDO';
+                  final nikVal =
+                      (row['no_nik'] ?? row['nik'] ?? row['id'])?.toString() ??
+                          '';
+                  final namaVal =
+                      (row['nama_lengkap'] ?? row['nama'])?.toString() ?? '';
                   final compIdVal = row['company_id'] ?? row['companyId'] ?? 1;
 
                   row = <String, dynamic>{
@@ -535,7 +717,8 @@ Future<bool> syncAllMasterData({
                   }
                 }
 
-                batch.insert(table, row, conflictAlgorithm: ConflictAlgorithm.replace);
+                batch.insert(table, row,
+                    conflictAlgorithm: ConflictAlgorithm.replace);
                 count++;
                 if (count % 400 == 0) {
                   await batch.commit(noResult: true);

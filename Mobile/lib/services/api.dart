@@ -10,14 +10,28 @@ import '../models/auth_model.dart';
 import '../models/incident_news_model.dart';
 import '../models/notification_item_model.dart';
 import '../models/profile_model.dart';
+import 'preference.dart';
 
 class ApiService {
-  // Hotspot Tethering Laptop = http://192.168.137.1:5200
-  // Wi-Fi Kantor / LAN = http://192.168.130.236:5200
-  // USB ADB Reverse = http://127.0.0.1:5200
-  // PROD = https://indexsafeevolution.indexim.id
-  final baseUrl = 'http://127.0.0.1:5200';
-  bool get isLocalDev => baseUrl.contains('192.168.') || baseUrl.contains('127.0.0.1');
+  /// Endpoint resmi untuk aplikasi pengguna. Nilai ini tidak bergantung pada
+  /// laptop, Wi-Fi kantor, atau USB debugging.
+  ///
+  /// Pengujian developer terhadap backend lokal tetap bisa dilakukan secara
+  /// eksplisit, misalnya:
+  /// `flutter run --dart-define=API_BASE_URL=http://127.0.0.1:5200`
+  final baseUrl = const String.fromEnvironment(
+    'API_BASE_URL',
+    defaultValue: 'https://indexsafeevolution.indexim.id',
+  );
+
+  /// Aplikasi web MBS SAP adalah sumber aturan bisnis dan master Observasi.
+  /// REST API Indexsafe tetap dipakai untuk modul yang sudah berbasis JWT.
+  final mbsWebUrl = const String.fromEnvironment(
+    'MBS_WEB_URL',
+    defaultValue: 'https://mbssap.indexim.id',
+  );
+  bool get isLocalDev =>
+      baseUrl.contains('192.168.') || baseUrl.contains('127.0.0.1');
   final company = 'IC';
   late Dio dio;
 
@@ -47,6 +61,8 @@ class ApiService {
   }
 
   static String? _token;
+  static String? _mbsSessionCookie;
+  static Future<void>? _mbsSessionRefresh;
 
   String get getToken {
     return _token ?? '';
@@ -144,9 +160,8 @@ class ApiService {
             dioErr.type == DioExceptionType.sendTimeout ||
             dioErr.type == DioExceptionType.receiveTimeout ||
             dioErr.type == DioExceptionType.unknown) {
-          final fallbackHost = baseUrl.contains('192.168.')
-              ? 'http://127.0.0.1:5200'
-              : baseUrl;
+          final fallbackHost =
+              baseUrl.contains('192.168.') ? 'http://127.0.0.1:5200' : baseUrl;
           final fallbackDio = Dio(BaseOptions(
             baseUrl: '$fallbackHost/api',
             headers: dio.options.headers,
@@ -154,8 +169,8 @@ class ApiService {
             connectTimeout: const Duration(seconds: 3),
             receiveTimeout: const Duration(seconds: 5),
           ));
-          res = await fallbackDio.post('/login',
-              data: json.encode(loginPayload));
+          res =
+              await fallbackDio.post('/login', data: json.encode(loginPayload));
           dio.options.baseUrl = '$fallbackHost/api';
         } else {
           rethrow;
@@ -164,6 +179,9 @@ class ApiService {
 
       var data = AuthModel.fromJson(Map<String, dynamic>.from(res.data as Map));
       _token = data.token;
+      // Masuk juga ke MBS SAP agar master dan skenario Observasi yang dibaca
+      // mobile persis berasal dari backend web resmi.
+      await _loginMbsWeb(userStr, pswd.toString());
       return Right(data);
     } on DioException catch (err) {
       return Left(errorHandler(err));
@@ -191,9 +209,8 @@ class ApiService {
         if (dioErr.type == DioExceptionType.connectionTimeout ||
             dioErr.type == DioExceptionType.connectionError ||
             dioErr.type == DioExceptionType.unknown) {
-          final fallbackHost = baseUrl.contains('192.168.')
-              ? 'http://127.0.0.1:5200'
-              : baseUrl;
+          final fallbackHost =
+              baseUrl.contains('192.168.') ? 'http://127.0.0.1:5200' : baseUrl;
           final fallbackDio = Dio(BaseOptions(
             baseUrl: '$fallbackHost/api',
             headers: dio.options.headers,
@@ -358,7 +375,8 @@ class ApiService {
     }
   }
 
-  Future<Either<Map, Map>> scanQr(String code, {String? scanType, double? lat, double? lng, double? acc}) async {
+  Future<Either<Map, Map>> scanQr(String code,
+      {String? scanType, double? lat, double? lng, double? acc}) async {
     dio.options.headers['Authorization'] = 'Bearer $_token';
     try {
       var con = await Connectivity().checkConnectivity();
@@ -389,7 +407,8 @@ class ApiService {
         final m = res.data as Map;
         final unread = (m['unread_count'] as num?)?.toInt() ?? 0;
         final unactioned = (m['unactioned_count'] as num?)?.toInt() ?? 0;
-        final total = (m['total_pending_count'] as num?)?.toInt() ?? (unread + unactioned);
+        final total = (m['total_pending_count'] as num?)?.toInt() ??
+            (unread + unactioned);
         return {
           'unread': unread,
           'unactioned': unactioned,
@@ -399,12 +418,14 @@ class ApiService {
       return {'unread': 0, 'unactioned': 0, 'total': 0};
     } catch (_) {
       try {
-        var resFallback = await dio.get('/notifications', queryParameters: {'limit': 1});
+        var resFallback =
+            await dio.get('/notifications', queryParameters: {'limit': 1});
         if (resFallback.data is Map) {
           final m = resFallback.data as Map;
           final unread = (m['unread_count'] as num?)?.toInt() ?? 0;
           final unactioned = (m['unactioned_count'] as num?)?.toInt() ?? 0;
-          final total = (m['total_pending_count'] as num?)?.toInt() ?? (unread + unactioned);
+          final total = (m['total_pending_count'] as num?)?.toInt() ??
+              (unread + unactioned);
           return {
             'unread': unread,
             'unactioned': unactioned,
@@ -416,13 +437,16 @@ class ApiService {
     }
   }
 
-  Future<Either<Map, List<NotificationItemModel>>> getNotifications({int limit = 30}) async {
+  Future<Either<Map, List<NotificationItemModel>>> getNotifications(
+      {int limit = 30}) async {
     try {
       dio.options.headers['Authorization'] = 'Bearer $getToken';
-      var res = await dio.get('/notifications', queryParameters: {'limit': limit});
+      var res =
+          await dio.get('/notifications', queryParameters: {'limit': limit});
       if (res.data is Map && res.data['data'] is List) {
         final list = (res.data['data'] as List)
-            .map((item) => NotificationItemModel.fromJson(Map<String, dynamic>.from(item as Map)))
+            .map((item) => NotificationItemModel.fromJson(
+                Map<String, dynamic>.from(item as Map)))
             .toList();
         return Right(list);
       }
@@ -516,9 +540,8 @@ class ApiService {
         if (dioErr.type == DioExceptionType.connectionTimeout ||
             dioErr.type == DioExceptionType.connectionError ||
             dioErr.response?.statusCode == 404) {
-          final fallbackHost = baseUrl.contains('192.168.')
-              ? 'http://127.0.0.1:5200'
-              : baseUrl;
+          final fallbackHost =
+              baseUrl.contains('192.168.') ? 'http://127.0.0.1:5200' : baseUrl;
           final fallbackDio = Dio(BaseOptions(
             baseUrl: '$fallbackHost/api',
             headers: dio.options.headers,
@@ -533,7 +556,8 @@ class ApiService {
 
       if (res.data is Map && res.data['data'] is List) {
         final list = (res.data['data'] as List)
-            .map((item) => IncidentNewsModel.fromJson(Map<String, dynamic>.from(item as Map)))
+            .map((item) => IncidentNewsModel.fromJson(
+                Map<String, dynamic>.from(item as Map)))
             .toList();
         return Right(list);
       }
@@ -543,7 +567,8 @@ class ApiService {
     }
   }
 
-  Future<Either<Map, List<IncidentNewsModel>>> getHomeBanners({int limit = 5}) async {
+  Future<Either<Map, List<IncidentNewsModel>>> getHomeBanners(
+      {int limit = 5}) async {
     try {
       dio.options.headers['Authorization'] = 'Bearer $getToken';
       final params = <String, dynamic>{'limit': limit};
@@ -555,16 +580,16 @@ class ApiService {
         if (dioErr.type == DioExceptionType.connectionTimeout ||
             dioErr.type == DioExceptionType.connectionError ||
             dioErr.response?.statusCode == 404) {
-          final fallbackHost = baseUrl.contains('192.168.')
-              ? 'http://127.0.0.1:5200'
-              : baseUrl;
+          final fallbackHost =
+              baseUrl.contains('192.168.') ? 'http://127.0.0.1:5200' : baseUrl;
           final fallbackDio = Dio(BaseOptions(
             baseUrl: '$fallbackHost/api',
             headers: dio.options.headers,
             connectTimeout: const Duration(seconds: 4),
             receiveTimeout: const Duration(seconds: 6),
           ));
-          res = await fallbackDio.get('/incidents/banners', queryParameters: params);
+          res = await fallbackDio.get('/incidents/banners',
+              queryParameters: params);
         } else {
           rethrow;
         }
@@ -572,7 +597,8 @@ class ApiService {
 
       if (res.data is Map && res.data['data'] is List) {
         final list = (res.data['data'] as List)
-            .map((item) => IncidentNewsModel.fromJson(Map<String, dynamic>.from(item as Map)))
+            .map((item) => IncidentNewsModel.fromJson(
+                Map<String, dynamic>.from(item as Map)))
             .toList();
         return Right(list);
       }
@@ -591,9 +617,8 @@ class ApiService {
         if (dioErr.type == DioExceptionType.connectionTimeout ||
             dioErr.type == DioExceptionType.connectionError ||
             dioErr.response?.statusCode == 404) {
-          final fallbackHost = baseUrl.contains('192.168.')
-              ? 'http://127.0.0.1:5200'
-              : baseUrl;
+          final fallbackHost =
+              baseUrl.contains('192.168.') ? 'http://127.0.0.1:5200' : baseUrl;
           final fallbackDio = Dio(BaseOptions(
             baseUrl: '$fallbackHost/api',
             headers: dio.options.headers,
@@ -631,9 +656,8 @@ class ApiService {
         if (dioErr.type == DioExceptionType.connectionTimeout ||
             dioErr.type == DioExceptionType.connectionError ||
             dioErr.response?.statusCode == 404) {
-          final fallbackHost = baseUrl.contains('192.168.')
-              ? 'http://127.0.0.1:5200'
-              : baseUrl;
+          final fallbackHost =
+              baseUrl.contains('192.168.') ? 'http://127.0.0.1:5200' : baseUrl;
           final fallbackDio = Dio(BaseOptions(
             baseUrl: '$fallbackHost/api',
             headers: dio.options.headers,
@@ -693,7 +717,8 @@ class ApiService {
       if (res.data is Map) {
         return Right(Map<String, dynamic>.from(res.data as Map));
       }
-      return const Right({'success': true, 'message': 'Roster berhasil disimpan'});
+      return const Right(
+          {'success': true, 'message': 'Roster berhasil disimpan'});
     } on DioException catch (err) {
       return Left(errorHandler(err));
     }
@@ -706,13 +731,15 @@ class ApiService {
       if (res.data is Map) {
         return Right(Map<String, dynamic>.from(res.data as Map));
       }
-      return const Right({'success': true, 'message': 'Roster berhasil dihapus'});
+      return const Right(
+          {'success': true, 'message': 'Roster berhasil dihapus'});
     } on DioException catch (err) {
       return Left(errorHandler(err));
     }
   }
 
-  Future<Either<Map, Map<String, dynamic>>> getSafeMapPoints({int? month, int? year}) async {
+  Future<Either<Map, Map<String, dynamic>>> getSafeMapPoints(
+      {int? month, int? year}) async {
     try {
       if (_token != null && _token!.isNotEmpty) {
         dio.options.headers['Authorization'] = 'Bearer $getToken';
@@ -728,15 +755,15 @@ class ApiService {
             dioErr.type == DioExceptionType.connectionError ||
             dioErr.type == DioExceptionType.unknown ||
             dioErr.response?.statusCode == 404) {
-          final fallbackHost = baseUrl.contains('192.168.')
-              ? 'http://127.0.0.1:5200'
-              : baseUrl;
+          final fallbackHost =
+              baseUrl.contains('192.168.') ? 'http://127.0.0.1:5200' : baseUrl;
           final fallbackDio = Dio(BaseOptions(
             baseUrl: fallbackHost,
             headers: dio.options.headers,
             connectTimeout: const Duration(seconds: 4),
           ));
-          res = await fallbackDio.get('/api/performance/safemap', queryParameters: {
+          res = await fallbackDio
+              .get('/api/performance/safemap', queryParameters: {
             if (month != null) 'month': month,
             if (year != null) 'year': year,
           });
@@ -775,21 +802,22 @@ class ApiService {
       }
       Response res;
       try {
-        res = await dio.post('/api/performance/safemap/close-hazard', data: formData);
+        res = await dio.post('/api/performance/safemap/close-hazard',
+            data: formData);
       } on DioException catch (dioErr) {
         if (dioErr.type == DioExceptionType.connectionTimeout ||
             dioErr.type == DioExceptionType.connectionError ||
             dioErr.type == DioExceptionType.unknown ||
             dioErr.response?.statusCode == 404) {
-          final fallbackHost = baseUrl.contains('192.168.')
-              ? 'http://127.0.0.1:5200'
-              : baseUrl;
+          final fallbackHost =
+              baseUrl.contains('192.168.') ? 'http://127.0.0.1:5200' : baseUrl;
           final fallbackDio = Dio(BaseOptions(
             baseUrl: fallbackHost,
             headers: dio.options.headers,
             connectTimeout: const Duration(seconds: 4),
           ));
-          res = await fallbackDio.post('/api/performance/safemap/close-hazard', data: formData);
+          res = await fallbackDio.post('/api/performance/safemap/close-hazard',
+              data: formData);
         } else {
           rethrow;
         }
@@ -995,7 +1023,8 @@ class ApiService {
             headers: dio.options.headers,
             connectTimeout: const Duration(seconds: 6),
           ));
-          res = await fallbackDio.post('/hazard/reassign', data: jsonEncode(payload));
+          res = await fallbackDio.post('/hazard/reassign',
+              data: jsonEncode(payload));
         } else {
           rethrow;
         }
@@ -1047,7 +1076,8 @@ class ApiService {
     }
   }
 
-  Future<Either<Map, List<Map<String, dynamic>>>> searchPja(String query, {bool lintasPerusahaan = true}) async {
+  Future<Either<Map, List<Map<String, dynamic>>>> searchPja(String query,
+      {bool lintasPerusahaan = true}) async {
     try {
       if (_token != null && _token!.isNotEmpty) {
         dio.options.headers['Authorization'] = 'Bearer $getToken';
@@ -1073,7 +1103,8 @@ class ApiService {
             headers: dio.options.headers,
             connectTimeout: const Duration(seconds: 4),
           ));
-          res = await fallbackDio.get('/hazard/search-pja', queryParameters: params);
+          res = await fallbackDio.get('/hazard/search-pja',
+              queryParameters: params);
         } else {
           rethrow;
         }
@@ -1091,7 +1122,8 @@ class ApiService {
     }
   }
 
-  Future<Either<Map, Map<String, dynamic>>> takeUpHazard(int id, {String? note}) async {
+  Future<Either<Map, Map<String, dynamic>>> takeUpHazard(int id,
+      {String? note}) async {
     try {
       if (_token != null && _token!.isNotEmpty) {
         dio.options.headers['Authorization'] = 'Bearer $getToken';
@@ -1110,7 +1142,6 @@ class ApiService {
       return Left(errorHandler(err));
     }
   }
-
 
   Future<Either<Map, List<Map<String, dynamic>>>> getSafeMapHazardPoints({
     int days = 30,
@@ -1150,7 +1181,8 @@ class ApiService {
             headers: dio.options.headers,
             connectTimeout: const Duration(seconds: 6),
           ));
-          res = await fallbackDio.get('/performance/safemap', queryParameters: params);
+          res = await fallbackDio.get('/performance/safemap',
+              queryParameters: params);
         } else {
           rethrow;
         }
@@ -1322,7 +1354,8 @@ class ApiService {
     }
   }
 
-  Future<Either<Map, Map<String, dynamic>>> recordPermitViolation(Map<String, dynamic> payload) async {
+  Future<Either<Map, Map<String, dynamic>>> recordPermitViolation(
+      Map<String, dynamic> payload) async {
     dio.options.headers['Authorization'] = 'Bearer $_token';
     try {
       var con = await Connectivity().checkConnectivity();
@@ -1332,7 +1365,8 @@ class ApiService {
         return const Left({'message': 'No internet access!'});
       }
 
-      var res = await dio.post('/qr/permit/violation', data: json.encode(payload));
+      var res =
+          await dio.post('/qr/permit/violation', data: json.encode(payload));
       if (res.data is Map) {
         return Right(Map<String, dynamic>.from(res.data as Map));
       }
@@ -1342,7 +1376,8 @@ class ApiService {
     }
   }
 
-  Future<Either<Map, Map<String, dynamic>>> recordPermitMovement(Map<String, dynamic> payload) async {
+  Future<Either<Map, Map<String, dynamic>>> recordPermitMovement(
+      Map<String, dynamic> payload) async {
     dio.options.headers['Authorization'] = 'Bearer $_token';
     try {
       var con = await Connectivity().checkConnectivity();
@@ -1352,7 +1387,8 @@ class ApiService {
         return const Left({'message': 'No internet access!'});
       }
 
-      var res = await dio.post('/qr/permit/movement', data: json.encode(payload));
+      var res =
+          await dio.post('/qr/permit/movement', data: json.encode(payload));
       if (res.data is Map) {
         return Right(Map<String, dynamic>.from(res.data as Map));
       }
@@ -1365,11 +1401,13 @@ class ApiService {
   Future<List<String>> getMasterAreas({int? perusahaanId}) async {
     try {
       final res = await dio.get('/master/areas', queryParameters: {
-        if (perusahaanId != null && perusahaanId > 0) 'perusahaanId': perusahaanId,
+        if (perusahaanId != null && perusahaanId > 0)
+          'perusahaanId': perusahaanId,
       });
       if (res.data is List) {
         final list = (res.data as List)
-            .map((e) => (e is Map ? e['namaArea']?.toString() : e.toString()) ?? '')
+            .map((e) =>
+                (e is Map ? e['namaArea']?.toString() : e.toString()) ?? '')
             .where((s) => s.isNotEmpty)
             .toList();
         return list;
@@ -1380,15 +1418,573 @@ class ApiService {
     return [];
   }
 
-  Future<List<String>> getBenchmarks(String areaUtama, {int? perusahaanId}) async {
+  Dio _mbsDio() {
+    final cookie = _mbsSessionCookie ?? PreferenceService.getMbsSessionCookie();
+    return Dio(BaseOptions(
+      baseUrl: mbsWebUrl,
+      headers: {
+        'Accept': 'application/json, text/html',
+        if (cookie != null && cookie.isNotEmpty) 'Cookie': cookie,
+      },
+      responseType: ResponseType.plain,
+      followRedirects: false,
+      validateStatus: (status) => status != null && status < 500,
+      connectTimeout: const Duration(seconds: 15),
+      receiveTimeout: const Duration(seconds: 30),
+    ));
+  }
+
+  String _csrfToken(String html) {
+    return RegExp(
+          r'name="__RequestVerificationToken"[^>]*value="([^"]+)"',
+        ).firstMatch(html)?.group(1) ??
+        '';
+  }
+
+  String _mergeMbsCookies(String? current, List<String>? setCookies) {
+    final cookies = <String, String>{};
+    if (current != null) {
+      for (final value in current.split(';')) {
+        final pair = value.trim();
+        final pos = pair.indexOf('=');
+        if (pos > 0) cookies[pair.substring(0, pos)] = pair;
+      }
+    }
+    for (final header in setCookies ?? const <String>[]) {
+      final firstPart = header.split(';').first.trim();
+      final pos = firstPart.indexOf('=');
+      if (pos > 0) cookies[firstPart.substring(0, pos)] = firstPart;
+    }
+    return cookies.values.join('; ');
+  }
+
+  Future<void> _loginMbsWeb(String user, String password) async {
     try {
+      final client = _mbsDio();
+      final page = await client.get<String>('/');
+      final initialCookie = _mergeMbsCookies(
+        _mbsSessionCookie ?? PreferenceService.getMbsSessionCookie(),
+        page.headers.map['set-cookie'],
+      );
+      final csrf = _csrfToken(page.data ?? '');
+      if (page.statusCode != 200 || csrf.isEmpty) return;
+
+      final login = await client.post<String>('/',
+          options: Options(headers: {
+            'Cookie': initialCookie,
+            Headers.contentTypeHeader: Headers.formUrlEncodedContentType,
+          }),
+          data: {
+            'nrp': user.trim(),
+            'password': password,
+            'rememberMe': 'true',
+            '__RequestVerificationToken': csrf,
+          });
+      if (login.statusCode != 302) return;
+      final merged =
+          _mergeMbsCookies(initialCookie, login.headers.map['set-cookie']);
+      if (merged.isEmpty) return;
+      _mbsSessionCookie = merged;
+      await PreferenceService.setMbsSessionCookie(merged);
+    } catch (e) {
+      // Kegagalan sesi web tidak membatalkan login REST/offline. Master cache
+      // dan API REST dipakai sebagai fallback sampai koneksi tersedia lagi.
+      debugPrint('[ApiService] MBS web session unavailable: $e');
+    }
+  }
+
+  Future<void> _ensureMbsWebSession() async {
+    final existing =
+        _mbsSessionCookie ?? PreferenceService.getMbsSessionCookie();
+    if (existing != null && existing.isNotEmpty) {
+      _mbsSessionCookie = existing;
+      return;
+    }
+    // Akun lama mungkin tidak mengaktifkan "ingat saya", tetapi kredensial
+    // offline tetap disimpan setelah login pertama. Keduanya sah untuk
+    // membentuk ulang sesi MBS tanpa meminta pengguna login kembali.
+    // Halaman BBS memuat beberapa master secara paralel. Satu proses login
+    // yang dipakai bersama mencegah request saling menimpa cookie ASP.NET.
+    _mbsSessionRefresh ??= () async {
+      final user =
+          PreferenceService.getUser() ?? PreferenceService.getOfflineNik();
+      final password = PreferenceService.getPassword() ??
+          PreferenceService.getOfflinePassword();
+      if (user != null &&
+          user.isNotEmpty &&
+          password != null &&
+          password.isNotEmpty) {
+        await _loginMbsWeb(user, password);
+      }
+    }();
+    try {
+      await _mbsSessionRefresh;
+    } finally {
+      _mbsSessionRefresh = null;
+    }
+  }
+
+  /// Sesi ini dipakai WebView untuk modul MBS yang kompleks agar tetap masuk
+  /// dengan akun aplikasi tanpa meminta pengguna login kedua kali.
+  Future<String?> getMbsWebSessionCookie() async {
+    await _ensureMbsWebSession();
+    return _mbsSessionCookie ?? PreferenceService.getMbsSessionCookie();
+  }
+
+  Future<void> _renewMbsWebSession() async {
+    // Cookie ASP.NET dapat kedaluwarsa walaupun internet aktif. Kosongkan
+    // salinan lama lalu bentuk sesi baru menggunakan kredensial login yang
+    // tersimpan terenkripsi di perangkat.
+    _mbsSessionCookie = null;
+    await PreferenceService.setMbsSessionCookie('');
+    await _ensureMbsWebSession();
+  }
+
+  bool _isMbsLoginPage(String html) {
+    return html.contains('id="loginSplash"') ||
+        html.contains("id='loginSplash'") ||
+        html.contains('name="nrp"');
+  }
+
+  Future<Response<String>> _mbsGetWithSession(
+    String path, {
+    Map<String, dynamic>? queryParameters,
+  }) async {
+    await _ensureMbsWebSession();
+    var response =
+        await _mbsDio().get<String>(path, queryParameters: queryParameters);
+    if (_isMbsLoginPage(response.data ?? '')) {
+      await _renewMbsWebSession();
+      response =
+          await _mbsDio().get<String>(path, queryParameters: queryParameters);
+    }
+    return response;
+  }
+
+  dynamic _decodeMbsJson(dynamic raw) {
+    if (raw is String) {
+      // globalAreasList pada halaman Razor ditulis sebagai literal JavaScript
+      // (`{ id: 1, namaArea: ... }`), bukan JSON dengan key ber-quote.
+      // Normalisasi hanya key sederhana sebelum didecode.
+      final normalized = raw.replaceAllMapped(
+        RegExp(r'([\{,]\s*)([A-Za-z_][A-Za-z0-9_]*)\s*:'),
+        (match) => '${match.group(1)}"${match.group(2)}":',
+      );
+      return jsonDecode(normalized);
+    }
+    return raw;
+  }
+
+  List<Map<String, dynamic>> _webEntries(List<dynamic> values, String nameKey) {
+    return values
+        .whereType<Map>()
+        .map((item) {
+          final value = Map<String, dynamic>.from(item);
+          return <String, dynamic>{
+            // Daftar area dari web memakai `id`, sementara perusahaan memakai
+            // `Id`. Keduanya adalah kontrak MBS yang sah.
+            'id':
+                int.tryParse((value['id'] ?? value['Id'])?.toString() ?? '') ??
+                    0,
+            'name': value[nameKey]?.toString() ?? '',
+          };
+        })
+        .where((item) => item['id'] != 0 && item['name'] != '')
+        .toList();
+  }
+
+  Future<Map<String, dynamic>?> _getMbsObservationOptions() async {
+    await _ensureMbsWebSession();
+    final cookie = _mbsSessionCookie ?? PreferenceService.getMbsSessionCookie();
+    if (cookie == null || cookie.isEmpty) return null;
+    try {
+      final client = _mbsDio();
+      final page = await client.get<String>('/Observation/Index');
+      final html = page.data ?? '';
+      if (page.statusCode != 200 || html.contains('id="loginSplash"')) {
+        return null;
+      }
+      final areasJson =
+          RegExp(r'var globalAreasList = (\[.*?\]);', dotAll: true)
+              .firstMatch(html)
+              ?.group(1);
+      final companiesJson =
+          RegExp(r'var globalCompaniesList = (\[.*?\]);', dotAll: true)
+              .firstMatch(html)
+              ?.group(1);
+      final departmentsJson =
+          RegExp(r'var globalCompanyDeptMap = (\{.*?\});', dotAll: true)
+              .firstMatch(html)
+              ?.group(1);
+      if (areasJson == null ||
+          companiesJson == null ||
+          departmentsJson == null) {
+        return null;
+      }
+
+      final areas = _webEntries(
+          List<dynamic>.from(_decodeMbsJson(areasJson) as List), 'namaArea');
+      final companies = _webEntries(
+          List<dynamic>.from(_decodeMbsJson(companiesJson) as List), 'Nama');
+      final departmentMap =
+          Map<String, dynamic>.from(_decodeMbsJson(departmentsJson) as Map);
+      final departmentNames = <String>{};
+      for (final raw in departmentMap.values) {
+        if (raw is List) {
+          departmentNames.addAll(raw
+              .map((entry) => entry.toString().trim())
+              .where((entry) => entry.isNotEmpty));
+        }
+      }
+      final departments = departmentNames.toList()..sort();
+      final locations = <Map<String, dynamic>>[];
+      final benchmarkResponses = await Future.wait(areas.map((area) async {
+        try {
+          final response = await client.get<String>('/Api/GetBenchmarks',
+              queryParameters: {'areaUtama': area['name']});
+          if (response.statusCode != 200) return const <Map<String, dynamic>>[];
+          final items = _decodeMbsJson(response.data);
+          if (items is! List) return const <Map<String, dynamic>>[];
+          return items
+              .whereType<Map>()
+              .map((item) {
+                final benchmark = Map<String, dynamic>.from(item);
+                return <String, dynamic>{
+                  'id': int.tryParse(benchmark['id']?.toString() ?? '') ?? 0,
+                  'name': benchmark['namaBenchmark']?.toString() ?? '',
+                  'area': area['name'],
+                };
+              })
+              .where((item) => item['id'] != 0 && item['name'] != '')
+              .toList();
+        } catch (_) {
+          return const <Map<String, dynamic>>[];
+        }
+      }));
+      for (final rows in benchmarkResponses) {
+        locations.addAll(rows);
+      }
+
+      const documents = [
+        'Instruksi Kerja (IK)',
+        'Job Safety Analysis (JSA)',
+        'Prosedur Kerja (SOP)',
+        'Lain-lain'
+      ];
+      const risks = [
+        'Explosive',
+        'Geotechnical',
+        'Working at Height',
+        'Isolation',
+        'Lifting',
+        'Traffic & Tyre',
+        'Other'
+      ];
+      const levels = ['Rendah', 'Sedang', 'Tinggi', 'Ekstrim'];
+      const subjects = [
+        'Alat Pelindung Diri',
+        'Peralatan',
+        'Posisi Seseorang',
+        'Prosedur Kerja',
+        'Reaksi Seseorang'
+      ];
+      const results = ['Positive', 'Improvement', 'Violation'];
+      List<Map<String, dynamic>> fixed(List<String> names) => List.generate(
+          names.length, (index) => {'id': index + 1, 'name': names[index]});
+      return {
+        'areas': areas,
+        'locations': locations,
+        'companies': companies,
+        'departments': fixed(departments),
+        'documents': fixed(documents),
+        'criticalRisks': fixed(risks),
+        'riskLevels': fixed(levels),
+        'subjects': fixed(subjects),
+        'results': fixed(results),
+      };
+    } catch (e) {
+      debugPrint('[ApiService] MBS Observation master unavailable: $e');
+      return null;
+    }
+  }
+
+  /// Options for Observasi are served from the shared MBS database, not from
+  /// the app's legacy sample master tables.
+  Future<Map<String, dynamic>?> getObservationOptions(
+      {int? perusahaanId}) async {
+    final webData = await _getMbsObservationOptions();
+    if (webData != null) {
+      await PreferenceService.setObservationOptionsCache(webData);
+      return webData;
+    }
+    try {
+      if (_token != null && _token!.isNotEmpty) {
+        dio.options.headers['Authorization'] = 'Bearer $getToken';
+      }
+      final res = await dio.get('/observation/options', queryParameters: {
+        if (perusahaanId != null && perusahaanId > 0)
+          'perusahaanId': perusahaanId,
+      });
+      if (res.data is Map) {
+        final data = Map<String, dynamic>.from(res.data as Map);
+        await PreferenceService.setObservationOptionsCache(data);
+        return data;
+      }
+    } catch (e) {
+      debugPrint('[ApiService] Error fetching observation options: $e');
+    }
+    return null;
+  }
+
+  Future<bool> _deleteObservationOnMbsWeb(int id) async {
+    await _ensureMbsWebSession();
+    final cookie = _mbsSessionCookie ?? PreferenceService.getMbsSessionCookie();
+    if (cookie == null || cookie.isEmpty) return false;
+    try {
+      final client = _mbsDio();
+      // Laporan bisa sudah terhapus melalui web MBS atau percobaan sebelumnya,
+      // sementara cache SQLite HP belum sempat dibersihkan. Dalam kondisi itu
+      // tujuan pengguna (menghapus laporan) sudah tercapai; izinkan caller
+      // membersihkan salinan lokalnya juga.
+      final existing = await client.get<String>('/Observation/GetData/$id');
+      if (existing.statusCode == 404) return true;
+      if (existing.statusCode != 200) return false;
+
+      // ASP.NET Core MVC memvalidasi anti-forgery token untuk operasi hapus.
+      final formPage = await client.get<String>('/Observation/Index');
+      final csrf = _csrfToken(formPage.data ?? '');
+      if (formPage.statusCode != 200 || csrf.isEmpty) return false;
+
+      final response = await client.post<String>('/Observation/Delete/$id',
+          options: Options(headers: {
+            'Cookie': cookie,
+            Headers.contentTypeHeader: Headers.formUrlEncodedContentType,
+          }),
+          data: {'__RequestVerificationToken': csrf});
+      // Endpoint web me-redirect kembali ke daftar Observasi jika berhasil.
+      return response.statusCode == 302 || response.statusCode == 303;
+    } catch (e) {
+      debugPrint('[ApiService] MBS Observation delete failed: $e');
+      return false;
+    }
+  }
+
+  Future<bool> deleteObservation(int id) async {
+    final deletedOnMbs = await _deleteObservationOnMbsWeb(id);
+    if (deletedOnMbs) return true;
+    try {
+      _restoreStoredToken();
+      dio.options.headers['Authorization'] = 'Bearer $getToken';
+      final res = await dio.delete('/tran/observation/$id');
+      return res.data is Map && res.data['status'] == true;
+    } catch (e) {
+      debugPrint('[ApiService] Error deleting observation: $e');
+      return false;
+    }
+  }
+
+  Future<bool> updateObservation(int id, Map<String, dynamic> fields) async {
+    final updatedOnMbs = await _updateObservationOnMbsWeb(id, fields);
+    if (updatedOnMbs) return true;
+    try {
+      _restoreStoredToken();
+      if (getToken.isEmpty) {
+        debugPrint('[ApiService] Observation update blocked: no saved token.');
+        return false;
+      }
+      dio.options.headers['Authorization'] = 'Bearer $getToken';
+      final fallbackFields = Map<String, dynamic>.from(fields);
+      final image = fallbackFields['image'];
+      if (image is MultipartFile) fallbackFields['image'] = image.clone();
+      final res = await dio.put('/tran/observation/$id',
+          data: FormData.fromMap(fallbackFields));
+      return res.data is Map && res.data['status'] == true;
+    } catch (e) {
+      debugPrint('[ApiService] Error updating observation: $e');
+      return false;
+    }
+  }
+
+  Future<bool> _updateObservationOnMbsWeb(int id, Map<String, dynamic> fields,
+      {bool resolveMissingId = true}) async {
+    await _ensureMbsWebSession();
+    for (var attempt = 0; attempt < 2; attempt++) {
+      final cookie =
+          _mbsSessionCookie ?? PreferenceService.getMbsSessionCookie();
+      if (cookie == null || cookie.isEmpty) return false;
+      try {
+        final client = _mbsDio();
+        final formPage = await client.get<String>('/Observation/Index');
+        final csrf = _csrfToken(formPage.data ?? '');
+        final formHtml = formPage.data ?? '';
+        if (formPage.statusCode != 200 ||
+            csrf.isEmpty ||
+            _isMbsLoginPage(formHtml)) {
+          if (attempt == 0) {
+            await _renewMbsWebSession();
+            continue;
+          }
+          return false;
+        }
+
+        String value(String key) => fields[key]?.toString() ?? '';
+        String result(String raw) {
+          switch (raw.trim().toUpperCase()) {
+            case 'P':
+              return 'Positive';
+            case 'I':
+              return 'Improvement';
+            case 'V':
+              return 'Violation';
+            default:
+              return raw;
+          }
+        }
+
+        final body = <String, dynamic>{
+          'id': id.toString(),
+          'tanggal': value('tanggal'),
+          'waktuStr': value('waktu').isNotEmpty ? value('waktu') : '12:00',
+          'Area': value('area'),
+          'Lokasi': value('lokasi'),
+          'DetilLokasi': value('detil_lokasi'),
+          'KegiatanYangDiamati': value('kegiatan_yang_diamati'),
+          'PerusahaanId': value('perusahaan_id'),
+          'PerusahaanYangDiamati': value('perusahaan_yang_diamati'),
+          'DepartemenYangDiamati': value('departemen_yang_diamati'),
+          'DokumenPendukung': value('dokumen_pendukung'),
+          'ResikoKritis': value('resiko_kritis'),
+          'TingkatResiko': value('tingkat_resiko'),
+          'PerihalYangDiamati': value('perihal_yang_diamati'),
+          'hasilObservasiList': result(value('hasil_observasi')),
+          'keteranganList': value('keterangan'),
+          'HasilObservasi': result(value('hasil_observasi')),
+          'Keterangan': value('keterangan'),
+          '__RequestVerificationToken': csrf,
+        };
+        final image = fields['image'];
+        // MultipartFile hanya dapat dikirim satu kali. Gunakan clone sehingga
+        // percobaan ulang (setelah sesi/ID dipulihkan) selalu mendapat stream
+        // file yang baru.
+        if (image is MultipartFile) body['fotoList'] = image.clone();
+        final response = await client.post<String>('/Observation/Create',
+            options: Options(headers: {'Cookie': cookie}),
+            data: FormData.fromMap(body));
+        // Aksi MVC biasanya redirect ke daftar (302), namun beberapa versi
+        // server mengembalikan halaman sukses langsung (200). Halaman validasi
+        // tetap berisi form dan ringkasan error, sehingga jangan anggap itu
+        // sebagai penyimpanan yang berhasil.
+        if (response.statusCode == 302 || response.statusCode == 303) {
+          final location = response.headers.value('location') ?? '';
+          if (!location.contains('/Observation') && attempt == 0) {
+            await _renewMbsWebSession();
+            continue;
+          }
+          return location.contains('/Observation');
+        }
+        final responseText = response.data?.toLowerCase() ?? '';
+        final succeeded = response.statusCode == 200 &&
+            !responseText.contains("validation-summary-errors") &&
+            !responseText.contains("gagal memperbarui") &&
+            !responseText.contains("gagal menyimpan");
+        if (succeeded) return true;
+        if (response.statusCode == 404 && resolveMissingId) {
+          final resolvedId = await _findMbsObservationId(fields);
+          if (resolvedId != null && resolvedId != id) {
+            debugPrint(
+                '[ApiService] Recovered stale MBS observation ID $id -> $resolvedId');
+            return _updateObservationOnMbsWeb(resolvedId, fields,
+                resolveMissingId: false);
+          }
+        }
+        if (attempt == 0 && _isMbsLoginPage(response.data ?? '')) {
+          await _renewMbsWebSession();
+          continue;
+        }
+        debugPrint(
+            '[ApiService] MBS Observation update rejected: ${response.statusCode}');
+        return false;
+      } catch (e) {
+        if (attempt == 0) {
+          await _renewMbsWebSession();
+          continue;
+        }
+        debugPrint('[ApiService] MBS Observation update failed: $e');
+        return false;
+      }
+    }
+    return false;
+  }
+
+  String _matchMbsText(String value) =>
+      value.replaceAll(RegExp(r'\s+'), ' ').trim().toLowerCase();
+
+  /// Versi lama aplikasi sempat menyimpan ID REST yang sudah tidak ada di
+  /// halaman MBS. Cari satu laporan yang cocok dari histori MBS agar edit
+  /// pengguna tetap menuju baris laporan yang sebenarnya.
+  Future<int?> _findMbsObservationId(Map<String, dynamic> fields) async {
+    final cookie = _mbsSessionCookie ?? PreferenceService.getMbsSessionCookie();
+    if (cookie == null || cookie.isEmpty) return null;
+    try {
+      final page = await _mbsDio().get<String>('/Observation/Index');
+      if (page.statusCode != 200 || _isMbsLoginPage(page.data ?? '')) {
+        return null;
+      }
+      final targetPoint =
+          _matchMbsText(fields['perihal_yang_diamati']?.toString() ?? '');
+      final targetRemark =
+          _matchMbsText(fields['keterangan']?.toString() ?? '');
+      if (targetPoint.isEmpty || targetRemark.isEmpty) return null;
+
+      final cards = RegExp(
+        r'editObservation\((\d+)\)[\s\S]*?<strong>Perihal:</strong>\s*([^<]+)[\s\S]*?<p[^>]*>\s*([^<]+?)\s*</p>',
+        caseSensitive: false,
+      ).allMatches(page.data ?? '');
+      for (final card in cards) {
+        final point = _matchMbsText(card.group(2) ?? '');
+        final remark = _matchMbsText(card.group(3) ?? '');
+        if (point == targetPoint && remark == targetRemark) {
+          return int.tryParse(card.group(1) ?? '');
+        }
+      }
+    } catch (e) {
+      debugPrint('[ApiService] MBS ID recovery failed: $e');
+    }
+    return null;
+  }
+
+  void _restoreStoredToken() {
+    if (_token != null &&
+        _token!.isNotEmpty &&
+        !_token!.startsWith('offline_token_')) {
+      return;
+    }
+    final saved =
+        PreferenceService.getAuth()?.token ?? PreferenceService.getBgToken();
+    if (saved != null &&
+        saved.isNotEmpty &&
+        !saved.startsWith('offline_token_')) {
+      _token = saved;
+    }
+  }
+
+  Future<List<String>> getBenchmarks(String areaUtama,
+      {int? perusahaanId}) async {
+    try {
+      _restoreStoredToken();
+      if (_token != null && _token!.isNotEmpty) {
+        dio.options.headers['Authorization'] = 'Bearer $_token';
+      }
       final res = await dio.get('/master/benchmarks', queryParameters: {
         'areaUtama': areaUtama,
-        if (perusahaanId != null && perusahaanId > 0) 'perusahaanId': perusahaanId,
+        if (perusahaanId != null && perusahaanId > 0)
+          'perusahaanId': perusahaanId,
       });
       if (res.data is List) {
         final list = (res.data as List)
-            .map((e) => (e is Map ? e['namaBenchmark']?.toString() : e.toString()) ?? '')
+            .map((e) =>
+                (e is Map ? e['namaBenchmark']?.toString() : e.toString()) ??
+                '')
             .where((s) => s.isNotEmpty)
             .toList();
         return list;
@@ -1413,7 +2009,8 @@ class ApiService {
       final res = await dio.post('/master/benchmarks', data: {
         'areaUtama': areaUtama,
         'namaBenchmark': namaBenchmark,
-        if (perusahaanId != null && perusahaanId > 0) 'perusahaanId': perusahaanId,
+        if (perusahaanId != null && perusahaanId > 0)
+          'perusahaanId': perusahaanId,
         'createdByNik': createdByNik,
         'createdByName': createdByName,
       });
@@ -1449,6 +2046,523 @@ class ApiService {
     return null;
   }
 
+  /// Membaca master dan riwayat Safety Talk langsung dari MBS SAP.  Modul ini
+  /// memang dikelola oleh aplikasi web MBS, sehingga master lokal lama tidak
+  /// boleh dijadikan sumber utama.
+  Future<Map<String, dynamic>?> getSafetyTalkData() async {
+    await _ensureMbsWebSession();
+    try {
+      final page = await _mbsDio().get<String>('/SafetyTalk/Index');
+      final html = page.data ?? '';
+      if (page.statusCode != 200 || _isMbsLoginPage(html)) return null;
+      final rawAreas = RegExp(r'var globalAreasList = (\[.*?\]);', dotAll: true)
+          .firstMatch(html)
+          ?.group(1);
+      if (rawAreas == null) return null;
+      final areas = _webEntries(
+        List<dynamic>.from(_decodeMbsJson(rawAreas) as List),
+        'namaArea',
+      );
+      final talks = <Map<String, dynamic>>[];
+      final cards = RegExp(
+        r'<span[^>]*font-weight: 700; font-size: 14px[^>]*>\s*([^<]+?)\s*</span>[\s\S]*?bi-geo-alt-fill[^>]*></i>\s*([^<]+?)(?:\s*</span>)[\s\S]*?onclick="editSafetyTalk\((\d+)\)"',
+        caseSensitive: false,
+      ).allMatches(html);
+      for (final card in cards) {
+        talks.add({
+          'id': int.tryParse(card.group(3) ?? '') ?? 0,
+          'judul': card.group(1)?.trim() ?? '',
+          'areaLokasi': card.group(2)?.trim() ?? '',
+        });
+      }
+      return {'areas': areas, 'talks': talks};
+    } catch (e) {
+      debugPrint('[ApiService] MBS Safety Talk unavailable: $e');
+      return null;
+    }
+  }
+
+  Future<List<String>> getSafetyTalkBenchmarks(String area) async {
+    if (area.trim().isEmpty) return const [];
+    try {
+      final res = await _mbsGetWithSession('/Api/GetBenchmarks',
+          queryParameters: {'areaUtama': area});
+      final decoded = _decodeMbsJson(res.data);
+      if (res.statusCode != 200 || decoded is! List) return const [];
+      return decoded
+          .whereType<Map>()
+          .map((item) => item['namaBenchmark']?.toString().trim() ?? '')
+          .where((item) => item.isNotEmpty)
+          .toList();
+    } catch (e) {
+      debugPrint('[ApiService] Safety Talk benchmark unavailable: $e');
+      return const [];
+    }
+  }
+
+  /// Master Coaching harus mengikuti halaman MBS, bukan bergantung pada
+  /// salinan SQLite yang mungkin belum pernah tersinkron pada perangkat baru.
+  Future<Map<String, dynamic>?> getCoachingOptions() async {
+    try {
+      // Area dan perusahaan di MBS adalah master bersama. Halaman Observasi
+      // selalu menyertakan dua daftar lengkap ini, sedangkan beberapa versi
+      // halaman Coaching hanya merendernya setelah JavaScript berjalan.
+      final masterPage = await _mbsGetWithSession('/Observation/Index');
+      final html = masterPage.data ?? '';
+      if (masterPage.statusCode != 200 || _isMbsLoginPage(html)) return null;
+
+      List<Map<String, dynamic>> readVariable(
+        String source,
+        List<String> names, {
+        required String label,
+      }) {
+        for (final name in names) {
+          final raw = RegExp('var\\s+$name\\s*=\\s*(\\[.*?\\]);',
+                  dotAll: true, caseSensitive: false)
+              .firstMatch(source)
+              ?.group(1);
+          if (raw == null) continue;
+          try {
+            final decoded = _decodeMbsJson(raw);
+            if (decoded is List) {
+              return _webEntries(List<dynamic>.from(decoded), label);
+            }
+          } catch (_) {}
+        }
+        return const [];
+      }
+
+      final areas =
+          readVariable(html, ['globalAreasList'], label: 'namaArea');
+      final companies =
+          readVariable(html, ['globalCompaniesList'], label: 'Nama');
+      final coachingPage = await _mbsGetWithSession('/Coaching/Index');
+      final coachingHtml = coachingPage.data ?? '';
+      var themes = readVariable(
+        coachingHtml,
+        ['globalCoachingThemes', 'coachingThemes', 'temaCoachingList'],
+        label: 'name',
+      );
+
+      // Beberapa versi MBS menulis tema langsung sebagai <option>, bukan
+      // variabel JavaScript. Ambil hanya select bertema coaching.
+      if (themes.isEmpty) {
+        final select = RegExp(
+          r'<select[^>]*(?:tema|theme)[^>]*>([\s\S]*?)</select>',
+          caseSensitive: false,
+        ).firstMatch(coachingHtml)?.group(1);
+        if (select != null) {
+          final values = <Map<String, dynamic>>[];
+          for (final option in RegExp(
+                  r'''<option[^>]*value=["']?([^"' >]+)[^>]*>([\s\S]*?)</option>''',
+                  caseSensitive: false)
+              .allMatches(select)) {
+            final id = int.tryParse(option.group(1) ?? '') ?? 0;
+            final name =
+                option.group(2)?.replaceAll(RegExp(r'<[^>]+>'), '').trim();
+            if (id > 0 && name != null && name.isNotEmpty) {
+              values.add({'id': id, 'name': name});
+            }
+          }
+          themes = values;
+        }
+      }
+      // Tema standar juga dipakai sebagai fallback offline oleh web lama.
+      if (themes.isEmpty) {
+        themes = const [
+          {'id': 1, 'name': 'Sosialisasi'},
+          {'id': 2, 'name': 'Sharing Knowledge'},
+          {'id': 3, 'name': 'Pembinaan'},
+        ];
+      }
+      if (areas.isEmpty && companies.isEmpty) return null;
+      return {'areas': areas, 'companies': companies, 'themes': themes};
+    } catch (e) {
+      debugPrint('[ApiService] MBS Coaching master unavailable: $e');
+      return null;
+    }
+  }
+
+  Future<List<Map<String, dynamic>>?> getCoachingBenchmarks(String area) async {
+    if (area.trim().isEmpty) return const [];
+    try {
+      final response = await _mbsGetWithSession('/Api/GetBenchmarks',
+          queryParameters: {'areaUtama': area.trim()});
+      final decoded = _decodeMbsJson(response.data);
+      if (response.statusCode != 200 || decoded is! List) return null;
+      return decoded
+          .whereType<Map>()
+          .map((raw) {
+            final item = Map<String, dynamic>.from(raw);
+            return <String, dynamic>{
+              'id': int.tryParse(item['id']?.toString() ?? '') ?? 0,
+              'name': item['namaBenchmark']?.toString().trim() ?? '',
+            };
+          })
+          .where((item) => item['id'] != 0 && item['name']!.isNotEmpty)
+          .toList();
+    } catch (e) {
+      debugPrint('[ApiService] MBS Coaching benchmark unavailable: $e');
+      return null;
+    }
+  }
+
+  Future<List<Map<String, dynamic>>?> searchCoachingEmployees(
+      String query) async {
+    if (query.trim().length < 2) return const [];
+    try {
+      final response = await _mbsGetWithSession('/Api/SearchEmployee',
+          queryParameters: {'query': query.trim(), 'lintasPerusahaan': true});
+      final decoded = _decodeMbsJson(response.data);
+      if (response.statusCode != 200 || decoded is! List) return null;
+      return decoded
+          .whereType<Map>()
+          .map((raw) {
+            final item = Map<String, dynamic>.from(raw);
+            return <String, dynamic>{
+              'id': item['id'] ?? item['Id'] ?? item['nik'],
+              'no_nik':
+                  item['nik']?.toString() ?? item['noNik']?.toString() ?? '',
+              'nama_lengkap':
+                  item['nama']?.toString() ?? item['name']?.toString() ?? '',
+              'posisi': item['jabatan']?.toString() ?? '',
+              'departemen': item['departemen']?.toString() ?? '',
+              'perusahaan': item['perusahaan']?.toString() ?? '',
+            };
+          })
+          .where((item) => item['nama_lengkap']!.isNotEmpty)
+          .toList();
+    } catch (e) {
+      debugPrint('[ApiService] MBS Coaching participant unavailable: $e');
+      return null;
+    }
+  }
+
+  /// Persis alur halaman BBS web: Detail Lokasi hanya berasal dari
+  /// `/Api/GetBenchmarks?areaUtama=...`. Nilai `null` berarti permintaan
+  /// gagal; daftar kosong berarti MBS memang belum mempunyai benchmark untuk
+  /// area tersebut. Keduanya sengaja dibedakan agar UI tidak menyamarkan
+  /// kegagalan koneksi sebagai master kosong.
+  Future<List<String>?> getBbsBenchmarks(String area) async {
+    if (area.trim().isEmpty) return const [];
+    try {
+      final response = await _mbsGetWithSession(
+        '/Api/GetBenchmarks',
+        queryParameters: {'areaUtama': area.trim()},
+      );
+      final decoded = _decodeMbsJson(response.data);
+      if (response.statusCode != 200 || decoded is! List) return null;
+      return decoded
+          .whereType<Map>()
+          .map((item) => item['namaBenchmark']?.toString().trim() ?? '')
+          .where((item) => item.isNotEmpty)
+          .toSet()
+          .toList()
+        ..sort();
+    } catch (e) {
+      debugPrint('[ApiService] BBS benchmark unavailable: $e');
+      return null;
+    }
+  }
+
+  /// Endpoint master yang sama dipakai halaman web BBS. Benchmark baru harus
+  /// disimpan ke MBS, bukan hanya ditambahkan sementara di perangkat.
+  Future<String?> createBbsBenchmark({
+    required String areaUtama,
+    required String namaBenchmark,
+  }) async {
+    await _ensureMbsWebSession();
+    final area = areaUtama.trim();
+    final name = namaBenchmark.trim();
+    if (area.isEmpty || name.isEmpty) return null;
+    try {
+      final response = await _mbsDio().post<String>(
+        '/Api/AddBenchmark',
+        data: {
+          'areaUtama': area,
+          'namaBenchmark': name,
+        },
+        options: Options(
+          contentType: Headers.formUrlEncodedContentType,
+          headers: {'X-Requested-With': 'XMLHttpRequest'},
+        ),
+      );
+      final decoded = _decodeMbsJson(response.data);
+      if (response.statusCode != 200 && response.statusCode != 201) return null;
+      if (decoded is Map) {
+        final data = decoded['data'];
+        if (data is Map && data['namaBenchmark'] != null) {
+          return data['namaBenchmark'].toString();
+        }
+      }
+      return name;
+    } catch (e) {
+      debugPrint('[ApiService] BBS benchmark create failed: $e');
+      return null;
+    }
+  }
+
+  Future<Map<String, dynamic>?> getSafetyTalk(int id) async {
+    await _ensureMbsWebSession();
+    try {
+      final res = await _mbsDio().get<String>('/SafetyTalk/GetData/$id');
+      if (res.statusCode != 200 || res.data == null) return null;
+      final decoded = _decodeMbsJson(res.data);
+      return decoded is Map ? Map<String, dynamic>.from(decoded) : null;
+    } catch (e) {
+      debugPrint('[ApiService] Safety Talk detail unavailable: $e');
+      return null;
+    }
+  }
+
+  Future<bool> submitSafetyTalk(Map<String, dynamic> data) async {
+    await _ensureMbsWebSession();
+    for (var attempt = 0; attempt < 2; attempt++) {
+      try {
+        final client = _mbsDio();
+        final page = await client.get<String>('/SafetyTalk/Index');
+        final html = page.data ?? '';
+        final csrf = _csrfToken(html);
+        if (page.statusCode != 200 || csrf.isEmpty || _isMbsLoginPage(html)) {
+          if (attempt == 0) {
+            await _renewMbsWebSession();
+            continue;
+          }
+          return false;
+        }
+        final body = <String, dynamic>{
+          'id': data['id']?.toString() ?? '',
+          'tanggal': data['tanggal'],
+          'waktuStr': data['waktuStr'],
+          'area': data['area'],
+          'detilLokasi': data['detilLokasi'],
+          'lokasi': data['lokasi'],
+          'judul': data['judul'],
+          'keterangan': data['keterangan'],
+          '__RequestVerificationToken': csrf,
+        };
+        final selfPath = data['fotoDiri']?.toString();
+        final eventPath = data['fotoKegiatan']?.toString();
+        if (selfPath != null && selfPath.isNotEmpty) {
+          body['fotoDiri'] = await MultipartFile.fromFile(selfPath);
+        }
+        if (eventPath != null && eventPath.isNotEmpty) {
+          body['fotoKegiatan'] = await MultipartFile.fromFile(eventPath);
+        }
+        final res = await client.post<String>('/SafetyTalk/Submit',
+            data: FormData.fromMap(body),
+            options: Options(headers: {'X-Requested-With': 'XMLHttpRequest'}));
+        if (res.statusCode == 200 || res.statusCode == 201) return true;
+        if (attempt == 0 && _isMbsLoginPage(res.data ?? '')) {
+          await _renewMbsWebSession();
+          continue;
+        }
+        return false;
+      } catch (e) {
+        debugPrint('[ApiService] Safety Talk submit failed: $e');
+        if (attempt == 0) {
+          await _renewMbsWebSession();
+          continue;
+        }
+      }
+    }
+    return false;
+  }
+
+  Future<bool> deleteSafetyTalk(int id) async {
+    await _ensureMbsWebSession();
+    try {
+      final client = _mbsDio();
+      final page = await client.get<String>('/SafetyTalk/Index');
+      final csrf = _csrfToken(page.data ?? '');
+      if (csrf.isEmpty) return false;
+      final res = await client.post<String>('/SafetyTalk/Delete/$id',
+          data: {
+            '__RequestVerificationToken': csrf,
+          },
+          options: Options(contentType: Headers.formUrlEncodedContentType));
+      return res.statusCode == 200 ||
+          res.statusCode == 302 ||
+          res.statusCode == 303;
+    } catch (e) {
+      debugPrint('[ApiService] Safety Talk delete failed: $e');
+      return false;
+    }
+  }
+
+  /// Master BBS wajib berasal dari MBS agar kategori dan butir perilaku di
+  /// mobile selalu sama dengan halaman web.
+  Future<List<Map<String, dynamic>>> getBbsCategories(String type) async {
+    try {
+      final res = await _mbsGetWithSession('/Bbs/GetCategories',
+          queryParameters: {'type': type});
+      final raw = _decodeMbsJson(res.data);
+      return raw is List
+          ? raw
+              .whereType<Map>()
+              .map((e) => Map<String, dynamic>.from(e))
+              .toList()
+          : const [];
+    } catch (e) {
+      debugPrint('[ApiService] BBS category unavailable: $e');
+      return const [];
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getBbsCompanies() async {
+    try {
+      final page = await _mbsGetWithSession('/Bbs/Index');
+      final raw = RegExp(r'var globalCompaniesList = (\[.*?\]);', dotAll: true)
+          .firstMatch(page.data ?? '')
+          ?.group(1);
+      if (raw == null) return const [];
+      final decoded = _decodeMbsJson(raw);
+      return decoded is List
+          ? decoded
+              .whereType<Map>()
+              .map((row) => Map<String, dynamic>.from(row))
+              .toList()
+          : const [];
+    } catch (e) {
+      debugPrint('[ApiService] BBS company unavailable: $e');
+      return const [];
+    }
+  }
+
+  Future<List<String>> getBbsAreas() async {
+    try {
+      final page = await _mbsGetWithSession('/Bbs/Index');
+      final html = page.data ?? '';
+      final serverRaw = RegExp(r'var serverAreas = (\[.*?\]);', dotAll: true)
+          .firstMatch(html)
+          ?.group(1);
+      final standardRaw =
+          RegExp(r'var defaultStandardAreas = (\[.*?\]);', dotAll: true)
+              .firstMatch(html)
+              ?.group(1);
+      final names = <String>{};
+      for (final raw in [serverRaw, standardRaw]) {
+        final decoded = raw == null ? null : _decodeMbsJson(raw);
+        if (decoded is List) {
+          for (final row in decoded) {
+            final name = row is Map
+                ? (row['namaArea'] ??
+                        row['NamaArea'] ??
+                        row['name'] ??
+                        row['Name'])
+                    ?.toString()
+                    .trim()
+                : row?.toString().trim();
+            if (name != null && name.isNotEmpty) {
+              names.add(name);
+            }
+          }
+        }
+      }
+      return names.toList()..sort();
+    } catch (e) {
+      debugPrint('[ApiService] BBS area unavailable: $e');
+      return const [];
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getBbsTopics(int categoryId) async {
+    try {
+      final res = await _mbsGetWithSession('/Bbs/GetTopics',
+          queryParameters: {'categoryId': categoryId});
+      final raw = _decodeMbsJson(res.data);
+      return raw is List
+          ? raw
+              .whereType<Map>()
+              .map((item) => Map<String, dynamic>.from(item))
+              .toList()
+          : const [];
+    } catch (e) {
+      debugPrint('[ApiService] BBS topic unavailable: $e');
+      return const [];
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getBbsBehaviors(int categoryId,
+      {int? topicId}) async {
+    try {
+      final res = await _mbsGetWithSession('/Bbs/GetBehaviors',
+          queryParameters: {
+            'categoryId': categoryId,
+            if (topicId != null) 'topicId': topicId
+          });
+      final raw = _decodeMbsJson(res.data);
+      return raw is List
+          ? raw
+              .whereType<Map>()
+              .map((e) => Map<String, dynamic>.from(e))
+              .toList()
+          : const [];
+    } catch (e) {
+      debugPrint('[ApiService] BBS behavior unavailable: $e');
+      return const [];
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> searchBbsWorkers(String query,
+      {int? companyId}) async {
+    if (query.trim().length < 2) return const [];
+    try {
+      final res =
+          await _mbsGetWithSession('/Bbs/SearchWorker', queryParameters: {
+        'q': query.trim(),
+        if (companyId != null) 'companyId': companyId,
+      });
+      final raw = _decodeMbsJson(res.data);
+      return raw is List
+          ? raw
+              .whereType<Map>()
+              .map((item) => Map<String, dynamic>.from(item))
+              .toList()
+          : const [];
+    } catch (e) {
+      debugPrint('[ApiService] BBS worker search unavailable: $e');
+      return const [];
+    }
+  }
+
+  Future<bool> submitBbs(Map<String, dynamic> values,
+      {String? photoPath}) async {
+    await _ensureMbsWebSession();
+    try {
+      final client = _mbsDio();
+      final page = await client.get<String>('/Bbs/Index');
+      final csrf = _csrfToken(page.data ?? '');
+      if (csrf.isEmpty || _isMbsLoginPage(page.data ?? '')) return false;
+      final data = <String, dynamic>{
+        ...values,
+        '__RequestVerificationToken': csrf
+      };
+      final form = FormData();
+      for (final entry in data.entries) {
+        final value = entry.value;
+        if (value is Iterable) {
+          for (final item in value) {
+            form.fields.add(MapEntry(entry.key, item.toString()));
+          }
+        } else {
+          form.fields.add(MapEntry(entry.key, value.toString()));
+        }
+      }
+      if (photoPath != null && photoPath.isNotEmpty) {
+        form.files
+            .add(MapEntry('foto', await MultipartFile.fromFile(photoPath)));
+      }
+      final result = await client.post<String>('/Bbs/Create', data: form);
+      return result.statusCode == 200 ||
+          result.statusCode == 302 ||
+          result.statusCode == 303;
+    } catch (e) {
+      debugPrint('[ApiService] BBS submit failed: $e');
+      return false;
+    }
+  }
+
   dynamic errorHandler(DioException err) {
     if (err.type == DioExceptionType.connectionTimeout ||
         err.type == DioExceptionType.sendTimeout ||
@@ -1475,7 +2589,8 @@ class ApiService {
         };
       }
       try {
-        var res = Map<String, dynamic>.from(jsonDecode(err.response.toString()));
+        var res =
+            Map<String, dynamic>.from(jsonDecode(err.response.toString()));
         if ((res['message'] ?? '') != '') {
           return <String, dynamic>{'message': res['message']};
         }

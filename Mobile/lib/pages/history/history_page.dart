@@ -13,6 +13,7 @@ import '../../widgets/sap_module_ui.dart';
 import '../../widgets/snackbar_msg.dart';
 import '../../widgets/top_bar.dart';
 import 'history_detail_page.dart';
+import '../observation/observation_form_page.dart';
 
 class HistoryPage extends StatefulWidget {
   const HistoryPage(this.module, this.history, {this.lastId, super.key});
@@ -40,13 +41,17 @@ class _HistoryPageState extends State<HistoryPage> {
     return _rawData.where((item) {
       if (item is! Map) return false;
       final title = '${item['title'] ?? ''}'.toLowerCase();
-      final remark = '${item['remark'] ?? item['detil_temuan'] ?? ''}'.toLowerCase();
-      final location = '${item['location_name'] ?? item['location_detail'] ?? item['lokasi'] ?? ''}'.toLowerCase();
+      final remark =
+          '${item['remark'] ?? item['detil_temuan'] ?? ''}'.toLowerCase();
+      final location =
+          '${item['location_name'] ?? item['location_detail'] ?? item['lokasi'] ?? ''}'
+              .toLowerCase();
       final area = '${item['area_name'] ?? item['area'] ?? ''}'.toLowerCase();
       final pja = '${item['pja_name'] ?? item['pja'] ?? ''}'.toLowerCase();
       final pic = '${item['pic_name'] ?? item['pic'] ?? ''}'.toLowerCase();
       final code = '${item['code'] ?? ''}'.toLowerCase();
-      final company = '${item['company'] ?? item['perusahaan'] ?? ''}'.toLowerCase();
+      final company =
+          '${item['company'] ?? item['perusahaan'] ?? ''}'.toLowerCase();
       return title.contains(q) ||
           remark.contains(q) ||
           location.contains(q) ||
@@ -64,6 +69,7 @@ class _HistoryPageState extends State<HistoryPage> {
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _getData();
+      _fetchAndRefresh();
       if (widget.lastId == null) {
         Future.delayed(const Duration(seconds: 2), () => _getData());
         Future.delayed(const Duration(seconds: 4), () => _getData());
@@ -80,7 +86,9 @@ class _HistoryPageState extends State<HistoryPage> {
 
   Future<void> _fetchAndRefresh() async {
     final isOnline = OfflineSyncService.instance.state.value.isOnline;
-    if (isOnline) {
+    // USB/ADB development uses localhost and may not register as a normal
+    // Wi-Fi/mobile connection, but the backend is still reachable.
+    if (isOnline || _api.isLocalDev) {
       final userNik = _profile?.noNik ?? '';
       final profileId = _profile?.id ?? 0;
 
@@ -96,8 +104,10 @@ class _HistoryPageState extends State<HistoryPage> {
                   final row = <String, dynamic>{
                     'id': id,
                     'code': item['code'] ?? 'HZ-$id',
-                    'title': item['title'] ?? item['remark'] ?? 'Laporan Bahaya',
-                    'location_detail': item['location_detail'] ?? item['lokasi'] ?? '',
+                    'title':
+                        item['title'] ?? item['remark'] ?? 'Laporan Bahaya',
+                    'location_detail':
+                        item['location_detail'] ?? item['lokasi'] ?? '',
                     'date': item['date'] ?? '',
                     'time': item['time'] ?? '',
                     'remark': item['remark'] ?? '',
@@ -105,11 +115,17 @@ class _HistoryPageState extends State<HistoryPage> {
                     'status': item['status'] is int ? item['status'] : 0,
                     'repair': item['repair'] is int ? item['repair'] : 0,
                     'repair_remark': item['repair_remark'] ?? item['perbaikan'],
-                    'repair_image': item['repair_image'] ?? item['foto_perbaikan'],
-                    'pja_id': (item['nik_pja'] == userNik) ? profileId : (item['pja_id'] ?? 0),
-                    'employee_id': (item['nik'] == userNik) ? profileId : (item['employee_id'] ?? profileId),
+                    'repair_image':
+                        item['repair_image'] ?? item['foto_perbaikan'],
+                    'pja_id': (item['nik_pja'] == userNik)
+                        ? profileId
+                        : (item['pja_id'] ?? 0),
+                    'employee_id': (item['nik'] == userNik)
+                        ? profileId
+                        : (item['employee_id'] ?? profileId),
                     'sync_id': id,
-                    'created_at': item['created_at'] ?? DateTime.now().toString(),
+                    'created_at':
+                        item['created_at'] ?? DateTime.now().toString(),
                   };
                   final existing = await _db.get('hazard_trans', id);
                   if (existing == null) {
@@ -122,7 +138,66 @@ class _HistoryPageState extends State<HistoryPage> {
             }
           }
         } catch (_) {}
-      } else if (widget.history == History.action || widget.history == History.monitoring) {
+      } else if (widget.history == History.summary &&
+          widget.module == Module.observation) {
+        try {
+          final res = await _api.dio.get('/tran/observation?limit=100');
+          if (res.data is Map && res.data['data'] is List) {
+            for (final raw in res.data['data'] as List) {
+              if (raw is! Map) continue;
+              final item = Map<String, dynamic>.from(raw);
+              final serverId = int.tryParse(item['id'].toString());
+              if (serverId == null) continue;
+              // Keep server history separate from locally generated IDs.
+              final localId = -serverId;
+              final row = <String, dynamic>{
+                'id': localId,
+                'code': 'OBS-$serverId',
+                'title': item['kegiatanYangDiamati'] ?? 'Observasi Lapangan',
+                'date': item['date']?.toString().split('T').first ?? '',
+                'area': item['area'] ?? '',
+                'lokasi': item['lokasi'] ?? '',
+                'location_detail': item['detilLokasi'] ?? '',
+                'company_id': item['perusahaanId'],
+                'company_name': item['perusahaanYangDiamati'] ?? '',
+                'dept_name': item['departemenYangDiamati'] ?? '',
+                'doc_name': item['dokumenPendukung'] ?? '',
+                'risk_name': item['resikoKritis'] ?? '',
+                'risk_level': item['tingkatResiko'] ?? '',
+                'remark': item['keterangan'] ?? '',
+                'perihal': item['perihalYangDiamati'] ?? '',
+                'hasil': item['hasilObservasi'] ?? '',
+                'photo_url': item['fotoUrl'] ?? '',
+                'employee_id': profileId,
+                'sync_id': serverId,
+                'created_at': item['createdAt'] ?? DateTime.now().toString(),
+              };
+              final existing = await _db.get('observation_trans', localId);
+              if (existing == null) {
+                await _db.insert('observation_trans', row);
+              } else {
+                await _db.update('observation_trans', row, localId);
+              }
+              final found = await _db.rawQuery(
+                  'select id from observation_details where tran_id=? and ref_id=?',
+                  [localId, serverId]);
+              if (found.isEmpty) {
+                await _db.insert('observation_details', {
+                  'name': item['perihalYangDiamati'] ?? '',
+                  'point': item['perihalYangDiamati'] ?? '',
+                  'type': item['hasilObservasi'] ?? '',
+                  'remark': item['keterangan'] ?? '',
+                  'image': item['fotoUrl'] ?? '',
+                  'tran_id': localId,
+                  'ref_id': serverId,
+                  'sync_id': serverId,
+                });
+              }
+            }
+          }
+        } catch (_) {}
+      } else if (widget.history == History.action ||
+          widget.history == History.monitoring) {
         try {
           final actionRes = await _api.getAction(widget.module.name);
           await actionRes.fold((_) async {}, (response) async {
@@ -136,24 +211,42 @@ class _HistoryPageState extends State<HistoryPage> {
                     final row = <String, dynamic>{
                       'id': id,
                       'code': item['code'] ?? 'AP-$id',
-                      'title': item['title'] ?? item['detilTemuan'] ?? item['kategoriTemuan'] ?? 'Action',
-                      'location_detail': item['location_detail'] ?? item['detilLokasi'] ?? item['lokasi'] ?? '',
+                      'title': item['title'] ??
+                          item['detilTemuan'] ??
+                          item['kategoriTemuan'] ??
+                          'Action',
+                      'location_detail': item['location_detail'] ??
+                          item['detilLokasi'] ??
+                          item['lokasi'] ??
+                          '',
                       'date': item['date'] ?? item['tanggal'] ?? '',
                       'time': item['time'] ?? item['waktu'] ?? '',
                       'remark': item['remark'] ?? item['detilTemuan'] ?? '',
                       'image': item['image'] ?? item['fotoTemuan'],
                       'status': item['status'] is int ? item['status'] : 0,
-                      'pja_id': (item['nik_pja'] == userNik || item['nikPja'] == userNik) ? profileId : (item['pja_id'] ?? 0),
-                      'pic_id': (item['nik_pic'] == userNik || item['nikPic'] == userNik) ? profileId : (item['pic_id'] ?? 0),
-                      'employee_id': (item['nik'] == userNik) ? profileId : (item['employee_id'] ?? 0),
+                      'pja_id': (item['nik_pja'] == userNik ||
+                              item['nikPja'] == userNik)
+                          ? profileId
+                          : (item['pja_id'] ?? 0),
+                      'pic_id': (item['nik_pic'] == userNik ||
+                              item['nikPic'] == userNik)
+                          ? profileId
+                          : (item['pic_id'] ?? 0),
+                      'employee_id': (item['nik'] == userNik)
+                          ? profileId
+                          : (item['employee_id'] ?? 0),
                       'plan': item['plan'] ?? item['rencanaPerbaikan'],
-                      'plan_date': item['plan_date'] ?? item['tanggalRencanaPerbaikan'],
+                      'plan_date':
+                          item['plan_date'] ?? item['tanggalRencanaPerbaikan'],
                       'action': item['action'] ?? item['perbaikan'],
-                      'action_date': item['action_date'] ?? item['tanggalPerbaikan'],
-                      'action_image': item['action_image'] ?? item['fotoPerbaikan'],
+                      'action_date':
+                          item['action_date'] ?? item['tanggalPerbaikan'],
+                      'action_image':
+                          item['action_image'] ?? item['fotoPerbaikan'],
                       'table': widget.module.name,
                       'category': widget.module.name,
-                      'created_at': item['created_at'] ?? DateTime.now().toString(),
+                      'created_at':
+                          item['created_at'] ?? DateTime.now().toString(),
                       'updated_at': DateTime.now().toString(),
                     };
                     final existing = await _db.get('action_plans', id);
@@ -320,6 +413,19 @@ class _HistoryPageState extends State<HistoryPage> {
     }
   }
 
+  Future<void> _editObservation(Map<String, dynamic> row) async {
+    if (!mounted) return;
+    final editData = Map<String, dynamic>.from(row);
+    // Navigation is intentionally immediate; an absent local detail cache
+    // must never prevent opening the edit form for a server report.
+    if (!mounted) return;
+    await Navigator.push(
+        context,
+        MaterialPageRoute(
+            builder: (_) => ObservationFormPage(editData: editData)));
+    _fetchAndRefresh();
+  }
+
   Future<dynamic> _showBottomSheet(int index) {
     var sync = (_rawData[index]['sync_id'] == null) ? false : true;
     return showModalBottomSheet(
@@ -327,149 +433,172 @@ class _HistoryPageState extends State<HistoryPage> {
       useSafeArea: true,
       showDragHandle: true,
       constraints: const BoxConstraints(
-        maxHeight: 350,
+        maxHeight: 560,
       ),
       builder: (_) {
-        return Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          child: Column(
-            children: [
-              ListTile(
-                title: const Text(
-                  'Tampilkan',
-                  style: TextStyle(
-                    color: Colors.black87,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                trailing: Icon(
-                  Icons.remove_red_eye,
-                  color: Colors.indigo.shade400,
-                ),
-                contentPadding: const EdgeInsets.fromLTRB(0, 10, 0, 10),
-                shape:
-                    Border(bottom: BorderSide(color: Colors.indigo.shade100)),
-                onTap: () {
-                  Navigator.pop(context);
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => HistoryDetailPage(
-                        widget.module,
-                        widget.history,
-                        _rawData[index] as Map<String, dynamic>,
-                      ),
+        return SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Column(
+              children: [
+                ListTile(
+                  title: const Text(
+                    'Tampilkan',
+                    style: TextStyle(
+                      color: Colors.black87,
+                      fontWeight: FontWeight.bold,
                     ),
-                  );
-                },
-              ),
-              ListTile(
-                title: Text(
-                  'Sinkron',
-                  style: TextStyle(
-                    color: (sync) ? Colors.black45 : Colors.black87,
-                    fontWeight: FontWeight.bold,
                   ),
-                ),
-                trailing: Icon(
-                  Icons.cloud_sync,
-                  color: (sync) ? Colors.indigo.shade200 : Colors.indigo,
-                ),
-                contentPadding: const EdgeInsets.fromLTRB(0, 10, 0, 10),
-                shape:
-                    Border(bottom: BorderSide(color: Colors.indigo.shade100)),
-                onTap: (sync)
-                    ? null
-                    : () {
-                        switch (widget.module) {
-                          case Module.inspection:
-                          case Module.inspectionDaily:
-                          case Module.inspectionWeekly:
-                          case Module.simama:
-                            syncTran(_db, _api, 'inspection',
-                                    _rawData[index]['id'] as int)
-                                .then((val) => _feedBack(val));
-                            break;
-                          default:
-                            syncTran(_db, _api, widget.module.name,
-                                    _rawData[index]['id'] as int)
-                                .then((val) => _feedBack(val));
-                            break;
-                        }
-                        Navigator.pop(context);
-                      },
-              ),
-              ListTile(
-                title: Text(
-                  'Hapus Data',
-                  style: TextStyle(
-                    color: (sync) ? Colors.black45 : Colors.black87,
-                    fontWeight: FontWeight.bold,
+                  trailing: Icon(
+                    Icons.remove_red_eye,
+                    color: Colors.indigo.shade400,
                   ),
+                  contentPadding: const EdgeInsets.fromLTRB(0, 10, 0, 10),
+                  shape:
+                      Border(bottom: BorderSide(color: Colors.indigo.shade100)),
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => HistoryDetailPage(
+                          widget.module,
+                          widget.history,
+                          _rawData[index] as Map<String, dynamic>,
+                        ),
+                      ),
+                    );
+                  },
                 ),
-                trailing: Icon(
-                  Icons.delete_forever,
-                  color: (sync) ? Colors.indigo.shade200 : Colors.indigo,
+                ListTile(
+                  title: Text(
+                    'Sinkron',
+                    style: TextStyle(
+                      color: (sync) ? Colors.black45 : Colors.black87,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  trailing: Icon(
+                    Icons.cloud_sync,
+                    color: (sync) ? Colors.indigo.shade200 : Colors.indigo,
+                  ),
+                  contentPadding: const EdgeInsets.fromLTRB(0, 10, 0, 10),
+                  shape:
+                      Border(bottom: BorderSide(color: Colors.indigo.shade100)),
+                  onTap: (sync)
+                      ? null
+                      : () {
+                          switch (widget.module) {
+                            case Module.inspection:
+                            case Module.inspectionDaily:
+                            case Module.inspectionWeekly:
+                            case Module.simama:
+                              syncTran(_db, _api, 'inspection',
+                                      _rawData[index]['id'] as int)
+                                  .then((val) => _feedBack(val));
+                              break;
+                            default:
+                              syncTran(_db, _api, widget.module.name,
+                                      _rawData[index]['id'] as int)
+                                  .then((val) => _feedBack(val));
+                              break;
+                          }
+                          Navigator.pop(context);
+                        },
                 ),
-                contentPadding: const EdgeInsets.fromLTRB(0, 10, 0, 10),
-                onTap: (sync)
-                    ? null
-                    : () {
-                        Navigator.pop(context);
-                        showDialog(
-                          context: context,
-                          builder: (BuildContext context) {
-                            return AlertDialog(
-                              title: const Text('Delete Data'),
-                              content: const Text(
-                                'Apakah anda akan menghapus data?',
+                if (widget.module == Module.observation && sync)
+                  ListTile(
+                    title: const Text('Edit Observasi',
+                        style: TextStyle(fontWeight: FontWeight.bold)),
+                    trailing: const Icon(Icons.edit_outlined),
+                    contentPadding: const EdgeInsets.fromLTRB(0, 10, 0, 10),
+                    shape: Border(
+                        bottom: BorderSide(color: Colors.indigo.shade100)),
+                    onTap: () {
+                      Navigator.pop(context);
+                      _editObservation(_rawData[index] as Map<String, dynamic>);
+                    },
+                  ),
+                ListTile(
+                  title: Text(
+                    'Hapus Data',
+                    style: TextStyle(
+                      color: Colors.black87,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  trailing: Icon(
+                    Icons.delete_forever,
+                    color: Colors.indigo,
+                  ),
+                  contentPadding: const EdgeInsets.fromLTRB(0, 10, 0, 10),
+                  onTap: () {
+                    Navigator.pop(context);
+                    showDialog(
+                      context: context,
+                      builder: (BuildContext context) {
+                        return AlertDialog(
+                          title: const Text('Delete Data'),
+                          content: const Text(
+                            'Apakah anda akan menghapus data?',
+                          ),
+                          actions: [
+                            TextButton(
+                              style: TextButton.styleFrom(
+                                textStyle:
+                                    Theme.of(context).textTheme.labelLarge,
                               ),
-                              actions: [
-                                TextButton(
-                                  style: TextButton.styleFrom(
-                                    textStyle:
-                                        Theme.of(context).textTheme.labelLarge,
-                                  ),
-                                  child: const Text('Cancel'),
-                                  onPressed: () {
-                                    Navigator.pop(context);
-                                  },
-                                ),
-                                TextButton(
-                                  style: TextButton.styleFrom(
-                                    textStyle:
-                                        Theme.of(context).textTheme.labelLarge,
-                                  ),
-                                  child: const Text('Ok'),
-                                  onPressed: () {
-                                    Navigator.pop(context);
-                                    _db
-                                        .delete(_table,
-                                            _rawData[index]['id'] as int)
-                                        .then((val) {
-                                      if (!mounted) return;
-                                      if (val > 0) {
-                                        _db.execute(
-                                            '''delete from ${_table.replaceAll('_trans', '')}_details 
+                              child: const Text('Cancel'),
+                              onPressed: () {
+                                Navigator.pop(context);
+                              },
+                            ),
+                            TextButton(
+                              style: TextButton.styleFrom(
+                                textStyle:
+                                    Theme.of(context).textTheme.labelLarge,
+                              ),
+                              child: const Text('Ok'),
+                              onPressed: () {
+                                Navigator.pop(context);
+                                () async {
+                                  var canDelete = true;
+                                  if (widget.module == Module.observation &&
+                                      sync) {
+                                    canDelete = await _api.deleteObservation(
+                                        _rawData[index]['sync_id'] as int);
+                                  }
+                                  if (!canDelete) {
+                                    if (mounted)
+                                      SnackBarMsg.danger(this.context,
+                                          'Gagal menghapus laporan server.');
+                                    return;
+                                  }
+                                  final val = await _db.delete(
+                                      _table, _rawData[index]['id'] as int);
+                                  if (!mounted) return;
+                                  if (val > 0) {
+                                    _db.execute(
+                                        '''delete from ${_table.replaceAll('_trans', '')}_details
                                             where tran_id=${_rawData[index]['id'] as int}''');
-                                        setState(
-                                            () => _rawData.removeAt(index));
-                                        SnackBarMsg.success(this.context,
-                                            'Data berhasil dihapus!');
-                                      } else {
-                                        SnackBarMsg.danger(this.context,
-                                            'Data gagal dihapus!');
-                                      }
-                                    });
-                                  },
-                                ),
-                              ],
-                            );
-                          },
+                                    setState(() => _rawData.removeAt(index));
+                                    SnackBarMsg.success(
+                                        this.context, 'Data berhasil dihapus!');
+                                  } else {
+                                    SnackBarMsg.danger(
+                                        this.context, 'Data gagal dihapus!');
+                                  }
+                                }();
+                              },
+                            ),
+                          ],
                         );
                       },
-              ),
-            ],
+                    );
+                  },
+                ),
+              ],
+            ),
           ),
         );
       },
@@ -503,30 +632,37 @@ class _HistoryPageState extends State<HistoryPage> {
                 ),
               ),
               const SizedBox(height: 14),
-              Container(
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: const Color(0xFFE2E8F0)),
-                ),
-                child: TextField(
-                  onChanged: (val) => setState(() => _searchQuery = val),
-                  decoration: InputDecoration(
-                    hintText: 'Cari laporan, lokasi, PJA, atau PIC...',
-                    hintStyle: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
-                    prefixIcon: const Icon(Icons.search_rounded, color: Color(0xFF64748B), size: 20),
-                    suffixIcon: _searchQuery.isNotEmpty
-                        ? IconButton(
-                            icon: const Icon(Icons.clear_rounded, size: 18),
-                            onPressed: () => setState(() => _searchQuery = ''),
-                          )
-                        : null,
-                    border: InputBorder.none,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              if (widget.module != Module.coaching &&
+                  widget.module != Module.observation) ...[
+                Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                  ),
+                  child: TextField(
+                    onChanged: (val) => setState(() => _searchQuery = val),
+                    decoration: InputDecoration(
+                      hintText: 'Cari laporan, lokasi, PJA, atau PIC...',
+                      hintStyle: const TextStyle(
+                          fontSize: 13, color: Color(0xFF94A3B8)),
+                      prefixIcon: const Icon(Icons.search_rounded,
+                          color: Color(0xFF64748B), size: 20),
+                      suffixIcon: _searchQuery.isNotEmpty
+                          ? IconButton(
+                              icon: const Icon(Icons.clear_rounded, size: 18),
+                              onPressed: () =>
+                                  setState(() => _searchQuery = ''),
+                            )
+                          : null,
+                      border: InputBorder.none,
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 12),
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 14),
+                const SizedBox(height: 14),
+              ],
               Text(
                 _historyTitle(),
                 style: const TextStyle(
@@ -618,7 +754,8 @@ class _HistoryRecordCard extends StatelessWidget {
     final title = titleCase('${row['title'] ?? pageTitle(module)}');
     final remark = titleCase('${row['remark'] ?? row['detil_temuan'] ?? '-'}');
     final area = titleCase('${row['area_name'] ?? row['area'] ?? '-'}');
-    final location = titleCase('${row['location_name'] ?? row['location_detail'] ?? row['lokasi'] ?? '-'}');
+    final location = titleCase(
+        '${row['location_name'] ?? row['location_detail'] ?? row['lokasi'] ?? '-'}');
     final pjaName = row['pja_name'] ?? row['pja'];
     final picName = row['pic_name'] ?? row['pic'];
     final timeText = [
@@ -707,10 +844,16 @@ class _HistoryRecordCard extends StatelessWidget {
           SapInfoLine(icon: Icons.notes_rounded, text: 'Note: $remark'),
           SapInfoLine(icon: Icons.map_rounded, text: 'Area: $area'),
           SapInfoLine(icon: Icons.place_rounded, text: 'Lokasi: $location'),
-          if (pjaName != null && pjaName.toString().isNotEmpty && pjaName != '-')
-            SapInfoLine(icon: Icons.person_outline_rounded, text: 'PJA: $pjaName'),
-          if (picName != null && picName.toString().isNotEmpty && picName != '-')
-            SapInfoLine(icon: Icons.assignment_ind_outlined, text: 'PIC: $picName'),
+          if (pjaName != null &&
+              pjaName.toString().isNotEmpty &&
+              pjaName != '-')
+            SapInfoLine(
+                icon: Icons.person_outline_rounded, text: 'PJA: $pjaName'),
+          if (picName != null &&
+              picName.toString().isNotEmpty &&
+              picName != '-')
+            SapInfoLine(
+                icon: Icons.assignment_ind_outlined, text: 'PIC: $picName'),
         ],
       ),
     );

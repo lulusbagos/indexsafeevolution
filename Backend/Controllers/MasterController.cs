@@ -267,6 +267,66 @@ namespace Indexsafe.Api.Controllers
         }
 
         /// <summary>
+        /// Mobile Observation dropdown source. Values are read from the shared
+        /// MBS tables/views; no sample enum values are returned here.
+        /// </summary>
+        [HttpGet("observation/options")]
+        public async Task<IActionResult> GetObservationOptions([FromQuery] int? perusahaanId)
+        {
+            var currentCompanyId = GetCurrentCompanyId();
+            var allowedIds = await _companyHierarchyService.GetAccessibleCompanyIdsAsync(currentCompanyId);
+            var companyId = perusahaanId.HasValue && allowedIds.Contains(perusahaanId.Value)
+                ? perusahaanId.Value : currentCompanyId;
+
+            var companies = await _context.Perusahaans.AsNoTracking()
+                .Where(p => allowedIds.Contains(p.PerusahaanId) && p.StatusAktif)
+                .OrderBy(p => p.NamaPerusahaan)
+                .Select(p => new { id = p.PerusahaanId, name = p.NamaPerusahaan })
+                .ToListAsync();
+            var departments = await _companyHierarchyService.GetDepartmentsByCompanyAsync(companyId);
+
+            var benchmarkQuery = _context.Benchmarks.AsNoTracking();
+            if (await benchmarkQuery.AnyAsync(b => b.PerusahaanId == companyId))
+                benchmarkQuery = benchmarkQuery.Where(b => b.PerusahaanId == companyId);
+            else
+                benchmarkQuery = benchmarkQuery.Where(b => b.PerusahaanId == 1);
+            var locations = await benchmarkQuery
+                .Where(b => !string.IsNullOrWhiteSpace(b.NamaBenchmark))
+                .OrderBy(b => b.AreaUtama).ThenBy(b => b.NamaBenchmark)
+                .Select(b => new { id = b.Id, name = b.NamaBenchmark!.Trim(), area = b.AreaUtama ?? string.Empty })
+                .ToListAsync();
+            var areas = locations.Where(l => !string.IsNullOrWhiteSpace(l.area))
+                .Select(l => l.area).Distinct().OrderBy(x => x)
+                .Select((name, index) => new { id = index + 1, name }).ToList();
+
+            // tbl_t_observation is the MBS source of truth for these text fields.
+            var observations = _context.Observations.AsNoTracking()
+                .Where(o => !o.IsDeleted && (o.PerusahaanId == companyId || o.PerusahaanId == null));
+            var documents = await observations.Where(o => o.DokumenPendukung != null && o.DokumenPendukung != "")
+                .Select(o => o.DokumenPendukung!).Distinct().OrderBy(x => x).ToListAsync();
+            var criticalRisks = await observations.Where(o => o.ResikoKritis != null && o.ResikoKritis != "")
+                .Select(o => o.ResikoKritis!).Distinct().OrderBy(x => x).ToListAsync();
+            var riskLevels = await observations.Where(o => o.TingkatResiko != null && o.TingkatResiko != "")
+                .Select(o => o.TingkatResiko!).Distinct().OrderBy(x => x).ToListAsync();
+            var subjects = await observations.Where(o => o.PerihalYangDiamati != null && o.PerihalYangDiamati != "")
+                .Select(o => o.PerihalYangDiamati!).Distinct().OrderBy(x => x).ToListAsync();
+            var results = await observations.Where(o => o.HasilObservasi != null && o.HasilObservasi != "")
+                .Select(o => o.HasilObservasi!).Distinct().OrderBy(x => x).ToListAsync();
+
+            return Ok(new {
+                companies,
+                departments = departments.Select((name, index) => new { id = index + 1, name }),
+                areas,
+                locations,
+                documents = documents.Select((name, index) => new { id = index + 1, name }),
+                criticalRisks = criticalRisks.Select((name, index) => new { id = index + 1, name }),
+                riskLevels = riskLevels.Select((name, index) => new { id = index + 1, name }),
+                subjects = subjects.Select((name, index) => new { id = index + 1, name }),
+                results = results.Select((name, index) => new { id = index + 1, name })
+            });
+        }
+
+        /// <summary>
         /// Search employees / PJAs across companies
         /// </summary>
         [HttpGet("master/employees")]

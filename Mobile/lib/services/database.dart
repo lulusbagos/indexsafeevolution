@@ -17,6 +17,7 @@ class DatabaseService {
     _database = await _initDatabase();
     await _ensureHazardTransColumns(_database!);
     await _ensureInspectionTransColumns(_database!);
+    await _ensureObservationTransColumns(_database!);
     await _ensureEmployeeColumns(_database!);
     await _ensureBenchmarkTable(_database!);
     return _database!;
@@ -37,6 +38,7 @@ class DatabaseService {
     if (oldVersion < 2) await _createOfflineSyncJobsTable(db);
     await _ensureHazardTransColumns(db);
     await _ensureInspectionTransColumns(db);
+    await _ensureObservationTransColumns(db);
     await _ensureEmployeeColumns(db);
     await _ensureBenchmarkTable(db);
   }
@@ -50,15 +52,43 @@ class DatabaseService {
       'nik_pja',
       'departemen_pja',
       'payload_json',
-      'q1_1', 'q1_2', 'q1_3',
-      'q2_1', 'q2_2', 'q2_3',
-      'q3_1', 'q3_2', 'q3_3',
-      'q4_1', 'q4_2', 'q4_3',
-      'q5_1', 'q5_2', 'q5_3',
+      'q1_1',
+      'q1_2',
+      'q1_3',
+      'q2_1',
+      'q2_2',
+      'q2_3',
+      'q3_1',
+      'q3_2',
+      'q3_3',
+      'q4_1',
+      'q4_2',
+      'q4_3',
+      'q5_1',
+      'q5_2',
+      'q5_3',
     ];
     for (var col in cols) {
       try {
-        await db.execute('ALTER TABLE inspection_trans ADD COLUMN `$col` TEXT;');
+        await db
+            .execute('ALTER TABLE inspection_trans ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  }
+
+  static Future<void> _ensureObservationTransColumns(Database db) async {
+    for (final col in [
+      'area',
+      'lokasi',
+      'company_name',
+      'dept_name',
+      'doc_name',
+      'risk_name',
+      'risk_level'
+    ]) {
+      try {
+        await db
+            .execute('ALTER TABLE observation_trans ADD COLUMN `$col` TEXT;');
       } catch (_) {}
     }
   }
@@ -71,8 +101,10 @@ class DatabaseService {
       } catch (_) {}
     }
     try {
-      await db.execute('CREATE INDEX IF NOT EXISTS idx_emp_nik ON employees (no_nik);');
-      await db.execute('CREATE INDEX IF NOT EXISTS idx_emp_nama ON employees (nama_lengkap);');
+      await db.execute(
+          'CREATE INDEX IF NOT EXISTS idx_emp_nik ON employees (no_nik);');
+      await db.execute(
+          'CREATE INDEX IF NOT EXISTS idx_emp_nama ON employees (nama_lengkap);');
     } catch (_) {}
   }
 
@@ -89,11 +121,14 @@ class DatabaseService {
           created_at TEXT
         );
       ''');
-      await db.execute('CREATE INDEX IF NOT EXISTS idx_bm_area ON tbl_m_benchmark (area_utama);');
-      await db.execute('CREATE INDEX IF NOT EXISTS idx_bm_name ON tbl_m_benchmark (nama_benchmark);');
+      await db.execute(
+          'CREATE INDEX IF NOT EXISTS idx_bm_area ON tbl_m_benchmark (area_utama);');
+      await db.execute(
+          'CREATE INDEX IF NOT EXISTS idx_bm_name ON tbl_m_benchmark (nama_benchmark);');
       // Bersihkan entri invalid CAMP EKSPLORASI dari area_utama
-      await db.execute("DELETE FROM tbl_m_benchmark WHERE area_utama LIKE '%CAMP EKSPLORASI%' OR nama_benchmark = 'CAMP EKSPLORASI BLOCK CENTRAL';");
-      
+      await db.execute(
+          "DELETE FROM tbl_m_benchmark WHERE area_utama LIKE '%CAMP EKSPLORASI%' OR nama_benchmark = 'CAMP EKSPLORASI BLOCK CENTRAL';");
+
       // Pastikan kolom nik, departemen, jabatan, perusahaan ada di tabel employees
       for (var col in ['nik', 'departemen', 'jabatan', 'perusahaan']) {
         try {
@@ -144,7 +179,8 @@ class DatabaseService {
       var dbPath = await getDatabasesPath();
       var path = join(dbPath, 'isafe18.db');
       await deleteDatabase(path);
-      debugPrint('[DatabaseService] Database lokal SQLite isafe18.db berhasil dihapus.');
+      debugPrint(
+          '[DatabaseService] Database lokal SQLite isafe18.db berhasil dihapus.');
     } catch (e) {
       debugPrint('[DatabaseService] Error menghapus database lokal: $e');
     }

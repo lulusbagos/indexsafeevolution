@@ -114,12 +114,16 @@ namespace Indexsafe.Api.Services
 
             savedUrl = $"/uploads/{category}/{monthFolder}/{uniqueFileName}";
 
-            // Mirror file to MBS_SAP web directory & C:\MinePermitFiles\MBS\profiles to keep both systems perfectly synchronized
-            try
+            // These are Windows deployment paths. On macOS/Linux they must not
+            // be created as literal directories (for example "D:\\...") in
+            // the source tree, because that also breaks MSBuild file globs.
+            if (OperatingSystem.IsWindows())
             {
-                var sourceFile = Path.Combine(uploadsFolder, uniqueFileName);
-                if (File.Exists(sourceFile))
+                try
                 {
+                    var sourceFile = Path.Combine(uploadsFolder, uniqueFileName);
+                    if (File.Exists(sourceFile))
+                    {
                     // If profiles category, ensure copies in C:\MinePermitFiles\MBS\profiles directly as well
                     if (string.Equals(category, "profiles", StringComparison.OrdinalIgnoreCase))
                     {
@@ -157,11 +161,12 @@ namespace Indexsafe.Api.Services
                             File.Copy(sourceFile, Path.Combine(mbsDirectProfiles, $"{prefix}.jpg"), true);
                         }
                     }
+                    }
                 }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"[ImageUploadService] Mirror to MBS_SAP/Profiles error: {ex.Message}");
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[ImageUploadService] Mirror to MBS_SAP/Profiles error: {ex.Message}");
+                }
             }
 
             sw.Stop();
