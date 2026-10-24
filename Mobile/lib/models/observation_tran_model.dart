@@ -23,6 +23,13 @@ class ObservationTrnModel {
   String? createdAt;
   String? updatedAt;
   String? deletedAt;
+  String? area;
+  String? lokasi;
+  String? companyName;
+  String? deptName;
+  String? docName;
+  String? riskName;
+  String? riskLevel;
 
   ObservationTrnModel({
     this.id,
@@ -49,6 +56,13 @@ class ObservationTrnModel {
     this.createdAt,
     this.updatedAt,
     this.deletedAt,
+    this.area,
+    this.lokasi,
+    this.companyName,
+    this.deptName,
+    this.docName,
+    this.riskName,
+    this.riskLevel,
   });
 
   ObservationTrnModel.fromJson(Map<String, dynamic> json) {
@@ -76,6 +90,13 @@ class ObservationTrnModel {
     createdAt = json['created_at'];
     updatedAt = json['updated_at'];
     deletedAt = json['deleted_at'];
+    area = json['area'];
+    lokasi = json['lokasi'];
+    companyName = json['company_name'];
+    deptName = json['dept_name'];
+    docName = json['doc_name'];
+    riskName = json['risk_name'];
+    riskLevel = json['risk_level'];
   }
 
   Map<String, dynamic> toJson() {
@@ -104,6 +125,13 @@ class ObservationTrnModel {
     data['created_at'] = createdAt;
     data['updated_at'] = updatedAt;
     data['deleted_at'] = deletedAt;
+    data['area'] = area;
+    data['lokasi'] = lokasi;
+    data['company_name'] = companyName;
+    data['dept_name'] = deptName;
+    data['doc_name'] = docName;
+    data['risk_name'] = riskName;
+    data['risk_level'] = riskLevel;
     return data;
   }
 }

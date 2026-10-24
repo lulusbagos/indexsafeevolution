@@ -6,14 +6,10 @@ import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:video_player/video_player.dart';
 
-import '../../models/safety_tran_model.dart';
 import '../../services/api.dart';
 import '../../services/database.dart';
 import '../../services/preference.dart';
-import '../../services/sync.dart';
-import '../../utils/enums.dart';
 import '../../utils/helpers.dart';
-import '../../widgets/alert_app.dart';
 import '../../widgets/button_app.dart';
 import '../../widgets/sap_form_widgets.dart';
 import '../../widgets/snackbar_msg.dart';
@@ -21,7 +17,9 @@ import '../../widgets/top_bar.dart';
 import '../../widgets/upload_files.dart';
 
 class SafetyTalkFormPage extends StatefulWidget {
-  const SafetyTalkFormPage({super.key});
+  const SafetyTalkFormPage({this.existingId, super.key});
+
+  final int? existingId;
 
   @override
   State<SafetyTalkFormPage> createState() => _SafetyTalkFormPageState();
@@ -35,46 +33,27 @@ class _SafetyTalkFormPageState extends State<SafetyTalkFormPage> {
   final _locationDetail = TextEditingController();
   final _title = TextEditingController();
   final _remark = TextEditingController();
-  final List<dynamic> _rawData = [];
   final List<MapEntry<int, dynamic>> _areaList = [];
   List<MapEntry<int, dynamic>> _locationList = [];
   DateTime? _date = DateTime.now();
   String? _time = DateFormat('hh:mm').format(DateTime.now());
   int? _areaId;
-  int? _companyId;
   int? _locationId;
   VideoPlayerController? _videoPlayer;
   File? _videoFile;
   bool _isVideo = false;
   String? _selfImage;
   String? _eventImage;
+  bool _isSaving = false;
+  bool _loadingMaster = true;
+  Map<String, dynamic>? _existing;
 
   @override
   void initState() {
     super.initState();
-    _companyId = _profile?.companyId;
-
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _fillGpsFromDevice(silent: true);
-      _db.rawQuery('''select
-        me.id id_area,
-        me."name" area,
-        me2.id id_lokasi,
-        me2."name" lokasi
-      from enum_masters me
-        left join enum_masters me2 on me2.ref_id=me.id and me2.deleted_at is null
-      where me.deleted_at is null and me."type" = 'area' and me."name" not like 'Inspeksi%' and me."name" not like 'Area%'
-      order by me."name",me2."name"''').then((val) {
-        if (val.isNotEmpty) {
-          setState(() {
-            _rawData.addAll(val.toList());
-            _areaList.addAll({
-              for (var row in val.toList()) row['id_area'] as int: row['area']
-            }.entries.toList());
-            _areaList.sort((a, b) => (a.value).compareTo(b.value));
-          });
-        }
-      });
+      _loadMbsForm();
     });
   }
 
@@ -108,19 +87,51 @@ class _SafetyTalkFormPageState extends State<SafetyTalkFormPage> {
     });
   }
 
-  void _getLocation(int val) {
+  Future<void> _loadMbsForm() async {
+    final master = await _api.getSafetyTalkData();
+    if (!mounted) return;
+    if (master != null) {
+      _areaList
+        ..clear()
+        ..addAll((master['areas'] as List).map((raw) {
+          final item = Map<String, dynamic>.from(raw as Map);
+          return MapEntry(item['id'] as int, item['name']);
+        }));
+    }
+    if (widget.existingId != null) {
+      _existing = await _api.getSafetyTalk(widget.existingId!);
+      final data = _existing;
+      if (data != null) {
+        _title.text = data['judul']?.toString() ?? '';
+        _remark.text = data['keterangan']?.toString() ?? '';
+        _locationDetail.text = data['lokasi']?.toString() ?? '';
+        final date = DateTime.tryParse(data['tanggal']?.toString() ?? '');
+        if (date != null) _date = date;
+        _time = data['waktu']?.toString().substring(0, 5);
+        final area = data['area']?.toString();
+        final match = _areaList.where((e) => e.value.toString() == area);
+        if (match.isNotEmpty) {
+          _areaId = match.first.key;
+          await _getLocation(_areaId!, selected: data['detilLokasi']?.toString());
+        }
+      }
+    }
+    if (mounted) setState(() => _loadingMaster = false);
+  }
+
+  Future<void> _getLocation(int val, {String? selected}) async {
     _areaId = val;
     _locationId = null;
-    _locationList = {
-      for (var row in _rawData
-          .where((e) =>
-              e['id_lokasi'] != null &&
-              e['id_area'] != null &&
-              e['id_area'] as int == val)
-          .toList())
-        row['id_lokasi'] as int: row['lokasi']
-    }.entries.toList();
-    _locationList.sort((a, b) => (a.value).compareTo(b.value));
+    final area = _areaList.firstWhere((e) => e.key == val).value.toString();
+    final locations = await _api.getSafetyTalkBenchmarks(area);
+    if (!mounted) return;
+    setState(() {
+      _locationList = List.generate(locations.length, (i) => MapEntry(i + 1, locations[i]));
+      if (selected != null) {
+        final current = _locationList.where((e) => e.value.toString() == selected);
+        if (current.isNotEmpty) _locationId = current.first.key;
+      }
+    });
   }
 
   @override
@@ -132,7 +143,9 @@ class _SafetyTalkFormPageState extends State<SafetyTalkFormPage> {
         body: SingleChildScrollView(
           controller: _scrollCtrl,
           padding: const EdgeInsets.all(20),
-          child: Column(
+          child: _loadingMaster
+              ? const SizedBox(height: 420, child: Center(child: CircularProgressIndicator()))
+              : Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
@@ -161,7 +174,7 @@ class _SafetyTalkFormPageState extends State<SafetyTalkFormPage> {
                 initialValue: _date != null
                     ? '${_date!.day}/${_date!.month}/${_date!.year}'
                     : null,
-                firstDate: DateTime.now(),
+                firstDate: DateTime(2000),
                 lastDate: DateTime(2100),
                 dateLabelText: 'Date',
                 timeLabelText: 'Hour',
@@ -203,11 +216,6 @@ class _SafetyTalkFormPageState extends State<SafetyTalkFormPage> {
                 },
               ),
               const SizedBox(height: 15),
-              CompanyDropdown(
-                initialCompanyId: _profile?.companyId,
-                initialCompanyName: _profile?.company,
-                onChanged: (value) => setState(() => _companyId = value),
-              ),
               const Text(
                 'Area',
                 style: TextStyle(
@@ -422,7 +430,8 @@ class _SafetyTalkFormPageState extends State<SafetyTalkFormPage> {
                     border: Border.all(color: Colors.grey),
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: _selfImage == null || _selfImage == ''
+                  child: (_selfImage == null || _selfImage == '') &&
+                          _existing?['fotoDiri'] == null
                       ? const Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
@@ -440,7 +449,11 @@ class _SafetyTalkFormPageState extends State<SafetyTalkFormPage> {
                             ),
                           ],
                         )
-                      : Image.file(File(_selfImage!)),
+                      : _selfImage != null
+                          ? Image.file(File(_selfImage!), fit: BoxFit.cover)
+                          : _existing?['fotoDiri'] != null
+                              ? Image.network('${_api.mbsWebUrl}${_existing!['fotoDiri']}', fit: BoxFit.cover)
+                              : const SizedBox(),
                 ),
               ),
               if (_selfImage != null) const UploadFiles('SafetyTalkForm', null),
@@ -503,7 +516,8 @@ class _SafetyTalkFormPageState extends State<SafetyTalkFormPage> {
                     border: Border.all(color: Colors.grey),
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: _eventImage == null || _eventImage == ''
+                  child: (_eventImage == null || _eventImage == '') &&
+                          _existing?['fotoKegiatan'] == null
                       ? const Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
@@ -521,7 +535,11 @@ class _SafetyTalkFormPageState extends State<SafetyTalkFormPage> {
                             ),
                           ],
                         )
-                      : Image.file(File(_eventImage!)),
+                      : _eventImage != null
+                          ? Image.file(File(_eventImage!), fit: BoxFit.cover)
+                          : _existing?['fotoKegiatan'] != null
+                              ? Image.network('${_api.mbsWebUrl}${_existing!['fotoKegiatan']}', fit: BoxFit.cover)
+                              : const SizedBox(),
                 ),
               ),
               if (_eventImage != null)
@@ -670,59 +688,39 @@ class _SafetyTalkFormPageState extends State<SafetyTalkFormPage> {
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
           child: buttonApp(
             label: 'Simpan',
-            onPressed: (_areaId == null ||
+            onPressed: _isSaving || (_areaId == null ||
                     _locationId == null ||
                     _locationDetail.text == '' ||
                     _title.text == '' ||
                     _remark.text == '' ||
-                    _selfImage == null ||
-                    _eventImage == null)
+                    (_selfImage == null && _existing == null) ||
+                    (_eventImage == null && _existing == null))
                 ? null
-                : () {
-                    var data = SafetyTrnModel(
-                      code:
-                          '${_profile?.noNik}-${DateTime.now().millisecondsSinceEpoch}0000000000'
-                              .substring(0, 24),
-                      title: _title.text,
-                      companyId: _companyId,
-                      employeeId: _profile?.id,
-                      areaId: _areaId,
-                      locationId: _locationId,
-                      locationDetail: _locationDetail.text,
-                      date: _date!.toString().substring(0, 10),
-                      time: _time!,
-                      remark: _remark.text,
-                      selfImage: _selfImage,
-                      eventImage: _eventImage,
-                      createdAt: DateTime.now().toString(),
-                      updatedAt: DateTime.now().toString(),
-                    );
-                    try {
-                      _db.insert('safety_trans', data.toJson()).then((tranId) {
-                        if (tranId > 0) {
-                          syncTran(_db, _api, 'safety', tranId).then((sync) {
-                            if (!mounted) return;
-                            if (sync == true) {
-                              SnackBarMsg.success(
-                                  this.context, 'Berhasil sinkron!');
-                            } else {
-                              SnackBarMsg.danger(
-                                  this.context, 'Gagal sinkron!');
-                            }
-                          });
-                          if (!mounted) return;
-                          alertSuccess(this.context, Module.safety,
-                              lastId: tranId);
-                        } else {
-                          if (!mounted) return;
-                          alertFailed(this.context, Module.safety);
-                        }
-                      });
-                    } catch (e) {
-                      debugPrint(e.toString());
-                      if (!mounted) return;
-                      alertFailed(this.context, Module.safety);
+                : () async {
+                    setState(() => _isSaving = true);
+                    final area = _areaList.firstWhere((e) => e.key == _areaId).value.toString();
+                    final benchmark = _locationList.firstWhere((e) => e.key == _locationId).value.toString();
+                    final savedOnMbs = await _api.submitSafetyTalk({
+                      'id': widget.existingId,
+                      'tanggal': _date!.toIso8601String().substring(0, 10),
+                      'waktuStr': _time,
+                      'area': area,
+                      'detilLokasi': benchmark,
+                      'lokasi': _locationDetail.text.trim(),
+                      'judul': _title.text.trim(),
+                      'keterangan': _remark.text.trim(),
+                      'fotoDiri': _selfImage,
+                      'fotoKegiatan': _eventImage,
+                    });
+                    if (!mounted) return;
+                    setState(() => _isSaving = false);
+                    if (savedOnMbs) {
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(widget.existingId == null ? 'Safety Talk berhasil disimpan.' : 'Safety Talk berhasil diperbarui.')));
+                      Navigator.pop(context, true);
+                      return;
                     }
+                    SnackBarMsg.danger(context, 'Gagal menyimpan ke MBS. Periksa koneksi lalu coba lagi.');
+                    return;
                   },
           ),
         ),

@@ -18,6 +18,7 @@ import '../../services/p5m_share_service.dart';
 import '../simama/simama_form_page.dart';
 import '../p5m/p5m_form_page.dart';
 import 'history_detail_page.dart';
+import '../observation/observation_form_page.dart';
 
 class HistoryPage extends StatefulWidget {
   const HistoryPage(this.module, this.history, {this.lastId, super.key});
@@ -68,6 +69,7 @@ class _HistoryPageState extends State<HistoryPage> {
     super.initState();
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      _getData();
       _fetchAndRefresh();
       if (widget.lastId == null) {
         Future.delayed(const Duration(seconds: 2), () => _getData());
@@ -167,6 +169,64 @@ class _HistoryPageState extends State<HistoryPage> {
                     await _db.update('p2h_trans', row, localId);
                   }
                 }
+              }
+            }
+          }
+        } catch (_) {}
+      } else if (widget.history == History.summary &&
+          widget.module == Module.observation) {
+        try {
+          final res = await _api.dio.get('/tran/observation?limit=100');
+          if (res.data is Map && res.data['data'] is List) {
+            for (final raw in res.data['data'] as List) {
+              if (raw is! Map) continue;
+              final item = Map<String, dynamic>.from(raw);
+              final serverId = int.tryParse(item['id'].toString());
+              if (serverId == null) continue;
+              // Keep server history separate from locally generated IDs.
+              final localId = -serverId;
+              final row = <String, dynamic>{
+                'id': localId,
+                'code': 'OBS-$serverId',
+                'title': item['kegiatanYangDiamati'] ?? 'Observasi Lapangan',
+                'date': item['date']?.toString().split('T').first ?? '',
+                'area': item['area'] ?? '',
+                'lokasi': item['lokasi'] ?? '',
+                'location_detail': item['detilLokasi'] ?? '',
+                'company_id': item['perusahaanId'],
+                'company_name': item['perusahaanYangDiamati'] ?? '',
+                'dept_name': item['departemenYangDiamati'] ?? '',
+                'doc_name': item['dokumenPendukung'] ?? '',
+                'risk_name': item['resikoKritis'] ?? '',
+                'risk_level': item['tingkatResiko'] ?? '',
+                'remark': item['keterangan'] ?? '',
+                'perihal': item['perihalYangDiamati'] ?? '',
+                'hasil': item['hasilObservasi'] ?? '',
+                'photo_url': item['fotoUrl'] ?? '',
+                'employee_id': profileId,
+                'sync_id': serverId,
+                'created_at': item['createdAt'] ?? DateTime.now().toString(),
+              };
+              final existing = await _db.get('observation_trans', localId);
+              if (existing == null) {
+                await _db.insert('observation_trans', row);
+              } else {
+                await _db.update('observation_trans', row, localId);
+              }
+              final found = await _db.rawQuery(
+                  'select id from observation_details where tran_id=? and ref_id=?',
+                  [localId, serverId]);
+              if (found.isEmpty) {
+                await _db.insert('observation_details', {
+                  'name': item['perihalYangDiamati'] ?? '',
+                  'point': item['perihalYangDiamati'] ?? '',
+                  'type': item['hasilObservasi'] ?? '',
+                  'remark': item['keterangan'] ?? '',
+                  'image': item['fotoUrl'] ?? '',
+                  'tran_id': localId,
+                  'ref_id': serverId,
+                  'sync_id': serverId,
+                });
               }
             }
           }
@@ -421,6 +481,19 @@ class _HistoryPageState extends State<HistoryPage> {
     }
   }
 
+  Future<void> _editObservation(Map<String, dynamic> row) async {
+    if (!mounted) return;
+    final editData = Map<String, dynamic>.from(row);
+    // Navigation is intentionally immediate; an absent local detail cache
+    // must never prevent opening the edit form for a server report.
+    if (!mounted) return;
+    await Navigator.push(
+        context,
+        MaterialPageRoute(
+            builder: (_) => ObservationFormPage(editData: editData)));
+    _fetchAndRefresh();
+  }
+
   Future<dynamic> _showBottomSheet(int index) {
     var sync = (_rawData[index]['sync_id'] == null) ? false : true;
     return showModalBottomSheet(
@@ -428,7 +501,7 @@ class _HistoryPageState extends State<HistoryPage> {
       useSafeArea: true,
       showDragHandle: true,
       constraints: const BoxConstraints(
-        maxHeight: 440,
+        maxHeight: 560,
       ),
       builder: (_) {
         return Padding(
@@ -599,6 +672,19 @@ class _HistoryPageState extends State<HistoryPage> {
                         Navigator.pop(context);
                       },
               ),
+                if (widget.module == Module.observation && sync)
+                  ListTile(
+                    title: const Text('Edit Observasi',
+                        style: TextStyle(fontWeight: FontWeight.bold)),
+                    trailing: const Icon(Icons.edit_outlined),
+                    contentPadding: const EdgeInsets.fromLTRB(0, 10, 0, 10),
+                    shape: Border(
+                        bottom: BorderSide(color: Colors.indigo.shade100)),
+                    onTap: () {
+                      Navigator.pop(context);
+                      _editObservation(_rawData[index] as Map<String, dynamic>);
+                    },
+                  ),
               ListTile(
                 title: Text(
                   'Hapus Data',
@@ -640,7 +726,16 @@ class _HistoryPageState extends State<HistoryPage> {
                               final rowItem = _rawData[index];
                               final id = rowItem['id'] as int;
                               final syncId = rowItem['sync_id'];
-                              _db.delete(_table, id).then((val) {
+                              () async {
+                                var canDelete = true;
+                                if (widget.module == Module.observation && sync && syncId != null) {
+                                  canDelete = await _api.deleteObservation(syncId as int);
+                                }
+                                if (!canDelete) {
+                                  if (mounted) SnackBarMsg.danger(this.context, 'Gagal menghapus laporan server.');
+                                  return;
+                                }
+                                final val = await _db.delete(_table, id);
                                 if (!mounted) return;
                                 if (val > 0) {
                                   _db.execute(
@@ -648,14 +743,14 @@ class _HistoryPageState extends State<HistoryPage> {
                                       where tran_id=$id''');
                                   setState(() => _rawData.removeAt(index));
                                   SnackBarMsg.success(this.context, 'Data berhasil dihapus!');
-                                  if (syncId != null) {
+                                  if (syncId != null && widget.module != Module.observation) {
                                     final modName = (widget.module == Module.simama) ? 'simama' : widget.module.name;
                                     _api.dio.delete('/tran/$modName/$syncId').then((_) {}, onError: (_) {});
                                   }
                                 } else {
                                   SnackBarMsg.danger(this.context, 'Data gagal dihapus!');
                                 }
-                              });
+                              }();
                             },
                           ),
                         ],

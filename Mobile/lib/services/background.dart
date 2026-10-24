@@ -40,14 +40,8 @@ void onStart(ServiceInstance service) async {
       /* post details */
       if ((prefs.getString('bgToken') ?? '') != '') {
         api.setToken = prefs.getString('bgToken') ?? '';
-        for (var name in [
-          'inspection',
-          'coaching',
-          'k3',
-          'observation',
-          'p2h',
-          'p5m'
-        ].toList()) {
+        for (var name
+            in ['inspection', 'coaching', 'k3', 'p2h', 'p5m'].toList()) {
           debugPrint('--- post detail: $name ---');
           db.rawQuery(
               '''select dt.id from ${name}_details dt inner join ${name}_trans tr on dt.tran_id = tr.id 
@@ -331,7 +325,8 @@ class BackgroundService {
       androidConfiguration: AndroidConfiguration(
         autoStart: isEnabled,
         onStart: onStart,
-        isForegroundMode: false, // Hilangkan notifikasi persisten background service di status bar
+        isForegroundMode:
+            false, // Hilangkan notifikasi persisten background service di status bar
         autoStartOnBoot: isEnabled,
       ),
     );

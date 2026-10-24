@@ -582,6 +582,11 @@ namespace Indexsafe.Api.Controllers
                 {
                     var kegiatan = form["kegiatan_yang_diamati"].FirstOrDefault() ?? form["activity"].FirstOrDefault() ?? "Observasi Prosedur Kerja";
                     var deptDiamati = form["departemen_yang_diamati"].FirstOrDefault() ?? "OPERASI";
+                    var perusahaanDiamati = form["perusahaan_yang_diamati"].FirstOrDefault();
+                    var dokumenPendukung = form["dokumen_pendukung"].FirstOrDefault();
+                    var perusahaanDiamatiId = int.TryParse(form["perusahaan_id"].FirstOrDefault(), out var observedCompanyId)
+                        ? observedCompanyId
+                        : companyId;
                     var resikoKritis = form["resiko_kritis"].FirstOrDefault();
                     var tingkatResiko = form["tingkat_resiko"].FirstOrDefault() ?? "Medium";
                     var perihal = form["perihal_yang_diamati"].FirstOrDefault() ?? form["subject"].FirstOrDefault() ?? "Kepatuhan SOP";
@@ -612,7 +617,9 @@ namespace Indexsafe.Api.Controllers
                         HasilObservasi = hasil,
                         Keterangan = keterangan,
                         FotoUrl = fotoUrl,
-                        PerusahaanId = companyId,
+                        PerusahaanId = perusahaanDiamatiId,
+                        PerusahaanYangDiamati = perusahaanDiamati,
+                        DokumenPendukung = dokumenPendukung,
                         IsDeleted = false,
                         CreatedAt = DateTime.Now
                     };
@@ -1217,6 +1224,49 @@ namespace Indexsafe.Api.Controllers
             }
 
             return Ok(new { status = true, data = new List<object>() });
+        }
+
+        [HttpDelete("tran/observation/{id:int}")]
+        public async Task<IActionResult> DeleteObservation(int id)
+        {
+            var observation = await _context.Observations
+                .FirstOrDefaultAsync(o => o.Id == id && !o.IsDeleted && o.Nik == GetCurrentNik());
+            if (observation == null)
+                return NotFound(new { message = "Observasi tidak ditemukan atau bukan milik pengguna." });
+            observation.IsDeleted = true;
+            await _context.SaveChangesAsync();
+            return Ok(new { status = true });
+        }
+
+        [HttpPut("tran/observation/{id:int}")]
+        [Consumes("multipart/form-data")]
+        public async Task<IActionResult> UpdateObservation(int id, [FromForm] IFormCollection form)
+        {
+            var observation = await _context.Observations
+                .FirstOrDefaultAsync(o => o.Id == id && !o.IsDeleted && o.Nik == GetCurrentNik());
+            if (observation == null)
+                return NotFound(new { message = "Observasi tidak ditemukan atau bukan milik pengguna." });
+
+            string? Value(string key) => form[key].FirstOrDefault()?.Trim();
+            observation.KegiatanYangDiamati = Value("kegiatan_yang_diamati") ?? observation.KegiatanYangDiamati;
+            observation.Area = Value("area") ?? observation.Area;
+            observation.Lokasi = Value("lokasi") ?? observation.Lokasi;
+            observation.DetilLokasi = Value("detil_lokasi") ?? observation.DetilLokasi;
+            observation.PerihalYangDiamati = Value("perihal_yang_diamati") ?? observation.PerihalYangDiamati;
+            observation.HasilObservasi = Value("hasil_observasi") ?? observation.HasilObservasi;
+            observation.Keterangan = Value("keterangan") ?? observation.Keterangan;
+            observation.DepartemenYangDiamati = Value("departemen_yang_diamati") ?? observation.DepartemenYangDiamati;
+            observation.DokumenPendukung = Value("dokumen_pendukung") ?? observation.DokumenPendukung;
+            observation.ResikoKritis = Value("resiko_kritis") ?? observation.ResikoKritis;
+            observation.TingkatResiko = Value("tingkat_resiko") ?? observation.TingkatResiko;
+            observation.PerusahaanYangDiamati = Value("perusahaan_yang_diamati") ?? observation.PerusahaanYangDiamati;
+            if (int.TryParse(Value("perusahaan_id"), out var companyId)) observation.PerusahaanId = companyId;
+            if (DateTime.TryParse(Value("tanggal"), out var date)) observation.Date = date;
+            var photo = form.Files["image"];
+            if (photo != null)
+                observation.FotoUrl = await _imageUploadService.UploadAndCompressImageAsync(photo, "observation", "obs");
+            await _context.SaveChangesAsync();
+            return Ok(new { status = true, data = new { id = observation.Id } });
         }
 
         /// <summary>

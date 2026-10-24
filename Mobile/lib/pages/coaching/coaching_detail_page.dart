@@ -32,6 +32,7 @@ class _CoachingDetailPageState extends State<CoachingDetailPage>
   int? _pesertaId;
   MapEntry<int, dynamic>? _pesertaItem;
   String? _image;
+  bool _saving = false;
   late final TabController _tabCtrl = TabController(length: 2, vsync: this);
 
   @override
@@ -248,49 +249,53 @@ class _CoachingDetailPageState extends State<CoachingDetailPage>
               SizedBox(
                 width: MediaQuery.of(context).size.width,
                 child: buttonApp(
-                  label: 'Simpan',
-                  onPressed: (_itemList.isEmpty)
+                  label: _saving ? 'Menyimpan...' : 'Simpan',
+                  onPressed: (_itemList.isEmpty || _saving)
                       ? null
-                      : () {
+                      : () async {
+                          setState(() => _saving = true);
                           widget.coachingTrnModel?.createdAt =
                               DateTime.now().toString();
                           widget.coachingTrnModel?.updatedAt =
                               DateTime.now().toString();
                           try {
-                            _db
-                                .insert('coaching_trans',
-                                    widget.coachingTrnModel!.toJson())
-                                .then((tranId) {
-                              if (tranId > 0) {
-                                syncTran(_db, _api, 'coaching', tranId)
-                                    .then((sync) {
-                                  if (sync == true) {
-                                    SnackBarMsg.success(
-                                        context, 'Berhasil sinkron!');
-                                  } else {
-                                    SnackBarMsg.danger(
-                                        context, 'Gagal sinkron!');
-                                  }
-                                });
-                                for (var row in _itemList) {
-                                  row.tranId = tranId;
-                                  row.status = 0;
-                                  _db
-                                      .insert('coaching_details', row.toJson())
-                                      .then((itemId) {
-                                    _db.saveFiles('CoachingForm', row.pointId!,
-                                        tranId, itemId);
-                                  });
-                                }
-                                alertSuccess(context, Module.coaching,
-                                    lastId: tranId);
-                              } else {
+                            final tranId = await _db.insert(
+                              'coaching_trans',
+                              widget.coachingTrnModel!.toJson(),
+                            );
+                            if (tranId <= 0) {
+                              if (context.mounted) {
                                 alertFailed(context, Module.coaching);
                               }
-                            });
+                              return;
+                            }
+                            for (final row in _itemList) {
+                              row.tranId = tranId;
+                              row.status = 0;
+                              final itemId = await _db.insert(
+                                'coaching_details',
+                                row.toJson(),
+                              );
+                              if (itemId > 0 && row.pointId != null) {
+                                await _db.saveFiles(
+                                  'CoachingForm', row.pointId!, tranId, itemId);
+                              }
+                            }
+                            final synced = await syncTran(_db, _api, 'coaching', tranId);
+                            if (!context.mounted) return;
+                            if (synced) {
+                              SnackBarMsg.success(context, 'Coaching dan peserta berhasil tersinkron.');
+                            } else {
+                              SnackBarMsg.warning(context, 'Coaching tersimpan di perangkat dan akan tersinkron otomatis saat online.');
+                            }
+                            alertSuccess(context, Module.coaching, lastId: tranId);
                           } catch (e) {
                             debugPrint(e.toString());
-                            alertFailed(context, Module.coaching);
+                            if (context.mounted) {
+                              alertFailed(context, Module.coaching);
+                            }
+                          } finally {
+                            if (mounted) setState(() => _saving = false);
                           }
                         },
                 ),

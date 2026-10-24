@@ -274,7 +274,7 @@ class _CompanyDropdownState extends State<CompanyDropdown> {
           isExpanded: true,
           decoration: InputDecoration(
             hintText:
-                _loading ? 'Memuat master perusahaan...' : 'Pilih perusahaan',
+                _loading ? 'Memuat daftar perusahaan...' : 'Pilih perusahaan',
             prefixIcon: const Padding(
               padding: EdgeInsets.only(left: 10),
               child: Icon(Icons.apartment_rounded, size: 24),
@@ -314,7 +314,9 @@ Future<void> fillGpsCoordinate(
     if (!serviceEnabled) {
       final prefs = await SharedPreferences.getInstance();
       final cachedGps = prefs.getString('last_known_gps_coord');
-      if (cachedGps != null && cachedGps.isNotEmpty && controller.text.isEmpty) {
+      if (cachedGps != null &&
+          cachedGps.isNotEmpty &&
+          controller.text.isEmpty) {
         controller.text = cachedGps;
         onChanged();
       }
@@ -336,7 +338,9 @@ Future<void> fillGpsCoordinate(
         permission == LocationPermission.deniedForever) {
       final prefs = await SharedPreferences.getInstance();
       final cachedGps = prefs.getString('last_known_gps_coord');
-      if (cachedGps != null && cachedGps.isNotEmpty && controller.text.isEmpty) {
+      if (cachedGps != null &&
+          cachedGps.isNotEmpty &&
+          controller.text.isEmpty) {
         controller.text = cachedGps;
         onChanged();
       }
@@ -353,7 +357,8 @@ Future<void> fillGpsCoordinate(
     Position? pos = await Geolocator.getLastKnownPosition();
     if (pos != null && controller.text.isEmpty) {
       if (context.mounted) {
-        controller.text = '${pos.latitude.toStringAsFixed(6)}, ${pos.longitude.toStringAsFixed(6)}';
+        controller.text =
+            '${pos.latitude.toStringAsFixed(6)}, ${pos.longitude.toStringAsFixed(6)}';
         onChanged();
       }
     }
@@ -366,7 +371,8 @@ Future<void> fillGpsCoordinate(
       );
       pos = freshPos;
       if (context.mounted) {
-        controller.text = '${pos.latitude.toStringAsFixed(6)}, ${pos.longitude.toStringAsFixed(6)}';
+        controller.text =
+            '${pos.latitude.toStringAsFixed(6)}, ${pos.longitude.toStringAsFixed(6)}';
         onChanged();
       }
     } catch (_) {
@@ -381,17 +387,21 @@ Future<void> fillGpsCoordinate(
         '${pos.latitude.toStringAsFixed(6)}, ${pos.longitude.toStringAsFixed(6)}',
       );
       if (!silent && context.mounted) {
-        SnackBarMsg.success(context, 'Koordinat GPS satelit berhasil dideteksi.');
+        SnackBarMsg.success(
+            context, 'Koordinat GPS satelit berhasil dideteksi.');
       }
     } else {
       // 3. Fallback: Ambil dari penyimpanan lokal aplikasi jika perangkat baru restart tanpa cache OS
       final prefs = await SharedPreferences.getInstance();
       final cachedGps = prefs.getString('last_known_gps_coord');
-      if (cachedGps != null && cachedGps.isNotEmpty && controller.text.isEmpty) {
+      if (cachedGps != null &&
+          cachedGps.isNotEmpty &&
+          controller.text.isEmpty) {
         controller.text = cachedGps;
         onChanged();
         if (!silent && context.mounted) {
-          SnackBarMsg.info(context, 'Menggunakan titik koordinat GPS tersimpan sebelumnya.');
+          SnackBarMsg.info(
+              context, 'Menggunakan titik koordinat GPS tersimpan sebelumnya.');
         }
       } else if (!silent && context.mounted) {
         SnackBarMsg.warning(context, 'Sedang mencari sinyal satelit GPS...');
@@ -442,40 +452,94 @@ Future<MapEntry<int, String>?> showAddCustomLocationDialog({
   final result = await showDialog<MapEntry<int, String>>(
     context: context,
     builder: (dialogContext) {
-      return AlertDialog(
-        title: const Text('Tambah Lokasi Custom'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Gunakan fitur ini jika benchmark/detail lokasi belum tersedia di list.',
-              style: TextStyle(fontSize: 12, color: Colors.black54),
-            ),
-            const SizedBox(height: 12),
-            TextFormField(
-              controller: controller,
-              autofocus: true,
-              textCapitalization: TextCapitalization.characters,
-              decoration: const InputDecoration(
-                labelText: 'Nama Lokasi / Benchmark',
-                hintText: 'Contoh: Workshop Mitra KM 12',
-                prefixIcon: Icon(Icons.add_location_alt_rounded),
+      return Dialog(
+        insetPadding: const EdgeInsets.symmetric(horizontal: 24),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 24, 24, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 52,
+                height: 52,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEFF6FF),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: const Icon(Icons.add_location_alt_rounded,
+                    color: Color(0xFF2563EB), size: 27),
               ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Batal'),
-          ),
-          FilledButton(
-            onPressed: () async {
+              const SizedBox(height: 18),
+              const Text('Tambah lokasi baru',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
+              const SizedBox(height: 6),
+              const Text(
+                'Tambahkan detail lokasi atau benchmark yang belum tersedia pada daftar.',
+                style: TextStyle(color: Color(0xFF64748B), height: 1.4),
+              ),
+              const SizedBox(height: 22),
+              const Text('NAMA LOKASI / BENCHMARK',
+                  style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: .5,
+                      color: Color(0xFF475569))),
+              const SizedBox(height: 8),
+              TextFormField(
+                controller: controller,
+                autofocus: true,
+                textCapitalization: TextCapitalization.characters,
+                decoration: InputDecoration(
+                  hintText: 'Contoh: Workshop Mitra KM 12',
+                  hintStyle: const TextStyle(color: Color(0xFF94A3B8)),
+                  prefixIcon: const Icon(Icons.place_outlined,
+                      color: Color(0xFF475569)),
+                  filled: true,
+                  fillColor: const Color(0xFFF1F5F9),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide.none,
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: const BorderSide(
+                        color: Color(0xFF2563EB), width: 1.25),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 24),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.pop(dialogContext),
+                      style: OutlinedButton.styleFrom(
+                        minimumSize: const Size.fromHeight(48),
+                        foregroundColor: const Color(0xFF334155),
+                        side: const BorderSide(color: Color(0xFFCBD5E1)),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14)),
+                      ),
+                      child: const Text('Batal'),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: FilledButton(
+                      onPressed: () async {
               final name = controller.text.trim();
-              if (name.isEmpty) return;
-              final id = -DateTime.now().millisecondsSinceEpoch;
-              await db.insert('enum_masters', {
+              if (name.isEmpty) {
+                SnackBarMsg.warning(
+                    dialogContext, 'Masukkan nama lokasi terlebih dahulu.');
+                return;
+              }
+              // Gunakan ID lokal yang unik dan positif. Sebagian versi SQLite
+              // mengembalikan hasil insert negatif sebagai gagal ketika id
+              // negatif dipakai, sehingga lokasi custom tidak pernah tampil.
+              final id = DateTime.now().microsecondsSinceEpoch;
+              final inserted = await db.insert('enum_masters', {
                 'id': id,
                 'code': 'CUSTOM-$id',
                 'name': name,
@@ -485,19 +549,47 @@ Future<MapEntry<int, String>?> showAddCustomLocationDialog({
                 'created_at': DateTime.now().toString(),
                 'updated_at': DateTime.now().toString(),
               });
+              if (inserted <= 0) {
+                if (dialogContext.mounted) {
+                  SnackBarMsg.danger(
+                      dialogContext, 'Lokasi belum dapat ditambahkan.');
+                }
+                return;
+              }
               if (dialogContext.mounted) {
                 Navigator.pop(dialogContext, MapEntry(id, name));
               }
             },
-            child: const Text('Simpan'),
+                      style: FilledButton.styleFrom(
+                        minimumSize: const Size.fromHeight(48),
+                        padding: const EdgeInsets.symmetric(horizontal: 10),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14)),
+                      ),
+                      child: const FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.add_rounded, size: 18),
+                            SizedBox(width: 6),
+                            Text('Tambahkan', maxLines: 1),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ),
-        ],
+        ),
       );
     },
   );
 
   if (result != null && context.mounted) {
-    SnackBarMsg.success(context, 'Lokasi custom berhasil ditambahkan.');
+    SnackBarMsg.success(context, 'Lokasi baru berhasil ditambahkan.');
   }
   return result;
 }
@@ -514,10 +606,18 @@ class AddCustomLocationButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return Align(
       alignment: Alignment.centerRight,
-      child: TextButton.icon(
+      child: OutlinedButton.icon(
         onPressed: onPressed,
-        icon: const Icon(Icons.add_location_alt_rounded, size: 18),
-        label: const Text('Tambah Lokasi Custom'),
+        icon: const Icon(Icons.add_location_alt_rounded, size: 17),
+        label: const Text('Tambah lokasi baru', maxLines: 1,
+            overflow: TextOverflow.ellipsis),
+        style: OutlinedButton.styleFrom(
+          foregroundColor: const Color(0xFF2563EB),
+          side: const BorderSide(color: Color(0xFFBFDBFE)),
+          backgroundColor: const Color(0xFFEFF6FF),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
       ),
     );
   }

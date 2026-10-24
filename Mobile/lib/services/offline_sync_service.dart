@@ -9,6 +9,7 @@ import 'database.dart';
 import 'notification.dart';
 import 'preference.dart';
 import 'sync.dart';
+import '../pages/bbs/bbs_model.dart';
 
 /// Persistent outbox used by features whose server endpoint is not connected yet.
 class OfflineSyncJob {
@@ -203,6 +204,41 @@ class OfflineSyncService {
       (await _jobs())
           .any((job) => job.feature == feature && job.localId == localId);
 
+  Future<void> discard({required String feature, required String localId}) async {
+    try {
+      final db = await _db.database;
+      await db.delete(
+        'offline_sync_jobs',
+        where: 'feature = ? and local_id = ?',
+        whereArgs: [feature, localId],
+      );
+    } catch (e) {
+      debugPrint('[OfflineSyncService] Error discard job: $e');
+    }
+    await refresh();
+  }
+
+  Future<({int success, int failed})> syncBbsPending() async {
+    if (!state.value.isOnline) return (success: 0, failed: 0);
+    var success = 0;
+    var failed = 0;
+    for (final job in await _jobs()) {
+      if (job.feature != 'bbs') continue;
+      final form = Map<String, dynamic>.from(job.payload['form'] as Map);
+      final photoPath = job.payload['photoPath']?.toString();
+      final sent = await _api.submitBbs(form, photoPath: photoPath);
+      if (sent) {
+        await discard(feature: job.feature, localId: job.localId);
+        await BbsStorage.markSynced(job.localId);
+        success++;
+      } else {
+        failed++;
+      }
+    }
+    await refresh();
+    return (success: success, failed: failed);
+  }
+
   Future<void> refresh() async {
     int pending = (await _jobs()).length;
     for (final name in const [
@@ -221,11 +257,9 @@ class OfflineSyncService {
         pending += rows.length;
       } catch (_) {}
     }
-    try {
-      final actRows = await _db.rawQuery(
-          'select id from action_plans where deleted_at is null and updated_at is null');
-      pending += actRows.length;
-    } catch (_) {}
+    // Action plan yang masuk dari server lama dapat memiliki `updated_at`
+    // kosong. Itu bukan berarti laporan baru dari perangkat ini, sehingga
+    // jangan pernah memasukkannya ke badge sinkronisasi laporan.
     state.value =
         OfflineSyncState(isOnline: state.value.isOnline, pendingCount: pending);
     pendingCountNotifier.value = pending;
@@ -264,19 +298,8 @@ class OfflineSyncService {
         } catch (_) {}
       }
 
-      // Sync pending action plans
-      try {
-        final pendingActions = await _db.rawQuery(
-          'select id, [table] from action_plans where deleted_at is null and updated_at is null',
-        );
-        for (final row in pendingActions) {
-          final id = row['id'] as int;
-          final tableName = (row['table'] ?? 'hazard').toString();
-          await syncAction(_db, _api, tableName, id);
-        }
-      } catch (e) {
-        debugPrint('[OfflineSyncService] Error syncing pending actions: $e');
-      }
+      await syncBbsPending();
+
     } finally {
       _syncing = false;
       isSyncingNotifier.value = false;
@@ -551,12 +574,6 @@ class OfflineSyncService {
         }
       }
 
-      final actRes = await _db.rawQuery(
-        'select count(1) as jml from action_plans where deleted_at is null and updated_at is null',
-      );
-      if (actRes.isNotEmpty && actRes[0]['jml'] != null) {
-        total += (actRes[0]['jml'] as int);
-      }
     } catch (e) {
       debugPrint('[OfflineSyncService] Error getPendingCount: $e');
     }
@@ -615,6 +632,10 @@ class OfflineSyncService {
       }
       await Future.delayed(const Duration(milliseconds: 300));
     }
+
+    final bbsResult = await syncBbsPending();
+    success += bbsResult.success;
+    failed += bbsResult.failed;
 
     await refreshPendingCount();
     return (success: success, failed: failed);

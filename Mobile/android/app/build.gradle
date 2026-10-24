@@ -48,6 +48,10 @@ android {
 
     sourceSets {
         main.java.srcDirs += 'src/main/kotlin'
+        // The native output of package:jni is not merged by the Flutter
+        // plugin loader on this project/AGP combination. Package it explicitly
+        // so JniPlugin can load libdartjni.so at app start.
+        main.jniLibs.srcDirs += "${rootProject.buildDir}/jni/intermediates/merged_native_libs/debug/mergeDebugNativeLibs/out"
     }
 
     defaultConfig {
@@ -92,4 +96,8 @@ flutter {
 
 dependencies {
     coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.0.4'
+    // path_provider_android uses package:jni. Keep its native runtime in the
+    // final APK; otherwise Android cannot load libdartjni.so during plugin
+    // registration and Flutter remains on the launch splash screen.
+    implementation project(':jni')
 }

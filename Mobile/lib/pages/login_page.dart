@@ -21,8 +21,7 @@ class LoginPage extends StatefulWidget {
   State<LoginPage> createState() => _LoginPageState();
 }
 
-class _LoginPageState extends State<LoginPage>
-    with SingleTickerProviderStateMixin {
+class _LoginPageState extends State<LoginPage> {
   final _key = GlobalKey<FormState>();
   final _db = DatabaseService();
   final _api = ApiService();
@@ -32,16 +31,10 @@ class _LoginPageState extends State<LoginPage>
   bool _remember = true;
   bool _obscureText = true;
   bool _isLoading = false;
-  late AnimationController _animCtrl;
 
   @override
   void initState() {
     super.initState();
-
-    _animCtrl = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 12),
-    )..repeat();
 
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       PackageInfo packageInfo = await PackageInfo.fromPlatform();
@@ -61,12 +54,6 @@ class _LoginPageState extends State<LoginPage>
         setState(() => _remember = true);
       }
     });
-  }
-
-  @override
-  void dispose() {
-    _animCtrl.dispose();
-    super.dispose();
   }
 
   Future<void> _performOfflineLogin({bool isExplicitOffline = false}) async {
@@ -496,15 +483,12 @@ class _LoginPageState extends State<LoginPage>
       backgroundColor: const Color(0xFFFAFCFF),
       body: Stack(
         children: [
-          // Dynamic Living Corporate Background
+          // Calm, plain background: no moving or decorative visual patterns.
           Positioned.fill(
-            child: AnimatedBuilder(
-              animation: _animCtrl,
-              builder: (context, _) {
-                return CustomPaint(
-                  painter: _DynamicCorporateBackgroundPainter(_animCtrl.value),
-                );
-              },
+            child: DecoratedBox(
+              decoration: const BoxDecoration(
+                color: Color(0xFFFAFCFF),
+              ),
             ),
           ),
 
@@ -873,43 +857,6 @@ class _LoginPageState extends State<LoginPage>
                                             ),
                                     ),
                                   ),
-                                ),
-                              ),
-                            ),
-
-                            const SizedBox(height: 12),
-
-                            // Explicit Offline Mode Login Button
-                            SizedBox(
-                              width: double.infinity,
-                              height: 48,
-                              child: OutlinedButton.icon(
-                                onPressed: _isLoading
-                                    ? null
-                                    : () => _performOfflineLogin(isExplicitOffline: true),
-                                icon: const Icon(
-                                  Icons.cloud_off_rounded,
-                                  size: 19,
-                                  color: Color(0xFF334155),
-                                ),
-                                label: const Text(
-                                  'MASUK MODE OFFLINE',
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.bold,
-                                    letterSpacing: 1.1,
-                                    color: Color(0xFF334155),
-                                  ),
-                                ),
-                                style: OutlinedButton.styleFrom(
-                                  side: BorderSide(
-                                    color: Colors.grey.shade400,
-                                    width: 1.4,
-                                  ),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(16),
-                                  ),
-                                  backgroundColor: Colors.white.withValues(alpha: 0.9),
                                 ),
                               ),
                             ),

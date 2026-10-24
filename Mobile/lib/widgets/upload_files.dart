@@ -67,21 +67,20 @@ class _UploadFilesState extends State<UploadFiles> {
                       allowedExtensions: ['jpg', 'jpeg', 'png', 'gif'],
                     );
                     if (result != null) {
-                      int i = 1;
                       for (var path in result.paths) {
-                        _db
-                            .insert(
-                                'files',
-                                FileModel(
-                                  name: path,
-                                  type: widget.type,
-                                  pointId: widget.pointId,
-                                ).toJson())
-                            .then((val) {
-                          if (i == result.paths.length) _getFiles();
-                          i++;
-                        });
+                        if (path == null || path.isEmpty) continue;
+                        await _db.insert(
+                            'files',
+                            FileModel(
+                              name: path,
+                              type: widget.type,
+                              pointId: widget.pointId,
+                            ).toJson());
                       }
+                      // Refresh setelah seluruh file tersimpan. Sebelumnya
+                      // callback paralel dapat selesai tidak berurutan saat
+                      // pengguna memilih lebih dari satu foto.
+                      _getFiles();
                     }
                   },
                   child: const Text('+ Upload Foto Lainnya'),
@@ -98,7 +97,15 @@ class _UploadFilesState extends State<UploadFiles> {
                             Container(
                               margin: const EdgeInsets.only(right: 10),
                               height: 90,
-                              child: Image.file(File(item.name!)),
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(8),
+                                child: Image.file(
+                                  File(item.name!),
+                                  width: 120,
+                                  height: 90,
+                                  fit: BoxFit.cover,
+                                ),
+                              ),
                             )
                         ],
                       ),
