@@ -500,9 +500,49 @@ namespace Indexsafe.Api.Controllers
         public async Task<IActionResult> GetMyPermissions()
         {
             var userNik = GetCurrentNik();
+            if (string.IsNullOrWhiteSpace(userNik))
+            {
+                return Unauthorized(new { status = false, message = "Sesi tidak valid." });
+            }
+
             var perm = await _context.UserScanPermissions
-                .AsNoTracking()
                 .FirstOrDefaultAsync(p => p.Nik == userNik);
+
+            // Jika belum ada di tbl_m_user_scan_permission, otomatis create record default (CanScanAcara = true)
+            // Menjamin user pertama kali buka modul scan otomatis dapat izin scan acara
+            if (perm == null)
+            {
+                try
+                {
+                    var userName = GetCurrentName();
+                    var userDept = GetCurrentDepartment();
+                    var userComp = GetCurrentCompany();
+
+                    perm = new UserScanPermission
+                    {
+                        Nik = userNik,
+                        Nama = userName,
+                        Departemen = userDept,
+                        Perusahaan = userComp,
+                        CanScanAcara = true, // Default: Semua user otomatis mendapat modul scan acara
+                        CanScanMinePermit = false,
+                        CanScanPermitPelanggaran = false,
+                        CanScanPermitKeluarMasuk = false,
+                        CanScanSimper = false,
+                        CanScanCommissioning = false,
+                        CanScanSpecialPermit = false,
+                        CanScanOther = false,
+                        UpdatedAt = DateTime.Now,
+                        UpdatedBy = "System (Auto Provision)"
+                    };
+                    _context.UserScanPermissions.Add(perm);
+                    await _context.SaveChangesAsync();
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[QrController] Error auto-creating UserScanPermission: {ex.Message}");
+                }
+            }
 
             return Ok(new
             {

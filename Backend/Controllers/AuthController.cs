@@ -275,9 +275,50 @@ namespace Indexsafe.Api.Controllers
                     existingAppUser.Role = role;
                 }
                 existingAppUser.LastLogin = DateTime.Now;
-                _context.AppUsers.Update(existingAppUser);
             }
             await _context.SaveChangesAsync();
+
+            // Auto-provision hak akses scan: Pengguna pertama kali login otomatis mendapatkan izin scan acara (CanScanAcara = true)
+            // Terintegrasi langsung dengan Web Admin http://localhost:5111/UserScan/Index
+            try
+            {
+                var scanPerm = await _context.UserScanPermissions.FirstOrDefaultAsync(p => p.Nik == nrp);
+                if (scanPerm == null)
+                {
+                    scanPerm = new UserScanPermission
+                    {
+                        Nik = nrp,
+                        Nama = fullName,
+                        Departemen = deptName,
+                        Perusahaan = companyName,
+                        CanScanAcara = true, // Default: Pengguna baru otomatis mendapatkan izin scan acara
+                        CanScanMinePermit = false,
+                        CanScanPermitPelanggaran = false,
+                        CanScanPermitKeluarMasuk = false,
+                        CanScanSimper = false,
+                        CanScanCommissioning = false,
+                        CanScanSpecialPermit = false,
+                        CanScanOther = false,
+                        UpdatedAt = DateTime.Now,
+                        UpdatedBy = "System (Auto First Login)"
+                    };
+                    _context.UserScanPermissions.Add(scanPerm);
+                    await _context.SaveChangesAsync();
+                }
+                else if (string.IsNullOrEmpty(scanPerm.Nama) || string.IsNullOrEmpty(scanPerm.Departemen) || string.IsNullOrEmpty(scanPerm.Perusahaan))
+                {
+                    scanPerm.Nama = fullName;
+                    scanPerm.Departemen = deptName;
+                    scanPerm.Perusahaan = companyName;
+                    scanPerm.UpdatedAt = DateTime.Now;
+                    _context.UserScanPermissions.Update(scanPerm);
+                    await _context.SaveChangesAsync();
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[AuthController] Auto-provision UserScanPermission error: {ex.Message}");
+            }
 
             // Generate JWT Token
             var token = _jwtService.GenerateToken(

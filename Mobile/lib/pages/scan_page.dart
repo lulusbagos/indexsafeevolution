@@ -2886,12 +2886,13 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
               IconButton(
                 onPressed: () {
                   HapticFeedback.lightImpact();
+                  _loadMyPermissions();
                   _loadEvents();
                   if (_hasCameraPermission && _scannerController != null) {
                     _scannerController?.start();
                   }
                 },
-                tooltip: 'Refresh',
+                tooltip: 'Refresh Izin & Acara',
                 style: IconButton.styleFrom(
                   backgroundColor: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
                   foregroundColor: isDark ? const Color(0xFFE2E8F0) : const Color(0xFF475569),
@@ -3217,17 +3218,39 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
                     decoration: BoxDecoration(
                       color: const Color(0xFF0F172A).withValues(alpha: .80),
                       borderRadius: BorderRadius.circular(22),
-                      border: Border.all(color: Colors.white.withValues(alpha: .15)),
+                      border: Border.all(
+                        color: (!_canScanAcara && !_canScanMinePermit)
+                            ? const Color(0xFFEF4444).withValues(alpha: .4)
+                            : Colors.white.withValues(alpha: .15),
+                      ),
                     ),
-                    child: const Row(
+                    child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.center_focus_strong_rounded, size: 16, color: Color(0xFF38BDF8)),
-                        SizedBox(width: 8),
+                        Icon(
+                          (!_canScanAcara && !_canScanMinePermit)
+                              ? Icons.gpp_bad_rounded
+                              : (_canScanMinePermit && !_canScanAcara)
+                                  ? Icons.badge_rounded
+                                  : Icons.center_focus_strong_rounded,
+                          size: 16,
+                          color: (!_canScanAcara && !_canScanMinePermit)
+                              ? const Color(0xFFEF4444)
+                              : (_canScanMinePermit && !_canScanAcara)
+                                  ? const Color(0xFF10B981)
+                                  : const Color(0xFF38BDF8),
+                        ),
+                        const SizedBox(width: 8),
                         Text(
-                          'Arahkan kamera ke QR Acara atau Mine Permit',
+                          (!_canScanAcara && !_canScanMinePermit)
+                              ? 'Izin scan dinonaktifkan Admin (User Scan)'
+                              : (_canScanMinePermit && !_canScanAcara)
+                                  ? 'Mode Khusus: Scan Mine Permit & Petugas'
+                                  : 'Arahkan kamera ke QR Acara atau Mine Permit',
                           style: TextStyle(
-                            color: Colors.white,
+                            color: (!_canScanAcara && !_canScanMinePermit)
+                                ? const Color(0xFFFCA5A5)
+                                : Colors.white,
                             fontSize: 12,
                             fontWeight: FontWeight.w700,
                           ),
