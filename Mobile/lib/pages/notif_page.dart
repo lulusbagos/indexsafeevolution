@@ -208,14 +208,25 @@ class _NotifPageState extends State<NotifPage> {
               }
             }
 
-            final isHazard = !isCoaching && !isRoster && (typeLower.contains('hazard') || urlLower.contains('hazard'));
-            final isInspect = !isCoaching && !isRoster && (typeLower.contains('inspect') || urlLower.contains('inspect'));
+            final isViolation = typeLower.contains('violation') ||
+                titleLower.contains('pelanggaran');
+
+            final isGateMovement = typeLower.contains('movement') ||
+                titleLower.contains('gerbang') ||
+                titleLower.contains('gate');
+
+            final isHazard = !isCoaching && !isRoster && !isViolation && !isGateMovement && (typeLower.contains('hazard') || urlLower.contains('hazard'));
+            final isInspect = !isCoaching && !isRoster && !isViolation && !isGateMovement && (typeLower.contains('inspect') || urlLower.contains('inspect'));
 
             final String category = isCoaching
                 ? 'coaching'
                 : (isRoster
                     ? 'roster'
-                    : (isHazard ? 'hazard' : (isInspect ? 'inspection' : 'general')));
+                    : (isViolation
+                        ? 'violation'
+                        : (isGateMovement
+                            ? 'movement'
+                            : (isHazard ? 'hazard' : (isInspect ? 'inspection' : 'general')))));
 
             combined.add({
               'id': n.id,
@@ -232,14 +243,28 @@ class _NotifPageState extends State<NotifPage> {
               'action_text': n.actionText,
               'is_read': n.isRead,
               'is_actioned': n.isActioned,
-              'is_action_required': (isCoaching || isRoster) ? false : n.isActionRequired,
+              'is_action_required': (isCoaching || isRoster || isGateMovement) ? false : (isViolation ? true : n.isActionRequired),
               'date': n.createdAt != null ? DateFormat('yyyy-MM-dd').format(n.createdAt!) : '',
               'time': n.createdAt != null ? DateFormat('HH:mm').format(n.createdAt!) : '',
               'created_at_dt': n.createdAt ?? DateTime.now(),
-              // Coaching / Roster informasi tidak ada penalty status (-1)
-              'status': isCoaching ? -1 : (isRoster ? (n.isRead ? 1 : 0) : (n.isActioned ? 2 : (n.isRead ? 1 : 0))),
-              'area_name': isCoaching ? 'Kinerja & Pembinaan' : (isRoster ? 'Jadwal Kerja & SAP' : (isHazard ? 'K3 Temuan Lapangan' : 'Sistem SAP')),
-              'location_name': isRoster ? 'Pengaturan Roster' : (n.url ?? ''),
+              // Coaching / Roster / Movement tidak ada status penalti (-1)
+              'status': isCoaching ? -1 : (isRoster || isGateMovement ? (n.isRead ? 1 : 0) : (isViolation ? 0 : (n.isActioned ? 2 : (n.isRead ? 1 : 0)))),
+              'area_name': isCoaching
+                  ? 'Kinerja & Pembinaan'
+                  : (isRoster
+                      ? 'Jadwal Kerja & SAP'
+                      : (isViolation
+                          ? 'K3 Pelanggaran Permit'
+                          : (isGateMovement
+                              ? 'Security & Akses Gerbang'
+                              : (isHazard ? 'K3 Temuan Lapangan' : 'Sistem SAP')))),
+              'location_name': isRoster
+                  ? 'Pengaturan Roster'
+                  : (isViolation
+                      ? 'Area Operasional Tambang'
+                      : (isGateMovement
+                          ? 'Pos Security Tambang'
+                          : (n.url ?? ''))),
             });
           }
         },
@@ -865,7 +890,13 @@ class _NotifPageState extends State<NotifPage> {
     } else {
       IconData iconData = Icons.notifications_active_rounded;
       Color iconColor = fallbackColor;
-      if (clean.contains('hazard')) {
+      if (clean.contains('violation')) {
+        iconData = Icons.gavel_rounded;
+        iconColor = const Color(0xFFDC2626);
+      } else if (clean.contains('movement') || clean.contains('gate')) {
+        iconData = Icons.meeting_room_rounded;
+        iconColor = const Color(0xFF0284C7);
+      } else if (clean.contains('hazard')) {
         iconData = Icons.warning_amber_rounded;
         iconColor = const Color(0xFFEA580C);
       } else if (clean.contains('inspect') || clean.contains('simama')) {
@@ -1005,33 +1036,50 @@ class _NotifPageState extends State<NotifPage> {
     final isPjaTag = notifType.contains('pja') || itemTitleLower.contains('pja');
     final isPicTag = notifType.contains('pic') || itemTitleLower.contains('pic');
 
-    final primaryTheme = isCoaching
-        ? const Color(0xFF7C3AED)
-        : (isRoster
-            ? const Color(0xFF7C3AED)
-            : (isPicTag
-                ? const Color(0xFF2563EB)
-                : (isPjaTag
-                    ? (isInspection ? const Color(0xFF0F766E) : const Color(0xFFEA580C))
-                    : (isHazard
-                        ? const Color(0xFFE65100)
-                        : (isInspection
-                            ? const Color(0xFF0288D1)
-                            : const Color(0xFF00897B))))));
+    final isViolation = category.contains('violation') ||
+        notifType.contains('violation') ||
+        itemTitleLower.contains('pelanggaran');
 
-    final bgTheme = isCoaching
-        ? const Color(0xFFF5F3FF)
-        : (isRoster
-            ? const Color(0xFFF3E8FF)
-            : (isPicTag
-                ? const Color(0xFFEFF6FF)
-                : (isPjaTag
-                    ? (isInspection ? const Color(0xFFF0FDF4) : const Color(0xFFFFF7ED))
-                    : (isHazard
-                        ? const Color(0xFFFFF3E0)
-                        : (isInspection
-                            ? const Color(0xFFE1F5FE)
-                            : const Color(0xFFE0F2F1))))));
+    final isGateMovement = category.contains('movement') ||
+        notifType.contains('movement') ||
+        itemTitleLower.contains('gerbang') ||
+        itemTitleLower.contains('gate');
+
+    final primaryTheme = isViolation
+        ? const Color(0xFFDC2626)
+        : (isGateMovement
+            ? const Color(0xFF0284C7)
+            : (isCoaching
+                ? const Color(0xFF7C3AED)
+                : (isRoster
+                    ? const Color(0xFF7C3AED)
+                    : (isPicTag
+                        ? const Color(0xFF2563EB)
+                        : (isPjaTag
+                            ? (isInspection ? const Color(0xFF0F766E) : const Color(0xFFEA580C))
+                            : (isHazard
+                                ? const Color(0xFFE65100)
+                                : (isInspection
+                                    ? const Color(0xFF0288D1)
+                                    : const Color(0xFF00897B))))))));
+
+    final bgTheme = isViolation
+        ? const Color(0xFFFEE2E2)
+        : (isGateMovement
+            ? const Color(0xFFE0F2FE)
+            : (isCoaching
+                ? const Color(0xFFF5F3FF)
+                : (isRoster
+                    ? const Color(0xFFF3E8FF)
+                    : (isPicTag
+                        ? const Color(0xFFEFF6FF)
+                        : (isPjaTag
+                            ? (isInspection ? const Color(0xFFF0FDF4) : const Color(0xFFFFF7ED))
+                            : (isHazard
+                                ? const Color(0xFFFFF3E0)
+                                : (isInspection
+                                    ? const Color(0xFFE1F5FE)
+                                    : const Color(0xFFE0F2F1))))))));
 
     final statusInt = (item['status'] as int?) ?? (isCoaching ? -1 : 0);
     final String statusText = (statusInt >= 0 && statusInt < globals.status.length)
@@ -1048,7 +1096,11 @@ class _NotifPageState extends State<NotifPage> {
     final locName = titleCase(item['location_name']?.toString() ?? '-');
 
     String moduleBadge;
-    if (isCoaching) {
+    if (isViolation) {
+      moduleBadge = 'PELANGGARAN K3';
+    } else if (isGateMovement) {
+      moduleBadge = 'AKSES GERBANG';
+    } else if (isCoaching) {
       moduleBadge = 'COACHING';
     } else if (isRoster) {
       moduleBadge = notifType.contains('tugas') ? 'PERIODE TUGAS' : 'ROSTER KERJA';
@@ -1107,19 +1159,23 @@ class _NotifPageState extends State<NotifPage> {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Icon(
-                            isCoaching
-                                ? Icons.psychology_outlined
-                                : (isRoster
-                                    ? (item['notif_type']?.toString().contains('tugas') == true
-                                        ? Icons.flight_takeoff_rounded
-                                        : Icons.calendar_month_rounded)
-                                    : (isPicTag
-                                        ? Icons.assignment_ind_rounded
-                                        : (isPjaTag
-                                            ? Icons.shield_rounded
-                                            : (isHazard
-                                                ? Icons.warning_amber_rounded
-                                                : Icons.fact_check_outlined)))),
+                            isViolation
+                                ? Icons.gavel_rounded
+                                : (isGateMovement
+                                    ? Icons.meeting_room_rounded
+                                    : (isCoaching
+                                        ? Icons.psychology_outlined
+                                        : (isRoster
+                                            ? (item['notif_type']?.toString().contains('tugas') == true
+                                                ? Icons.flight_takeoff_rounded
+                                                : Icons.calendar_month_rounded)
+                                            : (isPicTag
+                                                ? Icons.assignment_ind_rounded
+                                                : (isPjaTag
+                                                    ? Icons.shield_rounded
+                                                    : (isHazard
+                                                        ? Icons.warning_amber_rounded
+                                                        : Icons.fact_check_outlined)))))),
                             size: 13,
                             color: primaryTheme,
                           ),

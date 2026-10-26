@@ -933,6 +933,32 @@ namespace Indexsafe.Api.Controllers
             _context.PermitViolations.Add(violation);
             await _context.SaveChangesAsync();
 
+            // Create in-app notification for the scanned employee
+            try
+            {
+                var notifViolation = new Notification
+                {
+                    RecipientNik = req.ViolatorNik.Trim(),
+                    Title = "Peringatan Catatan Pelanggaran K3",
+                    Message = $"Anda tercatat melakukan pelanggaran K3: '{violation.ViolationType}' di {violation.ViolationLocation ?? "Area Operasional"}. Tindakan: {violation.ActionTaken ?? "Teguran & Pencatatan"}. Dicatat oleh Petugas {violation.ReportedByName} ({violation.ReportedByNik}).",
+                    Url = $"/Permit/Violation/{violation.Id}",
+                    NotifType = "permit_violation",
+                    Category = "violation",
+                    SenderName = violation.ReportedByName ?? "Petugas K3 / Security",
+                    Priority = "urgent",
+                    ActionText = "Lihat Detail",
+                    IsRead = false,
+                    IsActioned = false,
+                    CreatedAt = DateTime.Now
+                };
+                _context.Notifications.Add(notifViolation);
+                await _context.SaveChangesAsync();
+            }
+            catch (Exception notifEx)
+            {
+                Console.WriteLine($"[RecordPermitViolation] Failed to create notification: {notifEx.Message}");
+            }
+
             return Ok(new
             {
                 status = true,
@@ -998,6 +1024,32 @@ namespace Indexsafe.Api.Controllers
 
             _context.PermitGateLogs.Add(log);
             await _context.SaveChangesAsync();
+
+            // Create in-app notification for the scanned employee
+            try
+            {
+                var notifMovement = new Notification
+                {
+                    RecipientNik = req.Nik.Trim(),
+                    Title = $"Pencatatan Gerbang: {log.Direction} Tambang",
+                    Message = $"Anda tercatat {log.Direction} melalui {log.LokasiPos} pada {log.CreatedAt:dd/MM/yyyy HH:mm} WITA. Keperluan: {log.Keperluan}{(string.IsNullOrWhiteSpace(log.NomorUnit) ? "" : $" | Unit: {log.NomorUnit}")}. Dicatat oleh Petugas {log.CreatedByName}.",
+                    Url = $"/Permit/Movement/{log.Id}",
+                    NotifType = "permit_gate_movement",
+                    Category = "movement",
+                    SenderName = log.CreatedByName ?? "Petugas Security Gate",
+                    Priority = "normal",
+                    ActionText = "Lihat Riwayat",
+                    IsRead = false,
+                    IsActioned = false,
+                    CreatedAt = DateTime.Now
+                };
+                _context.Notifications.Add(notifMovement);
+                await _context.SaveChangesAsync();
+            }
+            catch (Exception notifEx)
+            {
+                Console.WriteLine($"[RecordPermitMovement] Failed to create notification: {notifEx.Message}");
+            }
 
             return Ok(new
             {
