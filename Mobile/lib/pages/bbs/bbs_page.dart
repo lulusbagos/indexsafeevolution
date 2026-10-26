@@ -12,12 +12,14 @@ import '../../services/offline_sync_service.dart';
 import 'bbs_form_page.dart';
 import 'bbs_model.dart';
 
-const _bbsBlue = Color(0xFF075985);
-const _bbsGreen = Color(0xFF059669);
-const _bbsBackground = Color(0xFFF4F7FB);
+const _bbsBlue = Color(0xFF0284C7);
+const _bbsGreen = Color(0xFF16A34A);
+const _bbsBackground = Color(0xFFF8FAFC);
 
 class BbsPage extends StatefulWidget {
-  const BbsPage({super.key});
+  const BbsPage({this.initialClassification, super.key});
+
+  final String? initialClassification;
 
   @override
   State<BbsPage> createState() => _BbsPageState();
@@ -25,283 +27,37 @@ class BbsPage extends StatefulWidget {
 
 class _BbsPageState extends State<BbsPage> {
   late Future<List<BbsObservation>> _future;
+  String _filter = 'Semua';
+  final _searchCtrl = TextEditingController();
+  String _searchQuery = '';
 
   @override
   void initState() {
     super.initState();
-    _reload();
-  }
-
-  void _reload() => _future = BbsStorage.load();
-
-  Future<void> _open(Widget page) async {
-    await Navigator.push(context, MaterialPageRoute(builder: (_) => page));
-    if (mounted) {
-      setState(() {
-        _reload();
-      });
+    if (widget.initialClassification != null) {
+      _filter = widget.initialClassification!;
     }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: _bbsBackground,
-      appBar: const TopBar(title: 'Behaviour Based Safety'),
-      body: FutureBuilder<List<BbsObservation>>(
-        future: _future,
-        builder: (context, snapshot) {
-          final data = snapshot.data ?? const <BbsObservation>[];
-          return ListView(padding: const EdgeInsets.all(20), children: [
-            _BbsHero(
-              total: data.length,
-              safe: data.where((e) => e.classification == 'Perilaku Aman').length,
-              atRisk: data.where((e) => e.classification != 'Perilaku Aman').length,
-            ),
-            const SizedBox(height: 18),
-            _BbsActionCard(title: 'Observasi Perilaku', subtitle: 'Catat perilaku aman dan berisiko di lapangan.', icon: Icons.visibility_rounded, color: _bbsBlue, onTap: () => _open(const BbsFormPage())),
-            _BbsActionCard(title: 'Riwayat Observasi', subtitle: 'Lihat hasil observasi BBS Anda.', icon: Icons.history_rounded, color: const Color(0xFF6366F1), badge: data.length, onTap: () => _open(const BbsListPage())),
-          ]);
-        },
-      ),
-      floatingActionButton: FloatingActionButton.extended(onPressed: () => _open(const BbsFormPage()), backgroundColor: _bbsBlue, foregroundColor: Colors.white, icon: const Icon(Icons.add_rounded), label: const Text('Buat Observasi')),
-    );
-  }
-}
-
-class _BbsHero extends StatelessWidget {
-  const _BbsHero({
-    required this.total,
-    required this.safe,
-    required this.atRisk,
-  });
-
-  final int total;
-  final int safe;
-  final int atRisk;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF075985), Color(0xFF0284C7)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x33075985),
-            blurRadius: 18,
-            offset: Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Row(
-            children: [
-              CircleAvatar(
-                radius: 24,
-                backgroundColor: Color(0x33FFFFFF),
-                child: Icon(Icons.groups_2_rounded, color: Colors.white),
-              ),
-              SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'BBS',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 22,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    Text(
-                      'Behaviour Based Safety',
-                      style: TextStyle(color: Color(0xFFD7F2FF)),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-          Row(
-            children: [
-              _HeroMetric(label: 'Total', value: total),
-              _HeroMetric(label: 'Aman', value: safe),
-              _HeroMetric(label: 'Berisiko', value: atRisk),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _HeroMetric extends StatelessWidget {
-  const _HeroMetric({required this.label, required this.value});
-
-  final String label;
-  final int value;
-
-  @override
-  Widget build(BuildContext context) {
-    return Expanded(
-      child: Column(
-        children: [
-          Text(
-            '$value',
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 20,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            label,
-            textAlign: TextAlign.center,
-            style: const TextStyle(color: Color(0xFFD7F2FF), fontSize: 10),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _BbsActionCard extends StatelessWidget {
-  const _BbsActionCard({
-    required this.title,
-    required this.subtitle,
-    required this.icon,
-    required this.color,
-    required this.onTap,
-    this.badge,
-  });
-
-  final String title;
-  final String subtitle;
-  final IconData icon;
-  final Color color;
-  final VoidCallback onTap;
-  final int? badge;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: Material(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(18),
-          child: Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: const Color(0xFFE2E8F0)),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  width: 50,
-                  height: 50,
-                  decoration: BoxDecoration(
-                    color: color.withValues(alpha: .10),
-                    borderRadius: BorderRadius.circular(15),
-                  ),
-                  child: Icon(icon, color: color),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              title,
-                              style: const TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w800,
-                                color: Color(0xFF172033),
-                              ),
-                            ),
-                          ),
-                          if (badge != null)
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 3,
-                              ),
-                              decoration: BoxDecoration(
-                                color: color.withValues(alpha: .10),
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              child: Text(
-                                '$badge',
-                                style: TextStyle(
-                                  color: color,
-                                  fontWeight: FontWeight.w800,
-                                  fontSize: 11,
-                                ),
-                              ),
-                            ),
-                        ],
-                      ),
-                      const SizedBox(height: 5),
-                      Text(
-                        subtitle,
-                        style: const TextStyle(
-                          color: Color(0xFF667085),
-                          height: 1.35,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 8),
-                const Icon(
-                  Icons.chevron_right_rounded,
-                  color: Color(0xFF98A2B3),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class BbsListPage extends StatefulWidget {
-  const BbsListPage({super.key});
-
-  @override
-  State<BbsListPage> createState() => _BbsListPageState();
-}
-
-class _BbsListPageState extends State<BbsListPage> {
-  late Future<List<BbsObservation>> _future;
-
-  @override
-  void initState() {
-    super.initState();
     _reload();
+  }
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
   }
 
   void _reload() {
-    _future = BbsStorage.load();
+    setState(() {
+      _future = BbsStorage.load();
+    });
+  }
+
+  Future<void> _openCreate() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const BbsFormPage()),
+    );
+    if (mounted) _reload();
   }
 
   Future<void> _deleteLocal(BbsObservation observation) async {
@@ -349,7 +105,7 @@ class _BbsListPageState extends State<BbsListPage> {
     await OfflineSyncService.instance.discard(feature: 'bbs', localId: observation.id);
     await BbsStorage.remove(observation.id);
     if (!mounted) return;
-    setState(_reload);
+    _reload();
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Laporan dihapus dari perangkat.'), behavior: SnackBarBehavior.floating),
     );
@@ -357,66 +113,309 @@ class _BbsListPageState extends State<BbsListPage> {
 
   @override
   Widget build(BuildContext context) {
+    const accent = _bbsBlue;
+
     return Scaffold(
       backgroundColor: _bbsBackground,
-      appBar: const TopBar(title: 'Riwayat BBS'),
+      appBar: const TopBar(title: 'Behaviour Based Safety'),
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
+      floatingActionButton: FloatingActionButton.extended(
+        backgroundColor: accent,
+        foregroundColor: Colors.white,
+        elevation: 3,
+        onPressed: _openCreate,
+        icon: const Icon(Icons.add_rounded),
+        label: const Text(
+          'Buat Observasi',
+          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+        ),
+      ),
       body: FutureBuilder<List<BbsObservation>>(
         future: _future,
         builder: (context, snapshot) {
-          final items = snapshot.data ?? const <BbsObservation>[];
-          return items.isEmpty
-              ? const _EmptyBbs()
-              : ListView.separated(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: items.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 10),
-                  itemBuilder: (context, index) {
-                    final item = items[index];
-                    return _ObservationTile(
-                      observation: item,
-                      onDelete: () => _deleteLocal(item),
-                      onTap: () async {
-                        await Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => BbsDetailPage(item),
+          final allItems = snapshot.data ?? const <BbsObservation>[];
+          final totalCount = allItems.length;
+          final safeCount = allItems.where((e) => e.classification == 'Perilaku Aman').length;
+          final atRiskCount = allItems.where((e) => e.classification != 'Perilaku Aman').length;
+
+          // Filter by status
+          var items = allItems;
+          if (_filter == 'Perilaku Aman') {
+            items = items.where((e) => e.classification == 'Perilaku Aman').toList();
+          } else if (_filter == 'Perilaku Berisiko') {
+            items = items.where((e) => e.classification != 'Perilaku Aman').toList();
+          }
+
+          // Filter by search query
+          if (_searchQuery.isNotEmpty) {
+            final q = _searchQuery.toLowerCase();
+            items = items.where((e) {
+              return e.observedPerson.toLowerCase().contains(q) ||
+                  e.observerNik.toLowerCase().contains(q) ||
+                  e.location.toLowerCase().contains(q) ||
+                  e.category.toLowerCase().contains(q) ||
+                  e.department.toLowerCase().contains(q);
+            }).toList();
+          }
+
+          return RefreshIndicator(
+            onRefresh: () async {
+              _reload();
+              await _future;
+            },
+            color: accent,
+            child: Column(
+              children: [
+                // Top Search & Quick Filter Segment
+                Container(
+                  color: Colors.white,
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
+                  child: Column(
+                    children: [
+                      // Search box
+                      if (allItems.isNotEmpty || _searchQuery.isNotEmpty)
+                        Container(
+                          margin: const EdgeInsets.only(bottom: 10),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF8FAFC),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: const Color(0xFFE2E8F0)),
                           ),
-                        );
-                        if (mounted) setState(_reload);
-                      },
-                    );
-                  },
-                );
+                          child: TextField(
+                            controller: _searchCtrl,
+                            onChanged: (val) => setState(() => _searchQuery = val.trim()),
+                            style: const TextStyle(fontSize: 13),
+                            decoration: InputDecoration(
+                              hintText: 'Cari pekerja, NIK, lokasi, kategori...',
+                              hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12.5),
+                              prefixIcon: const Icon(Icons.search_rounded, color: Color(0xFF64748B), size: 20),
+                              suffixIcon: _searchQuery.isNotEmpty
+                                  ? IconButton(
+                                      icon: const Icon(Icons.clear_rounded, size: 18),
+                                      onPressed: () {
+                                        _searchCtrl.clear();
+                                        setState(() => _searchQuery = '');
+                                      },
+                                    )
+                                  : null,
+                              border: InputBorder.none,
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                            ),
+                          ),
+                        ),
+
+                      // Segmented Filters
+                      Row(
+                        children: [
+                          _FilterSegmentPill(
+                            label: 'Semua',
+                            count: totalCount,
+                            isSelected: _filter == 'Semua',
+                            activeColor: _bbsBlue,
+                            onTap: () => setState(() => _filter = 'Semua'),
+                          ),
+                          const SizedBox(width: 8),
+                          _FilterSegmentPill(
+                            label: 'Aman',
+                            count: safeCount,
+                            isSelected: _filter == 'Perilaku Aman',
+                            activeColor: const Color(0xFF16A34A),
+                            onTap: () => setState(() => _filter = 'Perilaku Aman'),
+                          ),
+                          const SizedBox(width: 8),
+                          _FilterSegmentPill(
+                            label: 'Berisiko',
+                            count: atRiskCount,
+                            isSelected: _filter == 'Perilaku Berisiko',
+                            activeColor: const Color(0xFFDC2626),
+                            onTap: () => setState(() => _filter = 'Perilaku Berisiko'),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const Divider(height: 1, color: Color(0xFFF1F5F9)),
+
+                // Observations List
+                Expanded(
+                  child: items.isEmpty
+                      ? _EmptyBbs(
+                          isFiltered: _filter != 'Semua' || _searchQuery.isNotEmpty,
+                          onResetFilter: () {
+                            _searchCtrl.clear();
+                            setState(() {
+                              _filter = 'Semua';
+                              _searchQuery = '';
+                            });
+                          },
+                          onCreate: _openCreate,
+                        )
+                      : ListView.separated(
+                          physics: const AlwaysScrollableScrollPhysics(
+                            parent: BouncingScrollPhysics(),
+                          ),
+                          padding: const EdgeInsets.fromLTRB(16, 12, 16, 88),
+                          itemCount: items.length,
+                          separatorBuilder: (_, __) => const SizedBox(height: 10),
+                          itemBuilder: (context, index) {
+                            final item = items[index];
+                            return _ObservationTile(
+                              observation: item,
+                              onDelete: () => _deleteLocal(item),
+                              onTap: () async {
+                                await Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => BbsDetailPage(item),
+                                  ),
+                                );
+                                if (mounted) _reload();
+                              },
+                            );
+                          },
+                        ),
+                ),
+              ],
+            ),
+          );
         },
       ),
     );
   }
 }
 
+typedef BbsListPage = BbsPage;
+
+class _FilterSegmentPill extends StatelessWidget {
+  const _FilterSegmentPill({
+    required this.label,
+    required this.count,
+    required this.isSelected,
+    required this.activeColor,
+    required this.onTap,
+  });
+
+  final String label;
+  final int count;
+  final bool isSelected;
+  final Color activeColor;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(10),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          decoration: BoxDecoration(
+            color: isSelected ? activeColor.withValues(alpha: 0.1) : const Color(0xFFF8FAFC),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: isSelected ? activeColor : const Color(0xFFE2E8F0),
+              width: isSelected ? 1.5 : 1,
+            ),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                  color: isSelected ? activeColor : const Color(0xFF475569),
+                ),
+              ),
+              const SizedBox(width: 5),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                decoration: BoxDecoration(
+                  color: isSelected ? activeColor : const Color(0xFFE2E8F0),
+                  borderRadius: BorderRadius.circular(99),
+                ),
+                child: Text(
+                  '$count',
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    color: isSelected ? Colors.white : const Color(0xFF64748B),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _EmptyBbs extends StatelessWidget {
-  const _EmptyBbs();
+  const _EmptyBbs({
+    this.isFiltered = false,
+    this.onResetFilter,
+    this.onCreate,
+  });
+
+  final bool isFiltered;
+  final VoidCallback? onResetFilter;
+  final VoidCallback? onCreate;
 
   @override
   Widget build(BuildContext context) {
     return Center(
-      child: Padding(
+      child: SingleChildScrollView(
         padding: const EdgeInsets.all(32),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.inbox_rounded,
-                size: 64, color: Colors.blueGrey.shade200),
-            const SizedBox(height: 12),
-            const Text(
-              'Belum ada observasi',
-              style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
+            Container(
+              padding: const EdgeInsets.all(18),
+              decoration: const BoxDecoration(
+                color: Color(0xFFF1F5F9),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                isFiltered ? Icons.search_off_rounded : Icons.groups_2_outlined,
+                size: 54,
+                color: Colors.blueGrey.shade300,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              isFiltered ? 'Tidak ada observasi yang cocok' : 'Belum Ada Observasi BBS',
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF0F172A)),
             ),
             const SizedBox(height: 6),
-            const Text(
-              'Observasi BBS yang disimpan akan tampil di sini.',
+            Text(
+              isFiltered
+                  ? 'Coba gunakan kata kunci pencarian lain atau reset filter.'
+                  : 'Catat pengamatan perilaku aman dan berisiko pekerja di lapangan.',
               textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.black54),
+              style: const TextStyle(color: Color(0xFF64748B), fontSize: 12.5),
             ),
+            const SizedBox(height: 18),
+            if (isFiltered)
+              OutlinedButton.icon(
+                onPressed: onResetFilter,
+                icon: const Icon(Icons.refresh_rounded, size: 16),
+                label: const Text('Reset Filter'),
+              )
+            else if (onCreate != null)
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _bbsBlue,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 11),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+                onPressed: onCreate,
+                icon: const Icon(Icons.add_rounded, size: 18),
+                label: const Text('Buat Observasi Pertama', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+              ),
           ],
         ),
       ),

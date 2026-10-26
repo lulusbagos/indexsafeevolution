@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../services/api.dart';
+import '../services/popup_ad_service.dart';
 import '../services/preference.dart';
 import '../utils/globals.dart' as globals;
 import 'dashboard_page.dart';
@@ -36,6 +37,15 @@ class _HomePageState extends State<HomePage> {
       await prefs.setString('bgToken', _api.getToken);
       await prefs.setInt('bgProfile', (_profile?.id ?? 0));
       await prefs.setString('bgNik', (_profile?.noNik ?? ''));
+
+      // Tampilkan iklan popup jika ada dari backend (1 hari sekali)
+      if (mounted) {
+        Future.delayed(const Duration(milliseconds: 700), () {
+          if (mounted) {
+            PopupAdService.checkAndShowPopupAd(context);
+          }
+        });
+      }
     });
   }
 

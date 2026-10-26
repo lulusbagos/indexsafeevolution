@@ -1,9 +1,9 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:geolocator/geolocator.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -13,6 +13,7 @@ import '../../services/database.dart';
 import '../../services/offline_sync_service.dart';
 import '../../services/preference.dart';
 import '../../widgets/top_bar.dart';
+import '../../widgets/sap_form_widgets.dart';
 import 'fci_model.dart';
 
 class FciFormPage extends StatefulWidget {
@@ -62,7 +63,6 @@ class _FciFormPageState extends State<FciFormPage> {
   String? _existingFotoUrl;
 
   bool _isSaving = false;
-  bool _isLoadingGps = false;
 
   // Master Area & Benchmark
   List<String> _masterAreas = [];
@@ -114,6 +114,10 @@ class _FciFormPageState extends State<FciFormPage> {
       _tindakanCtrl.text = d.tindakanPerbaikan ?? '';
       _picCtrl.text = d.pic ?? '';
       _existingFotoUrl = d.fotoUrl;
+
+      if (d.pic != null && d.pic!.isNotEmpty) {
+        _findEmployeeByPicName(d.pic!);
+      }
     }
 
     _loadAreas();
@@ -229,46 +233,7 @@ class _FciFormPageState extends State<FciFormPage> {
     }
   }
 
-  // GPS Fetch
-  Future<void> _getGpsLocation() async {
-    setState(() => _isLoadingGps = true);
-    try {
-      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      if (!serviceEnabled) {
-        _showSnack('Layanan GPS / Lokasi tidak aktif. Silakan aktifkan GPS.');
-        setState(() => _isLoadingGps = false);
-        return;
-      }
 
-      LocationPermission permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-        if (permission == LocationPermission.denied) {
-          _showSnack('Izin lokasi ditolak');
-          setState(() => _isLoadingGps = false);
-          return;
-        }
-      }
-
-      final pos = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
-        timeLimit: const Duration(seconds: 10),
-      );
-
-      setState(() {
-        _latCtrl.text = pos.latitude.toStringAsFixed(6);
-        _lngCtrl.text = pos.longitude.toStringAsFixed(6);
-        if (_lokasiCtrl.text.isEmpty) {
-          _lokasiCtrl.text = '${_areaCtrl.text} (${pos.latitude.toStringAsFixed(4)}, ${pos.longitude.toStringAsFixed(4)})';
-        }
-        _isLoadingGps = false;
-      });
-      _showSnack('Koordinat GPS berhasil diperoleh!', isSuccess: true);
-    } catch (e) {
-      setState(() => _isLoadingGps = false);
-      _showSnack('Gagal mengambil koordinat GPS: $e');
-    }
-  }
 
   // Photo Pickers
   Future<void> _pickImage(ImageSource source) async {
@@ -287,6 +252,85 @@ class _FciFormPageState extends State<FciFormPage> {
     } catch (e) {
       _showSnack('Gagal memilih foto: $e');
     }
+  }
+
+
+
+  // Resolve Photo URLs
+  String _resolvePhotoUrl(String url) {
+    final clean = url.trim();
+    if (clean.startsWith('http://') || clean.startsWith('https://')) return clean;
+    return '${_api.baseUrl}/image/$clean';
+  }
+
+  String _resolveEmployeePhotoUrl(String? foto) {
+    if (foto == null || foto.trim().isEmpty) return '';
+    final clean = foto.trim();
+    if (clean.startsWith('http://') || clean.startsWith('https://')) return clean;
+    if (clean.startsWith('/uploads/')) return 'https://mbssap.indexim.id$clean';
+    if (clean.startsWith('/')) return '${_api.baseUrl}$clean';
+    return '${_api.baseUrl}/uploads/$clean';
+  }
+
+  // Ultra-Lightweight Avatar with Offline Fallback
+  Widget _buildEmployeeAvatar(String? photo, String name, {double radius = 18}) {
+    final fallback = CircleAvatar(
+      radius: radius,
+      backgroundColor: _tealColor,
+      child: Text(
+        name.trim().isNotEmpty ? name.trim()[0].toUpperCase() : 'P',
+        style: TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.bold,
+          fontSize: radius * 0.85,
+        ),
+      ),
+    );
+
+    final photoUrl = _resolveEmployeePhotoUrl(photo);
+    if (photoUrl.isEmpty) {
+      return fallback;
+    }
+
+    return ClipOval(
+      child: SizedBox(
+        width: radius * 2,
+        height: radius * 2,
+        child: Image.network(
+          photoUrl,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => fallback,
+          loadingBuilder: (context, child, loadingProgress) {
+            if (loadingProgress == null) return child;
+            return fallback;
+          },
+        ),
+      ),
+    );
+  }
+
+  // Find Employee by Name / NIK from local SQLite
+  Future<void> _findEmployeeByPicName(String text) async {
+    try {
+      final sqldb = await _db.database;
+      final cleanText = text.trim().replaceAll("'", "''");
+      final rows = await sqldb.rawQuery(
+        "SELECT no_nik, nama_lengkap, depart, posisi, departemen, jabatan, perusahaan, foto FROM employees WHERE '$cleanText' LIKE '%' || no_nik || '%' OR '$cleanText' LIKE '%' || nama_lengkap || '%' LIMIT 1",
+      );
+      if (rows.isNotEmpty && mounted) {
+        final r = rows.first;
+        setState(() {
+          _selectedPicEmployee = _FciEmployeeItem(
+            nik: r['no_nik']?.toString().trim() ?? '',
+            nama: r['nama_lengkap']?.toString().trim() ?? '',
+            departemen: (r['departemen'] ?? r['depart'])?.toString().trim() ?? '',
+            jabatan: (r['jabatan'] ?? r['posisi'])?.toString().trim() ?? '',
+            perusahaan: r['perusahaan']?.toString().trim() ?? '',
+            foto: r['foto']?.toString().trim() ?? '',
+          );
+        });
+      }
+    } catch (_) {}
   }
 
   void _showSnack(String msg, {bool isSuccess = false}) {
@@ -574,67 +618,140 @@ class _FciFormPageState extends State<FciFormPage> {
     );
   }
 
-  // Employee / PIC Search
+  // Employee / PIC Search (A-Z sorted, prioritized login company, supports multi-company, ONLY TARGET SAP)
   Future<List<_FciEmployeeItem>> _searchEmployees(String query) async {
-    final cleanQ = query.trim().replaceAll("'", "''");
+    final cleanQ = query.trim();
     final list = <_FciEmployeeItem>[];
 
-    // 1. Search local SQLite employees table
+    final profile = PreferenceService.getProfile();
+    final userCompany = profile?.company?.trim() ?? '';
+    final userCompanyId = profile?.companyId ?? 0;
+
+    // 1. Online First: Query API personil pemegang Target SAP
     try {
-      final sqldb = await _db.database;
-      final rows = await sqldb.rawQuery(
-        cleanQ.isEmpty
-            ? "SELECT no_nik, nama_lengkap, depart, posisi, departemen, jabatan, perusahaan FROM employees WHERE no_nik IS NOT NULL AND nama_lengkap IS NOT NULL AND nama_lengkap != '' LIMIT 35"
-            : "SELECT no_nik, nama_lengkap, depart, posisi, departemen, jabatan, perusahaan FROM employees WHERE (no_nik LIKE '%$cleanQ%' OR nama_lengkap LIKE '%$cleanQ%' OR depart LIKE '%$cleanQ%') AND nama_lengkap IS NOT NULL LIMIT 40",
+      final serverEmployees = await _api.searchFciPicEmployees(
+        cleanQ,
+        companyId: userCompanyId,
+        companyName: userCompany,
       );
 
+      if (serverEmployees != null && serverEmployees.isNotEmpty) {
+        for (final item in serverEmployees) {
+          final nik = item['nik']?.toString().trim() ?? '';
+          final nama = item['nama']?.toString().trim() ?? '';
+          if (nik.isNotEmpty && nama.isNotEmpty && !list.any((x) => x.nik == nik)) {
+            list.add(_FciEmployeeItem(
+              nik: nik,
+              nama: nama,
+              departemen: item['departemen']?.toString().trim() ?? '',
+              jabatan: item['jabatan']?.toString().trim() ?? '',
+              perusahaan: item['perusahaan']?.toString().trim() ?? '',
+              foto: item['foto']?.toString().trim() ?? '',
+            ));
+          }
+        }
+
+        // Cache online results into local SQLite employees table in background
+        Future.microtask(() async {
+          try {
+            final sqldb = await _db.database;
+            final batch = sqldb.batch();
+            for (final emp in list) {
+              batch.rawInsert('''
+                INSERT OR REPLACE INTO employees (no_nik, nama_lengkap, depart, departemen, posisi, jabatan, perusahaan, foto, company_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+              ''', [
+                emp.nik,
+                emp.nama,
+                emp.departemen,
+                emp.departemen,
+                emp.jabatan,
+                emp.jabatan,
+                emp.perusahaan,
+                emp.foto,
+                (userCompany.isNotEmpty && emp.perusahaan.toLowerCase() == userCompany.toLowerCase()) ? userCompanyId : 999,
+              ]);
+            }
+            await batch.commit(noResult: true);
+          } catch (_) {}
+        });
+
+        return list;
+      }
+    } catch (e) {
+      debugPrint('[FciFormPage] Online Target SAP employee search error: $e');
+    }
+
+    // 2. Offline Fallback: Search local SQLite employees table
+    try {
+      final sqldb = await _db.database;
+      final List<dynamic> whereArgs = [];
+      String whereClause = "no_nik IS NOT NULL AND nama_lengkap IS NOT NULL AND nama_lengkap != ''";
+
+      if (cleanQ.isNotEmpty) {
+        final terms = cleanQ.replaceAll("'", "''").split(' ').where((t) => t.trim().isNotEmpty).toList();
+        final conds = <String>[];
+        for (final t in terms) {
+          conds.add("(no_nik LIKE ? OR nama_lengkap LIKE ? OR depart LIKE ? OR departemen LIKE ? OR perusahaan LIKE ?)");
+          final wildcard = '%$t%';
+          whereArgs.addAll([wildcard, wildcard, wildcard, wildcard, wildcard]);
+        }
+        if (conds.isNotEmpty) {
+          whereClause += " AND (${conds.join(' AND ')})";
+        }
+      }
+
+      final sql = '''
+        SELECT no_nik, nama_lengkap, depart, posisi, departemen, jabatan, perusahaan, foto,
+        CASE 
+          WHEN (perusahaan IS NOT NULL AND LOWER(perusahaan) = LOWER(?)) 
+            OR (company_id IS NOT NULL AND company_id = ?) 
+          THEN 0 
+          ELSE 1 
+        END AS priority_company
+        FROM employees
+        WHERE $whereClause
+        ORDER BY priority_company ASC, nama_lengkap COLLATE NOCASE ASC
+        LIMIT 100
+      ''';
+
+      final queryArgs = [userCompany, userCompanyId, ...whereArgs];
+      final rows = await sqldb.rawQuery(sql, queryArgs);
+
       for (final r in rows) {
-        list.add(_FciEmployeeItem(
-          nik: r['no_nik']?.toString().trim() ?? '',
-          nama: r['nama_lengkap']?.toString().trim() ?? '',
-          departemen: (r['departemen'] ?? r['depart'])?.toString().trim() ?? '',
-          jabatan: (r['jabatan'] ?? r['posisi'])?.toString().trim() ?? '',
-          perusahaan: r['perusahaan']?.toString().trim() ?? '',
-        ));
+        final nik = r['no_nik']?.toString().trim() ?? '';
+        final nama = r['nama_lengkap']?.toString().trim() ?? '';
+        if (nik.isNotEmpty && nama.isNotEmpty && !list.any((x) => x.nik == nik)) {
+          list.add(_FciEmployeeItem(
+            nik: nik,
+            nama: nama,
+            departemen: (r['departemen'] ?? r['depart'])?.toString().trim() ?? '',
+            jabatan: (r['jabatan'] ?? r['posisi'])?.toString().trim() ?? '',
+            perusahaan: r['perusahaan']?.toString().trim() ?? '',
+            foto: r['foto']?.toString().trim() ?? '',
+          ));
+        }
       }
     } catch (e) {
       debugPrint('[FciFormPage] Local employee query error: $e');
-    }
-
-    // 2. Fallback / Search via Server API if local is small
-    if (list.length < 5 && cleanQ.isNotEmpty) {
-      try {
-        final res = await _api.searchPja(cleanQ, lintasPerusahaan: true);
-        res.fold((_) {}, (serverData) {
-          for (final item in serverData) {
-            final nik = item['nik']?.toString().trim() ?? '';
-            final nama = item['nama']?.toString().trim() ?? '';
-            if (nik.isNotEmpty && nama.isNotEmpty && !list.any((x) => x.nik == nik)) {
-              list.add(_FciEmployeeItem(
-                nik: nik,
-                nama: nama,
-                departemen: (item['departemen'] ?? item['depart'])?.toString().trim() ?? '',
-                jabatan: (item['jabatan'] ?? item['posisi'])?.toString().trim() ?? '',
-                perusahaan: item['perusahaan']?.toString().trim() ?? '',
-              ));
-            }
-          }
-        });
-      } catch (_) {}
     }
 
     return list;
   }
 
   void _showEmployeePickerModal() {
+    final profile = PreferenceService.getProfile();
+    final userCompany = profile?.company?.trim() ?? '';
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) {
-        String filter = '';
+        final searchCtrl = TextEditingController();
         List<_FciEmployeeItem> results = [];
         bool isSearching = true;
+        Timer? debounceTimer;
 
         return StatefulBuilder(
           builder: (modalCtx, setModalState) {
@@ -649,7 +766,7 @@ class _FciFormPageState extends State<FciFormPage> {
               }
             }
 
-            if (results.isEmpty && isSearching && filter.isEmpty) {
+            if (results.isEmpty && isSearching && searchCtrl.text.isEmpty) {
               performSearch('');
             }
 
@@ -676,12 +793,15 @@ class _FciFormPageState extends State<FciFormPage> {
                         const Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text('Pilih PIC Tindakan Perbaikan', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                            Text('Pilih pengawas / personil dari data karyawan', style: TextStyle(color: Color(0xFF64748B), fontSize: 12)),
+                            Text('Pilih PIC', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                            Text('Pilih personil penanggung jawab', style: TextStyle(color: Color(0xFF64748B), fontSize: 12)),
                           ],
                         ),
                         IconButton(
-                          onPressed: () => Navigator.pop(modalCtx),
+                          onPressed: () {
+                            debounceTimer?.cancel();
+                            Navigator.pop(modalCtx);
+                          },
                           icon: const Icon(Icons.close_rounded, color: Color(0xFF64748B)),
                         ),
                       ],
@@ -697,22 +817,28 @@ class _FciFormPageState extends State<FciFormPage> {
                         border: Border.all(color: const Color(0xFFE2E8F0)),
                       ),
                       child: TextField(
+                        controller: searchCtrl,
                         autofocus: false,
                         onChanged: (val) {
-                          filter = val;
-                          performSearch(val);
+                          setModalState(() {});
+                          debounceTimer?.cancel();
+                          debounceTimer = Timer(const Duration(milliseconds: 300), () {
+                            performSearch(val);
+                          });
                         },
                         decoration: InputDecoration(
-                          hintText: 'Cari nama, NIK, atau departemen...',
+                          hintText: 'Cari nama, NIK, atau perusahaan...',
                           hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
                           prefixIcon: const Icon(Icons.search_rounded, color: _tealColor),
                           border: InputBorder.none,
                           contentPadding: const EdgeInsets.symmetric(vertical: 14),
-                          suffixIcon: filter.isNotEmpty
+                          suffixIcon: searchCtrl.text.isNotEmpty
                               ? IconButton(
                                   icon: const Icon(Icons.clear_rounded, size: 18),
                                   onPressed: () {
-                                    setModalState(() => filter = '');
+                                    searchCtrl.clear();
+                                    setModalState(() {});
+                                    debounceTimer?.cancel();
                                     performSearch('');
                                   },
                                 )
@@ -738,9 +864,9 @@ class _FciFormPageState extends State<FciFormPage> {
                                   children: [
                                     Icon(Icons.person_search_rounded, size: 48, color: Colors.blueGrey.shade200),
                                     const SizedBox(height: 10),
-                                    const Text('Data karyawan tidak ditemukan', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF64748B))),
+                                    const Text('Data PIC tidak ditemukan', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF64748B))),
                                     const SizedBox(height: 4),
-                                    const Text('Coba gunakan kata kunci pencarian yang lain', style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8))),
+                                    const Text('Silakan coba kata kunci pencarian lain', style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8))),
                                   ],
                                 ),
                               )
@@ -751,24 +877,46 @@ class _FciFormPageState extends State<FciFormPage> {
                                 itemBuilder: (_, idx) {
                                   final emp = results[idx];
                                   final isSelected = _picCtrl.text.contains(emp.nik) || (_selectedPicEmployee?.nik == emp.nik);
+                                  final isMyCompany = userCompany.isNotEmpty && emp.perusahaan.toLowerCase() == userCompany.toLowerCase();
 
                                   return ListTile(
                                     contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                    leading: CircleAvatar(
-                                      backgroundColor: isSelected ? _tealColor : const Color(0xFFF0FDFA),
-                                      foregroundColor: isSelected ? Colors.white : _tealColor,
-                                      child: Text(
-                                        emp.nama.isNotEmpty ? emp.nama[0].toUpperCase() : 'P',
-                                        style: const TextStyle(fontWeight: FontWeight.bold),
-                                      ),
-                                    ),
-                                    title: Text(
-                                      emp.nama,
-                                      style: TextStyle(
-                                        fontSize: 13.5,
-                                        fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
-                                        color: isSelected ? _tealColor : const Color(0xFF0F172A),
-                                      ),
+                                    leading: _buildEmployeeAvatar(emp.foto, emp.nama, radius: 20),
+                                    title: Row(
+                                      children: [
+                                        Expanded(
+                                          child: Text(
+                                            emp.nama,
+                                            style: TextStyle(
+                                              fontSize: 13.5,
+                                              fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                                              color: isSelected ? _tealColor : const Color(0xFF0F172A),
+                                            ),
+                                          ),
+                                        ),
+                                        if (emp.perusahaan.isNotEmpty) ...[
+                                          const SizedBox(width: 6),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                            decoration: BoxDecoration(
+                                              color: isMyCompany ? const Color(0xFFD1FAE5) : const Color(0xFFF1F5F9),
+                                              borderRadius: BorderRadius.circular(5),
+                                              border: Border.all(
+                                                color: isMyCompany ? const Color(0xFF10B981) : const Color(0xFFCBD5E1),
+                                                width: 0.8,
+                                              ),
+                                            ),
+                                            child: Text(
+                                              emp.perusahaan,
+                                              style: TextStyle(
+                                                fontSize: 10,
+                                                fontWeight: FontWeight.bold,
+                                                color: isMyCompany ? const Color(0xFF047857) : const Color(0xFF64748B),
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ],
                                     ),
                                     subtitle: Text(
                                       'NIK: ${emp.nik}${emp.departemen.isNotEmpty ? " • ${emp.departemen}" : ""}${emp.jabatan.isNotEmpty ? " • ${emp.jabatan}" : ""}',
@@ -776,6 +924,7 @@ class _FciFormPageState extends State<FciFormPage> {
                                     ),
                                     trailing: isSelected ? const Icon(Icons.check_circle, color: _tealColor) : null,
                                     onTap: () {
+                                      debounceTimer?.cancel();
                                       Navigator.pop(modalCtx);
                                       setState(() {
                                         _selectedPicEmployee = emp;
@@ -813,37 +962,41 @@ class _FciFormPageState extends State<FciFormPage> {
     return deficits.join('; ') + '.';
   }
 
-  void _applyAutoRecommendation() {
-    final rec = _generateAutoRecommendation();
-    setState(() {
-      _tindakanCtrl.text = rec;
-    });
-    _showSnack('Rekomendasi otomatis diterapkan ke form perbaikan!', isSuccess: true);
-  }
 
-  // Share to WhatsApp
+
+  // Share to WhatsApp dengan Nilai Detail Lengkap
   Future<void> _shareToWhatsApp() async {
     final tglStr = DateFormat('dd MMM yyyy').format(_tanggal);
     final waktuStr = '${_waktu.hour.toString().padLeft(2, '0')}:${_waktu.minute.toString().padLeft(2, '0')}';
+    final profile = PreferenceService.getProfile();
+    final compName = profile?.company ?? '';
 
     final text = StringBuffer();
     text.writeln('📋 *LAPORAN PENILAIAN FRONT CONDITION INDEX (FCI)*');
-    text.writeln('📅 Waktu: $tglStr $waktuStr | Shift: $_shift');
-    text.writeln('📍 Area: ${_areaCtrl.text} | Front: ${_namaFrontCtrl.text} | Pit: ${_pitCtrl.text}');
-    if (_detilLokasiCtrl.text.isNotEmpty) text.writeln('📌 Benchmark: ${_detilLokasiCtrl.text}');
-    text.writeln('---------------------------------------');
-    text.writeln('⭐ *SKOR FCI: $_totalScore% ($_kategoriIndex.toUpperCase())*');
-    text.writeln('1. Lantai Front (15%): $_skorLantaiFront');
-    text.writeln('2. Ruang Manuver (15%): $_skorRuangManuver');
-    text.writeln('3. Safety Berm (15%): $_skorSafetyBerm');
-    text.writeln('4. Kondisi Dinding (15%): $_skorKondisiDinding');
-    text.writeln('5. Drainase Sump (10%): $_skorDrainaseSump');
-    text.writeln('6. Kebersihan Spillage (10%): $_skorKebersihanSpillage');
-    text.writeln('7. Posisi Alat Bench (10%): $_skorPosisiAlat');
-    text.writeln('8. Rambu & Penerangan (10%): $_skorRambuPenerangan');
-    text.writeln('---------------------------------------');
-    if (_catatanCtrl.text.isNotEmpty) text.writeln('📝 *Catatan:* ${_catatanCtrl.text}');
-    if (_tindakanCtrl.text.isNotEmpty) text.writeln('🛠️ *Tindakan Perbaikan:* ${_tindakanCtrl.text} (PIC: ${_picCtrl.text})');
+    if (compName.isNotEmpty) text.writeln('🏢 *Perusahaan:* $compName');
+    text.writeln('📅 *Waktu:* $tglStr $waktuStr | Shift: $_shift');
+    text.writeln('📍 *Lokasi Front:* ${_namaFrontCtrl.text} (${_pitCtrl.text} - ${_areaCtrl.text})');
+    if (_detilLokasiCtrl.text.isNotEmpty) text.writeln('📌 *Benchmark/Detil:* ${_detilLokasiCtrl.text}');
+    if (_latCtrl.text.isNotEmpty && _lngCtrl.text.isNotEmpty) {
+      text.writeln('🌐 *Koordinat GPS:* ${_latCtrl.text}, ${_lngCtrl.text}');
+    }
+    text.writeln('━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    text.writeln('⭐ *SKOR EVALUASI FCI: $_totalScore% - ${_kategoriIndex.toUpperCase()}*');
+    text.writeln('━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    text.writeln('📊 *RINCIAN 8 PARAMETER PENILAIAN:*');
+    text.writeln('1. Lantai Front (15%): $_skorLantaiFront/100');
+    text.writeln('2. Ruang Manuver & Loading (15%): $_skorRuangManuver/100');
+    text.writeln('3. Safety Berm / Tanggul (15%): $_skorSafetyBerm/100');
+    text.writeln('4. Kondisi Dinding / Highwall (15%): $_skorKondisiDinding/100');
+    text.writeln('5. Drainase & Sump Front (10%): $_skorDrainaseSump/100');
+    text.writeln('6. Kebersihan Lantai & Spillage (10%): $_skorKebersihanSpillage/100');
+    text.writeln('7. Posisi Alat & Bench Setup (10%): $_skorPosisiAlat/100');
+    text.writeln('8. Rambu & Penerangan Malam (10%): $_skorRambuPenerangan/100');
+    text.writeln('━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    text.writeln('📝 *Catatan Observasi:* ${_catatanCtrl.text.isNotEmpty ? _catatanCtrl.text : '-'}');
+    text.writeln('🛠️ *Rekomendasi Tindakan:* ${_tindakanCtrl.text.isNotEmpty ? _tindakanCtrl.text : '-'}');
+    text.writeln('👤 *PIC Penanggung Jawab:* ${_picCtrl.text.isNotEmpty ? _picCtrl.text : '-'}');
+    text.writeln('ℹ️ _Status Notifikasi PIC: Informasi Nilai FCI terkirim_');
     text.writeln('\n_Dilaporkan via SAP Mobile - Indexsafe Evolution_');
 
     final uri = Uri.parse('whatsapp://send?text=${Uri.encodeComponent(text.toString())}');
@@ -852,11 +1005,11 @@ class _FciFormPageState extends State<FciFormPage> {
         await launchUrl(uri);
       } else {
         await Clipboard.setData(ClipboardData(text: text.toString()));
-        _showSnack('Teks berhasil disalin ke clipboard!', isSuccess: true);
+        _showSnack('Teks laporan berhasil disalin ke clipboard!', isSuccess: true);
       }
     } catch (_) {
       await Clipboard.setData(ClipboardData(text: text.toString()));
-      _showSnack('Teks berhasil disalin ke clipboard!', isSuccess: true);
+      _showSnack('Teks laporan berhasil disalin ke clipboard!', isSuccess: true);
     }
   }
 
@@ -966,38 +1119,141 @@ class _FciFormPageState extends State<FciFormPage> {
           barrierDismissible: false,
           builder: (ctx) => AlertDialog(
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-            title: Row(
+            contentPadding: const EdgeInsets.fromLTRB(20, 24, 20, 16),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(
-                  isSavedOnline ? Icons.check_circle : Icons.cloud_off_rounded,
-                  color: isSavedOnline ? const Color(0xFF10B981) : const Color(0xFFF59E0B),
-                  size: 28,
+                Container(
+                  width: 60,
+                  height: 60,
+                  decoration: BoxDecoration(
+                    color: isSavedOnline ? const Color(0xFFD1FAE5) : const Color(0xFFFEF3C7),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    isSavedOnline ? Icons.check_circle_rounded : Icons.cloud_off_rounded,
+                    color: isSavedOnline ? const Color(0xFF059669) : const Color(0xFFD97706),
+                    size: 36,
+                  ),
                 ),
-                const SizedBox(width: 10),
-                Text(isSavedOnline ? 'Berhasil Disimpan!' : 'Disimpan Offline'),
+                const SizedBox(height: 14),
+                Text(
+                  isSavedOnline ? 'Laporan FCI Berhasil Disimpan!' : 'Laporan Tersimpan Offline',
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  isSavedOnline
+                      ? (widget.editData != null
+                          ? 'Perubahan laporan FCI telah diperbarui di server.'
+                          : 'Laporan FCI tersimpan di server. Karyawan yang menjadi PIC otomatis menerima notifikasi informasi skor FCI (tanpa perlu follow-up).')
+                      : 'Laporan FCI tersimpan di memori perangkat dan akan tersinkronisasi otomatis saat terhubung internet.',
+                  style: const TextStyle(fontSize: 12.5, color: Color(0xFF334155), height: 1.4),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 16),
+
+                // Detail Badge Card
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                  ),
+                  child: Column(
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text('Nilai Evaluasi FCI:', style: TextStyle(fontSize: 12, color: Color(0xFF475569), fontWeight: FontWeight.w600)),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: _categoryColor.withOpacity(0.14),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              '$_totalScore% ($_kategoriIndex)',
+                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: _categoryColor),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text('Lokasi Front:', style: TextStyle(fontSize: 12, color: Color(0xFF475569), fontWeight: FontWeight.w600)),
+                          Text(
+                            '${_namaFrontCtrl.text} (${_pitCtrl.text})',
+                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                          ),
+                        ],
+                      ),
+                      if (_picCtrl.text.isNotEmpty) ...[
+                        const SizedBox(height: 6),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text('PIC Tindakan:', style: TextStyle(fontSize: 12, color: Color(0xFF475569), fontWeight: FontWeight.w600)),
+                            Flexible(
+                              child: Text(
+                                _selectedPicEmployee?.nama ?? _picCtrl.text,
+                                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 18),
+
+                // Button WhatsApp Share with detailed values
+                SizedBox(
+                  width: double.infinity,
+                  height: 46,
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      _shareToWhatsApp();
+                    },
+                    icon: const Icon(Icons.share_rounded, size: 18, color: Colors.white),
+                    label: const Text(
+                      'Bagikan Hasil ke WhatsApp',
+                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF25D366),
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      elevation: 1,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+
+                // Button Close / Selesai
+                SizedBox(
+                  width: double.infinity,
+                  height: 42,
+                  child: TextButton(
+                    onPressed: () {
+                      Navigator.pop(ctx);
+                      Navigator.pop(context, true);
+                    },
+                    child: const Text(
+                      'Selesai & Kembali',
+                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF475569)),
+                    ),
+                  ),
+                ),
               ],
             ),
-            content: Text(
-              isSavedOnline
-                  ? (widget.editData != null
-                      ? 'Laporan FCI berhasil diperbarui di server.'
-                      : 'Laporan FCI baru berhasil dikirim dan tersimpan di server.')
-                  : 'Laporan FCI tersimpan di perangkat (Mode Offline) dan akan disinkronkan otomatis saat ada koneksi.',
-            ),
-            actions: [
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: _tealColor,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                ),
-                onPressed: () {
-                  Navigator.pop(ctx);
-                  Navigator.pop(context, true);
-                },
-                child: const Text('OK'),
-              ),
-            ],
           ),
         );
       }
@@ -1313,47 +1569,28 @@ class _FciFormPageState extends State<FciFormPage> {
 
                     const SizedBox(height: 12),
 
-                    // Lokasi Spesifik & GPS
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        Expanded(
-                          child: TextFormField(
-                            controller: _lokasiCtrl,
-                            decoration: InputDecoration(
-                              labelText: 'Lokasi Spesifik / Deskripsi',
-                              hintText: 'Misal: RL 50 Seam B',
-                              prefixIcon: const Icon(Icons.my_location_rounded, size: 18, color: _tealColor),
-                              filled: true,
-                              fillColor: const Color(0xFFF8FAFC),
-                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
-                              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        IconButton.filled(
-                          onPressed: _isLoadingGps ? null : _getGpsLocation,
-                          icon: _isLoadingGps
-                              ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                              : const Icon(Icons.gps_fixed_rounded, size: 20),
-                          style: IconButton.styleFrom(
-                            backgroundColor: _tealColor,
-                            foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                            padding: const EdgeInsets.all(13),
-                          ),
-                        ),
-                      ],
-                    ),
-
-                    if (_latCtrl.text.isNotEmpty) ...[
-                      const SizedBox(height: 6),
-                      Text(
-                        'Koordinat GPS: ${_latCtrl.text}, ${_lngCtrl.text}',
-                        style: const TextStyle(fontSize: 11, color: Color(0xFF64748B), fontStyle: FontStyle.italic),
+                    // Lokasi Spesifik
+                    TextFormField(
+                      controller: _lokasiCtrl,
+                      decoration: InputDecoration(
+                        labelText: 'Lokasi Spesifik / Deskripsi',
+                        hintText: 'Misal: RL 50 Seam B',
+                        prefixIcon: const Icon(Icons.location_on_rounded, size: 18, color: _tealColor),
+                        filled: true,
+                        fillColor: const Color(0xFFF8FAFC),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
                       ),
-                    ],
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Otomatis Koordinat GPS
+                    SapGpsLocationCard(
+                      latController: _latCtrl,
+                      lngController: _lngCtrl,
+                      lokasiController: _lokasiCtrl,
+                      primaryColor: _tealColor,
+                    ),
                   ],
                 ),
               ),
@@ -1506,7 +1743,7 @@ class _FciFormPageState extends State<FciFormPage> {
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(18),
-                border: Border.all(color: const Color(0xFFE2E8F0)),
+                border: Border.all(color: const Color(0xFFCBD5E1)),
                 boxShadow: const [
                   BoxShadow(color: Color(0x08000000), blurRadius: 10, offset: Offset(0, 3)),
                 ],
@@ -1520,7 +1757,7 @@ class _FciFormPageState extends State<FciFormPage> {
                     decoration: BoxDecoration(
                       color: const Color(0xFFF8FAFC),
                       borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                      border: Border.all(color: const Color(0xFFCBD5E1), width: 1.2),
                     ),
                     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                     child: Column(
@@ -1532,7 +1769,7 @@ class _FciFormPageState extends State<FciFormPage> {
                             SizedBox(width: 8),
                             Text(
                               'Catatan Observasi Kondisi Front',
-                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF334155)),
+                              style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
                             ),
                           ],
                         ),
@@ -1540,10 +1777,10 @@ class _FciFormPageState extends State<FciFormPage> {
                         TextFormField(
                           controller: _catatanCtrl,
                           maxLines: 2,
-                          style: const TextStyle(fontSize: 13, color: Color(0xFF0F172A)),
+                          style: const TextStyle(fontSize: 13.5, color: Color(0xFF0F172A), fontWeight: FontWeight.w600),
                           decoration: const InputDecoration(
                             hintText: 'Tuliskan temuan atau catatan kondisi aktual di front...',
-                            hintStyle: TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
+                            hintStyle: TextStyle(color: Color(0xFF475569), fontSize: 12.5, fontWeight: FontWeight.w500),
                             border: InputBorder.none,
                             isDense: true,
                             contentPadding: EdgeInsets.only(top: 4, bottom: 2),
@@ -1555,47 +1792,24 @@ class _FciFormPageState extends State<FciFormPage> {
 
                   const SizedBox(height: 12),
 
-                  // 2. Tindakan Perbaikan
+                  // 2. Tindakan Perbaikan (Professional Card without Auto Rekomendasi)
                   Container(
                     decoration: BoxDecoration(
                       color: const Color(0xFFF8FAFC),
                       borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                      border: Border.all(color: const Color(0xFFCBD5E1), width: 1.2),
                     ),
                     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        const Row(
                           children: [
-                            const Row(
-                              children: [
-                                Icon(Icons.handyman_rounded, size: 16, color: _tealColor),
-                                SizedBox(width: 8),
-                                Text(
-                                  'Rekomendasi Tindakan Perbaikan',
-                                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF334155)),
-                                ),
-                              ],
-                            ),
-                            InkWell(
-                              onTap: _applyAutoRecommendation,
-                              borderRadius: BorderRadius.circular(6),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                decoration: BoxDecoration(
-                                  color: _tealAccent.withOpacity(0.12),
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                child: const Row(
-                                  children: [
-                                    Icon(Icons.bolt_rounded, size: 13, color: _tealColor),
-                                    SizedBox(width: 3),
-                                    Text('Auto Rekomendasi', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: _tealColor)),
-                                  ],
-                                ),
-                              ),
+                            Icon(Icons.handyman_rounded, size: 16, color: _tealColor),
+                            SizedBox(width: 8),
+                            Text(
+                              'Rekomendasi Tindakan Perbaikan',
+                              style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
                             ),
                           ],
                         ),
@@ -1603,10 +1817,10 @@ class _FciFormPageState extends State<FciFormPage> {
                         TextFormField(
                           controller: _tindakanCtrl,
                           maxLines: 2,
-                          style: const TextStyle(fontSize: 13, color: Color(0xFF0F172A)),
+                          style: const TextStyle(fontSize: 13.5, color: Color(0xFF0F172A), fontWeight: FontWeight.w600),
                           decoration: const InputDecoration(
                             hintText: 'Misal: Perlu dozer merapikan lantai & menaikkan tanggul crest...',
-                            hintStyle: TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
+                            hintStyle: TextStyle(color: Color(0xFF475569), fontSize: 12.5, fontWeight: FontWeight.w500),
                             border: InputBorder.none,
                             isDense: true,
                             contentPadding: EdgeInsets.only(top: 4, bottom: 2),
@@ -1618,10 +1832,16 @@ class _FciFormPageState extends State<FciFormPage> {
 
                   const SizedBox(height: 14),
 
-                  // 3. PIC Tindakan Perbaikan (Pilih dari Data Karyawan)
-                  const Text(
-                    'PIC Tindakan Perbaikan (Data Karyawan)',
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF334155)),
+                  // 3. PIC Tindakan Perbaikan (Pilih dari Data Karyawan - Clean Header)
+                  const Row(
+                    children: [
+                      Icon(Icons.person_pin_circle_rounded, size: 16, color: _tealColor),
+                      SizedBox(width: 8),
+                      Text(
+                        'PIC Tindakan Perbaikan (Data Karyawan)',
+                        style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 6),
                   _buildPicSelector(),
@@ -1629,12 +1849,33 @@ class _FciFormPageState extends State<FciFormPage> {
                   const SizedBox(height: 16),
 
                   // 4. Foto Dokumentasi Front (Ultra-Premium Card)
-                  const Text(
-                    'Foto Dokumentasi Kondisi Front',
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF334155)),
+                  const Row(
+                    children: [
+                      Icon(Icons.photo_camera_back_rounded, size: 16, color: _tealColor),
+                      SizedBox(width: 8),
+                      Text(
+                        'Foto Dokumentasi Kondisi Front',
+                        style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 6),
-                  _buildPremiumPhotoCard(),
+                  _buildPhotoUploadCard(
+                    title: 'Unggah Bukti Foto Dokumentasi Front',
+                    subtitle: 'Lampirkan foto kondisi aktual lantai, tanggul berm, atau dinding highwall (JPG/PNG maks 10MB)',
+                    badgeLabel: 'Foto Dokumentasi Front',
+                    localFile: _fotoFile,
+                    existingUrl: _existingFotoUrl,
+                    onCamera: () => _pickImage(ImageSource.camera),
+                    onGallery: () => _pickImage(ImageSource.gallery),
+                    onRemove: () {
+                      setState(() {
+                        _fotoFile = null;
+                        _existingFotoUrl = null;
+                      });
+                    },
+                    icon: Icons.add_a_photo_rounded,
+                  ),
                 ],
               ),
             ),
@@ -1749,7 +1990,10 @@ class _FciFormPageState extends State<FciFormPage> {
                         ],
                       ),
                       const SizedBox(height: 2),
-                      Text(guideline, style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                      Text(
+                        guideline,
+                        style: const TextStyle(fontSize: 11.5, color: Color(0xFF334155), fontWeight: FontWeight.w500),
+                      ),
                     ],
                   ),
                 ),
@@ -1774,7 +2018,7 @@ class _FciFormPageState extends State<FciFormPage> {
                         color: isSelected ? optColor.withOpacity(0.12) : const Color(0xFFF8FAFC),
                         borderRadius: BorderRadius.circular(10),
                         border: Border.all(
-                          color: isSelected ? optColor : const Color(0xFFE2E8F0),
+                          color: isSelected ? optColor : const Color(0xFFCBD5E1),
                           width: isSelected ? 1.5 : 1,
                         ),
                       ),
@@ -1798,16 +2042,16 @@ class _FciFormPageState extends State<FciFormPage> {
                             child: Text(
                               opt.label,
                               style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                                color: isSelected ? const Color(0xFF0F172A) : const Color(0xFF475569),
+                                fontSize: 12.5,
+                                fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                                color: isSelected ? const Color(0xFF0F172A) : const Color(0xFF1E293B),
                               ),
                             ),
                           ),
                           Icon(
                             opt.icon,
                             size: 18,
-                            color: isSelected ? optColor : const Color(0xFF94A3B8),
+                            color: isSelected ? optColor : const Color(0xFF64748B),
                           ),
                         ],
                       ),
@@ -1986,7 +2230,7 @@ class _FciFormPageState extends State<FciFormPage> {
 
           const SizedBox(height: 12),
 
-          // Auto-generated Recommendation Box
+          // Panduan Rekomendasi Lapangan (Informational Only)
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
@@ -1997,49 +2241,20 @@ class _FciFormPageState extends State<FciFormPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                const Row(
                   children: [
-                    const Row(
-                      children: [
-                        Icon(Icons.bolt_rounded, size: 16, color: _tealColor),
-                        SizedBox(width: 6),
-                        Text('Rekomendasi Otomatis:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11.5, color: _tealColor)),
-                      ],
-                    ),
-                    TextButton.icon(
-                      style: TextButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                        visualDensity: VisualDensity.compact,
-                        foregroundColor: _tealColor,
-                      ),
-                      onPressed: _applyAutoRecommendation,
-                      icon: const Icon(Icons.arrow_downward_rounded, size: 14),
-                      label: const Text('Terapkan', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                    ),
+                    Icon(Icons.info_outline_rounded, size: 15, color: _tealColor),
+                    SizedBox(width: 6),
+                    Text('Panduan Rekomendasi Standar Lapangan:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11.5, color: _tealColor)),
                   ],
                 ),
-                Text(_generateAutoRecommendation(), style: const TextStyle(fontSize: 11, color: Color(0xFF334155), height: 1.3)),
+                const SizedBox(height: 5),
+                Text(_generateAutoRecommendation(), style: const TextStyle(fontSize: 11, color: Color(0xFF334155), height: 1.35)),
               ],
             ),
           ),
 
-          const SizedBox(height: 10),
-
-          // WhatsApp Share Button
-          SizedBox(
-            width: double.infinity,
-            child: OutlinedButton.icon(
-              onPressed: _shareToWhatsApp,
-              icon: const Icon(Icons.share_rounded, size: 18, color: Color(0xFF25D366)),
-              label: const Text('Bagikan Ringkasan ke WhatsApp', style: TextStyle(color: Color(0xFF1E293B), fontWeight: FontWeight.bold, fontSize: 12)),
-              style: OutlinedButton.styleFrom(
-                side: const BorderSide(color: Color(0xFF25D366)),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                padding: const EdgeInsets.symmetric(vertical: 10),
-              ),
-            ),
-          ),
+          const SizedBox(height: 6),
         ],
       ),
     );
@@ -2049,26 +2264,19 @@ class _FciFormPageState extends State<FciFormPage> {
     if (_picCtrl.text.isNotEmpty) {
       final name = _selectedPicEmployee?.nama ?? _picCtrl.text;
       final sub = _selectedPicEmployee != null
-          ? 'NIK: ${_selectedPicEmployee!.nik}${_selectedPicEmployee!.departemen.isNotEmpty ? " • ${_selectedPicEmployee!.departemen}" : ""}${_selectedPicEmployee!.jabatan.isNotEmpty ? " • ${_selectedPicEmployee!.jabatan}" : ""}'
+          ? 'NIK: ${_selectedPicEmployee!.nik}${_selectedPicEmployee!.perusahaan.isNotEmpty ? " • ${_selectedPicEmployee!.perusahaan}" : ""}${_selectedPicEmployee!.departemen.isNotEmpty ? " • ${_selectedPicEmployee!.departemen}" : ""}${_selectedPicEmployee!.jabatan.isNotEmpty ? " • ${_selectedPicEmployee!.jabatan}" : ""}'
           : 'PIC Terpilih';
 
       return Container(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         decoration: BoxDecoration(
-          color: const Color(0xFFF0FDFA),
+          color: const Color(0xFFF8FAFC),
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: _tealAccent.withOpacity(0.6), width: 1.2),
+          border: Border.all(color: const Color(0xFFCBD5E1), width: 1.2),
         ),
         child: Row(
           children: [
-            CircleAvatar(
-              backgroundColor: _tealColor,
-              radius: 18,
-              child: Text(
-                name.isNotEmpty ? name[0].toUpperCase() : 'P',
-                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
-              ),
-            ),
+            _buildEmployeeAvatar(_selectedPicEmployee?.foto, name, radius: 22),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
@@ -2081,7 +2289,7 @@ class _FciFormPageState extends State<FciFormPage> {
                   const SizedBox(height: 2),
                   Text(
                     sub,
-                    style: const TextStyle(fontSize: 11.5, color: Color(0xFF0D9488)),
+                    style: const TextStyle(fontSize: 11.5, color: Color(0xFF0F766E), fontWeight: FontWeight.w600),
                   ),
                 ],
               ),
@@ -2093,7 +2301,7 @@ class _FciFormPageState extends State<FciFormPage> {
             ),
             IconButton(
               tooltip: 'Hapus PIC',
-              icon: const Icon(Icons.close_rounded, color: Color(0xFF94A3B8), size: 18),
+              icon: const Icon(Icons.close_rounded, color: Color(0xFF64748B), size: 18),
               onPressed: () {
                 setState(() {
                   _selectedPicEmployee = null;
@@ -2114,13 +2322,13 @@ class _FciFormPageState extends State<FciFormPage> {
         decoration: BoxDecoration(
           color: const Color(0xFFF8FAFC),
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: const Color(0xFFE2E8F0)),
+          border: Border.all(color: const Color(0xFFCBD5E1), width: 1.2),
         ),
         child: Row(
           children: [
             Container(
-              width: 36,
-              height: 36,
+              width: 38,
+              height: 38,
               decoration: BoxDecoration(
                 color: _tealAccent.withOpacity(0.12),
                 borderRadius: BorderRadius.circular(10),
@@ -2133,26 +2341,39 @@ class _FciFormPageState extends State<FciFormPage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Pilih PIC dari Data Karyawan',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF0F172A)),
+                    'Pilih PIC',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5, color: Color(0xFF0F172A)),
                   ),
                   SizedBox(height: 2),
                   Text(
                     'Tentukan pengawas / personil penanggung jawab perbaikan',
-                    style: TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                    style: TextStyle(fontSize: 11.5, color: Color(0xFF475569), fontWeight: FontWeight.w500),
                   ),
                 ],
               ),
             ),
-            const Icon(Icons.chevron_right_rounded, color: Color(0xFF94A3B8)),
+            const Icon(Icons.chevron_right_rounded, color: _tealColor),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildPremiumPhotoCard() {
-    if (_fotoFile != null || (_existingFotoUrl != null && _existingFotoUrl!.isNotEmpty)) {
+  Widget _buildPhotoUploadCard({
+    required String title,
+    required String subtitle,
+    required String badgeLabel,
+    required File? localFile,
+    required String? existingUrl,
+    required VoidCallback onCamera,
+    required VoidCallback onGallery,
+    required VoidCallback onRemove,
+    required IconData icon,
+  }) {
+    final hasImage = localFile != null || (existingUrl != null && existingUrl.isNotEmpty);
+
+    if (hasImage) {
+      final imgUrl = existingUrl != null ? _resolvePhotoUrl(existingUrl) : '';
       return Container(
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(16),
@@ -2164,10 +2385,28 @@ class _FciFormPageState extends State<FciFormPage> {
           borderRadius: BorderRadius.circular(16),
           child: Stack(
             children: [
-              if (_fotoFile != null)
-                Image.file(_fotoFile!, width: double.infinity, height: 220, fit: BoxFit.cover)
+              if (localFile != null)
+                Image.file(localFile, width: double.infinity, height: 210, fit: BoxFit.cover)
               else
-                Image.network(_existingFotoUrl!, width: double.infinity, height: 220, fit: BoxFit.cover),
+                Image.network(
+                  imgUrl,
+                  width: double.infinity,
+                  height: 210,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => Container(
+                    height: 210,
+                    color: const Color(0xFFF1F5F9),
+                    alignment: Alignment.center,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.broken_image_rounded, size: 40, color: Colors.blueGrey.shade300),
+                        const SizedBox(height: 6),
+                        const Text('Foto offline / belum dimuat', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                      ],
+                    ),
+                  ),
+                ),
               // Top Overlay Bar
               Positioned(
                 top: 0,
@@ -2191,26 +2430,21 @@ class _FciFormPageState extends State<FciFormPage> {
                           color: Colors.black54,
                           borderRadius: BorderRadius.circular(8),
                         ),
-                        child: const Row(
+                        child: Row(
                           children: [
-                            Icon(Icons.check_circle_rounded, size: 14, color: Color(0xFF10B981)),
-                            SizedBox(width: 4),
-                            Text('Foto Dokumentasi Front', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                            const Icon(Icons.check_circle_rounded, size: 14, color: Color(0xFF10B981)),
+                            const SizedBox(width: 4),
+                            Text(badgeLabel, style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
                           ],
                         ),
                       ),
                       CircleAvatar(
                         backgroundColor: Colors.black54,
-                        radius: 16,
+                        radius: 15,
                         child: IconButton(
                           padding: EdgeInsets.zero,
                           icon: const Icon(Icons.close_rounded, color: Colors.white, size: 18),
-                          onPressed: () {
-                            setState(() {
-                              _fotoFile = null;
-                              _existingFotoUrl = null;
-                            });
-                          },
+                          onPressed: onRemove,
                         ),
                       ),
                     ],
@@ -2229,11 +2463,11 @@ class _FciFormPageState extends State<FciFormPage> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       const Text(
-                        'Foto siap dilampirkan ke sistem',
+                        'Foto siap dilampirkan',
                         style: TextStyle(color: Colors.white, fontSize: 11.5, fontWeight: FontWeight.w500),
                       ),
                       InkWell(
-                        onTap: () => _pickImage(ImageSource.camera),
+                        onTap: onCamera,
                         child: const Row(
                           children: [
                             Icon(Icons.cached_rounded, color: Color(0xFF5EEAD4), size: 14),
@@ -2254,62 +2488,63 @@ class _FciFormPageState extends State<FciFormPage> {
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFFF0FDFA),
+        color: const Color(0xFFF8FAFC),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: _tealAccent.withOpacity(0.5), style: BorderStyle.solid, width: 1.5),
+        border: Border.all(color: const Color(0xFFCBD5E1), width: 1.2),
       ),
       child: Column(
         children: [
           Container(
-            width: 52,
-            height: 52,
+            width: 48,
+            height: 48,
             decoration: BoxDecoration(
-              color: _tealAccent.withOpacity(0.15),
+              color: _tealAccent.withOpacity(0.12),
               shape: BoxShape.circle,
             ),
-            child: const Icon(Icons.add_a_photo_rounded, color: _tealColor, size: 26),
+            child: Icon(icon, color: _tealColor, size: 24),
           ),
-          const SizedBox(height: 10),
-          const Text(
-            'Unggah Bukti Foto Dokumentasi Front',
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF0F172A)),
-          ),
-          const SizedBox(height: 4),
-          const Text(
-            'Lampirkan foto kondisi aktual lantai, tanggul berm, atau dinding highwall (JPG/PNG maks 10MB)',
-            style: TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+          const SizedBox(height: 8),
+          Text(
+            title,
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF0F172A)),
             textAlign: TextAlign.center,
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 3),
+          Text(
+            subtitle,
+            style: const TextStyle(fontSize: 11, color: Color(0xFF475569), fontWeight: FontWeight.w500),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 12),
           Row(
             children: [
               Expanded(
                 child: ElevatedButton.icon(
-                  onPressed: () => _pickImage(ImageSource.camera),
-                  icon: const Icon(Icons.camera_alt_rounded, size: 18),
-                  label: const Text('Ambil Foto Kamera', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                  onPressed: onCamera,
+                  icon: const Icon(Icons.camera_alt_rounded, size: 16),
+                  label: const Text('Kamera', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: _tealColor,
                     foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    elevation: 1,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    padding: const EdgeInsets.symmetric(vertical: 11),
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                   ),
                 ),
               ),
               const SizedBox(width: 10),
               Expanded(
                 child: OutlinedButton.icon(
-                  onPressed: () => _pickImage(ImageSource.gallery),
-                  icon: const Icon(Icons.photo_library_rounded, size: 18, color: _tealColor),
-                  label: const Text('Buka Galeri', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: _tealColor)),
+                  onPressed: onGallery,
+                  icon: const Icon(Icons.photo_library_rounded, size: 16, color: _tealColor),
+                  label: const Text('Galeri', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: _tealColor)),
                   style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: _tealAccent, width: 1.2),
+                    side: const BorderSide(color: _tealColor, width: 1.2),
                     backgroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    padding: const EdgeInsets.symmetric(vertical: 11),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                   ),
                 ),
               ),
@@ -2335,6 +2570,7 @@ class _FciEmployeeItem {
   final String departemen;
   final String jabatan;
   final String perusahaan;
+  final String foto;
 
   const _FciEmployeeItem({
     required this.nik,
@@ -2342,6 +2578,7 @@ class _FciEmployeeItem {
     this.departemen = '',
     this.jabatan = '',
     this.perusahaan = '',
+    this.foto = '',
   });
 
   String get displayName => '$nama ($nik)';

@@ -9,7 +9,9 @@ import 'package:flutter/material.dart';
 import '../models/auth_model.dart';
 import '../models/incident_news_model.dart';
 import '../models/notification_item_model.dart';
+import '../models/popup_ad_model.dart';
 import '../models/profile_model.dart';
+import 'database.dart';
 import 'preference.dart';
 
 class ApiService {
@@ -134,6 +136,35 @@ class ApiService {
       debugPrint('[ApiService] Error fetching embed-web config: $e');
     }
     return 'https://mbssap.indexim.id/displaymobile';
+  }
+
+  /// Mengubah path gambar relatif (/uploads/iklan/...) menjadi URL absolut
+  String resolveImageUrl(String imageUrl) {
+    if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
+      return imageUrl;
+    }
+    final cleanBase = baseUrl.replaceAll(RegExp(r'/+$'), '');
+    final cleanPath = imageUrl.replaceAll(RegExp(r'^/+'), '');
+    return '$cleanBase/$cleanPath';
+  }
+
+  /// Mengambil data iklan/banner popup aktif dari backend
+  Future<PopupAdModel?> getActivePopupAd() async {
+    try {
+      final res = await dio.get(
+        '/ads/popup',
+        options: Options(
+          receiveTimeout: const Duration(seconds: 5),
+          sendTimeout: const Duration(seconds: 5),
+        ),
+      );
+      if (res.data != null && res.data is Map) {
+        return PopupAdModel.fromJson(Map<String, dynamic>.from(res.data as Map));
+      }
+    } catch (e) {
+      debugPrint('[ApiService] getActivePopupAd error: $e');
+    }
+    return null;
   }
 
   Future<Either<Map, AuthModel>> register(name, email, pswd) async {
@@ -1813,7 +1844,8 @@ class ApiService {
         .toList();
   }
 
-  Future<Map<String, dynamic>?> _getMbsObservationOptions() async {
+  Future<Map<String, dynamic>?> _getMbsObservationOptions(
+      {int? perusahaanId}) async {
     await _ensureMbsWebSession();
     final cookie = _mbsSessionCookie ?? PreferenceService.getMbsSessionCookie();
     if (cookie == null || cookie.isEmpty) return null;
@@ -1848,15 +1880,30 @@ class ApiService {
           List<dynamic>.from(_decodeMbsJson(companiesJson) as List), 'Nama');
       final departmentMap =
           Map<String, dynamic>.from(_decodeMbsJson(departmentsJson) as Map);
-      final departmentNames = <String>{};
-      for (final raw in departmentMap.values) {
-        if (raw is List) {
-          departmentNames.addAll(raw
+
+      List<String> targetDepts = [];
+      if (perusahaanId != null && perusahaanId > 0) {
+        final raw = departmentMap[perusahaanId.toString()];
+        if (raw is List && raw.isNotEmpty) {
+          targetDepts = raw
               .map((entry) => entry.toString().trim())
-              .where((entry) => entry.isNotEmpty));
+              .where((entry) => entry.isNotEmpty)
+              .toList();
         }
       }
-      final departments = departmentNames.toList()..sort();
+      if (targetDepts.isEmpty) {
+        final departmentNames = <String>{};
+        for (final raw in departmentMap.values) {
+          if (raw is List) {
+            departmentNames.addAll(raw
+                .map((entry) => entry.toString().trim())
+                .where((entry) => entry.isNotEmpty));
+          }
+        }
+        targetDepts = departmentNames.toList()..sort();
+      }
+
+      final departments = targetDepts;
       final locations = <Map<String, dynamic>>[];
       final benchmarkResponses = await Future.wait(areas.map((area) async {
         try {
@@ -1916,6 +1963,7 @@ class ApiService {
         'locations': locations,
         'companies': companies,
         'departments': fixed(departments),
+        'companyDeptMap': departmentMap,
         'documents': fixed(documents),
         'criticalRisks': fixed(risks),
         'riskLevels': fixed(levels),
@@ -1928,15 +1976,62 @@ class ApiService {
     }
   }
 
-  /// Options for Observasi are served from the shared MBS database, not from
-  /// the app's legacy sample master tables.
+  /// Retrieves departments for a specific company matching web ObservationController.
+  Future<List<String>> getDepartmentsByCompany(int companyId) async {
+    if (companyId <= 0) return const [];
+
+    // 1. Fast lookup from local cached options map
+    final cached = PreferenceService.getObservationOptionsCache();
+    if (cached != null && cached['companyDeptMap'] is Map) {
+      final map = cached['companyDeptMap'] as Map;
+      final raw = map[companyId.toString()];
+      if (raw is List && raw.isNotEmpty) {
+        return raw
+            .map((e) => e.toString().trim())
+            .where((e) => e.isNotEmpty)
+            .toList();
+      }
+    }
+
+    // 2. Query backend API
+    try {
+      if (_token != null && _token!.isNotEmpty) {
+        dio.options.headers['Authorization'] = 'Bearer $getToken';
+      }
+      final res = await dio.get('/observation/departments',
+          queryParameters: {'companyId': companyId});
+      if (res.data is Map && res.data['data'] is List) {
+        return (res.data['data'] as List)
+            .map((e) => e.toString().trim())
+            .where((e) => e.isNotEmpty)
+            .toList();
+      }
+    } catch (e) {
+      debugPrint('[ApiService] Backend /observation/departments error: $e');
+    }
+
+    // 3. Fallback: Query Web MBS
+    try {
+      final client = _mbsDio();
+      final res = await client.get<String>('/Observation/GetDepartmentsByCompany',
+          queryParameters: {'companyId': companyId});
+      if (res.statusCode == 200 && res.data != null) {
+        final decoded = _decodeMbsJson(res.data);
+        if (decoded is List) {
+          return decoded
+              .map((e) => e.toString().trim())
+              .where((e) => e.isNotEmpty)
+              .toList();
+        }
+      }
+    } catch (_) {}
+
+    return const [];
+  }
+
+  /// Options for Observasi are served from Backend API and MBS database.
   Future<Map<String, dynamic>?> getObservationOptions(
       {int? perusahaanId}) async {
-    final webData = await _getMbsObservationOptions();
-    if (webData != null) {
-      await PreferenceService.setObservationOptionsCache(webData);
-      return webData;
-    }
     try {
       if (_token != null && _token!.isNotEmpty) {
         dio.options.headers['Authorization'] = 'Bearer $getToken';
@@ -1951,7 +2046,14 @@ class ApiService {
         return data;
       }
     } catch (e) {
-      debugPrint('[ApiService] Error fetching observation options: $e');
+      debugPrint(
+          '[ApiService] Backend /observation/options failed: $e, falling back to MBS Web');
+    }
+
+    final webData = await _getMbsObservationOptions(perusahaanId: perusahaanId);
+    if (webData != null) {
+      await PreferenceService.setObservationOptionsCache(webData);
+      return webData;
     }
     return null;
   }
@@ -2113,7 +2215,7 @@ class ApiService {
           if (resolvedId != null && resolvedId != id) {
             debugPrint(
                 '[ApiService] Recovered stale MBS observation ID $id -> $resolvedId');
-            return _updateObservationOnMbsWeb(resolvedId, fields,
+            return await _updateObservationOnMbsWeb(resolvedId, fields,
                 resolveMissingId: false);
           }
         }
@@ -2649,6 +2751,21 @@ class ApiService {
     }
   }
 
+  Future<List<Map<String, dynamic>>> getCompanies() async {
+    try {
+      final res = await dio.get('/companies');
+      if (res.statusCode == 200 && res.data is Map && res.data['data'] is List) {
+        return (res.data['data'] as List)
+            .whereType<Map>()
+            .map((e) => Map<String, dynamic>.from(e))
+            .toList();
+      }
+    } catch (e) {
+      debugPrint('[ApiService] getCompanies error: $e');
+    }
+    return const [];
+  }
+
   Future<List<String>> getBbsAreas() async {
     try {
       final page = await _mbsGetWithSession('/Bbs/Index');
@@ -2726,24 +2843,80 @@ class ApiService {
 
   Future<List<Map<String, dynamic>>> searchBbsWorkers(String query,
       {int? companyId}) async {
-    if (query.trim().length < 2) return const [];
+    final cleanQ = query.trim();
+    if (cleanQ.length < 2) return const [];
+
+    // 1. Prioritize Backend API endpoint /api/bbs/workers (fast, includes PathFoto from vw_karyawan)
+    try {
+      final res = await dio.get(
+        '/bbs/workers',
+        queryParameters: {
+          'q': cleanQ,
+          if (companyId != null && companyId > 0) 'companyId': companyId,
+        },
+      );
+      if (res.data is List) {
+        return (res.data as List)
+            .whereType<Map>()
+            .map((item) => Map<String, dynamic>.from(item))
+            .toList();
+      }
+    } catch (e) {
+      debugPrint('[ApiService] Backend /bbs/workers error, fallback to MBS: $e');
+    }
+
+    // 2. Fallback to Web MBS /Bbs/SearchWorker
     try {
       final res =
           await _mbsGetWithSession('/Bbs/SearchWorker', queryParameters: {
-        'q': query.trim(),
-        if (companyId != null) 'companyId': companyId,
+        'q': cleanQ,
+        if (companyId != null && companyId > 0) 'companyId': companyId,
       });
       final raw = _decodeMbsJson(res.data);
-      return raw is List
-          ? raw
-              .whereType<Map>()
-              .map((item) => Map<String, dynamic>.from(item))
-              .toList()
-          : const [];
+      if (raw is List && raw.isNotEmpty) {
+        return raw
+            .whereType<Map>()
+            .map((item) => Map<String, dynamic>.from(item))
+            .toList();
+      }
     } catch (e) {
       debugPrint('[ApiService] BBS worker search unavailable: $e');
-      return const [];
     }
+
+    // 3. Fallback to local SQLite database (offline support with photo)
+    try {
+      final db = await DatabaseService().database;
+      final safeQ = '%$cleanQ%';
+      final List<Map<String, Object?>> rows;
+      if (companyId != null && companyId > 0) {
+        rows = await db.rawQuery(
+          '''
+          SELECT no_nik as nik, nama_lengkap as nama, posisi as jabatan, departemen, perusahaan, company_id as perusahaanId, foto
+          FROM employees
+          WHERE (nama_lengkap LIKE ? OR no_nik LIKE ? OR nik LIKE ?)
+          ORDER BY nama_lengkap ASC
+          LIMIT 25
+          ''',
+          [safeQ, safeQ, safeQ],
+        );
+      } else {
+        rows = await db.rawQuery(
+          '''
+          SELECT no_nik as nik, nama_lengkap as nama, posisi as jabatan, departemen, perusahaan, company_id as perusahaanId, foto
+          FROM employees
+          WHERE (nama_lengkap LIKE ? OR no_nik LIKE ? OR nik LIKE ?)
+          ORDER BY nama_lengkap ASC
+          LIMIT 25
+          ''',
+          [safeQ, safeQ, safeQ],
+        );
+      }
+      return rows.map((r) => Map<String, dynamic>.from(r)).toList();
+    } catch (e) {
+      debugPrint('[ApiService] SQLite fallback error: $e');
+    }
+
+    return const [];
   }
 
   Future<bool> submitBbs(Map<String, dynamic> values,
@@ -2856,7 +3029,7 @@ class ApiService {
       if (res.statusCode == 200 && res.data != null) {
         return Right(Map<String, dynamic>.from(res.data));
       }
-      return Left({'message': 'Gagal mengambil data kualitas SAP.'});
+      return const Left({'message': 'Gagal mengambil data kualitas SAP.'});
     } on DioException catch (e) {
       return Left(errorHandler(e) as Map<String, dynamic>);
     } catch (e) {
@@ -3347,10 +3520,19 @@ class ApiService {
     }
   }
 
-  Future<List<Map<String, dynamic>>> searchRciEmployees(String q) async {
+  Future<List<Map<String, dynamic>>> searchRciEmployees(
+    String q, {
+    int? companyId,
+    String? companyName,
+    int limit = 60,
+  }) async {
     try {
-      if (q.trim().length < 2) return [];
-      final res = await _rciRequest('/rci/search-employees', queryParameters: {'q': q.trim()});
+      final res = await _rciRequest('/rci/search-employees', queryParameters: {
+        if (q.trim().isNotEmpty) 'q': q.trim(),
+        if (companyId != null && companyId > 0) 'companyId': companyId,
+        if (companyName != null && companyName.isNotEmpty) 'companyName': companyName,
+        'limit': limit,
+      });
       if (res.data is Map && res.data['data'] is List) {
         final list = res.data['data'] as List;
         return list.map((e) => Map<String, dynamic>.from(e as Map)).toList();
@@ -3358,6 +3540,441 @@ class ApiService {
       return [];
     } catch (_) {
       return [];
+    }
+  }
+
+  /// Search PIC employees who have SAP Target (bukan semua karyawan)
+  Future<List<Map<String, dynamic>>?> searchFciPicEmployees(
+    String query, {
+    int? companyId,
+    String? companyName,
+    int limit = 100,
+  }) async {
+    try {
+      final res = await dio.get(
+        '/fci/pic-employees',
+        queryParameters: {
+          if (query.trim().isNotEmpty) 'query': query.trim(),
+          if (companyId != null && companyId > 0) 'companyId': companyId,
+          if (companyName != null && companyName.isNotEmpty) 'companyName': companyName,
+          'limit': limit,
+        },
+      );
+      if (res.statusCode == 200 && res.data != null) {
+        final data = res.data['data'];
+        if (data is List) {
+          return data.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+        }
+      }
+      return null;
+    } catch (e) {
+      debugPrint('[ApiService] searchFciPicEmployees error: $e');
+      return null;
+    }
+  }
+
+
+  // ==================== DCI (Disposal Condition Index) ====================
+  Future<Response> _dciRequest(
+    String path, {
+    String method = 'GET',
+    dynamic data,
+    Map<String, dynamic>? queryParameters,
+  }) async {
+    final cleanPath = path.startsWith('/') ? path : '/$path';
+    final List<String> targets = [
+      'http://127.0.0.1:5200/api$cleanPath',
+      'http://127.0.0.1:5200$cleanPath',
+      'http://192.168.130.236:5200/api$cleanPath',
+      'http://192.168.130.236:5200$cleanPath',
+      'http://192.168.137.1:5200/api$cleanPath',
+      'http://192.168.137.1:5200$cleanPath',
+      '$baseUrl/api$cleanPath',
+      '$baseUrl$cleanPath',
+    ];
+
+    DioException? lastDioError;
+    Exception? lastException;
+
+    for (final targetUrl in targets) {
+      try {
+        final client = Dio(BaseOptions(
+          headers: {
+            'Accept': 'application/json',
+            'Connection': 'Keep-Alive',
+            'company': company,
+            if (_token != null && _token!.isNotEmpty) 'Authorization': 'Bearer $_token',
+          },
+          contentType: data is FormData ? 'multipart/form-data' : Headers.jsonContentType,
+          responseType: ResponseType.json,
+          connectTimeout: const Duration(seconds: 4),
+          receiveTimeout: const Duration(seconds: 10),
+        ));
+
+        final res = await client.request(
+          targetUrl,
+          data: data,
+          queryParameters: queryParameters,
+          options: Options(method: method),
+        );
+
+        if (res.statusCode != null && res.statusCode! >= 200 && res.statusCode! < 300) {
+          return res;
+        }
+      } on DioException catch (e) {
+        lastDioError = e;
+        if (e.response?.statusCode == 404 ||
+            e.type == DioExceptionType.connectionTimeout ||
+            e.type == DioExceptionType.connectionError ||
+            e.type == DioExceptionType.unknown) {
+          continue;
+        }
+        rethrow;
+      } catch (e) {
+        lastException = e is Exception ? e : Exception(e.toString());
+      }
+    }
+
+    if (lastDioError != null) throw lastDioError;
+    throw lastException ?? Exception('Gagal menghubungi server DCI');
+  }
+
+  Future<Either<Map<String, dynamic>, Map<String, dynamic>>> getDciList({
+    String? userNik,
+    String? userNama,
+    int? companyId,
+    String? companyName,
+    String? scope,
+    String? search,
+    String? disposal,
+    String? kategori,
+    DateTime? startDate,
+    DateTime? endDate,
+    int page = 1,
+    int pageSize = 50,
+  }) async {
+    try {
+      final query = <String, dynamic>{
+        'page': page,
+        'pageSize': pageSize,
+      };
+      if (userNik != null && userNik.isNotEmpty) query['userNik'] = userNik;
+      if (userNama != null && userNama.isNotEmpty) query['userNama'] = userNama;
+      if (companyId != null && companyId > 0) query['companyId'] = companyId;
+      if (companyName != null && companyName.isNotEmpty) query['companyName'] = companyName;
+      if (scope != null && scope.isNotEmpty) query['scope'] = scope;
+      if (search != null && search.isNotEmpty) query['search'] = search;
+      if (disposal != null && disposal.isNotEmpty) query['disposal'] = disposal;
+      if (kategori != null && kategori.isNotEmpty) query['kategori'] = kategori;
+      if (startDate != null) query['startDate'] = startDate.toIso8601String();
+      if (endDate != null) query['endDate'] = endDate.toIso8601String();
+
+      final res = await _dciRequest('/dci', queryParameters: query);
+      if (res.data is Map) {
+        return Right(Map<String, dynamic>.from(res.data as Map));
+      }
+      return const Left({'message': 'Gagal mengambil data laporan DCI.'});
+    } on DioException catch (e) {
+      return Left(errorHandler(e) as Map<String, dynamic>);
+    } catch (e) {
+      return Left({'message': e.toString()});
+    }
+  }
+
+  Future<Either<Map<String, dynamic>, Map<String, dynamic>>> getDciDetail(int id) async {
+    try {
+      final res = await _dciRequest('/dci/$id');
+      if (res.data is Map) {
+        return Right(Map<String, dynamic>.from(res.data as Map));
+      }
+      return const Left({'message': 'Gagal mengambil detail laporan DCI.'});
+    } on DioException catch (e) {
+      return Left(errorHandler(e) as Map<String, dynamic>);
+    } catch (e) {
+      return Left({'message': e.toString()});
+    }
+  }
+
+  Future<Either<Map<String, dynamic>, Map<String, dynamic>>> saveDciReport(FormData data) async {
+    try {
+      final res = await _dciRequest('/dci', method: 'POST', data: data);
+      if (res.data is Map) {
+        return Right(Map<String, dynamic>.from(res.data as Map));
+      }
+      return const Left({'message': 'Gagal menyimpan laporan DCI.'});
+    } on DioException catch (e) {
+      return Left(errorHandler(e) as Map<String, dynamic>);
+    } catch (e) {
+      return Left({'message': e.toString()});
+    }
+  }
+
+  Future<Either<Map<String, dynamic>, Map<String, dynamic>>> deleteDciReport(int id) async {
+    try {
+      final res = await _dciRequest('/dci/$id', method: 'DELETE');
+      if (res.data is Map) {
+        return Right(Map<String, dynamic>.from(res.data as Map));
+      }
+      return const Right({});
+    } on DioException catch (e) {
+      return Left(errorHandler(e) as Map<String, dynamic>);
+    } catch (e) {
+      return Left({'message': e.toString()});
+    }
+  }
+
+  Future<Either<Map<String, dynamic>, Map<String, dynamic>>> getDciSuggestions({String? disposal}) async {
+    try {
+      final query = <String, dynamic>{};
+      if (disposal != null && disposal.isNotEmpty) query['disposal'] = disposal;
+      final res = await _dciRequest('/dci/suggestions', queryParameters: query);
+      if (res.data is Map) {
+        return Right(Map<String, dynamic>.from(res.data as Map));
+      }
+      return const Left({'message': 'Gagal mengambil saran rekomendasi DCI.'});
+    } on DioException catch (e) {
+      return Left(errorHandler(e) as Map<String, dynamic>);
+    } catch (e) {
+      return Left({'message': e.toString()});
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> searchDciEmployees(
+    String q, {
+    int? companyId,
+    String? companyName,
+    int limit = 60,
+  }) async {
+    try {
+      final res = await _dciRequest('/dci/search-employees', queryParameters: {
+        if (q.trim().isNotEmpty) 'q': q.trim(),
+        if (companyId != null && companyId > 0) 'companyId': companyId,
+        if (companyName != null && companyName.isNotEmpty) 'companyName': companyName,
+        'limit': limit,
+      });
+      if (res.data is Map && res.data['data'] is List) {
+        final list = res.data['data'] as List;
+        return list.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+      }
+      return [];
+    } catch (_) {
+      return [];
+    }
+  }
+
+  // ==================== SPI (Sediment Pond Index) ====================
+  Future<Response> _spiRequest(
+    String path, {
+    String method = 'GET',
+    dynamic data,
+    Map<String, dynamic>? queryParameters,
+  }) => _dciRequest(path.startsWith('/spi') ? path : '/spi$path', method: method, data: data, queryParameters: queryParameters);
+
+  Future<Either<Map<String, dynamic>, Map<String, dynamic>>> getSpiList({
+    String? userNik,
+    String? userNama,
+    int? companyId,
+    String? companyName,
+    String? scope,
+    String? search,
+    String? kolam,
+    String? kategori,
+    DateTime? startDate,
+    DateTime? endDate,
+    int page = 1,
+    int pageSize = 50,
+  }) async {
+    try {
+      final query = <String, dynamic>{
+        'page': page,
+        'pageSize': pageSize,
+      };
+      if (userNik != null && userNik.isNotEmpty) query['userNik'] = userNik;
+      if (userNama != null && userNama.isNotEmpty) query['userNama'] = userNama;
+      if (companyId != null && companyId > 0) query['companyId'] = companyId;
+      if (companyName != null && companyName.isNotEmpty) query['companyName'] = companyName;
+      if (scope != null && scope.isNotEmpty) query['scope'] = scope;
+      if (search != null && search.isNotEmpty) query['search'] = search;
+      if (kolam != null && kolam.isNotEmpty) query['kolam'] = kolam;
+      if (kategori != null && kategori.isNotEmpty) query['kategori'] = kategori;
+      if (startDate != null) query['startDate'] = startDate.toIso8601String();
+      if (endDate != null) query['endDate'] = endDate.toIso8601String();
+
+      final res = await _spiRequest('/spi', queryParameters: query);
+      if (res.data is Map) {
+        return Right(Map<String, dynamic>.from(res.data as Map));
+      }
+      return const Left({'message': 'Gagal mengambil data laporan SPI.'});
+    } on DioException catch (e) {
+      return Left(errorHandler(e) as Map<String, dynamic>);
+    } catch (e) {
+      return Left({'message': e.toString()});
+    }
+  }
+
+  Future<Either<Map<String, dynamic>, Map<String, dynamic>>> getSpiDetail(int id) async {
+    try {
+      final res = await _spiRequest('/spi/$id');
+      if (res.data is Map) {
+        return Right(Map<String, dynamic>.from(res.data as Map));
+      }
+      return const Left({'message': 'Gagal mengambil detail laporan SPI.'});
+    } on DioException catch (e) {
+      return Left(errorHandler(e) as Map<String, dynamic>);
+    } catch (e) {
+      return Left({'message': e.toString()});
+    }
+  }
+
+  Future<Either<Map<String, dynamic>, Map<String, dynamic>>> saveSpiReport(FormData data) async {
+    try {
+      final res = await _spiRequest('/spi', method: 'POST', data: data);
+      if (res.data is Map) {
+        return Right(Map<String, dynamic>.from(res.data as Map));
+      }
+      return const Left({'message': 'Gagal menyimpan laporan SPI.'});
+    } on DioException catch (e) {
+      return Left(errorHandler(e) as Map<String, dynamic>);
+    } catch (e) {
+      return Left({'message': e.toString()});
+    }
+  }
+
+  Future<Either<Map<String, dynamic>, Map<String, dynamic>>> deleteSpiReport(int id) async {
+    try {
+      final res = await _spiRequest('/spi/$id', method: 'DELETE');
+      if (res.data is Map) {
+        return Right(Map<String, dynamic>.from(res.data as Map));
+      }
+      return const Right({});
+    } on DioException catch (e) {
+      return Left(errorHandler(e) as Map<String, dynamic>);
+    } catch (e) {
+      return Left({'message': e.toString()});
+    }
+  }
+
+  Future<Either<Map<String, dynamic>, Map<String, dynamic>>> getSpiSuggestions() async {
+    try {
+      final res = await _spiRequest('/spi/suggestions');
+      if (res.data is Map) {
+        return Right(Map<String, dynamic>.from(res.data as Map));
+      }
+      return const Left({'message': 'Gagal mengambil rekomendasi SPI.'});
+    } on DioException catch (e) {
+      return Left(errorHandler(e) as Map<String, dynamic>);
+    } catch (e) {
+      return Left({'message': e.toString()});
+    }
+  }
+
+  // ==================== GCI (Geotechnical Condition Index) ====================
+  Future<Response> _gciRequest(
+    String path, {
+    String method = 'GET',
+    dynamic data,
+    Map<String, dynamic>? queryParameters,
+  }) => _dciRequest(path.startsWith('/gci') ? path : '/gci$path', method: method, data: data, queryParameters: queryParameters);
+
+  Future<Either<Map<String, dynamic>, Map<String, dynamic>>> getGciList({
+    String? userNik,
+    String? userNama,
+    int? companyId,
+    String? companyName,
+    String? scope,
+    String? search,
+    String? pit,
+    String? areaType,
+    String? kategori,
+    String? tarpLevel,
+    DateTime? startDate,
+    DateTime? endDate,
+    int page = 1,
+    int pageSize = 50,
+  }) async {
+    try {
+      final query = <String, dynamic>{
+        'page': page,
+        'pageSize': pageSize,
+      };
+      if (userNik != null && userNik.isNotEmpty) query['userNik'] = userNik;
+      if (userNama != null && userNama.isNotEmpty) query['userNama'] = userNama;
+      if (companyId != null && companyId > 0) query['companyId'] = companyId;
+      if (companyName != null && companyName.isNotEmpty) query['companyName'] = companyName;
+      if (scope != null && scope.isNotEmpty) query['scope'] = scope;
+      if (search != null && search.isNotEmpty) query['search'] = search;
+      if (pit != null && pit.isNotEmpty) query['pit'] = pit;
+      if (areaType != null && areaType.isNotEmpty) query['areaType'] = areaType;
+      if (kategori != null && kategori.isNotEmpty) query['kategori'] = kategori;
+      if (tarpLevel != null && tarpLevel.isNotEmpty) query['tarpLevel'] = tarpLevel;
+      if (startDate != null) query['startDate'] = startDate.toIso8601String();
+      if (endDate != null) query['endDate'] = endDate.toIso8601String();
+
+      final res = await _gciRequest('/gci', queryParameters: query);
+      if (res.data is Map) {
+        return Right(Map<String, dynamic>.from(res.data as Map));
+      }
+      return const Left({'message': 'Gagal mengambil data laporan GCI.'});
+    } on DioException catch (e) {
+      return Left(errorHandler(e) as Map<String, dynamic>);
+    } catch (e) {
+      return Left({'message': e.toString()});
+    }
+  }
+
+  Future<Either<Map<String, dynamic>, Map<String, dynamic>>> getGciDetail(int id) async {
+    try {
+      final res = await _gciRequest('/gci/$id');
+      if (res.data is Map) {
+        return Right(Map<String, dynamic>.from(res.data as Map));
+      }
+      return const Left({'message': 'Gagal mengambil detail laporan GCI.'});
+    } on DioException catch (e) {
+      return Left(errorHandler(e) as Map<String, dynamic>);
+    } catch (e) {
+      return Left({'message': e.toString()});
+    }
+  }
+
+  Future<Either<Map<String, dynamic>, Map<String, dynamic>>> saveGciReport(FormData data) async {
+    try {
+      final res = await _gciRequest('/gci', method: 'POST', data: data);
+      if (res.data is Map) {
+        return Right(Map<String, dynamic>.from(res.data as Map));
+      }
+      return const Left({'message': 'Gagal menyimpan laporan GCI.'});
+    } on DioException catch (e) {
+      return Left(errorHandler(e) as Map<String, dynamic>);
+    } catch (e) {
+      return Left({'message': e.toString()});
+    }
+  }
+
+  Future<Either<Map<String, dynamic>, Map<String, dynamic>>> deleteGciReport(int id) async {
+    try {
+      final res = await _gciRequest('/gci/$id', method: 'DELETE');
+      if (res.data is Map) {
+        return Right(Map<String, dynamic>.from(res.data as Map));
+      }
+      return const Right({});
+    } on DioException catch (e) {
+      return Left(errorHandler(e) as Map<String, dynamic>);
+    } catch (e) {
+      return Left({'message': e.toString()});
+    }
+  }
+
+  Future<Either<Map<String, dynamic>, Map<String, dynamic>>> getGciSuggestions() async {
+    try {
+      final res = await _gciRequest('/gci/suggestions');
+      if (res.data is Map) {
+        return Right(Map<String, dynamic>.from(res.data as Map));
+      }
+      return const Left({'message': 'Gagal mengambil saran rekomendasi GCI.'});
+    } on DioException catch (e) {
+      return Left(errorHandler(e) as Map<String, dynamic>);
+    } catch (e) {
+      return Left({'message': e.toString()});
     }
   }
 }

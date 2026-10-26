@@ -22,6 +22,11 @@ class DatabaseService {
     await _ensureBenchmarkTable(_database!);
     await _ensureP2hTransColumns(_database!);
     await _ensureP5mTransColumns(_database!);
+    await _ensureDciTable(_database!);
+    await _ensureSpiTable(_database!);
+    await _ensureGciTable(_database!);
+    await _ensureSafetyTransColumns(_database!);
+    await _ensureCoachingTransColumns(_database!);
     return _database!;
   }
 
@@ -45,6 +50,146 @@ class DatabaseService {
     await _ensureBenchmarkTable(db);
     await _ensureP2hTransColumns(db);
     await _ensureP5mTransColumns(db);
+    await _ensureDciTable(db);
+    await _ensureSpiTable(db);
+    await _ensureGciTable(db);
+    await _ensureSafetyTransColumns(db);
+    await _ensureCoachingTransColumns(db);
+  }
+
+  static Future<void> _ensureSpiTable(Database db) async {
+    try {
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS tbl_t_spi_report (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          server_id INTEGER,
+          tanggal TEXT,
+          waktu TEXT,
+          nik TEXT,
+          nama TEXT,
+          departemen TEXT,
+          perusahaan TEXT,
+          perusahaan_id INTEGER,
+          area TEXT,
+          lokasi TEXT,
+          detil_lokasi TEXT,
+          nama_kolam TEXT,
+          titik_penaatan TEXT,
+          shift TEXT,
+          latitude TEXT,
+          longitude TEXT,
+          skor_kapasitas_endapan INTEGER,
+          skor_kondisi_tanggul INTEGER,
+          skor_sekat_baffle INTEGER,
+          skor_pelimpah_spillway INTEGER,
+          skor_fasilitas_dosing INTEGER,
+          skor_kualitas_air_fisik INTEGER,
+          skor_titik_penaatan_debit INTEGER,
+          skor_rambu_pengaman INTEGER,
+          total_score REAL,
+          kategori_index TEXT,
+          catatan TEXT,
+          tindakan_perbaikan TEXT,
+          pic TEXT,
+          foto_url TEXT,
+          created_at TEXT
+        );
+      ''');
+    } catch (_) {}
+  }
+
+  static Future<void> _ensureGciTable(Database db) async {
+    try {
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS tbl_t_gci_report (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          server_id INTEGER,
+          tanggal TEXT,
+          waktu TEXT,
+          nik TEXT,
+          nama TEXT,
+          departemen TEXT,
+          perusahaan TEXT,
+          perusahaan_id INTEGER,
+          area TEXT,
+          lokasi TEXT,
+          detil_lokasi TEXT,
+          pit TEXT,
+          nama_lereng TEXT,
+          area_type TEXT,
+          shift TEXT,
+          latitude TEXT,
+          longitude TEXT,
+          skor_geometri_lereng INTEGER,
+          skor_kondisi_crest_toe INTEGER,
+          skor_tension_crack INTEGER,
+          skor_kestabilan_batuan INTEGER,
+          skor_rembesan_drainase INTEGER,
+          skor_pemantauan_sensor INTEGER,
+          skor_demarkasi_zona INTEGER,
+          skor_kepatuhan_rekomendasi INTEGER,
+          total_score REAL,
+          kategori_index TEXT,
+          tarp_level TEXT,
+          catatan TEXT,
+          tindakan_perbaikan TEXT,
+          pic TEXT,
+          pic_nik TEXT,
+          judul_temuan TEXT,
+          due_date TEXT,
+          foto_url TEXT,
+          jenis_inspeksi TEXT,
+          pja_nama TEXT,
+          pja_nik TEXT,
+          created_at TEXT
+        );
+      ''');
+    } catch (_) {}
+  }
+
+  static Future<void> _ensureDciTable(Database db) async {
+    try {
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS tbl_t_dci_report (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          server_id INTEGER,
+          tanggal TEXT,
+          waktu TEXT,
+          nik TEXT,
+          nama TEXT,
+          departemen TEXT,
+          perusahaan TEXT,
+          perusahaan_id INTEGER,
+          area TEXT,
+          lokasi TEXT,
+          detil_lokasi TEXT,
+          disposal TEXT,
+          nama_dump TEXT,
+          pad TEXT,
+          shift TEXT,
+          latitude TEXT,
+          longitude TEXT,
+          skor_lantai_dump INTEGER,
+          skor_safety_berm INTEGER,
+          skor_kondisi_crest INTEGER,
+          skor_grade_dumping INTEGER,
+          skor_drainase_dump INTEGER,
+          skor_penataan_spillage INTEGER,
+          skor_rambu_penerangan INTEGER,
+          skor_spotter_manuver INTEGER,
+          total_score REAL,
+          kategori_index TEXT,
+          catatan TEXT,
+          tindakan_perbaikan TEXT,
+          pic TEXT,
+          foto_url TEXT,
+          created_at TEXT
+        );
+      ''');
+      try {
+        await db.execute('ALTER TABLE tbl_t_dci_report ADD COLUMN pad TEXT;');
+      } catch (_) {}
+    } catch (_) {}
   }
 
   static Future<void> _ensureP5mTransColumns(Database db) async {
@@ -64,6 +209,61 @@ class DatabaseService {
     for (var col in cols) {
       try {
         await db.execute('ALTER TABLE p5m_trans ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  }
+
+  static Future<void> _ensureSafetyTransColumns(Database db) async {
+    final cols = [
+      'area',
+      'lokasi',
+      'detil_lokasi',
+      'judul',
+      'keterangan',
+      'self_image',
+      'event_image',
+      'foto_diri',
+      'foto_kegiatan',
+      'nik',
+      'nama',
+    ];
+    for (var col in cols) {
+      try {
+        await db.execute('ALTER TABLE safety_trans ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  }
+
+  static Future<void> _ensureCoachingTransColumns(Database db) async {
+    final cols = [
+      'area',
+      'lokasi',
+      'detil_lokasi',
+      'tema',
+      'komitmen',
+      'feedback',
+      'participants_json',
+      'nik',
+      'nama',
+      'foto',
+    ];
+    for (var col in cols) {
+      try {
+        await db.execute('ALTER TABLE coaching_trans ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+
+    final detailCols = [
+      'no_nik',
+      'nik',
+      'nama_lengkap',
+      'posisi',
+      'departemen',
+      'perusahaan',
+    ];
+    for (var col in detailCols) {
+      try {
+        await db.execute('ALTER TABLE coaching_details ADD COLUMN `$col` TEXT;');
       } catch (_) {}
     }
   }
@@ -153,7 +353,7 @@ class DatabaseService {
   }
 
   static Future<void> _ensureEmployeeColumns(Database db) async {
-    final cols = ['departemen', 'jabatan', 'perusahaan'];
+    final cols = ['departemen', 'jabatan', 'perusahaan', 'company_id', 'foto'];
     for (var col in cols) {
       try {
         await db.execute('ALTER TABLE employees ADD COLUMN `$col` TEXT;');
@@ -164,6 +364,8 @@ class DatabaseService {
           'CREATE INDEX IF NOT EXISTS idx_emp_nik ON employees (no_nik);');
       await db.execute(
           'CREATE INDEX IF NOT EXISTS idx_emp_nama ON employees (nama_lengkap);');
+      await db.execute(
+          'CREATE INDEX IF NOT EXISTS idx_emp_company ON employees (perusahaan);');
     } catch (_) {}
   }
 

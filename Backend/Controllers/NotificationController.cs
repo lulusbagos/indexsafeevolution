@@ -86,7 +86,7 @@ namespace Indexsafe.Api.Controllers
                 return false;
             }
 
-            if (t.StartsWith("hazard_") || t.StartsWith("inspection_") || t.StartsWith("actionplan_"))
+            if (t.StartsWith("hazard_") || t.StartsWith("inspection_") || t.StartsWith("actionplan_") || t.StartsWith("rci_approval") || t.StartsWith("rci_pic_task"))
             {
                 return true;
             }
@@ -240,6 +240,147 @@ namespace Indexsafe.Api.Controllers
                             IsRead = false,
                             IsActioned = false,
                             CreatedAt = insp.CreatedAt
+                        });
+                        hasNew = true;
+                    }
+                }
+
+                // 5. Condition Index (CI: FCI, RCI, DCI, SPI, GCI) PIC informational notifications (tidak harus di-followup, hanya pemberitahuan)
+                // FCI
+                var fciPics = await _context.FciReports.AsNoTracking()
+                    .Where(r => !r.IsDeleted && r.Pic != null && r.Pic.Contains(userNik))
+                    .OrderByDescending(r => r.Id).Take(15).ToListAsync();
+                foreach (var r in fciPics)
+                {
+                    bool exists = await _context.Notifications.AnyAsync(n => n.RecipientNik == userNik && n.Url == $"/Fci/Detail/{r.Id}");
+                    if (!exists)
+                    {
+                        _context.Notifications.Add(new Notification
+                        {
+                            RecipientNik = userNik,
+                            Title = "Informasi Nilai FCI (Front Condition Index)",
+                            Message = $"Informasi Nilai FCI: {r.TotalScore}% ({r.KategoriIndex}) di {r.NamaFront ?? r.Lokasi}. Rekomendasi: {r.TindakanPerbaikan ?? "Pemantauan rutin"}. Notifikasi ini bersifat informasi kondisi front dan tidak perlu di-follow up.",
+                            Url = $"/Fci/Detail/{r.Id}",
+                            NotifType = "ci_pic_info",
+                            Category = "info",
+                            SenderName = r.Nama ?? "Auditor FCI",
+                            Priority = "normal",
+                            ActionText = null,
+                            IsRead = false,
+                            IsActioned = true,
+                            CreatedAt = r.CreatedAt
+                        });
+                        hasNew = true;
+                    }
+                }
+
+                // RCI
+                var rciPics = await _context.RciReports.AsNoTracking()
+                    .Where(r => !r.IsDeleted && r.Pic != null && r.Pic.Contains(userNik))
+                    .OrderByDescending(r => r.Id).Take(15).ToListAsync();
+                foreach (var r in rciPics)
+                {
+                    bool exists = await _context.Notifications.AnyAsync(n => n.RecipientNik == userNik && n.Url == $"/Rci/Detail/{r.Id}");
+                    if (!exists)
+                    {
+                        _context.Notifications.Add(new Notification
+                        {
+                            RecipientNik = userNik,
+                            Title = "Pemberitahuan PIC Assessment RCI",
+                            Message = $"Anda dicatat sebagai PIC perbaikan Road Condition Index di {r.NamaJalan ?? r.Lokasi} (Skor: {r.TotalScore}% - {r.KategoriIndex}). Pemberitahuan ini bersifat informatif.",
+                            Url = $"/Rci/Detail/{r.Id}",
+                            NotifType = "ci_pic_info",
+                            Category = "info",
+                            SenderName = r.Nama ?? "Auditor RCI",
+                            Priority = "normal",
+                            ActionText = null,
+                            IsRead = false,
+                            IsActioned = true,
+                            CreatedAt = r.CreatedAt
+                        });
+                        hasNew = true;
+                    }
+                }
+
+                // DCI
+                var dciPics = await _context.DciReports.AsNoTracking()
+                    .Where(r => !r.IsDeleted && r.Pic != null && r.Pic.Contains(userNik))
+                    .OrderByDescending(r => r.Id).Take(15).ToListAsync();
+                foreach (var r in dciPics)
+                {
+                    bool exists = await _context.Notifications.AnyAsync(n => n.RecipientNik == userNik && n.Url == $"/Dci/Detail/{r.Id}");
+                    if (!exists)
+                    {
+                        _context.Notifications.Add(new Notification
+                        {
+                            RecipientNik = userNik,
+                            Title = "Pemberitahuan PIC Assessment DCI",
+                            Message = $"Anda dicatat sebagai PIC perbaikan Disposal Condition Index di {r.Disposal ?? r.NamaDump ?? r.Lokasi} (Skor: {r.TotalScore}% - {r.KategoriIndex}). Pemberitahuan ini bersifat informatif.",
+                            Url = $"/Dci/Detail/{r.Id}",
+                            NotifType = "ci_pic_info",
+                            Category = "info",
+                            SenderName = r.Nama ?? "Auditor DCI",
+                            Priority = "normal",
+                            ActionText = null,
+                            IsRead = false,
+                            IsActioned = true,
+                            CreatedAt = r.CreatedAt
+                        });
+                        hasNew = true;
+                    }
+                }
+
+                // SPI
+                var spiPics = await _context.SpiReports.AsNoTracking()
+                    .Where(r => !r.IsDeleted && r.Pic != null && r.Pic.Contains(userNik))
+                    .OrderByDescending(r => r.Id).Take(15).ToListAsync();
+                foreach (var r in spiPics)
+                {
+                    bool exists = await _context.Notifications.AnyAsync(n => n.RecipientNik == userNik && n.Url == $"/Spi/Detail/{r.Id}");
+                    if (!exists)
+                    {
+                        _context.Notifications.Add(new Notification
+                        {
+                            RecipientNik = userNik,
+                            Title = "Pemberitahuan PIC Assessment SPI",
+                            Message = $"Anda dicatat sebagai PIC fasilitas Sediment Pond di {r.NamaKolam ?? r.Lokasi} (Skor: {r.TotalScore}% - {r.KategoriIndex}). Pemberitahuan ini bersifat informatif.",
+                            Url = $"/Spi/Detail/{r.Id}",
+                            NotifType = "ci_pic_info",
+                            Category = "info",
+                            SenderName = r.Nama ?? "Auditor SPI",
+                            Priority = "normal",
+                            ActionText = null,
+                            IsRead = false,
+                            IsActioned = true,
+                            CreatedAt = r.CreatedAt
+                        });
+                        hasNew = true;
+                    }
+                }
+
+                // GCI
+                var gciPics = await _context.GciReports.AsNoTracking()
+                    .Where(r => !r.IsDeleted && ((r.Pic != null && r.Pic.Contains(userNik)) || (r.PicNik != null && r.PicNik.Contains(userNik))))
+                    .OrderByDescending(r => r.Id).Take(15).ToListAsync();
+                foreach (var r in gciPics)
+                {
+                    bool exists = await _context.Notifications.AnyAsync(n => n.RecipientNik == userNik && n.Url == $"/Gci/Detail/{r.Id}");
+                    if (!exists)
+                    {
+                        _context.Notifications.Add(new Notification
+                        {
+                            RecipientNik = userNik,
+                            Title = "Pemberitahuan PIC Assessment GCI (Geoteknik)",
+                            Message = $"Anda dicatat sebagai PIC penanganan geoteknik di {r.Pit} - {r.NamaLereng ?? r.Lokasi} (TARP: {r.TarpLevel}). Pemberitahuan ini bersifat informatif.",
+                            Url = $"/Gci/Detail/{r.Id}",
+                            NotifType = "ci_pic_info",
+                            Category = "info",
+                            SenderName = r.Nama ?? "Geotechnical Engineer",
+                            Priority = "normal",
+                            ActionText = null,
+                            IsRead = false,
+                            IsActioned = true,
+                            CreatedAt = r.CreatedAt
                         });
                         hasNew = true;
                     }

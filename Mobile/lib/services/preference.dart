@@ -261,4 +261,43 @@ class PreferenceService {
   static String getHazardMapMode() {
     return prefs?.getString('hazard_map_mode') ?? 'heatmap';
   }
+
+  /// Catatan tanggal terakhir kali iklan/banner popup dimunculkan (Format: yyyy-MM-dd)
+  static String? getLastAdShownDate() {
+    return prefs?.getString('last_popup_ad_shown_date');
+  }
+
+  static String? getLastAdShownFile() {
+    return prefs?.getString('last_popup_ad_shown_file');
+  }
+
+  static Future<void> setLastAdShown({
+    required String dateStr,
+    required String fileName,
+  }) async {
+    await prefs?.setString('last_popup_ad_shown_date', dateStr);
+    await prefs?.setString('last_popup_ad_shown_file', fileName);
+  }
+
+  static Future<void> clearLastAdShown() async {
+    await prefs?.remove('last_popup_ad_shown_date');
+    await prefs?.remove('last_popup_ad_shown_file');
+  }
+
+  /// Cache data titik Safe Map untuk Dashboard (1 hari sekali)
+  static String? getHazardMapLastFetchDate() {
+    return prefs?.getString('safemap_last_fetch_date');
+  }
+
+  static String? getCachedHazardMapJson() {
+    return prefs?.getString('safemap_cached_points_json');
+  }
+
+  static Future<void> setCachedHazardMapPoints({
+    required String jsonString,
+    required String dateStr,
+  }) async {
+    await prefs?.setString('safemap_cached_points_json', jsonString);
+    await prefs?.setString('safemap_last_fetch_date', dateStr);
+  }
 }

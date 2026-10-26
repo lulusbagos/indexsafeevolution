@@ -46,8 +46,10 @@ class _ObservationFormPageState extends State<ObservationFormPage> {
   List<MapEntry<int, dynamic>> _hasilOptions = [];
   List<MapEntry<int, dynamic>> _companyOptions = [];
   List<ObservationDetailModel> _editDetails = [];
+  Map<String, dynamic> _companyDeptMap = {};
   bool _loadingEditDetails = false;
   bool _loadingOptions = true;
+  bool _loadingDepts = false;
   String? _optionsError;
 
   @override
@@ -68,25 +70,6 @@ class _ObservationFormPageState extends State<ObservationFormPage> {
       if (widget.editData == null) _fillGpsFromDevice(silent: true);
       _loadObservationOptions(_companyId);
       if (widget.editData != null) _loadEditDetails();
-      /* Legacy local-master fallback for already downloaded offline data.
-         Online options are replaced by _loadObservationOptions above. */
-      _db.rawQuery('''select
-        me.id id_departemen_pekerja_yang_diamati,
-        me."name" departemen_pekerja_yang_diamati 
-      from enum_masters me 
-      where me.deleted_at is null and me."type" = 'dept'
-      order by me."name"''').then((val) {
-        if (val.isNotEmpty) {
-          setState(() {
-            _deptList.addAll({
-              for (var row in val.toList())
-                row['id_departemen_pekerja_yang_diamati'] as int:
-                    row['departemen_pekerja_yang_diamati']
-            }.entries.toList());
-            _deptList.sort((a, b) => (a.value).compareTo(b.value));
-          });
-        }
-      });
 
       _db.rawQuery('''select
         id id_dokumen_pendukung,
@@ -270,9 +253,26 @@ class _ObservationFormPageState extends State<ObservationFormPage> {
       };
     }).toList();
     setState(() {
+      if (options['companyDeptMap'] is Map) {
+        _companyDeptMap = Map<String, dynamic>.from(options['companyDeptMap'] as Map);
+      }
+
+      // Populate departments for the active company
+      List<MapEntry<int, dynamic>> depts = [];
+      if (companyId != null && companyId > 0 && _companyDeptMap.isNotEmpty) {
+        final list = _companyDeptMap[companyId.toString()];
+        if (list is List && list.isNotEmpty) {
+          final strings = list.map((e) => e.toString().trim()).where((e) => e.isNotEmpty).toList();
+          depts = List.generate(strings.length, (i) => MapEntry(i + 1, strings[i]));
+        }
+      }
+      if (depts.isEmpty) {
+        depts = _entries(options, 'departments');
+      }
+
       _deptList
         ..clear()
-        ..addAll(_entries(options, 'departments'));
+        ..addAll(depts);
       _companyOptions = _entries(options, 'companies');
       _docList
         ..clear()
@@ -311,6 +311,40 @@ class _ObservationFormPageState extends State<ObservationFormPage> {
         }
       }
       _loadingOptions = false;
+    });
+  }
+
+  /// Dynamically update departments when user picks an observed company,
+  /// matching web ObservationController logic.
+  Future<void> _updateDepartmentsForCompany(int companyId) async {
+    setState(() => _loadingDepts = true);
+    List<String> deptNames = [];
+
+    // 1. Instant local lookup from cached companyDeptMap
+    if (_companyDeptMap.isNotEmpty) {
+      final raw = _companyDeptMap[companyId.toString()];
+      if (raw is List && raw.isNotEmpty) {
+        deptNames = raw
+            .map((e) => e.toString().trim())
+            .where((e) => e.isNotEmpty)
+            .toList();
+      }
+    }
+
+    // 2. Fetch from Backend API / Web MBS if not found locally
+    if (deptNames.isEmpty) {
+      deptNames = await _api.getDepartmentsByCompany(companyId);
+    }
+
+    if (!mounted) return;
+    setState(() {
+      _deptList.clear();
+      if (deptNames.isNotEmpty) {
+        _deptList.addAll(List.generate(
+            deptNames.length, (i) => MapEntry(i + 1, deptNames[i])));
+      }
+      _deptId = null;
+      _loadingDepts = false;
     });
   }
 
@@ -491,8 +525,12 @@ class _ObservationFormPageState extends State<ObservationFormPage> {
                               ),
                               onChanged: (item) {
                                 if (item == null) return;
-                                setState(() => _companyId = item.key);
-                                _loadObservationOptions(item.key);
+                                final newCompanyId = item.key;
+                                setState(() {
+                                  _companyId = newCompanyId;
+                                  _deptId = null;
+                                });
+                                _updateDepartmentsForCompany(newCompanyId);
                               },
                             ),
                             const SizedBox(height: 14),
@@ -614,21 +652,46 @@ class _ObservationFormPageState extends State<ObservationFormPage> {
                             DropdownSearch<MapEntry<int, dynamic>>(
                               selectedItem: _deptList.where((e) => e.key == _deptId).firstOrNull,
                               items: _deptList.toList(),
+                              enabled: !_loadingDepts && _companyId != null,
                               itemAsString: (MapEntry<int, dynamic>? e) => e?.value ?? '',
                               dropdownDecoratorProps: DropDownDecoratorProps(
                                 dropdownSearchDecoration: InputDecoration(
-                                  hintText: 'Pilih Departemen...',
+                                  hintText: _loadingDepts
+                                      ? 'Memuat departemen...'
+                                      : (_companyId == null
+                                          ? 'Pilih Perusahaan terlebih dahulu...'
+                                          : (_deptList.isEmpty
+                                              ? '(Tidak ada departemen terdaftar)'
+                                              : 'Pilih Departemen...')),
                                   hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
-                                  prefixIcon: const Icon(Icons.corporate_fare_rounded, color: Color(0xFFD97706), size: 20),
+                                  prefixIcon: _loadingDepts
+                                      ? const Padding(
+                                          padding: EdgeInsets.all(12),
+                                          child: SizedBox(
+                                            width: 16,
+                                            height: 16,
+                                            child: CircularProgressIndicator(
+                                                strokeWidth: 2,
+                                                color: Color(0xFFD97706)),
+                                          ),
+                                        )
+                                      : const Icon(Icons.corporate_fare_rounded, color: Color(0xFFD97706), size: 20),
                                   filled: true,
                                   fillColor: const Color(0xFFF8FAFC),
                                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
                                   enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                                  disabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
                                 ),
                               ),
                               popupProps: const PopupProps.menu(
                                 fit: FlexFit.loose,
                                 showSearchBox: true,
+                                searchFieldProps: TextFieldProps(
+                                  decoration: InputDecoration(
+                                    hintText: 'Cari departemen...',
+                                    prefixIcon: Icon(Icons.search_rounded),
+                                  ),
+                                ),
                               ),
                               onChanged: (val) {
                                 if (val != null) setState(() => _deptId = val.key);
@@ -818,9 +881,10 @@ class _ObservationFormPageState extends State<ObservationFormPage> {
                                 .toString(),
                             deptName: _deptList
                                 .where((i) => i.key == _deptId)
-                                .first
-                                .value
-                                .toString(),
+                                .firstOrNull
+                                ?.value
+                                ?.toString() ??
+                                '',
                             docName: _docList
                                 .where((i) => i.key == _docId)
                                 .first

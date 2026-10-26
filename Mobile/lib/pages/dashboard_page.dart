@@ -231,6 +231,44 @@ class MapHazardItem {
         'pja': pja,
         'kategori': kategori,
       };
+
+  factory MapHazardItem.fromJson(Map<String, dynamic> json) {
+    DateTime parsedDate = DateTime.now();
+    try {
+      if (json['date'] != null) {
+        final dStr = json['date'].toString();
+        if (dStr.contains('/')) {
+          final parts = dStr.split('/');
+          if (parts.length == 3) {
+            final day = int.tryParse(parts[0]) ?? 1;
+            final month = int.tryParse(parts[1]) ?? 1;
+            final year = int.tryParse(parts[2]) ?? DateTime.now().year;
+            parsedDate = DateTime(year, month, day);
+          }
+        } else {
+          parsedDate = DateTime.tryParse(dStr) ?? DateTime.now();
+        }
+      }
+    } catch (_) {}
+
+    return MapHazardItem(
+      id: json['id'] is int ? json['id'] as int : int.tryParse(json['id']?.toString() ?? '0') ?? 0,
+      title: json['title']?.toString() ?? 'Temuan Hazard',
+      area: json['area']?.toString() ?? 'Area Tambang',
+      level: json['level']?.toString() ?? 'Sedang',
+      color: json['color']?.toString() ?? '#f59e0b',
+      status: json['status']?.toString() ?? 'Open',
+      statusColor: json['statusColor']?.toString() ?? '#ef4444',
+      lat: (json['lat'] is num) ? (json['lat'] as num).toDouble() : double.tryParse(json['lat']?.toString() ?? '0') ?? 0.0,
+      lng: (json['lng'] is num) ? (json['lng'] as num).toDouble() : double.tryParse(json['lng']?.toString() ?? '0') ?? 0.0,
+      photo: json['photo']?.toString() ?? '',
+      notes: json['notes']?.toString() ?? '',
+      date: parsedDate,
+      pelapor: json['pelapor']?.toString() ?? 'Safety Officer',
+      pja: json['pja']?.toString() ?? 'Supervisor Lapangan',
+      kategori: json['kategori']?.toString() ?? 'Kondisi Tidak Aman (KTA)',
+    );
+  }
 }
 
 Future<void> _injectCurrentPosition(WebViewController controller) async {
@@ -303,27 +341,42 @@ class _FullscreenHazardMapPage extends StatefulWidget {
 }
 
 class _FullscreenHazardMapPageState extends State<_FullscreenHazardMapPage>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin, WidgetsBindingObserver {
+  final _api = ApiService();
   late final WebViewController _controller;
   late String _mapMode;
-  bool _isHunterMode = true; // Mode Berburu Hazard (Pokemon GO style radar)
+  bool _isHunterMode = true;
   Position? _currentPos;
   StreamSubscription<Position>? _posSub;
   int _currentTargetIndex = 0;
   int _score = 350;
   bool _hasVibratedForTarget = false;
+
   late final AnimationController _pulseCtrl;
+  late final AnimationController _radarRotateCtrl;
+
+  late List<MapHazardItem> _liveHazards;
+  Timer? _realtimeTimer;
+  bool _isScanningRealtime = false;
+  String _selectedFilter = 'all'; // 'all', '1km', 'high'
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _mapMode = PreferenceService.getHazardMapMode();
     _currentPos = widget.initialUserPosition;
+    _liveHazards = List<MapHazardItem>.from(widget.unclosedHazards);
 
     _pulseCtrl = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1400),
     )..repeat(reverse: true);
+
+    _radarRotateCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 4),
+    )..repeat();
 
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
@@ -370,13 +423,162 @@ class _FullscreenHazardMapPageState extends State<_FullscreenHazardMapPage>
       ..loadHtmlString(widget.html, baseUrl: 'https://unpkg.com');
 
     _startLocationStream();
+
+    // Jalankan scan realtime di sekitar begitu masuk mode layar penuh
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _fetchRealtimeNearbyHazards(silent: true);
+    });
+
+    _startRealtimeTimer();
+  }
+
+  void _startRealtimeTimer() {
+    _realtimeTimer?.cancel();
+    // Polling efisien hemat daya setiap 25 detik (dapat di-refresh manual via tombol PING)
+    _realtimeTimer = Timer.periodic(const Duration(seconds: 25), (_) {
+      if (mounted && _isHunterMode) {
+        _fetchRealtimeNearbyHazards(silent: true);
+      }
+    });
+  }
+
+  void _stopRealtimeTimer() {
+    _realtimeTimer?.cancel();
+    _realtimeTimer = null;
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive) {
+      // Hentikan timer dan animasi saat diminimize agar tidak menguras baterai dan tidak panas
+      _stopRealtimeTimer();
+      _posSub?.pause();
+      _pulseCtrl.stop();
+      _radarRotateCtrl.stop();
+    } else if (state == AppLifecycleState.resumed) {
+      // Nyalakan kembali saat user kembali ke aplikasi
+      _pulseCtrl.repeat(reverse: true);
+      _radarRotateCtrl.repeat();
+      _posSub?.resume();
+      _startRealtimeTimer();
+      _fetchRealtimeNearbyHazards(silent: true);
+    }
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _stopRealtimeTimer();
     _posSub?.cancel();
     _pulseCtrl.dispose();
+    _radarRotateCtrl.dispose();
     super.dispose();
+  }
+
+  Future<void> _fetchRealtimeNearbyHazards({bool silent = true}) async {
+    if (_isScanningRealtime) return;
+    setState(() => _isScanningRealtime = true);
+    if (!silent) HapticFeedback.selectionClick();
+
+    try {
+      final pos = _currentPos ?? widget.initialUserPosition;
+      final res = await _api.getSafeMapHazardPoints(
+        days: 30,
+        onlyOpen: true,
+        limit: 120, // Realtime hunter mode memuat hingga 120 hazard sekitar
+        lat: pos?.latitude,
+        lon: pos?.longitude,
+      );
+
+      res.fold(
+        (err) => debugPrint('[HazardHunter] Realtime scan error: $err'),
+        (points) {
+          if (!mounted) return;
+          final now = DateTime.now();
+          final items = <MapHazardItem>[];
+
+          for (final p in points) {
+            final statusStr = p['status']?.toString() ?? 'Open';
+            final statusLower = statusStr.toLowerCase();
+            if (statusLower == 'closed' ||
+                statusLower == 'selesai' ||
+                statusLower == 'tutup') {
+              continue;
+            }
+
+            final level = p['resiko']?.toString() ??
+                p['tingkatResiko']?.toString() ??
+                'Sedang';
+            final color = (level == 'Kritis' || level == 'Ekstrem')
+                ? '#b91c1c'
+                : level == 'Tinggi'
+                    ? '#dc2626'
+                    : level == 'Sedang'
+                        ? '#f59e0b'
+                        : '#10b981';
+
+            DateTime tgl = now;
+            try {
+              if (p['tanggalIso'] != null) {
+                tgl = DateTime.tryParse(p['tanggalIso'].toString()) ?? now;
+              } else if (p['tanggal'] != null) {
+                tgl = DateTime.tryParse(p['tanggal'].toString()) ?? now;
+              }
+            } catch (_) {}
+
+            items.add(MapHazardItem(
+              id: int.tryParse(p['id']?.toString() ?? '0') ?? 0,
+              title: p['detail']?.toString() ??
+                  p['temuan']?.toString() ??
+                  'Temuan Hazard',
+              area: p['area']?.toString() ?? 'Area Operasional',
+              level: level,
+              color: color,
+              status: statusStr,
+              statusColor: '#ef4444',
+              lat: double.tryParse(p['lat']?.toString() ?? '0') ?? 0.0,
+              lng: double.tryParse(
+                      p['lon']?.toString() ?? p['lng']?.toString() ?? '0') ??
+                  0.0,
+              photo: () {
+                final raw = p['photoUrl']?.toString() ??
+                    p['fotoTemuan']?.toString() ??
+                    '';
+                if (raw.isEmpty) {
+                  return 'https://images.unsplash.com/photo-1581092160607-ee22621dd758?auto=format&fit=crop&w=520&q=80';
+                }
+                return raw.startsWith('http') ? raw : '${_api.baseUrl}$raw';
+              }(),
+              notes: p['tindakanPerbaikan']?.toString() ??
+                  p['perbaikan']?.toString() ??
+                  'Perlu tindakan isolasi dan perbaikan.',
+              date: tgl,
+              pelapor: p['nama']?.toString() ?? 'Pelapor Lapangan',
+              pja: p['pja']?.toString() ?? 'Foreman Area',
+              kategori: p['kategoriBahaya']?.toString() ??
+                  'Kondisi Tidak Aman (KTA)',
+            ));
+          }
+
+          if (items.isNotEmpty) {
+            setState(() {
+              _liveHazards = items;
+            });
+            final jsonStr = jsonEncode(items.map((e) => e.toJson()).toList());
+            _controller.runJavaScript(
+              'if(window.renderHazardPoints) window.renderHazardPoints($jsonStr);',
+            );
+            _updateMapGuide();
+            if (!silent) HapticFeedback.mediumImpact();
+          }
+        },
+      );
+    } catch (e) {
+      debugPrint('[HazardHunter] Realtime scan exception: $e');
+    } finally {
+      if (mounted) setState(() => _isScanningRealtime = false);
+    }
   }
 
   Future<void> _startLocationStream() async {
@@ -392,8 +594,8 @@ class _FullscreenHazardMapPageState extends State<_FullscreenHazardMapPage>
 
       _posSub = Geolocator.getPositionStream(
         locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.medium, // Balanced accuracy to save battery & prevent overheating
-          distanceFilter: 10, // Only trigger if moved 10 meters
+          accuracy: LocationAccuracy.high,
+          distanceFilter: 8,
         ),
       ).listen(
         (pos) {
@@ -455,9 +657,25 @@ class _FullscreenHazardMapPageState extends State<_FullscreenHazardMapPage>
     return 'Barat Laut';
   }
 
+  List<MapHazardItem> get _filteredHazards {
+    if (_liveHazards.isEmpty) return [];
+    final pos = _currentPos ?? widget.initialUserPosition;
+    return _liveHazards.where((h) {
+      if (_selectedFilter == '1km' && pos != null) {
+        final d = Geolocator.distanceBetween(
+            pos.latitude, pos.longitude, h.lat, h.lng);
+        return d <= 1000.0;
+      } else if (_selectedFilter == 'high') {
+        final lvl = h.level.toLowerCase();
+        return lvl == 'kritis' || lvl == 'tinggi' || lvl == 'ekstrem';
+      }
+      return true;
+    }).toList();
+  }
+
   List<MapHazardItem> get _sortedHazards {
-    if (widget.unclosedHazards.isEmpty) return [];
-    final list = List<MapHazardItem>.from(widget.unclosedHazards);
+    final list = List<MapHazardItem>.from(_filteredHazards);
+    if (list.isEmpty) return [];
     final pos = _currentPos ?? widget.initialUserPosition;
     if (pos != null) {
       list.sort((a, b) {
@@ -474,7 +692,7 @@ class _FullscreenHazardMapPageState extends State<_FullscreenHazardMapPage>
   void _onSelectMode(String mode) {
     if (_mapMode == mode) return;
     setState(() => _mapMode = mode);
-    PreferenceService.setHazardMapMode(mode); // Simpan permanen ke lokal
+    PreferenceService.setHazardMapMode(mode);
     _controller.runJavaScript(
       "if(window.setMapMode) window.setMapMode('$mode');",
     );
@@ -585,7 +803,7 @@ class _FullscreenHazardMapPageState extends State<_FullscreenHazardMapPage>
           margin: const EdgeInsets.all(12),
           decoration: BoxDecoration(
             gradient: const LinearGradient(
-              colors: [Color(0xFF0F172A), Color(0xFF1E293B)],
+              colors: [Color(0xFF090D16), Color(0xFF131B2E)],
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
             ),
@@ -593,13 +811,13 @@ class _FullscreenHazardMapPageState extends State<_FullscreenHazardMapPage>
             border: Border.all(
                 color: canTakeUp
                     ? const Color(0xFF10B981)
-                    : const Color(0xFF38BDF8),
-                width: 1.6),
+                    : const Color(0xFF00E5FF),
+                width: 1.8),
             boxShadow: [
               BoxShadow(
                 color: (canTakeUp
                         ? const Color(0xFF10B981)
-                        : const Color(0xFF0284C7))
+                        : const Color(0xFF00E5FF))
                     .withOpacity(0.45),
                 blurRadius: 30,
                 spreadRadius: 2,
@@ -620,7 +838,7 @@ class _FullscreenHazardMapPageState extends State<_FullscreenHazardMapPage>
               ),
               const SizedBox(height: 14),
 
-              // Title Header ala Pokemon Wild Encounter
+              // Title Header
               Container(
                 padding:
                     const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
@@ -651,8 +869,8 @@ class _FullscreenHazardMapPageState extends State<_FullscreenHazardMapPage>
                     const SizedBox(width: 7),
                     Text(
                       canTakeUp
-                          ? 'TARGET TERVERIFIKASI DALAM 50M!'
-                          : 'WILD HAZARD DETECTED!',
+                          ? 'TARGET VERIFIKASI < 50M: AMANKAN!'
+                          : 'WILD HAZARD TERDETEKSI!',
                       style: const TextStyle(
                         color: Colors.white,
                         fontWeight: FontWeight.w900,
@@ -686,7 +904,6 @@ class _FullscreenHazardMapPageState extends State<_FullscreenHazardMapPage>
                       ),
                     ),
                   ),
-                  // Tactical Reticle
                   Container(
                     width: 76,
                     height: 76,
@@ -695,14 +912,14 @@ class _FullscreenHazardMapPageState extends State<_FullscreenHazardMapPage>
                       border: Border.all(
                           color: canTakeUp
                               ? Colors.greenAccent
-                              : Colors.amberAccent,
+                              : const Color(0xFF00E5FF),
                           width: 2),
                     ),
                     child: Center(
                       child: Icon(Icons.filter_center_focus,
                           color: canTakeUp
                               ? Colors.greenAccent
-                              : Colors.amberAccent,
+                              : const Color(0xFF00E5FF),
                           size: 44),
                     ),
                   ),
@@ -751,7 +968,7 @@ class _FullscreenHazardMapPageState extends State<_FullscreenHazardMapPage>
                               size: 12),
                           const SizedBox(width: 4),
                           Text(
-                            'Jarak: ${distance.round()}m ${canTakeUp ? "(Aman)" : "(Jauh)"}',
+                            'Jarak: ${distance.round()}m ${canTakeUp ? "(Siap Amankan)" : "(Dekati)"}',
                             style: TextStyle(
                               color: canTakeUp
                                   ? Colors.greenAccent
@@ -822,10 +1039,10 @@ class _FullscreenHazardMapPageState extends State<_FullscreenHazardMapPage>
                 padding:
                     const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF38BDF8).withOpacity(0.12),
+                  color: const Color(0xFF00E5FF).withOpacity(0.12),
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
-                      color: const Color(0xFF38BDF8).withOpacity(0.35)),
+                      color: const Color(0xFF00E5FF).withOpacity(0.35)),
                 ),
                 child: const Row(
                   mainAxisSize: MainAxisSize.min,
@@ -834,7 +1051,7 @@ class _FullscreenHazardMapPageState extends State<_FullscreenHazardMapPage>
                         color: Colors.amber, size: 20),
                     SizedBox(width: 6),
                     Text(
-                      'Reward Temuan: +50 Poin SAP & Lencana Hunter',
+                      'Reward Hunter: +50 XP & Amankan Area Lapangan',
                       style: TextStyle(
                         color: Color(0xFFE0F2FE),
                         fontWeight: FontWeight.w700,
@@ -854,13 +1071,16 @@ class _FullscreenHazardMapPageState extends State<_FullscreenHazardMapPage>
                       style: ElevatedButton.styleFrom(
                         backgroundColor: canTakeUp
                             ? const Color(0xFF10B981)
-                            : const Color(0xFF475569),
+                            : const Color(0xFF334155),
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 13),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
-                        elevation: canTakeUp ? 4 : 0,
+                        elevation: canTakeUp ? 6 : 0,
+                        shadowColor: canTakeUp
+                            ? const Color(0xFF10B981).withOpacity(0.6)
+                            : null,
                       ),
                       onPressed: canTakeUp
                           ? () {
@@ -913,6 +1133,63 @@ class _FullscreenHazardMapPageState extends State<_FullscreenHazardMapPage>
     );
   }
 
+  void _showImageZoomDialog(BuildContext context, String imageUrl, String title) {
+    showDialog(
+      context: context,
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.all(16),
+        child: Stack(
+          alignment: Alignment.topRight,
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(20),
+              child: Container(
+                color: Colors.black,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    InteractiveViewer(
+                      minScale: 0.8,
+                      maxScale: 4.0,
+                      child: Image.network(
+                        imageUrl,
+                        fit: BoxFit.contain,
+                        errorBuilder: (_, __, ___) => const Padding(
+                          padding: EdgeInsets.all(40),
+                          child: Icon(Icons.broken_image,
+                              color: Colors.white54, size: 48),
+                        ),
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: Text(
+                        title,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            IconButton(
+              icon: const CircleAvatar(
+                backgroundColor: Colors.black54,
+                child: Icon(Icons.close, color: Colors.white, size: 20),
+              ),
+              onPressed: () => Navigator.pop(ctx),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final sorted = _sortedHazards;
@@ -938,10 +1215,9 @@ class _FullscreenHazardMapPageState extends State<_FullscreenHazardMapPage>
       dirName = _bearingToDirectionName(bearing);
     }
 
-    // Toleransi radius takeup dan getar: 10 - 12 meter
     final isWithin50Meters = distance <= 50.0;
 
-    // Trigger haptic jika baru saja masuk dalam radius 50m
+    // Haptic saat masuk radius 50m
     if (isWithin50Meters && !_hasVibratedForTarget) {
       _hasVibratedForTarget = true;
       HapticFeedback.heavyImpact();
@@ -951,150 +1227,225 @@ class _FullscreenHazardMapPageState extends State<_FullscreenHazardMapPage>
       _hasVibratedForTarget = false;
     }
 
+    // Warna target border
+    final targetColor = (target != null && target.color.startsWith('#'))
+        ? Color(int.parse(target.color.replaceFirst('#', '0xFF')))
+        : const Color(0xFFEF4444);
+
     return Scaffold(
       backgroundColor: Colors.black,
       body: Stack(
         children: [
-          // Map WebView
+          // Leaflet Satellite Map
           Positioned.fill(
             child: SafeArea(
               child: buildSafeMapWebView(_controller),
             ),
           ),
 
-          // Top Header Bar (Ramping & Overflow-Proof)
+          // TOP HUD: Futuristic Obsidian Radar Deck
           Positioned(
             top: 10,
-            left: 10,
-            right: 10,
+            left: 8,
+            right: 8,
             child: SafeArea(
-              child: Row(
-                children: [
-                  // Sleek Circular Back Button
-                  Material(
-                    color: Colors.white,
-                    elevation: 6,
-                    shape: const CircleBorder(),
-                    child: InkWell(
-                      customBorder: const CircleBorder(),
-                      onTap: () => Navigator.pop(context),
-                      child: const Padding(
-                        padding: EdgeInsets.all(9),
-                        child: Icon(Icons.arrow_back_rounded,
-                            color: Color(0xFF1D4ED8), size: 20),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 5),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF070B14).withOpacity(0.92),
+                  borderRadius: BorderRadius.circular(22),
+                  border: Border.all(
+                    color: const Color(0xFF00E5FF).withOpacity(0.35),
+                    width: 1.4,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.65),
+                      blurRadius: 18,
+                      offset: const Offset(0, 4),
+                    ),
+                    BoxShadow(
+                      color: const Color(0xFF00E5FF).withOpacity(0.12),
+                      blurRadius: 12,
+                    ),
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    // Back Button
+                    Material(
+                      color: Colors.white.withOpacity(0.08),
+                      shape: const CircleBorder(),
+                      child: InkWell(
+                        customBorder: const CircleBorder(),
+                        onTap: () => Navigator.pop(context),
+                        child: const Padding(
+                          padding: EdgeInsets.all(7),
+                          child: Icon(Icons.arrow_back_rounded,
+                              color: Color(0xFF38BDF8), size: 19),
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 8),
+                    const SizedBox(width: 6),
 
-                  // Center: Mode Berburu Hazard Toggle Pill
-                  Expanded(
-                    child: Material(
+                    // Rotating Radar Sweep Icon & Hunter Title
+                    Expanded(
+                      child: Row(
+                        children: [
+                          RotationTransition(
+                            turns: _radarRotateCtrl,
+                            child: Container(
+                              width: 28,
+                              height: 28,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                gradient: RadialGradient(
+                                  colors: [
+                                    const Color(0xFF00E5FF).withOpacity(0.4),
+                                    Colors.transparent,
+                                  ],
+                                ),
+                              ),
+                              child: const Icon(Icons.radar_rounded,
+                                  color: Color(0xFF00E5FF), size: 18),
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Flexible(
+                                      child: Text(
+                                        'HAZARD HUNTER',
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.w900,
+                                          fontSize: 11.5,
+                                          letterSpacing: 0.6,
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 4, vertical: 1),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFF59E0B),
+                                        borderRadius: BorderRadius.circular(5),
+                                      ),
+                                      child: Text(
+                                        '${_score}P',
+                                        style: const TextStyle(
+                                          color: Colors.black,
+                                          fontWeight: FontWeight.w900,
+                                          fontSize: 8.5,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 1),
+                                Row(
+                                  children: [
+                                    FadeTransition(
+                                      opacity: _pulseCtrl,
+                                      child: Container(
+                                        width: 5,
+                                        height: 5,
+                                        decoration: const BoxDecoration(
+                                          color: Color(0xFF10B981),
+                                          shape: BoxShape.circle,
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Flexible(
+                                      child: Text(
+                                        _isScanningRealtime
+                                            ? 'MEMINDAI...'
+                                            : 'REALTIME • ${sorted.length} TARGET',
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(
+                                          color: Color(0xFF7DD3FC),
+                                          fontSize: 9,
+                                          fontWeight: FontWeight.w800,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+
+                    // Ping Radar Button
+                    Material(
                       color: Colors.transparent,
                       child: InkWell(
-                        onTap: () {
-                          setState(() {
-                            _isHunterMode = !_isHunterMode;
-                            _updateMapGuide();
-                          });
-                          HapticFeedback.lightImpact();
-                        },
-                        borderRadius: BorderRadius.circular(24),
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 250),
+                        onTap: () => _fetchRealtimeNearbyHazards(silent: false),
+                        borderRadius: BorderRadius.circular(10),
+                        child: Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 10, vertical: 7.5),
+                              horizontal: 6, vertical: 5),
                           decoration: BoxDecoration(
-                            gradient: _isHunterMode
-                                ? const LinearGradient(
-                                    colors: [
-                                      Color(0xFF0F172A),
-                                      Color(0xFF1E293B)
-                                    ],
-                                  )
-                                : null,
-                            color: _isHunterMode
-                                ? null
-                                : Colors.white.withOpacity(0.95),
-                            borderRadius: BorderRadius.circular(24),
+                            color: _isScanningRealtime
+                                ? const Color(0xFFF59E0B).withOpacity(0.2)
+                                : const Color(0xFF00E5FF).withOpacity(0.12),
+                            borderRadius: BorderRadius.circular(8),
                             border: Border.all(
-                              color: _isHunterMode
-                                  ? const Color(0xFF38BDF8)
-                                  : Colors.black12,
-                              width: 1.5,
+                              color: _isScanningRealtime
+                                  ? const Color(0xFFF59E0B)
+                                  : const Color(0xFF00E5FF).withOpacity(0.4),
                             ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: _isHunterMode
-                                    ? const Color(0xFF0284C7).withOpacity(0.35)
-                                    : Colors.black12,
-                                blurRadius: 8,
-                              ),
-                            ],
                           ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
-                            mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               Icon(
-                                _isHunterMode
-                                    ? Icons.radar_rounded
-                                    : Icons.explore_off_rounded,
-                                color: _isHunterMode
-                                    ? const Color(0xFF38BDF8)
-                                    : Colors.grey,
-                                size: 15,
+                                Icons.wifi_tethering_rounded,
+                                size: 13,
+                                color: _isScanningRealtime
+                                    ? const Color(0xFFF59E0B)
+                                    : const Color(0xFF00E5FF),
                               ),
-                              const SizedBox(width: 5),
-                              Flexible(
-                                child: Text(
-                                  _isHunterMode ? 'SAFE MAPS' : 'MODE BIASA',
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    color: _isHunterMode
-                                        ? Colors.white
-                                        : Colors.black87,
-                                    fontWeight: FontWeight.w900,
-                                    fontSize: 11,
-                                    letterSpacing: 0.5,
-                                  ),
+                              const SizedBox(width: 3),
+                              Text(
+                                _isScanningRealtime ? 'SCAN' : 'PING',
+                                style: TextStyle(
+                                  color: _isScanningRealtime
+                                      ? const Color(0xFFF59E0B)
+                                      : const Color(0xFF00E5FF),
+                                  fontSize: 9.5,
+                                  fontWeight: FontWeight.w900,
                                 ),
                               ),
-                              if (_isHunterMode) ...[
-                                const SizedBox(width: 5),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 5, vertical: 1),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFFF59E0B),
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: Text(
-                                    '${_score}P',
-                                    style: const TextStyle(
-                                      color: Colors.black,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 9,
-                                    ),
-                                  ),
-                                ),
-                              ],
                             ],
                           ),
                         ),
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 8),
+                    const SizedBox(width: 4),
 
-                  // Mode Switcher (Heatmap | Titik | Off) - Compact
-                  Material(
-                    color: Colors.white,
-                    elevation: 6,
-                    borderRadius: BorderRadius.circular(20),
-                    child: Container(
+                    // Mode Switcher (Heatmap | Titik | Off)
+                    Container(
                       padding: const EdgeInsets.all(2),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.08),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: Colors.white12),
+                      ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
@@ -1104,53 +1455,74 @@ class _FullscreenHazardMapPageState extends State<_FullscreenHazardMapPage>
                         ],
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
 
-          // Tactical Compass / Bearing HUD (Hanya muncul jika Hunter Mode Aktif)
+          // TACTICAL QUICK FILTER BAR (Semua, Sekitar <1km, Risiko Tinggi)
+          Positioned(
+            top: 72,
+            left: 12,
+            right: 12,
+            child: SafeArea(
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    _buildFilterChip('all', 'SEMUA (${_liveHazards.length})'),
+                    const SizedBox(width: 6),
+                    _buildFilterChip('1km', '📍 SEKITAR < 1KM'),
+                    const SizedBox(width: 6),
+                    _buildFilterChip('high', '🔥 RISIKO TINGGI / KRITIS'),
+                  ],
+                ),
+              ),
+            ),
+          ),
+
+          // FLOATING TACTICAL COMPASS / GUIDANCE HUD
           if (_isHunterMode && target != null && _mapMode != 'off')
             Positioned(
-              top: 66,
+              top: 114,
               left: 14,
               right: 14,
               child: SafeArea(
                 child: Center(
                   child: Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 8),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF0F172A).withOpacity(0.94),
-                      borderRadius: BorderRadius.circular(20),
+                      color: const Color(0xFF070B14).withOpacity(0.95),
+                      borderRadius: BorderRadius.circular(22),
                       border: Border.all(
                         color: isWithin50Meters
                             ? const Color(0xFF10B981)
-                            : const Color(0xFF38BDF8),
+                            : const Color(0xFF00E5FF),
                         width: 1.6,
                       ),
                       boxShadow: [
                         BoxShadow(
                           color: (isWithin50Meters
                                   ? const Color(0xFF10B981)
-                                  : const Color(0xFF0284C7))
+                                  : const Color(0xFF00E5FF))
                               .withOpacity(0.4),
-                          blurRadius: 14,
+                          blurRadius: 16,
                         ),
                       ],
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        // Panah Kompas Navigasi Realtime Berotasi Halus (Smooth AnimatedRotation)
+                        // Compass needle
                         AnimatedRotation(
                           turns: bearing / 360.0,
                           duration: const Duration(milliseconds: 300),
                           curve: Curves.easeOutCubic,
                           child: Container(
-                            width: 32,
-                            height: 32,
+                            width: 34,
+                            height: 34,
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
                               gradient: LinearGradient(
@@ -1161,7 +1533,7 @@ class _FullscreenHazardMapPageState extends State<_FullscreenHazardMapPage>
                                       ]
                                     : [
                                         const Color(0xFF0284C7),
-                                        const Color(0xFF38BDF8)
+                                        const Color(0xFF00E5FF)
                                       ],
                                 begin: Alignment.topCenter,
                                 end: Alignment.bottomCenter,
@@ -1170,7 +1542,7 @@ class _FullscreenHazardMapPageState extends State<_FullscreenHazardMapPage>
                                 BoxShadow(
                                   color: (isWithin50Meters
                                           ? const Color(0xFF10B981)
-                                          : const Color(0xFF38BDF8))
+                                          : const Color(0xFF00E5FF))
                                       .withOpacity(0.6),
                                   blurRadius: 8,
                                 ),
@@ -1178,7 +1550,7 @@ class _FullscreenHazardMapPageState extends State<_FullscreenHazardMapPage>
                             ),
                             child: const Center(
                               child: Icon(Icons.navigation_rounded,
-                                  color: Colors.white, size: 18),
+                                  color: Colors.white, size: 20),
                             ),
                           ),
                         ),
@@ -1189,8 +1561,8 @@ class _FullscreenHazardMapPageState extends State<_FullscreenHazardMapPage>
                           children: [
                             Text(
                               isWithin50Meters
-                                  ? '🚨 SAFE MAPS: DALAM RADIUS 10M!'
-                                  : '🧭 SAFE MAPS • IKUTI PANAH',
+                                  ? '🎯 RADIUS VERIFIKASI < 50M • SIAP DIAMANKAN!'
+                                  : '🧭 IKUTI ARAH • TARGET #${(_currentTargetIndex % sorted.length) + 1}',
                               style: TextStyle(
                                 color: isWithin50Meters
                                     ? const Color(0xFF86EFAC)
@@ -1202,13 +1574,13 @@ class _FullscreenHazardMapPageState extends State<_FullscreenHazardMapPage>
                             ),
                             Text(
                               isWithin50Meters
-                                  ? '${distance.round()} Meter • SIAP DIAMANKAN'
-                                  : '${distance.round()} Meter ke Arah $dirName',
+                                  ? '${distance.round()} METER • SIAP CLOSING (+50P)'
+                                  : '${distance.round()} METER • KE ${dirName.toUpperCase()}',
                               style: TextStyle(
                                 color: isWithin50Meters
                                     ? const Color(0xFF4ADE80)
                                     : Colors.white,
-                                fontSize: 13,
+                                fontSize: 13.5,
                                 fontWeight: FontWeight.w900,
                               ),
                             ),
@@ -1221,48 +1593,95 @@ class _FullscreenHazardMapPageState extends State<_FullscreenHazardMapPage>
               ),
             ),
 
-          // Tombol Lokasi Saya (Floating Right)
+          // Floating GPS Tools on Right
           Positioned(
             bottom: (_isHunterMode && target != null) ? 220 : 24,
-            right: 16,
+            right: 14,
             child: SafeArea(
-              child: Material(
-                color: Colors.white,
-                elevation: 6,
-                borderRadius: BorderRadius.circular(12),
-                child: InkWell(
-                  onTap: () {
-                    _controller.runJavaScript(
-                      'if(window.locateMe) window.locateMe();',
-                    );
-                    _updateMapGuide();
-                  },
-                  borderRadius: BorderRadius.circular(12),
-                  child: const SizedBox(
-                    width: 44,
-                    height: 44,
-                    child: Icon(
-                      Icons.my_location_rounded,
-                      color: Color(0xFF1D4ED8),
-                      size: 22,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Auto Lock Nearest Target Button
+                  if (hasTargets)
+                    Material(
+                      color: const Color(0xFF070B14).withOpacity(0.9),
+                      elevation: 6,
+                      borderRadius: BorderRadius.circular(12),
+                      child: InkWell(
+                        onTap: () {
+                          HapticFeedback.lightImpact();
+                          setState(() {
+                            _currentTargetIndex = 0;
+                            _hasVibratedForTarget = false;
+                          });
+                          _flyToTarget(sorted[0]);
+                        },
+                        borderRadius: BorderRadius.circular(12),
+                        child: Container(
+                          width: 44,
+                          height: 44,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                                color:
+                                    const Color(0xFF00E5FF).withOpacity(0.4)),
+                          ),
+                          child: const Icon(
+                            Icons.center_focus_strong_rounded,
+                            color: Color(0xFF00E5FF),
+                            size: 22,
+                          ),
+                        ),
+                      ),
+                    ),
+                  const SizedBox(height: 8),
+
+                  // Locate Me Button
+                  Material(
+                    color: const Color(0xFF070B14).withOpacity(0.9),
+                    elevation: 6,
+                    borderRadius: BorderRadius.circular(12),
+                    child: InkWell(
+                      onTap: () {
+                        HapticFeedback.lightImpact();
+                        _controller.runJavaScript(
+                          'if(window.locateMe) window.locateMe();',
+                        );
+                        _updateMapGuide();
+                      },
+                      borderRadius: BorderRadius.circular(12),
+                      child: Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                              color: const Color(0xFF38BDF8).withOpacity(0.4)),
+                        ),
+                        child: const Icon(
+                          Icons.my_location_rounded,
+                          color: Color(0xFF38BDF8),
+                          size: 22,
+                        ),
+                      ),
                     ),
                   ),
-                ),
+                ],
               ),
             ),
           ),
 
-          // Bottom Encounter Card (Pokemon GO Wild Hazard Card)
+          // BOTTOM ENCOUNTER DECK (Futuristic Hazard Hunter Encounter Card)
           if (_isHunterMode && target != null && _mapMode != 'off')
             Positioned(
-              bottom: 14,
-              left: 14,
-              right: 14,
+              bottom: 12,
+              left: 12,
+              right: 12,
               child: SafeArea(
                 child: Container(
                   decoration: BoxDecoration(
                     gradient: const LinearGradient(
-                      colors: [Color(0xFF0F172A), Color(0xFF1E293B)],
+                      colors: [Color(0xFF070B14), Color(0xFF111A2D)],
                       begin: Alignment.topCenter,
                       end: Alignment.bottomCenter,
                     ),
@@ -1270,14 +1689,18 @@ class _FullscreenHazardMapPageState extends State<_FullscreenHazardMapPage>
                     border: Border.all(
                       color: isWithin50Meters
                           ? const Color(0xFF10B981)
-                          : const Color(0xFF38BDF8),
-                      width: 1.5,
+                          : targetColor.withOpacity(0.85),
+                      width: 1.8,
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.5),
-                        blurRadius: 20,
-                        offset: const Offset(0, 6),
+                        color: (isWithin50Meters
+                                ? const Color(0xFF10B981)
+                                : targetColor)
+                            .withOpacity(0.35),
+                        blurRadius: 22,
+                        spreadRadius: 1,
+                        offset: const Offset(0, 4),
                       ),
                     ],
                   ),
@@ -1285,7 +1708,7 @@ class _FullscreenHazardMapPageState extends State<_FullscreenHazardMapPage>
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      // Target Index & Risk Badge
+                      // Target Index & Navigation Controls
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
@@ -1293,18 +1716,18 @@ class _FullscreenHazardMapPageState extends State<_FullscreenHazardMapPage>
                             children: [
                               Container(
                                 padding: const EdgeInsets.symmetric(
-                                    horizontal: 8, vertical: 3),
+                                    horizontal: 8, vertical: 3.5),
                                 decoration: BoxDecoration(
                                   color:
                                       const Color(0xFF0284C7).withOpacity(0.25),
                                   borderRadius: BorderRadius.circular(6),
                                   border: Border.all(
-                                      color: const Color(0xFF0284C7)),
+                                      color: const Color(0xFF00E5FF)),
                                 ),
                                 child: Text(
-                                  '🎯 TARGET #${(_currentTargetIndex % sorted.length) + 1}/${sorted.length}',
+                                  '🎯 TARGET #${(_currentTargetIndex % sorted.length) + 1}/${sorted.length}${_currentTargetIndex == 0 ? ' (TERDEKAT)' : ''}',
                                   style: const TextStyle(
-                                    color: Color(0xFF7DD3FC),
+                                    color: Color(0xFF00E5FF),
                                     fontSize: 10,
                                     fontWeight: FontWeight.w900,
                                   ),
@@ -1313,24 +1736,19 @@ class _FullscreenHazardMapPageState extends State<_FullscreenHazardMapPage>
                               const SizedBox(width: 6),
                               Container(
                                 padding: const EdgeInsets.symmetric(
-                                    horizontal: 6, vertical: 3),
+                                    horizontal: 7, vertical: 3.5),
                                 decoration: BoxDecoration(
-                                  color: target.color.startsWith('#')
-                                      ? Color(int.parse(target.color
-                                              .replaceFirst('#', '0xFF')))
-                                          .withOpacity(0.2)
-                                      : Colors.red.withOpacity(0.2),
+                                  color: targetColor.withOpacity(0.25),
                                   borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(
+                                      color: targetColor.withOpacity(0.8)),
                                 ),
                                 child: Text(
-                                  target.level,
+                                  target.level.toUpperCase(),
                                   style: TextStyle(
-                                    color: target.color.startsWith('#')
-                                        ? Color(int.parse(target.color
-                                            .replaceFirst('#', '0xFF')))
-                                        : Colors.red,
+                                    color: targetColor,
                                     fontSize: 10,
-                                    fontWeight: FontWeight.bold,
+                                    fontWeight: FontWeight.w900,
                                   ),
                                 ),
                               ),
@@ -1346,6 +1764,7 @@ class _FullscreenHazardMapPageState extends State<_FullscreenHazardMapPage>
                                     size: 14,
                                     color: Colors.white70),
                                 onPressed: () {
+                                  HapticFeedback.selectionClick();
                                   setState(() {
                                     _currentTargetIndex = (_currentTargetIndex -
                                             1 +
@@ -1365,6 +1784,7 @@ class _FullscreenHazardMapPageState extends State<_FullscreenHazardMapPage>
                                     size: 14,
                                     color: Colors.white70),
                                 onPressed: () {
+                                  HapticFeedback.selectionClick();
                                   setState(() {
                                     _currentTargetIndex =
                                         (_currentTargetIndex + 1) %
@@ -1380,24 +1800,45 @@ class _FullscreenHazardMapPageState extends State<_FullscreenHazardMapPage>
                       ),
                       const SizedBox(height: 8),
 
-                      // Title & Area
+                      // Image & Info
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(10),
-                            child: SizedBox(
-                              width: 48,
-                              height: 48,
-                              child: Image.network(
-                                target.photo,
-                                fit: BoxFit.cover,
-                                errorBuilder: (_, __, ___) => Container(
-                                  color: Colors.white12,
-                                  child: const Icon(Icons.warning,
-                                      color: Colors.amber, size: 24),
+                          GestureDetector(
+                            onTap: () => _showImageZoomDialog(
+                                context, target.photo, target.title),
+                            child: Stack(
+                              children: [
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(10),
+                                  child: SizedBox(
+                                    width: 52,
+                                    height: 52,
+                                    child: Image.network(
+                                      target.photo,
+                                      fit: BoxFit.cover,
+                                      errorBuilder: (_, __, ___) => Container(
+                                        color: Colors.white12,
+                                        child: const Icon(Icons.warning,
+                                            color: Colors.amber, size: 24),
+                                      ),
+                                    ),
+                                  ),
                                 ),
-                              ),
+                                Positioned(
+                                  bottom: 2,
+                                  right: 2,
+                                  child: Container(
+                                    padding: const EdgeInsets.all(2),
+                                    decoration: BoxDecoration(
+                                      color: Colors.black87,
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: const Icon(Icons.zoom_in_rounded,
+                                        color: Colors.white70, size: 10),
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                           const SizedBox(width: 10),
@@ -1411,11 +1852,11 @@ class _FullscreenHazardMapPageState extends State<_FullscreenHazardMapPage>
                                   overflow: TextOverflow.ellipsis,
                                   style: const TextStyle(
                                     color: Colors.white,
-                                    fontWeight: FontWeight.w800,
-                                    fontSize: 13,
+                                    fontWeight: FontWeight.w900,
+                                    fontSize: 13.5,
                                   ),
                                 ),
-                                const SizedBox(height: 2),
+                                const SizedBox(height: 3),
                                 Text(
                                   '${target.area} • ${target.kategori}',
                                   maxLines: 1,
@@ -1425,6 +1866,43 @@ class _FullscreenHazardMapPageState extends State<_FullscreenHazardMapPage>
                                     fontSize: 11,
                                   ),
                                 ),
+                                const SizedBox(height: 3),
+                                // Proximity Visual Gauge (500m to 50m)
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: ClipRRect(
+                                        borderRadius: BorderRadius.circular(3),
+                                        child: LinearProgressIndicator(
+                                          value: (1.0 -
+                                                  ((distance - 50.0).clamp(
+                                                          0.0, 450.0) /
+                                                      450.0))
+                                              .clamp(0.05, 1.0),
+                                          minHeight: 4,
+                                          backgroundColor: Colors.white12,
+                                          valueColor:
+                                              AlwaysStoppedAnimation<Color>(
+                                            isWithin50Meters
+                                                ? const Color(0xFF10B981)
+                                                : const Color(0xFF00E5FF),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      '${distance.round()}M',
+                                      style: TextStyle(
+                                        color: isWithin50Meters
+                                            ? const Color(0xFF10B981)
+                                            : const Color(0xFF38BDF8),
+                                        fontSize: 10.5,
+                                        fontWeight: FontWeight.w900,
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ],
                             ),
                           ),
@@ -1432,7 +1910,7 @@ class _FullscreenHazardMapPageState extends State<_FullscreenHazardMapPage>
                       ),
                       const SizedBox(height: 12),
 
-                      // Pokemon Style Action Row (Enforce Distance < 10M)
+                      // Tactical Action Bar
                       Row(
                         children: [
                           Expanded(
@@ -1440,16 +1918,22 @@ class _FullscreenHazardMapPageState extends State<_FullscreenHazardMapPage>
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: isWithin50Meters
                                     ? const Color(0xFF10B981)
-                                    : const Color(0xFF334155),
+                                    : const Color(0xFF1E293B),
                                 foregroundColor: Colors.white,
                                 padding:
-                                    const EdgeInsets.symmetric(vertical: 11),
+                                    const EdgeInsets.symmetric(vertical: 12),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(12),
+                                  side: BorderSide(
+                                    color: isWithin50Meters
+                                        ? const Color(0xFF86EFAC)
+                                        : Colors.white12,
+                                    width: isWithin50Meters ? 1.5 : 1,
+                                  ),
                                 ),
-                                elevation: isWithin50Meters ? 4 : 0,
+                                elevation: isWithin50Meters ? 6 : 0,
                                 shadowColor: isWithin50Meters
-                                    ? const Color(0xFF10B981).withOpacity(0.5)
+                                    ? const Color(0xFF10B981).withOpacity(0.7)
                                     : null,
                               ),
                               onPressed: isWithin50Meters
@@ -1463,21 +1947,21 @@ class _FullscreenHazardMapPageState extends State<_FullscreenHazardMapPage>
                                     },
                               icon: Icon(
                                 isWithin50Meters
-                                    ? Icons.track_changes_rounded
-                                    : Icons.lock_rounded,
-                                size: 18,
+                                    ? Icons.bolt_rounded
+                                    : Icons.lock_outline_rounded,
+                                size: 19,
                                 color: isWithin50Meters
                                     ? Colors.white
                                     : const Color(0xFF94A3B8),
                               ),
                               label: Text(
                                 isWithin50Meters
-                                    ? 'TANGKAP & AMANKAN (+50P)'
-                                    : 'DEKATI TARGET (< 50M) - ${distance.round()}M',
+                                    ? '⚡ AMANKAN TEMUAN (+50 XP)'
+                                    : 'DEKATI TARGET (< 50M) • ${distance.round()}M',
                                 style: TextStyle(
                                   fontWeight: FontWeight.w900,
-                                  fontSize: 11.5,
-                                  letterSpacing: 0.4,
+                                  fontSize: 12,
+                                  letterSpacing: 0.5,
                                   color: isWithin50Meters
                                       ? Colors.white
                                       : const Color(0xFFCBD5E1),
@@ -1487,17 +1971,20 @@ class _FullscreenHazardMapPageState extends State<_FullscreenHazardMapPage>
                           ),
                           const SizedBox(width: 8),
 
-                          // Fly to Camera Button
+                          // Fly Camera
                           Material(
-                            color: Colors.white12,
+                            color: Colors.white.withOpacity(0.08),
                             borderRadius: BorderRadius.circular(12),
                             child: InkWell(
-                              onTap: () => _flyToTarget(target),
+                              onTap: () {
+                                HapticFeedback.selectionClick();
+                                _flyToTarget(target);
+                              },
                               borderRadius: BorderRadius.circular(12),
                               child: const Padding(
-                                padding: EdgeInsets.all(10),
+                                padding: EdgeInsets.all(11),
                                 child: Icon(Icons.near_me_rounded,
-                                    color: Colors.white, size: 20),
+                                    color: Color(0xFF00E5FF), size: 20),
                               ),
                             ),
                           ),
@@ -1505,14 +1992,16 @@ class _FullscreenHazardMapPageState extends State<_FullscreenHazardMapPage>
 
                           // Detail Button
                           Material(
-                            color: Colors.white12,
+                            color: Colors.white.withOpacity(0.08),
                             borderRadius: BorderRadius.circular(12),
                             child: InkWell(
-                              onTap: () =>
-                                  widget.onShowDetail(context, target.id),
+                              onTap: () {
+                                HapticFeedback.selectionClick();
+                                widget.onShowDetail(context, target.id);
+                              },
                               borderRadius: BorderRadius.circular(12),
                               child: const Padding(
-                                padding: EdgeInsets.all(10),
+                                padding: EdgeInsets.all(11),
                                 child: Icon(Icons.info_outline_rounded,
                                     color: Colors.white, size: 20),
                               ),
@@ -1530,24 +2019,73 @@ class _FullscreenHazardMapPageState extends State<_FullscreenHazardMapPage>
     );
   }
 
-  Widget _buildFullscreenModeButton(String key, String label) {
-    final isSelected = _mapMode == key;
+  Widget _buildFilterChip(String key, String label) {
+    final isSelected = _selectedFilter == key;
     return InkWell(
-      onTap: () => _onSelectMode(key),
+      onTap: () {
+        HapticFeedback.selectionClick();
+        setState(() {
+          _selectedFilter = key;
+          _currentTargetIndex = 0;
+        });
+        _updateMapGuide();
+      },
       borderRadius: BorderRadius.circular(16),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
         decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFF1D4ED8) : Colors.transparent,
+          color: isSelected
+              ? const Color(0xFF00E5FF).withOpacity(0.25)
+              : const Color(0xFF070B14).withOpacity(0.85),
           borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: isSelected
+                ? const Color(0xFF00E5FF)
+                : Colors.white.withOpacity(0.15),
+            width: isSelected ? 1.4 : 1,
+          ),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: const Color(0xFF00E5FF).withOpacity(0.3),
+                    blurRadius: 8,
+                  )
+                ]
+              : null,
         ),
         child: Text(
           label,
           style: TextStyle(
             fontSize: 10,
-            fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
-            color: isSelected ? Colors.white : const Color(0xFF64748B),
+            fontWeight: isSelected ? FontWeight.w900 : FontWeight.w600,
+            color: isSelected ? const Color(0xFF00E5FF) : const Color(0xFF94A3B8),
+            letterSpacing: 0.3,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFullscreenModeButton(String key, String label) {
+    final isSelected = _mapMode == key;
+    return InkWell(
+      onTap: () => _onSelectMode(key),
+      borderRadius: BorderRadius.circular(12),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3.5),
+        decoration: BoxDecoration(
+          color: isSelected ? const Color(0xFF00E5FF) : Colors.transparent,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 9.5,
+            fontWeight: isSelected ? FontWeight.w900 : FontWeight.w600,
+            color: isSelected ? Colors.black : const Color(0xFF94A3B8),
+            letterSpacing: 0.2,
           ),
         ),
       ),
@@ -1639,7 +2177,20 @@ class _DashboardPageState extends State<DashboardPage> with WidgetsBindingObserv
     WidgetsBinding.instance.addObserver(this);
     print('===> DASHBOARD INIT STATE RUNNING <===');
 
-    _unclosedHazards = [];
+    final cachedJson = PreferenceService.getCachedHazardMapJson();
+    if (cachedJson != null && cachedJson.isNotEmpty) {
+      try {
+        final decoded = jsonDecode(cachedJson) as List;
+        _unclosedHazards = decoded
+            .map((item) => MapHazardItem.fromJson(item as Map<String, dynamic>))
+            .toList();
+      } catch (e) {
+        debugPrint('Error restoring cached hazards: $e');
+        _unclosedHazards = [];
+      }
+    } else {
+      _unclosedHazards = [];
+    }
 
     _hazardMapCtrl
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
@@ -1703,7 +2254,6 @@ class _DashboardPageState extends State<DashboardPage> with WidgetsBindingObserv
     if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.inactive ||
         state == AppLifecycleState.hidden) {
-      // Shuts down GPS hardware immediately when screen is locked or app is in background to keep phone cool
       _positionStreamSub?.cancel();
       _positionStreamSub = null;
     } else if (state == AppLifecycleState.resumed) {
@@ -1722,11 +2272,21 @@ class _DashboardPageState extends State<DashboardPage> with WidgetsBindingObserv
     super.dispose();
   }
 
-  Future<void> _fetchHazardPointsFromApi([Position? pos]) async {
+  Future<void> _fetchHazardPointsFromApi({Position? pos, bool force = false}) async {
+    final todayStr = DateTime.now().toIso8601String().substring(0, 10);
+    final lastFetchDate = PreferenceService.getHazardMapLastFetchDate();
+
+    // Jika sudah pernah load hari ini dan cache tersedia, lewati panggilan API (1 hari sekali)
+    if (!force && lastFetchDate == todayStr && _unclosedHazards.isNotEmpty) {
+      debugPrint('[SafeMap] Menggunakan cache Safe Map hari ini ($todayStr), melewati panggilan network.');
+      _reloadMap();
+      return;
+    }
+
     if (_isFetchingHazards) return;
     _isFetchingHazards = true;
     try {
-      // Ambil hazard aktif 1 periode berjalan (30 hari), hanya yang belum closed, dibatasi 80 titik teratas agar sangat ringan
+      debugPrint('[SafeMap] Memuat titik Safe Map dari API (1x sehari / reload)...');
       final res = await _api.getSafeMapHazardPoints(
         days: 30,
         onlyOpen: true,
@@ -1745,7 +2305,6 @@ class _DashboardPageState extends State<DashboardPage> with WidgetsBindingObserv
             for (final p in points) {
               final statusStr = p['status']?.toString() ?? 'Open';
               final statusLower = statusStr.toLowerCase();
-              // Pastikan hanya hazard yang belum closed saja
               if (statusLower == 'closed' ||
                   statusLower == 'selesai' ||
                   statusLower == 'tutup') {
@@ -1806,6 +2365,12 @@ class _DashboardPageState extends State<DashboardPage> with WidgetsBindingObserv
               ));
             }
 
+            // Simpan cache 1 hari sekali
+            PreferenceService.setCachedHazardMapPoints(
+              jsonString: jsonEncode(items.map((e) => e.toJson()).toList()),
+              dateStr: todayStr,
+            );
+
             setState(() {
               _unclosedHazards = items;
             });
@@ -1865,7 +2430,7 @@ class _DashboardPageState extends State<DashboardPage> with WidgetsBindingObserv
     }
 
     if (isFirstLoc && _unclosedHazards.isEmpty) {
-      _fetchHazardPointsFromApi(pos);
+      _fetchHazardPointsFromApi(pos: pos);
     }
 
     // Jika mode 'off', jangan lakukan deteksi radar dan jangan bergetar
@@ -3686,458 +4251,394 @@ class _DashboardPageState extends State<DashboardPage> with WidgetsBindingObserv
     );
   }
 
-  String _hazardMapHtml({String mapMode = 'heatmap', Position? userPosition}) {
-    final pos = userPosition ?? _lastUserPosition;
-    final hasUserPos = pos != null;
-    final userLat = pos?.latitude ?? 1.2057;
-    final userLng = pos?.longitude ?? 117.2247;
-    final userAccuracy = pos?.accuracy ?? 10.0;
-    final pointsJson =
-        jsonEncode(_unclosedHazards.map((e) => e.toJson()).toList());
+  String _hazardMapHtml({
+    String mapMode = 'heatmap',
+    Position? userPosition,
+    List<MapHazardItem>? customHazards,
+  }) {
+    return buildHazardMapHtml(
+      mapMode: mapMode,
+      userPosition: userPosition ?? _lastUserPosition,
+      hazards: customHazards ?? _unclosedHazards,
+      baseUrl: _api.baseUrl,
+    );
+  }
+}
 
-    return '''
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <meta charset="utf-8" />
-      <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-      <script>
-        window.onerror = function(msg, url, line, col, err) {
-          if (window.HazardBridge) {
-            window.HazardBridge.postMessage(JSON.stringify({action: 'error', error: msg + ' at ' + url + ':' + line}));
-          }
-        };
-        console.log = function() {
-          var str = Array.prototype.slice.call(arguments).join(' ');
-          if (window.HazardBridge) {
-            window.HazardBridge.postMessage(JSON.stringify({action: 'log', message: str}));
-          }
-        };
-      </script>
-      <link rel="stylesheet" href="http://127.0.0.1:5200/leaflet/leaflet.css" />
-      <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
-      <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-      <script src="http://127.0.0.1:5200/leaflet/leaflet.js"></script>
-      <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
-      <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-      <style>
-        html, body, #map {
-          height: 100%;
-          width: 100%;
-          margin: 0;
-          padding: 0;
-          overflow: hidden;
-          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-        }
-        /* Hilangkan tulisan tiles @ Esri attribution */
-        .leaflet-control-attribution {
-          display: none !important;
-        }
-        /* Hilangkan tombol zoom in / out (+ / -) */
-        .leaflet-control-zoom {
-          display: none !important;
-        }
-        .leaflet-popup-content-wrapper {
-          border-radius: 14px;
-          box-shadow: 0 12px 30px rgba(15, 23, 42, .22);
-          padding: 4px;
-        }
-        .leaflet-popup {
-          transition: opacity .14s ease-out;
-        }
-        .hazard-popup {
-          width: 200px;
-          padding: 2px;
-        }
-        .hazard-popup img {
-          width: 100%;
-          height: 96px;
-          object-fit: cover;
-          border-radius: 9px;
-          display: block;
-          margin-bottom: 8px;
-        }
-        .hazard-popup h3 {
-          font-size: 13.5px;
-          line-height: 1.25;
-          margin: 0 0 5px;
-          color: #111827;
-          font-weight: 700;
-        }
-        .hazard-popup p {
-          font-size: 11.5px;
-          line-height: 1.35;
-          margin: 3px 0;
-          color: #4b5563;
-        }
-        .badge {
-          display: inline-block;
-          padding: 2px 7px;
-          border-radius: 999px;
-          color: white;
-          font-size: 10px;
-          font-weight: 700;
-        }
-        .btn-action-detail {
-          width: 100%;
-          padding: 7px 0;
-          background: #1d4ed8;
-          color: #ffffff;
-          border: none;
-          border-radius: 8px;
-          font-size: 11.5px;
-          font-weight: 700;
-          cursor: pointer;
-          margin-top: 8px;
-        }
-        .btn-action-close {
-          width: 100%;
-          padding: 7px 0;
-          background: #059669;
-          color: #ffffff;
-          border: none;
-          border-radius: 8px;
-          font-size: 11.5px;
-          font-weight: 700;
-          cursor: pointer;
-          margin-top: 5px;
-        }
-        .legend {
-          background: rgba(255,255,255,.95);
-          padding: 8px 10px;
-          border-radius: 12px;
-          box-shadow: 0 8px 20px rgba(15, 23, 42, .14);
-          font-size: 11px;
-          color: #1f2937;
-        }
-        .legend-row {
-          display: flex;
-          align-items: center;
-          gap: 6px;
-          margin-top: 4px;
-        }
-        .dot {
-          width: 9px;
-          height: 9px;
-          border-radius: 50%;
-          display: inline-block;
-        }
-        .user-location-arrow {
-          width: 34px;
-          height: 34px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          border-radius: 50%;
-          background: #ffffff;
-          border: 2px solid #2563eb;
-          box-shadow: 0 0 0 7px rgba(37, 99, 235, .18), 0 4px 12px rgba(15, 23, 42, .28);
-          position: relative;
-        }
-        .user-location-arrow svg {
-          width: 24px;
-          height: 24px;
-          fill: #2563eb;
-          transform: rotate(18deg);
-        }
-        .user-location-arrow::after {
-          content: '';
-          position: absolute; 
-          inset: -9px;
-          border: 2px solid rgba(37, 99, 235, .45);
-          border-radius: 50%;
-          animation: userPulse 1.8s ease-out infinite;
-        }
-        @keyframes userPulse {
-          0% { transform: scale(.65); opacity: 1; }
-          100% { transform: scale(1.7); opacity: 0; }
-        }
-        
-        .cluster-center-beacon {
-          width: 32px;
-          height: 32px;
-          border-radius: 50%;
-          background: #0f172a;
-          border: 2.5px solid #38bdf8;
-          box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          position: relative;
-          cursor: pointer;
-          transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
-        }
-        .cluster-center-beacon:hover, .cluster-center-beacon:active {
-          transform: scale(1.15);
-        }
-        .cluster-center-beacon .cluster-num {
-          font-size: 13px;
-          font-weight: 900;
-          color: #ffffff;
-          line-height: 1;
-        }
-        .cluster-center-beacon.is-expanded {
-          background: #1e293b;
-          border-color: #f43f5e !important;
-          box-shadow: 0 0 14px rgba(244, 63, 94, 0.85);
-        }
-        .cluster-ping {
-          position: absolute;
-          inset: -4px;
-          border-radius: 50%;
-          border: 1.5px solid #38bdf8;
-          opacity: 0.6;
-          pointer-events: none;
-        }
-        .pin-cluster-subtag {
-          position: absolute;
-          top: -5px;
-          right: -5px;
-          background: #0f172a;
-          color: #fff;
-          border: 1.5px solid #ffffff;
-          font-size: 8.5px;
-          font-weight: 900;
-          padding: 1px 3.5px;
-          border-radius: 8px;
-          line-height: 1;
-          box-shadow: 0 2px 5px rgba(0,0,0,0.5);
-        }
-        .hazard-pin-wrap {
-          position: relative;
-          width: 32px;
-          height: 32px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          cursor: pointer;
-        }
-        .hazard-ping {
-          position: absolute;
-          width: 14px;
-          height: 14px;
-          border-radius: 50%;
-          opacity: 0.5;
-          pointer-events: none;
-        }
-        .hazard-pin-badge {
-          width: 24px;
-          height: 24px;
-          border-radius: 50% 50% 50% 0;
-          transform: rotate(-45deg);
-          border: 2px solid #ffffff;
-          box-shadow: 0 4px 12px rgba(0,0,0,0.6);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          position: relative;
-          z-index: 2;
-        }
-        .hazard-pin-badge span {
-          transform: rotate(45deg);
-          color: #ffffff;
-          font-size: 13px;
-          font-weight: 900;
-          line-height: 1;
-        }
-      </style>
-    </head>
-    <body>
-      <div id="map"></div>
-      <script>
-        let map = null;
-        let heatLayer = null;
-        let markerLayer = null;
-        let userMarker = null;
-        let userAccuracyCircle = null;
-        let userCoordinates = $hasUserPos ? [$userLat, $userLng] : null;
-        let targetGuideLine = null;
-        let currentMode = '$mapMode';
+String buildHazardMapHtml({
+  String mapMode = 'heatmap',
+  Position? userPosition,
+  List<MapHazardItem> hazards = const [],
+  String baseUrl = 'http://127.0.0.1:5200',
+}) {
+  final hasUserPos = userPosition != null;
+  final userLat = userPosition?.latitude ?? 1.2057;
+  final userLng = userPosition?.longitude ?? 117.2247;
+  final userAccuracy = userPosition?.accuracy ?? 10.0;
+  final pointsJson = jsonEncode(hazards.map((e) => e.toJson()).toList());
 
-        window.setMapMode = function(mode) {
-          currentMode = mode;
-          if (!map || !heatLayer || !markerLayer) return;
-          if (mode === 'heatmap') {
-            if (!map.hasLayer(heatLayer)) map.addLayer(heatLayer);
-            if (!map.hasLayer(markerLayer)) map.addLayer(markerLayer);
-          } else if (mode === 'points') {
-            if (map.hasLayer(heatLayer)) map.removeLayer(heatLayer);
-            if (!map.hasLayer(markerLayer)) map.addLayer(markerLayer);
-          } else if (mode === 'off') {
-            if (map.hasLayer(heatLayer)) map.removeLayer(heatLayer);
-            if (map.hasLayer(markerLayer)) map.removeLayer(markerLayer);
-          }
-        };
+  return '''
+  <!DOCTYPE html>
+  <html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <script>
+      window.onerror = function(msg, url, line, col, err) {
+        if (window.HazardBridge) {
+          window.HazardBridge.postMessage(JSON.stringify({action: 'error', error: msg + ' at ' + url + ':' + line}));
+        }
+      };
+      console.log = function() {
+        var str = Array.prototype.slice.call(arguments).join(' ');
+        if (window.HazardBridge) {
+          window.HazardBridge.postMessage(JSON.stringify({action: 'log', message: str}));
+        }
+      };
+    </script>
+    <link rel="stylesheet" href="$baseUrl/leaflet/leaflet.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="$baseUrl/leaflet/leaflet.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+      html, body, #map {
+        height: 100%;
+        width: 100%;
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+      .leaflet-control-attribution { display: none !important; }
+      .leaflet-control-zoom { display: none !important; }
+      .leaflet-popup-content-wrapper {
+        border-radius: 14px;
+        box-shadow: 0 12px 30px rgba(15, 23, 42, .22);
+        padding: 4px;
+      }
+      .leaflet-popup { transition: opacity .14s ease-out; }
+      .hazard-popup { width: 200px; padding: 2px; }
+      .hazard-popup img {
+        width: 100%;
+        height: 96px;
+        object-fit: cover;
+        border-radius: 9px;
+        display: block;
+        margin-bottom: 8px;
+      }
+      .hazard-popup h3 {
+        font-size: 13.5px;
+        line-height: 1.25;
+        margin: 0 0 5px;
+        color: #111827;
+        font-weight: 700;
+      }
+      .hazard-popup p {
+        font-size: 11.5px;
+        line-height: 1.35;
+        margin: 3px 0;
+        color: #4b5563;
+      }
+      .badge {
+        display: inline-block;
+        padding: 2px 7px;
+        border-radius: 999px;
+        color: white;
+        font-size: 10px;
+        font-weight: 700;
+      }
+      .btn-action-detail {
+        width: 100%;
+        padding: 7px 0;
+        background: #1d4ed8;
+        color: #ffffff;
+        border: none;
+        border-radius: 8px;
+        font-size: 11.5px;
+        font-weight: 700;
+        cursor: pointer;
+        margin-top: 8px;
+      }
+      .btn-action-close {
+        width: 100%;
+        padding: 7px 0;
+        background: #059669;
+        color: #ffffff;
+        border: none;
+        border-radius: 8px;
+        font-size: 11.5px;
+        font-weight: 700;
+        cursor: pointer;
+        margin-top: 5px;
+      }
+      .legend {
+        background: rgba(255,255,255,.95);
+        padding: 8px 10px;
+        border-radius: 12px;
+        box-shadow: 0 8px 20px rgba(15, 23, 42, .14);
+        font-size: 11px;
+        color: #1f2937;
+      }
+      .legend-row {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        margin-top: 4px;
+      }
+      .dot {
+        width: 9px;
+        height: 9px;
+        border-radius: 50%;
+        display: inline-block;
+      }
+      .user-location-arrow {
+        width: 34px;
+        height: 34px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%;
+        background: #ffffff;
+        border: 2px solid #2563eb;
+        box-shadow: 0 0 0 7px rgba(37, 99, 235, .18), 0 4px 12px rgba(15, 23, 42, .28);
+        position: relative;
+      }
+      .user-location-arrow svg {
+        width: 24px;
+        height: 24px;
+        fill: #2563eb;
+        transform: rotate(18deg);
+      }
+      .user-location-arrow::after {
+        content: '';
+        position: absolute; 
+        inset: -9px;
+        border: 2px solid rgba(37, 99, 235, .45);
+        border-radius: 50%;
+        animation: userPulse 1.8s ease-out infinite;
+      }
+      @keyframes userPulse {
+        0% { transform: scale(.65); opacity: 1; }
+        100% { transform: scale(1.7); opacity: 0; }
+      }
+      
+      .cluster-center-beacon {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        background: #0f172a;
+        border: 2.5px solid #38bdf8;
+        box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        position: relative;
+        cursor: pointer;
+        transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+      }
+      .cluster-center-beacon:hover, .cluster-center-beacon:active {
+        transform: scale(1.15);
+      }
+      .cluster-center-beacon .cluster-num {
+        font-size: 13px;
+        font-weight: 900;
+        color: #ffffff;
+        line-height: 1;
+      }
+      .cluster-center-beacon.is-expanded {
+        background: #1e293b;
+        border-color: #f43f5e !important;
+        box-shadow: 0 0 14px rgba(244, 63, 94, 0.85);
+      }
+      .cluster-ping {
+        position: absolute;
+        inset: -4px;
+        border-radius: 50%;
+        border: 1.5px solid #38bdf8;
+        opacity: 0.6;
+        pointer-events: none;
+      }
+      .pin-cluster-subtag {
+        position: absolute;
+        top: -5px;
+        right: -5px;
+        background: #0f172a;
+        color: #fff;
+        border: 1.5px solid #ffffff;
+        font-size: 8.5px;
+        font-weight: 900;
+        padding: 1px 3.5px;
+        border-radius: 8px;
+        line-height: 1;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.5);
+      }
+      .hazard-pin-wrap {
+        position: relative;
+        width: 32px;
+        height: 32px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+      }
+      .hazard-ping {
+        position: absolute;
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        opacity: 0.5;
+        pointer-events: none;
+      }
+      .hazard-pin-badge {
+        width: 24px;
+        height: 24px;
+        border-radius: 50% 50% 50% 0;
+        transform: rotate(-45deg);
+        border: 2px solid #ffffff;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.6);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        position: relative;
+        z-index: 2;
+      }
+      .hazard-pin-badge span {
+        transform: rotate(45deg);
+        color: #ffffff;
+        font-size: 13px;
+        font-weight: 900;
+        line-height: 1;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="map"></div>
+    <script>
+      let map = null;
+      let heatLayer = null;
+      let markerLayer = null;
+      let userMarker = null;
+      let userAccuracyCircle = null;
+      let userCoordinates = $hasUserPos ? [$userLat, $userLng] : null;
+      let targetGuideLine = null;
+      let currentMode = '$mapMode';
+      const allMarkersMap = {};
+      const clusters = [];
 
-        window.toggleHeatmap = function(active) {
-          window.setMapMode(active ? 'heatmap' : 'points');
-        };
+      window.setMapMode = function(mode) {
+        currentMode = mode;
+        if (!map || !heatLayer || !markerLayer) return;
+        if (mode === 'heatmap') {
+          if (!map.hasLayer(heatLayer)) map.addLayer(heatLayer);
+          if (!map.hasLayer(markerLayer)) map.addLayer(markerLayer);
+        } else if (mode === 'points') {
+          if (map.hasLayer(heatLayer)) map.removeLayer(heatLayer);
+          if (!map.hasLayer(markerLayer)) map.addLayer(markerLayer);
+        } else if (mode === 'off') {
+          if (map.hasLayer(heatLayer)) map.removeLayer(heatLayer);
+          if (map.hasLayer(markerLayer)) map.removeLayer(markerLayer);
+        }
+      };
 
-        window.setUserLocation = function(lat, lng, accuracy, heading) {
-          if (window.renderUserMarker) {
-            window.renderUserMarker(lat, lng, accuracy, true, heading);
-          }
-        };
+      window.toggleHeatmap = function(active) {
+        window.setMapMode(active ? 'heatmap' : 'points');
+      };
 
-        window.updateGuideLine = function(uLat, uLng, tLat, tLng, color) {
-          if (targetGuideLine && map) {
-            map.removeLayer(targetGuideLine);
-            targetGuideLine = null;
-          }
-          if (!uLat || !uLng || !tLat || !tLng || !map) return;
-          targetGuideLine = L.polyline([[uLat, uLng], [tLat, tLng]], {
-            color: color || '#38bdf8',
-            weight: 4,
-            opacity: 0.9,
-            dashArray: '10, 10',
-            lineCap: 'round'
-          }).addTo(map);
-        };
+      window.setUserLocation = function(lat, lng, accuracy, heading) {
+        if (window.renderUserMarker) {
+          window.renderUserMarker(lat, lng, accuracy, true, heading);
+        }
+      };
 
-        window.clearGuideLine = function() {
-          if (targetGuideLine && map) { map.removeLayer(targetGuideLine); targetGuideLine = null; }
-        };
+      window.updateGuideLine = function(uLat, uLng, tLat, tLng, color) {
+        if (targetGuideLine && map) {
+          map.removeLayer(targetGuideLine);
+          targetGuideLine = null;
+        }
+        if (!uLat || !uLng || !tLat || !tLng || !map) return;
+        targetGuideLine = L.polyline([[uLat, uLng], [tLat, tLng]], {
+          color: color || '#38bdf8',
+          weight: 4,
+          opacity: 0.9,
+          dashArray: '10, 10',
+          lineCap: 'round'
+        }).addTo(map);
+      };
 
-        window.locateMe = function() {
-          if (userCoordinates && map) {
-            map.flyTo(userCoordinates, 16.5, { animate: true, duration: .55 });
-            if (userMarker) setTimeout(() => userMarker.openPopup(), 600);
-          }
-        };
+      window.clearGuideLine = function() {
+        if (targetGuideLine && map) { map.removeLayer(targetGuideLine); targetGuideLine = null; }
+      };
 
-        function initSafeMapEngine() {
-          console.log('[SafeMap] initSafeMapEngine called, L is ' + (typeof L));
-          if (typeof L === 'undefined') {
-            setTimeout(initSafeMapEngine, 60);
-            return;
-          }
-          if (window._safeMapStarted) return;
-          window._safeMapStarted = true;
-          console.log('[SafeMap] initSafeMapEngine proceeding to L.map');
+      window.locateMe = function() {
+        if (userCoordinates && map) {
+          map.flyTo(userCoordinates, 16.5, { animate: true, duration: .55 });
+          if (userMarker) setTimeout(() => userMarker.openPopup(), 600);
+        }
+      };
 
-          // Google Hybrid Satellite
-          const googleSat = L.tileLayer('https://mt{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
-            subdomains: ['0', '1', '2', '3'],
-            maxZoom: 20,
-            maxNativeZoom: 19,
-            keepBuffer: 1,
-            updateWhenIdle: true,
-            attribution: ''
-          });
-
-          // Fallback ESRI Satelit
-          const esriSat = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-            maxZoom: 20,
-            maxNativeZoom: 17,
-            keepBuffer: 1,
-            updateWhenIdle: true,
-            attribution: ''
-          });
-
-          // OpenStreetMap Base Fallback
-          const osm = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            maxZoom: 19,
-            attribution: ''
-          });
-
-          const hasUserPos = $hasUserPos;
-          const initialUserLat = $userLat;
-          const initialUserLng = $userLng;
-          const initialAccuracy = $userAccuracy;
-
-          // Inisialisasi map langsung ke lokasi pengguna jika tersedia agar area sekitarnya langsung terlihat
-          map = L.map('map', {
-            center: hasUserPos ? [initialUserLat, initialUserLng] : [1.0564, 117.7265],
-            zoom: hasUserPos ? 16 : 13.5,
-            maxZoom: 19,
-            minZoom: 10,
-            layers: [googleSat],
-            preferCanvas: true,
-            zoomControl: false,
-            attributionControl: false,
-            dragging: true,
-            scrollWheelZoom: true,
-            doubleClickZoom: true,
-            touchZoom: true,
-            closePopupOnClick: true,
-            zoomAnimation: true,
-            fadeAnimation: true,
-            markerZoomAnimation: true,
-            inertia: true,
-            inertiaDeceleration: 2600,
-            easeLinearity: .22,
-            zoomSnap: .5,
-            zoomDelta: .5,
-            wheelPxPerZoomLevel: 90
-          });
-
-          googleSat.on('tileerror', function() {
-            if (!map.hasLayer(esriSat)) {
-              map.addLayer(esriSat);
-            }
-          });
-
-          esriSat.on('tileerror', function() {
-            if (!map.hasLayer(osm)) {
-              map.addLayer(osm);
-            }
-          });
-
-          if (map.attributionControl) {
-            map.attributionControl.setPrefix(false);
-          }
-
-          map.on('preclick', function() {
-            map.closePopup();
-          });
-
-          const hazardPoints = $pointsJson;
-
-          heatLayer = L.layerGroup();
-          markerLayer = L.layerGroup();
-
-          window.renderUserMarker = function(lat, lng, accuracy, autoFly, heading) {
-            userCoordinates = [lat, lng];
-            if (userMarker) map.removeLayer(userMarker);
-            if (userAccuracyCircle) map.removeLayer(userAccuracyCircle);
-
-            const userIcon = L.divIcon({
-              className: '',
-              html: '<div class="user-location-arrow"><svg id="user-heading-arrow" style="transform:rotate(' + (heading || 18) + 'deg); transition: transform 0.3s ease-out;" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 4.5 20.29l.71.71L12 18l6.79 3 .71-.71L12 2z"/></svg></div>',
-              iconSize: [38, 38],
-              iconAnchor: [19, 19]
-            });
-            userAccuracyCircle = L.circle(userCoordinates, {
-              radius: Math.min(Math.max(accuracy || 10, 6), 15),
-              color: '#2563eb',
-              weight: 1,
-              fillColor: '#60a5fa',
-              fillOpacity: .12
-            }).addTo(map);
-            userMarker = L.marker(userCoordinates, {
-              icon: userIcon,
-              zIndexOffset: 1000
-            }).addTo(map);
-            userMarker.bindPopup(`
-              <div style="min-width:170px">
-                <strong style="font-size:13px;color:#1d4ed8">Posisi Saya</strong>
-                <p style="margin:5px 0 2px;font-size:11px;color:#4b5563">Lokasi perangkat saat ini</p>
-                <p style="margin:2px 0;font-size:10.5px;color:#64748b">\${lat.toFixed(6)}, \${lng.toFixed(6)}</p>
-                <p style="margin:2px 0;font-size:10.5px;color:#64748b">Akurasi ±\${Math.round(accuracy || 0)} meter</p>
+      function getHazardPopupHtml(point, isStacked, idx, N, clusterPoints) {
+        const nextPoint = isStacked && clusterPoints ? clusterPoints[(idx + 1) % N] : null;
+        return `
+          <div class="hazard-popup">
+            <img src="\${point.photo}" onerror="this.style.display='none'" />
+            \${isStacked ? `
+              <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:6px;padding:3px 7px;font-size:10px;font-weight:700;color:#1d4ed8;margin-bottom:6px;display:flex;align-items:center;justify-content:space-between">
+                <span>📍 Titik Bersama</span>
+                <span>Temuan \${idx + 1} dari \${N}</span>
               </div>
-            `);
+            ` : ''}
+            <div style="display:flex;gap:4px;margin-bottom:6px">
+              <span class="badge" style="background:\${point.color}">\${point.level}</span>
+              <span class="badge" style="background:\${point.statusColor}">\${point.status}</span>
+            </div>
+            <h3>\${point.title}</h3>
+            <p><strong>Area:</strong> \${point.area}</p>
+            <p><strong>Periode:</strong> \${point.date}</p>
+            <p style="margin-top:4px">\${point.notes}</p>
+            <button class="btn-action-detail" onclick="if(window.HazardBridge) window.HazardBridge.postMessage(JSON.stringify({action:'detail',id:\${point.id}}))">
+              🔍 Lihat Detail
+            </button>
+            <button class="btn-action-close" onclick="if(window.HazardBridge) window.HazardBridge.postMessage(JSON.stringify({action:'close',id:\${point.id}}))">
+              ⚡ Closing Hazard
+            </button>
+            \${isStacked && nextPoint ? `
+              <button style="width:100%;padding:6px 0;background:#0f172a;color:#38bdf8;border:1px solid #0284c7;border-radius:8px;font-size:11px;font-weight:800;cursor:pointer;margin-top:5px" onclick="window.focusNextHazard(\${nextPoint.id})">
+                🔄 Temuan Lain di Titik Ini (\${((idx + 1) % N) + 1}/\${N}) ➡
+              </button>
+            ` : ''}
+          </div>
+        `;
+      }
 
-            if (autoFly) {
-              map.setView(userCoordinates, 16);
-            }
-          };
+      window.focusNextHazard = function(targetId) {
+        const cluster = clusters.find(c => c.points && c.points.some(p => p.id === targetId));
+        if (cluster && cluster.points.length > 1 && !cluster.isExpanded && cluster.expand) {
+          cluster.expand();
+        }
 
-          if (hasUserPos) {
-            window.renderUserMarker(initialUserLat, initialUserLng, initialAccuracy, true);
+        setTimeout(() => {
+          if (allMarkersMap[targetId]) {
+            map.closePopup();
+            setTimeout(() => {
+              allMarkersMap[targetId].openPopup();
+              if (window.HazardBridge) {
+                window.HazardBridge.postMessage(JSON.stringify({ action: 'select', id: targetId }));
+              }
+            }, 120);
           }
+        }, 80);
+      };
 
-          // Spiderfy & Proximity Grouping Engine (Anti-Pin Bertumpuk)
-        const clusters = [];
+      window.renderHazardPoints = function(points) {
+        if (!map || !heatLayer || !markerLayer) return;
+        heatLayer.clearLayers();
+        markerLayer.clearLayers();
+        for (var k in allMarkersMap) delete allMarkersMap[k];
+        clusters.length = 0;
+
+        const hazardPoints = points || [];
         hazardPoints.forEach((point, index) => {
           point._origIndex = index;
           let added = false;
@@ -4145,7 +4646,7 @@ class _DashboardPageState extends State<DashboardPage> with WidgetsBindingObserv
             const dLat = (c.centerLat - point.lat);
             const dLng = (c.centerLng - point.lng);
             const distDeg = Math.sqrt(dLat * dLat + dLng * dLng);
-            if (distDeg < 0.00018) { // Radius tumpukan ~18-20 meter
+            if (distDeg < 0.00018) {
               c.points.push(point);
               added = true;
               break;
@@ -4160,74 +4661,10 @@ class _DashboardPageState extends State<DashboardPage> with WidgetsBindingObserv
           }
         });
 
-        const allMarkersMap = {};
-
-        function getHazardPopupHtml(point, isStacked, idx, N, clusterPoints) {
-          const nextPoint = isStacked && clusterPoints ? clusterPoints[(idx + 1) % N] : null;
-          return `
-            <div class="hazard-popup">
-              <img src="\${point.photo}" onerror="this.style.display='none'" />
-              \${isStacked ? `
-                <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:6px;padding:3px 7px;font-size:10px;font-weight:700;color:#1d4ed8;margin-bottom:6px;display:flex;align-items:center;justify-content:space-between">
-                  <span>📍 Titik Bersama</span>
-                  <span>Temuan \${idx + 1} dari \${N}</span>
-                </div>
-              ` : ''}
-              <div style="display:flex;gap:4px;margin-bottom:6px">
-                <span class="badge" style="background:\${point.color}">\${point.level}</span>
-                <span class="badge" style="background:\${point.statusColor}">\${point.status}</span>
-              </div>
-              <h3>\${point.title}</h3>
-              <p><strong>Area:</strong> \${point.area}</p>
-              <p><strong>Periode:</strong> \${point.date}</p>
-              <p style="margin-top:4px">\${point.notes}</p>
-              <button class="btn-action-detail" onclick="if(window.HazardBridge) window.HazardBridge.postMessage(JSON.stringify({action:'detail',id:\${point.id}}))">
-                🔍 Lihat Detail
-              </button>
-              <button class="btn-action-close" onclick="if(window.HazardBridge) window.HazardBridge.postMessage(JSON.stringify({action:'close',id:\${point.id}}))">
-                ⚡ Closing Hazard
-              </button>
-              \${isStacked && nextPoint ? `
-                <button style="width:100%;padding:6px 0;background:#0f172a;color:#38bdf8;border:1px solid #0284c7;border-radius:8px;font-size:11px;font-weight:800;cursor:pointer;margin-top:5px" onclick="window.focusNextHazard(\${nextPoint.id})">
-                  🔄 Temuan Lain di Titik Ini (\${((idx + 1) % N) + 1}/\${N}) ➡
-                </button>
-              ` : ''}
-            </div>
-          `;
-        }
-
-        window.focusNextHazard = function(targetId) {
-          const cluster = clusters.find(c => c.points && c.points.some(p => p.id === targetId));
-          if (cluster && cluster.points.length > 1 && !cluster.isExpanded && cluster.expand) {
-            cluster.expand();
-          }
-
-          setTimeout(() => {
-            if (allMarkersMap[targetId]) {
-              map.closePopup();
-              setTimeout(() => {
-                allMarkersMap[targetId].openPopup();
-                if (window.HazardBridge) {
-                  window.HazardBridge.postMessage(JSON.stringify({ action: 'select', id: targetId }));
-                }
-              }, 120);
-            }
-          }, 80);
-        };
-
-        // Tutup cluster saat pengguna klik di sembarang area peta
-        map.on('click', function(e) {
-          if (e.originalEvent && e.originalEvent._clusterHandled) return;
-          clusters.forEach(c => {
-            if (c.isExpanded && c.collapse) c.collapse();
-          });
-        });
-
         clusters.forEach((cluster) => {
           const N = cluster.points.length;
           const isStacked = N > 1;
 
-          // Warna tingkat risiko tertinggi dalam cluster
           let topColor = cluster.points[0].color;
           if (cluster.points.some(p => p.level === 'Kritis' || p.level === 'Tinggi')) {
             topColor = '#ef4444';
@@ -4235,7 +4672,6 @@ class _DashboardPageState extends State<DashboardPage> with WidgetsBindingObserv
             topColor = '#f59e0b';
           }
 
-          // Zona bahaya 50m di titik pusat cluster (sesuai perimeter take up)
           L.circle([cluster.centerLat, cluster.centerLng], {
             radius: 50,
             color: topColor,
@@ -4245,7 +4681,6 @@ class _DashboardPageState extends State<DashboardPage> with WidgetsBindingObserv
           }).addTo(heatLayer);
 
           if (!isStacked) {
-            // Hazard tunggal (1 pin): langsung tampilkan pin normal
             const point = cluster.points[0];
             const showPing = point._origIndex < 15 && (point.level === 'Kritis' || point.level === 'Tinggi');
             const pinIcon = L.divIcon({
@@ -4284,9 +4719,6 @@ class _DashboardPageState extends State<DashboardPage> with WidgetsBindingObserv
             });
 
           } else {
-            // Hazard bertumpuk (>1 pin):
-            // Default: HANYA TAMPILKAN BEACON CLUSTER (ANGKA)
-            // Pin & garis kaki HANYA muncul jika beacon di-klik!
             cluster.isExpanded = false;
             cluster.elements = [];
 
@@ -4328,7 +4760,6 @@ class _DashboardPageState extends State<DashboardPage> with WidgetsBindingObserv
 
             cluster.expand = function() {
               if (cluster.isExpanded) return;
-              // Tutup cluster lain yang sedang terbuka
               clusters.forEach(c => {
                 if (c !== cluster && c.isExpanded && c.collapse) c.collapse();
               });
@@ -4341,13 +4772,11 @@ class _DashboardPageState extends State<DashboardPage> with WidgetsBindingObserv
                 iconAnchor: [16, 16]
               }));
 
-              // Render garis laba-laba dan pin
               cluster.points.forEach((point, idx) => {
                 const angle = (2 * Math.PI * idx) / N - Math.PI / 2;
                 const mLat = cluster.centerLat + radiusDeg * Math.cos(angle);
                 const mLng = cluster.centerLng + (radiusDeg / Math.cos(cluster.centerLat * Math.PI / 180)) * Math.sin(angle);
 
-                // Garis kaki spider leg
                 const leg = L.polyline([[cluster.centerLat, cluster.centerLng], [mLat, mLng]], {
                   color: point.color,
                   weight: 2,
@@ -4356,7 +4785,6 @@ class _DashboardPageState extends State<DashboardPage> with WidgetsBindingObserv
                 }).addTo(markerLayer);
                 cluster.elements.push(leg);
 
-                // Pin marker
                 const pinIcon = L.divIcon({
                   className: '',
                   html: `
@@ -4407,7 +4835,131 @@ class _DashboardPageState extends State<DashboardPage> with WidgetsBindingObserv
           }
         });
 
-        // Fit bounds HANYA jika posisi user belum tersedia
+        window.setMapMode(currentMode);
+      };
+
+      function initSafeMapEngine() {
+        console.log('[SafeMap] initSafeMapEngine called, L is ' + (typeof L));
+        if (typeof L === 'undefined') {
+          setTimeout(initSafeMapEngine, 60);
+          return;
+        }
+        if (window._safeMapStarted) return;
+        window._safeMapStarted = true;
+
+        const googleSat = L.tileLayer('https://mt{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
+          subdomains: ['0', '1', '2', '3'],
+          maxZoom: 20,
+          maxNativeZoom: 19,
+          keepBuffer: 1,
+          updateWhenIdle: true,
+          attribution: ''
+        });
+
+        const esriSat = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+          maxZoom: 20,
+          maxNativeZoom: 17,
+          keepBuffer: 1,
+          updateWhenIdle: true,
+          attribution: ''
+        });
+
+        const osm = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          maxZoom: 19,
+          attribution: ''
+        });
+
+        const hasUserPos = $hasUserPos;
+        const initialUserLat = $userLat;
+        const initialUserLng = $userLng;
+        const initialAccuracy = $userAccuracy;
+
+        map = L.map('map', {
+          center: hasUserPos ? [initialUserLat, initialUserLng] : [1.0564, 117.7265],
+          zoom: hasUserPos ? 16 : 13.5,
+          maxZoom: 19,
+          minZoom: 10,
+          layers: [googleSat],
+          preferCanvas: true,
+          zoomControl: false,
+          attributionControl: false,
+          dragging: true,
+          scrollWheelZoom: true,
+          doubleClickZoom: true,
+          touchZoom: true,
+          closePopupOnClick: true,
+          zoomAnimation: true,
+          fadeAnimation: true,
+          markerZoomAnimation: true,
+          inertia: true,
+          inertiaDeceleration: 2600,
+          easeLinearity: .22,
+          zoomSnap: .5,
+          zoomDelta: .5,
+          wheelPxPerZoomLevel: 90
+        });
+
+        googleSat.on('tileerror', function() {
+          if (!map.hasLayer(esriSat)) map.addLayer(esriSat);
+        });
+
+        esriSat.on('tileerror', function() {
+          if (!map.hasLayer(osm)) map.addLayer(osm);
+        });
+
+        map.on('click', function(e) {
+          if (e.originalEvent && e.originalEvent._clusterHandled) return;
+          clusters.forEach(c => {
+            if (c.isExpanded && c.collapse) c.collapse();
+          });
+        });
+
+        const hazardPoints = $pointsJson;
+        heatLayer = L.layerGroup().addTo(map);
+        markerLayer = L.layerGroup().addTo(map);
+
+        window.renderUserMarker = function(lat, lng, accuracy, autoFly, heading) {
+          userCoordinates = [lat, lng];
+          if (userMarker) map.removeLayer(userMarker);
+          if (userAccuracyCircle) map.removeLayer(userAccuracyCircle);
+
+          const userIcon = L.divIcon({
+            className: '',
+            html: '<div class="user-location-arrow"><svg id="user-heading-arrow" style="transform:rotate(' + (heading || 18) + 'deg); transition: transform 0.3s ease-out;" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 4.5 20.29l.71.71L12 18l6.79 3 .71-.71L12 2z"/></svg></div>',
+            iconSize: [38, 38],
+            iconAnchor: [19, 19]
+          });
+          userAccuracyCircle = L.circle(userCoordinates, {
+            radius: Math.min(Math.max(accuracy || 10, 6), 15),
+            color: '#2563eb',
+            weight: 1,
+            fillColor: '#60a5fa',
+            fillOpacity: .12
+          }).addTo(map);
+          userMarker = L.marker(userCoordinates, {
+            icon: userIcon,
+            zIndexOffset: 1000
+          }).addTo(map);
+          userMarker.bindPopup(`
+            <div style="min-width:170px">
+              <strong style="font-size:13px;color:#1d4ed8">Posisi Saya</strong>
+              <p style="margin:5px 0 2px;font-size:11px;color:#4b5563">Lokasi perangkat saat ini</p>
+              <p style="margin:2px 0;font-size:10.5px;color:#64748b">\${lat.toFixed(6)}, \${lng.toFixed(6)}</p>
+              <p style="margin:2px 0;font-size:10.5px;color:#64748b">Akurasi ±\${Math.round(accuracy || 0)} meter</p>
+            </div>
+          `);
+
+          if (autoFly) {
+            map.setView(userCoordinates, 16);
+          }
+        };
+
+        if (hasUserPos) {
+          window.renderUserMarker(initialUserLat, initialUserLng, initialAccuracy, true);
+        }
+
+        window.renderHazardPoints(hazardPoints);
+
         if (!hasUserPos && !userCoordinates && hazardPoints.length > 0) {
           const validCoords = hazardPoints
             .filter(p => p.lat && p.lng && (Math.abs(p.lat) > 0.001 || Math.abs(p.lng) > 0.001))
@@ -4432,20 +4984,19 @@ class _DashboardPageState extends State<DashboardPage> with WidgetsBindingObserv
         };
         legend.addTo(map);
 
-          setTimeout(() => map && map.invalidateSize(), 200);
-          setTimeout(() => map && map.invalidateSize(), 600);
-        }
+        setTimeout(() => map && map.invalidateSize(), 200);
+        setTimeout(() => map && map.invalidateSize(), 600);
+      }
 
-        if (document.readyState === 'loading') {
-          document.addEventListener('DOMContentLoaded', initSafeMapEngine);
-        } else {
-          initSafeMapEngine();
-        }
-        window.addEventListener('load', initSafeMapEngine);
-        setTimeout(initSafeMapEngine, 250);
-      </script>
-    </body>
-    </html>
-    ''';
-  }
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initSafeMapEngine);
+      } else {
+        initSafeMapEngine();
+      }
+      window.addEventListener('load', initSafeMapEngine);
+      setTimeout(initSafeMapEngine, 250);
+    </script>
+  </body>
+  </html>
+  ''';
 }

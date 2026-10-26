@@ -263,14 +263,18 @@ class _FciIndexPageState extends State<FciIndexPage> {
       final res = await _api.deleteFciReport(item.id);
       res.fold(
         (err) => _showSnack(err['message']?.toString() ?? 'Gagal menghapus laporan'),
-        (succ) {
-          _showSnack('Laporan FCI berhasil dihapus', isSuccess: true);
-          _fetchData();
-        },
+        (succ) => _showSnack('Laporan FCI berhasil dihapus', isSuccess: true),
       );
     } catch (e) {
-      _showSnack('Gagal menghapus: $e');
+      _showSnack('Gagal menghapus di server: $e');
     }
+
+    try {
+      final db = await DatabaseService().database;
+      await db.delete('tbl_t_fci_report', where: 'id = ?', whereArgs: [item.id]);
+    } catch (_) {}
+
+    _fetchData();
   }
 
   void _showSnack(String msg, {bool isSuccess = false}) {

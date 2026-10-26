@@ -7,15 +7,48 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 
+import '../../services/database.dart';
+import '../../services/preference.dart';
+import '../../services/api.dart';
 import '../../services/offline_sync_service.dart';
 import '../../widgets/top_bar.dart';
-import 'ci_form_page.dart';
 import 'ci_model.dart';
 import 'fci_index_page.dart';
 import 'rci_index_page.dart';
+import 'dci_index_page.dart';
+import 'spi_index_page.dart';
+import 'gci_index_page.dart';
 
 const _ciNavy = Color(0xFF123B63);
 const _ciBg = Color(0xFFF4F7FA);
+
+class CiRecentAssessment {
+  final int id;
+  final String module; // 'FCI', 'RCI', 'DCI', 'SPI', 'GCI'
+  final String title;
+  final String area;
+  final String creator;
+  final String perusahaan;
+  final DateTime date;
+  final String time;
+  final double score;
+  final String status;
+  final Color themeColor;
+
+  CiRecentAssessment({
+    required this.id,
+    required this.module,
+    required this.title,
+    required this.area,
+    required this.creator,
+    required this.perusahaan,
+    required this.date,
+    required this.time,
+    required this.score,
+    required this.status,
+    required this.themeColor,
+  });
+}
 
 class CiAssessmentPage extends StatefulWidget {
   const CiAssessmentPage({super.key});
@@ -24,30 +57,305 @@ class CiAssessmentPage extends StatefulWidget {
 }
 
 class _CiAssessmentPageState extends State<CiAssessmentPage> {
-  late Future<List<CiAssessment>> _future;
+  late Future<List<CiRecentAssessment>> _future;
+  String _userCompany = '';
+
   @override
   void initState() {
     super.initState();
-    _reload();
+    final profile = PreferenceService.getProfile();
+    _userCompany = profile?.company?.trim() ?? 'PT INDEXIM COALINDO';
+    _future = _loadRecentAssessments();
   }
 
-  void _reload() => _future = CiStorage.load();
+  void _reload() {
+    setState(() {
+      _future = _loadRecentAssessments();
+    });
+  }
+
   Future<void> _open(Widget page) async {
     await Navigator.push(context, MaterialPageRoute(builder: (_) => page));
-    if (mounted) setState(_reload);
+    if (mounted) _reload();
+  }
+
+  Future<List<CiRecentAssessment>> _loadRecentAssessments() async {
+    final list = <CiRecentAssessment>[];
+    final profile = PreferenceService.getProfile();
+    final userComp = profile?.company?.trim() ?? 'PT INDEXIM COALINDO';
+    final dbService = DatabaseService();
+
+    try {
+      final db = await dbService.database;
+
+      // 1. FCI
+      try {
+        final fciRows = await db.query('tbl_t_fci_report', orderBy: 'id DESC', limit: 20);
+        for (final r in fciRows) {
+          final comp = (r['perusahaan'] ?? '').toString();
+          final tglStr = (r['tanggal'] ?? '').toString();
+          final parsedDate = DateTime.tryParse(tglStr) ?? DateTime.now();
+          final score = double.tryParse((r['total_score'] ?? '0').toString()) ?? 0;
+          list.add(CiRecentAssessment(
+            id: int.tryParse(r['id'].toString()) ?? 0,
+            module: 'FCI',
+            title: (r['nama_front'] ?? r['area'] ?? 'Front Loading').toString(),
+            area: (r['area'] ?? '-').toString(),
+            creator: '${r['nama'] ?? r['nik'] ?? '-'}',
+            perusahaan: comp,
+            date: parsedDate,
+            time: (r['waktu'] ?? '').toString(),
+            score: score,
+            status: (r['kategori_index'] ?? (score >= 80 ? 'Baik' : 'Kurang')).toString(),
+            themeColor: const Color(0xFF0284C7),
+          ));
+        }
+      } catch (_) {}
+
+      // 2. RCI
+      try {
+        final rciRows = await db.query('tbl_t_rci_report', orderBy: 'id DESC', limit: 20);
+        for (final r in rciRows) {
+          final comp = (r['perusahaan'] ?? '').toString();
+          final tglStr = (r['tanggal'] ?? '').toString();
+          final parsedDate = DateTime.tryParse(tglStr) ?? DateTime.now();
+          final score = double.tryParse((r['total_score'] ?? '0').toString()) ?? 0;
+          list.add(CiRecentAssessment(
+            id: int.tryParse(r['id'].toString()) ?? 0,
+            module: 'RCI',
+            title: (r['nama_jalan'] ?? r['ruas_jalan'] ?? 'Jalan Tambang').toString(),
+            area: (r['area'] ?? '-').toString(),
+            creator: '${r['nama'] ?? r['nik'] ?? '-'}',
+            perusahaan: comp,
+            date: parsedDate,
+            time: (r['waktu'] ?? '').toString(),
+            score: score,
+            status: (r['kategori_index'] ?? (score >= 80 ? 'Baik' : 'Kurang')).toString(),
+            themeColor: const Color(0xFFF59E0B),
+          ));
+        }
+      } catch (_) {}
+
+      // 3. DCI
+      try {
+        final dciRows = await db.query('tbl_t_dci_report', orderBy: 'id DESC', limit: 20);
+        for (final r in dciRows) {
+          final comp = (r['perusahaan'] ?? '').toString();
+          final tglStr = (r['tanggal'] ?? '').toString();
+          final parsedDate = DateTime.tryParse(tglStr) ?? DateTime.now();
+          final score = double.tryParse((r['total_score'] ?? '0').toString()) ?? 0;
+          list.add(CiRecentAssessment(
+            id: int.tryParse(r['id'].toString()) ?? 0,
+            module: 'DCI',
+            title: (r['nama_dump'] ?? r['area_dumping'] ?? 'Disposal Area').toString(),
+            area: (r['area'] ?? '-').toString(),
+            creator: '${r['nama'] ?? r['nik'] ?? '-'}',
+            perusahaan: comp,
+            date: parsedDate,
+            time: (r['waktu'] ?? '').toString(),
+            score: score,
+            status: (r['kategori_index'] ?? (score >= 80 ? 'Baik' : 'Kurang')).toString(),
+            themeColor: const Color(0xFFEA580C),
+          ));
+        }
+      } catch (_) {}
+
+      // 4. SPI
+      try {
+        final spiRows = await db.query('tbl_t_spi_report', orderBy: 'id DESC', limit: 20);
+        for (final r in spiRows) {
+          final comp = (r['perusahaan'] ?? '').toString();
+          final tglStr = (r['tanggal'] ?? '').toString();
+          final parsedDate = DateTime.tryParse(tglStr) ?? DateTime.now();
+          final score = double.tryParse((r['total_score'] ?? '0').toString()) ?? 0;
+          list.add(CiRecentAssessment(
+            id: int.tryParse(r['id'].toString()) ?? 0,
+            module: 'SPI',
+            title: (r['nama_kolam'] ?? r['lokasi'] ?? 'Sediment Pond').toString(),
+            area: '${r['area'] ?? '-'}${r['titik_penaatan'] != null && r['titik_penaatan'] != '' ? ' • ${r['titik_penaatan']}' : ''}',
+            creator: '${r['nama'] ?? r['nik'] ?? '-'}',
+            perusahaan: comp,
+            date: parsedDate,
+            time: (r['waktu'] ?? '').toString(),
+            score: score,
+            status: (r['kategori_index'] ?? (score >= 80 ? 'Baik' : 'Kurang')).toString(),
+            themeColor: const Color(0xFF0D9488),
+          ));
+        }
+      } catch (_) {}
+
+      // 5. GCI
+      try {
+        final gciRows = await db.query('tbl_t_gci_report', orderBy: 'id DESC', limit: 20);
+        for (final r in gciRows) {
+          final comp = (r['perusahaan'] ?? '').toString();
+          final tglStr = (r['tanggal'] ?? '').toString();
+          final parsedDate = DateTime.tryParse(tglStr) ?? DateTime.now();
+          final score = double.tryParse((r['total_score'] ?? '0').toString()) ?? 0;
+          list.add(CiRecentAssessment(
+            id: int.tryParse(r['id'].toString()) ?? 0,
+            module: 'GCI',
+            title: (r['judul_temuan'] ?? r['nama_lereng'] ?? 'Inspeksi Lereng').toString(),
+            area: '${r['pit'] ?? '-'}${r['nama_lereng'] != null && r['nama_lereng'] != '' ? ' • ${r['nama_lereng']}' : ''}',
+            creator: '${r['nama'] ?? r['nik'] ?? '-'}',
+            perusahaan: comp,
+            date: parsedDate,
+            time: (r['waktu'] ?? '').toString(),
+            score: score,
+            status: (r['tarp_level'] ?? (score >= 80 ? 'GREEN' : 'RED')).toString(),
+            themeColor: const Color(0xFF6366F1),
+          ));
+        }
+      } catch (_) {}
+    } catch (_) {}
+
+    // If local database has no assessments yet, fetch directly from server API
+    if (list.isEmpty) {
+      final api = ApiService();
+      try {
+        final fciRes = await api.getFciList(scope: 'all', pageSize: 10);
+        fciRes.fold((_) {}, (map) {
+          final items = map['data'] is List ? map['data'] as List : [];
+          for (final r in items) {
+            final score = double.tryParse((r['totalScore'] ?? r['total_score'] ?? '0').toString()) ?? 0;
+            final tglStr = (r['tanggal'] ?? '').toString();
+            list.add(CiRecentAssessment(
+              id: int.tryParse((r['id'] ?? 0).toString()) ?? 0,
+              module: 'FCI',
+              title: (r['namaFront'] ?? r['nama_front'] ?? r['area'] ?? 'Front Loading').toString(),
+              area: (r['area'] ?? '-').toString(),
+              creator: '${r['nama'] ?? r['nik'] ?? '-'}',
+              perusahaan: (r['perusahaan'] ?? '').toString(),
+              date: DateTime.tryParse(tglStr) ?? DateTime.now(),
+              time: (r['waktu'] ?? '').toString(),
+              score: score,
+              status: (r['kategoriIndex'] ?? r['kategori_index'] ?? (score >= 80 ? 'Baik' : 'Kurang')).toString(),
+              themeColor: const Color(0xFF0284C7),
+            ));
+          }
+        });
+      } catch (_) {}
+
+      try {
+        final rciRes = await api.getRciList(scope: 'all', pageSize: 10);
+        rciRes.fold((_) {}, (map) {
+          final items = map['data'] is List ? map['data'] as List : [];
+          for (final r in items) {
+            final score = double.tryParse((r['totalScore'] ?? r['total_score'] ?? '0').toString()) ?? 0;
+            final tglStr = (r['tanggal'] ?? '').toString();
+            list.add(CiRecentAssessment(
+              id: int.tryParse((r['id'] ?? 0).toString()) ?? 0,
+              module: 'RCI',
+              title: (r['namaJalan'] ?? r['nama_jalan'] ?? 'Jalan Tambang').toString(),
+              area: (r['area'] ?? '-').toString(),
+              creator: '${r['nama'] ?? r['nik'] ?? '-'}',
+              perusahaan: (r['perusahaan'] ?? '').toString(),
+              date: DateTime.tryParse(tglStr) ?? DateTime.now(),
+              time: (r['waktu'] ?? '').toString(),
+              score: score,
+              status: (r['kategoriIndex'] ?? r['kategori_index'] ?? (score >= 80 ? 'Baik' : 'Kurang')).toString(),
+              themeColor: const Color(0xFFF59E0B),
+            ));
+          }
+        });
+      } catch (_) {}
+
+      try {
+        final dciRes = await api.getDciList(scope: 'all', pageSize: 10);
+        dciRes.fold((_) {}, (map) {
+          final items = map['data'] is List ? map['data'] as List : [];
+          for (final r in items) {
+            final score = double.tryParse((r['totalScore'] ?? r['total_score'] ?? '0').toString()) ?? 0;
+            final tglStr = (r['tanggal'] ?? '').toString();
+            list.add(CiRecentAssessment(
+              id: int.tryParse((r['id'] ?? 0).toString()) ?? 0,
+              module: 'DCI',
+              title: (r['namaDisposal'] ?? r['nama_disposal'] ?? 'Disposal Area').toString(),
+              area: (r['area'] ?? '-').toString(),
+              creator: '${r['nama'] ?? r['nik'] ?? '-'}',
+              perusahaan: (r['perusahaan'] ?? '').toString(),
+              date: DateTime.tryParse(tglStr) ?? DateTime.now(),
+              time: (r['waktu'] ?? '').toString(),
+              score: score,
+              status: (r['kategoriIndex'] ?? r['kategori_index'] ?? (score >= 80 ? 'Baik' : 'Kurang')).toString(),
+              themeColor: const Color(0xFFEA580C),
+            ));
+          }
+        });
+      } catch (_) {}
+
+      try {
+        final spiRes = await api.getSpiList(scope: 'all', pageSize: 10);
+        spiRes.fold((_) {}, (map) {
+          final items = map['data'] is List ? map['data'] as List : [];
+          for (final r in items) {
+            final score = double.tryParse((r['totalScore'] ?? r['total_score'] ?? '0').toString()) ?? 0;
+            final tglStr = (r['tanggal'] ?? '').toString();
+            list.add(CiRecentAssessment(
+              id: int.tryParse((r['id'] ?? 0).toString()) ?? 0,
+              module: 'SPI',
+              title: (r['namaKolam'] ?? r['nama_kolam'] ?? 'Sediment Pond').toString(),
+              area: (r['area'] ?? '-').toString(),
+              creator: '${r['nama'] ?? r['nik'] ?? '-'}',
+              perusahaan: (r['perusahaan'] ?? '').toString(),
+              date: DateTime.tryParse(tglStr) ?? DateTime.now(),
+              time: (r['waktu'] ?? '').toString(),
+              score: score,
+              status: (r['kategoriIndex'] ?? r['kategori_index'] ?? (score >= 80 ? 'Baik' : 'Kurang')).toString(),
+              themeColor: const Color(0xFF0D9488),
+            ));
+          }
+        });
+      } catch (_) {}
+
+      try {
+        final gciRes = await api.getGciList(scope: 'all', pageSize: 10);
+        gciRes.fold((_) {}, (map) {
+          final items = map['data'] is List ? map['data'] as List : [];
+          for (final r in items) {
+            final score = double.tryParse((r['totalScore'] ?? r['total_score'] ?? '0').toString()) ?? 0;
+            final tglStr = (r['tanggal'] ?? '').toString();
+            list.add(CiRecentAssessment(
+              id: int.tryParse((r['id'] ?? 0).toString()) ?? 0,
+              module: 'GCI',
+              title: (r['judulTemuan'] ?? r['namaLereng'] ?? 'Inspeksi Lereng').toString(),
+              area: '${r['pit'] ?? '-'}${r['namaLereng'] != null ? ' • ${r['namaLereng']}' : ''}',
+              creator: '${r['nama'] ?? r['nik'] ?? '-'}',
+              perusahaan: (r['perusahaan'] ?? '').toString(),
+              date: DateTime.tryParse(tglStr) ?? DateTime.now(),
+              time: (r['waktu'] ?? '').toString(),
+              score: score,
+              status: (r['tarpLevel'] ?? (score >= 80 ? 'GREEN' : 'RED')).toString(),
+              themeColor: const Color(0xFF6366F1),
+            ));
+          }
+        });
+      } catch (_) {}
+    }
+
+    // Prioritize user's company assessments, then order by date desc
+    list.sort((a, b) {
+      final aIsUserComp = a.perusahaan.toLowerCase().contains(userComp.toLowerCase());
+      final bIsUserComp = b.perusahaan.toLowerCase().contains(userComp.toLowerCase());
+      if (aIsUserComp && !bIsUserComp) return -1;
+      if (!aIsUserComp && bIsUserComp) return 1;
+      return b.date.compareTo(a.date);
+    });
+
+    return list;
   }
 
   @override
   Widget build(BuildContext context) => Scaffold(
         backgroundColor: _ciBg,
-        appBar: const TopBar(title: 'Index Condition'),
-        body: FutureBuilder<List<CiAssessment>>(
+        appBar: const TopBar(title: 'Condition Index (CI)'),
+        body: FutureBuilder<List<CiRecentAssessment>>(
             future: _future,
             builder: (_, snapshot) {
-              final data = snapshot.data ?? const <CiAssessment>[];
+              final data = snapshot.data ?? const <CiRecentAssessment>[];
               return RefreshIndicator(
                   onRefresh: () async {
-                    setState(_reload);
+                    _reload();
                     await _future;
                   },
                   child: ListView(
@@ -55,58 +363,133 @@ class _CiAssessmentPageState extends State<CiAssessmentPage> {
                       children: [
                         _hero(data),
                         const SizedBox(height: 20),
-                        const Text('Pilih Jenis Assessment',
-                            style: TextStyle(
-                                fontSize: 17,
-                                fontWeight: FontWeight.w900,
-                                color: Color(0xFF172033))),
+                        const Text(
+                          'Pilih Jenis Assessment',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w900,
+                            color: Color(0xFF172033),
+                          ),
+                        ),
                         const SizedBox(height: 10),
                         _typeCard(
-                            'FCI',
-                            'Front Condition Index',
-                            'Kesiapan dan kondisi area loading front.',
-                            Icons.landscape_rounded,
-                            const Color(0xFF0284C7)),
+                          'FCI',
+                          'FCI (Front Condition Index)',
+                          'Kesiapan & kepatuhan standar keselamatan area loading front.',
+                          Icons.landscape_rounded,
+                          const Color(0xFF0284C7),
+                        ),
                         _typeCard(
-                            'RCI',
-                            'Road Condition Index',
-                            'Kondisi dan kelayakan ruas jalan operasional.',
-                            Icons.add_road_rounded,
-                            const Color(0xFFF59E0B)),
+                          'RCI',
+                          'RCI (Road Condition Index)',
+                          'Kondisi & kelayakan keselamatan ruas jalan angkut tambang.',
+                          Icons.add_road_rounded,
+                          const Color(0xFFF59E0B),
+                        ),
                         _typeCard(
-                            'DCI',
-                            'Disposal Condition Index',
-                            'Kesiapan dan kondisi area disposal/dumping.',
-                            Icons.terrain_rounded,
-                            const Color(0xFF7C3AED)),
+                          'DCI',
+                          'DCI (Disposal Condition Index)',
+                          'Stabilitas & kepatuhan operasional area penimbunan/dumping.',
+                          Icons.terrain_rounded,
+                          const Color(0xFFEA580C),
+                        ),
                         _typeCard(
-                            'SPI',
-                            'Sediment Pond Index',
-                            'Kondisi kolam sediment, tanggul, dan aliran air.',
-                            Icons.water_drop_rounded,
-                            const Color(0xFF0EA5A8)),
-                        const SizedBox(height: 18),
-                        Row(children: [
-                          const Expanded(
-                              child: Text('Assessment Terbaru',
-                                  style: TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w900))),
-                          if (data.isNotEmpty)
-                            TextButton(
-                                onPressed: () => _open(CiHistoryPage(data)),
-                                child: const Text('Lihat Semua'))
-                        ]),
+                          'SPI',
+                          'SPI (Sediment Pond Index)',
+                          'Pemantauan fasilitas kolam sediment & kepatuhan lingkungan.',
+                          Icons.water_drop_rounded,
+                          const Color(0xFF0D9488),
+                        ),
+                        _typeCard(
+                          'GCI',
+                          'GCI (Geoteknik & Lereng)',
+                          'Monitoring kestabilan lereng tambang & evaluasi level TARP.',
+                          Icons.landscape_rounded,
+                          const Color(0xFF6366F1),
+                        ),
+                        const SizedBox(height: 22),
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(7),
+                              decoration: BoxDecoration(
+                                color: _ciNavy.withValues(alpha: 0.08),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: const Icon(Icons.insights_rounded, size: 16, color: _ciNavy),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    'Assessment Terbaru',
+                                    style: TextStyle(
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w800,
+                                      color: Color(0xFF0F172A),
+                                      letterSpacing: -0.2,
+                                    ),
+                                  ),
+                                  if (_userCompany.isNotEmpty)
+                                    Text(
+                                      _userCompany,
+                                      style: const TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w600,
+                                        color: Color(0xFF64748B),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ),
+                            if (data.isNotEmpty)
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFF1F5F9),
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Container(
+                                      width: 6,
+                                      height: 6,
+                                      decoration: const BoxDecoration(
+                                        color: Color(0xFF10B981),
+                                        shape: BoxShape.circle,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 5),
+                                    Text(
+                                      '${data.take(10).length} Data Terbaru',
+                                      style: const TextStyle(
+                                        fontSize: 10.5,
+                                        fontWeight: FontWeight.w700,
+                                        color: Color(0xFF475569),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
                         if (data.isEmpty)
                           _empty()
                         else
-                          ...data.take(4).map((e) => _historyTile(e)),
+                          ...data.take(10).map((e) => _recentCard(e)),
                       ]));
             }),
       );
 
-  Widget _hero(List<CiAssessment> data) {
-    final open = data.where((e) => e.status != 'Closed').length;
+  Widget _hero(List<CiRecentAssessment> data) {
+    final baik = data.where((e) => e.score >= 80).length;
+    final perhatian = data.where((e) => e.score < 80).length;
+
     return Container(
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
@@ -128,135 +511,355 @@ class _CiAssessmentPageState extends State<CiAssessmentPage> {
                 child: Icon(Icons.analytics_rounded, color: Colors.white)),
             SizedBox(width: 10),
             Expanded(
-                child: Text('Index Condition',
+                child: Text('Condition Index (CI)',
                     style: TextStyle(
                         color: Colors.white,
-                        fontSize: 20,
+                        fontSize: 19,
                         fontWeight: FontWeight.w900)))
           ]),
-          const SizedBox(height: 9),
+          const SizedBox(height: 8),
           const Text(
-              'Keputusan operasional berbasis kondisi aktual, kontrol kritis, dan standar teknis aktif.',
-              style: TextStyle(color: Color(0xFFD9F4F5), height: 1.4)),
+              'Pemantauan kondisi aktual, kontrol risiko kritis, dan standar teknis operasional tambang.',
+              style: TextStyle(color: Color(0xFFD9F4F5), fontSize: 12, height: 1.4)),
           const SizedBox(height: 18),
           Row(children: [
-            _metric('${data.length}', 'Total'),
-            _metric('$open', 'Open'),
-            _metric(
-                '${data.where((e) => e.status == 'Closed').length}', 'Closed')
+            _metric('${data.length}', 'Total Assessment'),
+            _metric('$baik', 'Standar Baik (≥80%)'),
+            _metric('$perhatian', 'Perlu Perhatian (<80%)'),
           ]),
         ]));
   }
 
   Widget _metric(String value, String label) => Expanded(
       child: Container(
-          margin: const EdgeInsets.only(right: 8),
-          padding: const EdgeInsets.symmetric(vertical: 10),
+          margin: const EdgeInsets.only(right: 6),
+          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
           decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: .13),
-              borderRadius: BorderRadius.circular(13)),
+              color: Colors.white.withValues(alpha: .14),
+              borderRadius: BorderRadius.circular(12)),
           child: Column(children: [
             Text(value,
                 style: const TextStyle(
                     color: Colors.white,
-                    fontSize: 19,
+                    fontSize: 18,
                     fontWeight: FontWeight.w900)),
+            const SizedBox(height: 2),
             Text(label,
-                style: const TextStyle(color: Color(0xFFD9F4F5), fontSize: 11))
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(color: Color(0xFFD9F4F5), fontSize: 9.5, fontWeight: FontWeight.w500))
           ])));
-  Widget _typeCard(String code, String title, String subtitle, IconData icon,
-          Color color) =>
+
+  Widget _typeCard(String code, String title, String subtitle, IconData icon, Color color) =>
       Card(
           margin: const EdgeInsets.only(bottom: 10),
           elevation: 0,
           color: Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: BorderSide(color: Colors.grey.shade200),
+          ),
           child: InkWell(
               borderRadius: BorderRadius.circular(16),
               onTap: () => _open(code == 'FCI'
                   ? const FciIndexPage()
                   : (code == 'RCI'
                       ? const RciIndexPage()
-                      : CiFormPage(code))),
+                      : (code == 'DCI'
+                          ? const DciIndexPage()
+                          : (code == 'SPI'
+                              ? const SpiIndexPage()
+                              : const GciIndexPage())))),
               child: Padding(
-                  padding: const EdgeInsets.all(15),
+                  padding: const EdgeInsets.all(14),
                   child: Row(children: [
                     Container(
-                        width: 55,
-                        height: 55,
+                        width: 52,
+                        height: 52,
                         decoration: BoxDecoration(
-                            color: color.withValues(alpha: .1),
-                            borderRadius: BorderRadius.circular(16)),
-                        child: Icon(icon, color: color, size: 28)),
-                    const SizedBox(width: 13),
+                            color: color.withValues(alpha: .12),
+                            borderRadius: BorderRadius.circular(14)),
+                        child: Icon(icon, color: color, size: 26)),
+                    const SizedBox(width: 12),
                     Expanded(
                         child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                           Text(title,
-                              style:
-                                  const TextStyle(fontWeight: FontWeight.w800)),
-                          const SizedBox(height: 4),
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF0F172A))),
+                          const SizedBox(height: 3),
                           Text(subtitle,
-                              style: const TextStyle(
-                                  fontSize: 12,
-                                  color: Colors.blueGrey,
+                              style: TextStyle(
+                                  fontSize: 11.5,
+                                  color: Colors.blueGrey.shade700,
                                   height: 1.3))
                         ])),
-                    const Icon(Icons.chevron_right_rounded,
-                        color: Colors.blueGrey)
+                    Icon(Icons.chevron_right_rounded, color: Colors.blueGrey.shade400)
                   ]))));
-  Widget _historyTile(CiAssessment item) {
-    final color = _resultColor(item);
-    return Card(
-        margin: const EdgeInsets.only(bottom: 9),
-        elevation: 0,
-        child: ListTile(
-            onTap: () => _open(CiDetailPage(item)),
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-            leading: CircleAvatar(
-                backgroundColor: color.withValues(alpha: .1),
-                child: Icon(_typeIcon(item.type), color: color)),
-            title: Text(_typeLong(item.type),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontWeight: FontWeight.w800)),
-            subtitle: Text(
-                '${item.location}\n${DateFormat('dd MMM yyyy, HH:mm').format(item.assessedAt)} • ${item.operationalStatus}',
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis),
-            isThreeLine: true,
-            titleAlignment: ListTileTitleAlignment.center,
-            trailing: SizedBox(
-              width: 78,
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(item.index.toStringAsFixed(0),
-                      style: TextStyle(
-                          color: color,
-                          fontSize: 18,
-                          fontWeight: FontWeight.w900)),
-                  _ciSyncBadge(item, compact: true),
-                ],
+
+  Widget _recentCard(CiRecentAssessment item) {
+    Color scoreColor = const Color(0xFF10B981);
+    Color scoreBg = const Color(0xFFECFDF5);
+    Color scoreBorder = const Color(0xFFA7F3D0);
+    String statusLabel = 'Optimal';
+    IconData statusIcon = Icons.check_circle_rounded;
+
+    if (item.score < 65 ||
+        item.status.toUpperCase().contains('RED') ||
+        item.status.toUpperCase().contains('KURANG')) {
+      scoreColor = const Color(0xFFDC2626);
+      scoreBg = const Color(0xFFFEF2F2);
+      scoreBorder = const Color(0xFFFECACA);
+      statusLabel = 'Kritis';
+      statusIcon = Icons.warning_rounded;
+    } else if (item.score < 80 ||
+        item.status.toUpperCase().contains('YELLOW') ||
+        item.status.toUpperCase().contains('SEDANG')) {
+      scoreColor = const Color(0xFFD97706);
+      scoreBg = const Color(0xFFFFFBEB);
+      scoreBorder = const Color(0xFFFDE68A);
+      statusLabel = 'Waspada';
+      statusIcon = Icons.info_rounded;
+    }
+
+    IconData modIcon = Icons.assignment_rounded;
+    String modFull = item.module;
+    switch (item.module) {
+      case 'FCI':
+        modIcon = Icons.waves_rounded;
+        modFull = 'Front & Sump';
+        break;
+      case 'RCI':
+        modIcon = Icons.add_road_rounded;
+        modFull = 'Hauling Road';
+        break;
+      case 'DCI':
+        modIcon = Icons.terrain_rounded;
+        modFull = 'Disposal Area';
+        break;
+      case 'SPI':
+        modIcon = Icons.water_drop_rounded;
+        modFull = 'Sediment Pond';
+        break;
+      case 'GCI':
+        modIcon = Icons.landscape_rounded;
+        modFull = 'Geoteknik';
+        break;
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE2E8F0), width: 1.1),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x080F172A),
+            blurRadius: 10,
+            offset: Offset(0, 3),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Left vertical accent stripe
+              Container(
+                width: 4.5,
+                color: item.themeColor,
               ),
-            )));
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Top Row: Module Chip + Score Badge
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
+                            decoration: BoxDecoration(
+                              color: item.themeColor.withValues(alpha: 0.08),
+                              borderRadius: BorderRadius.circular(7),
+                              border: Border.all(color: item.themeColor.withValues(alpha: 0.2)),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(modIcon, size: 12, color: item.themeColor),
+                                const SizedBox(width: 5),
+                                Text(
+                                  '${item.module} • $modFull',
+                                  style: TextStyle(
+                                    color: item.themeColor,
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 10.5,
+                                    letterSpacing: 0.2,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: scoreBg,
+                              borderRadius: BorderRadius.circular(7),
+                              border: Border.all(color: scoreBorder),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(statusIcon, size: 11, color: scoreColor),
+                                const SizedBox(width: 4),
+                                Text(
+                                  '${item.score.toInt()}%',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w900,
+                                    color: scoreColor,
+                                    fontSize: 11.5,
+                                  ),
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  statusLabel,
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                    color: scoreColor,
+                                    fontSize: 10,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+
+                      // Title
+                      Text(
+                        item.title.trim().replaceAll('xSektor', ' x Sektor'),
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 13.5,
+                          color: Color(0xFF0F172A),
+                          height: 1.25,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 6),
+
+                      // Location
+                      if (item.area.isNotEmpty) ...[
+                        Row(
+                          children: [
+                            const Icon(Icons.place_rounded, size: 13, color: Color(0xFF64748B)),
+                            const SizedBox(width: 4),
+                            Expanded(
+                              child: Text(
+                                item.area,
+                                style: const TextStyle(
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w500,
+                                  color: Color(0xFF475569),
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                      ],
+
+                      // Divider
+                      const Divider(height: 8, thickness: 0.7, color: Color(0xFFF1F5F9)),
+                      const SizedBox(height: 4),
+
+                      // Bottom Metadata (Creator & Date)
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: 18,
+                                  height: 18,
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFF1F5F9),
+                                    shape: BoxShape.circle,
+                                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                                  ),
+                                  child: const Icon(Icons.person, size: 11, color: Color(0xFF64748B)),
+                                ),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: Text(
+                                    item.creator.isNotEmpty ? item.creator : 'Assessor',
+                                    style: const TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                      color: Color(0xFF475569),
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.schedule_rounded, size: 12, color: Color(0xFF94A3B8)),
+                              const SizedBox(width: 4),
+                              Text(
+                                DateFormat('dd MMM yyyy').format(item.date),
+                                style: const TextStyle(
+                                  fontSize: 10.5,
+                                  fontWeight: FontWeight.w500,
+                                  color: Color(0xFF94A3B8),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   Widget _empty() => Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-          color: Colors.white, borderRadius: BorderRadius.circular(16)),
-      child: const Column(children: [
-        Icon(Icons.assignment_outlined, size: 36, color: Colors.blueGrey),
-        SizedBox(height: 8),
-        Text('Belum ada assessment',
-            style: TextStyle(fontWeight: FontWeight.w800)),
-        SizedBox(height: 3),
+          color: Colors.white, borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.grey.shade200)),
+      child: Column(children: [
+        Icon(Icons.assignment_outlined, size: 36, color: Colors.blueGrey.shade300),
+        const SizedBox(height: 8),
+        Text('Belum ada assessment dari $_userCompany',
+            style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13)),
+        const SizedBox(height: 4),
         Text(
-            'Pilih Front Condition Index, Road Condition Index, atau Disposal Condition Index untuk memulai.',
-            style: TextStyle(color: Colors.blueGrey))
+            'Silakan pilih menu FCI, RCI, DCI, SPI, atau GCI di atas untuk membuat laporan assessment baru.',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: Colors.blueGrey.shade600, fontSize: 11.5))
       ]));
 }
 

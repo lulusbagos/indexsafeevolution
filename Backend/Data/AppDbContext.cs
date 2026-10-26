@@ -30,7 +30,10 @@ namespace Indexsafe.Api.Data
         public DbSet<DpaReport> DpaReports { get; set; } = null!;
         public DbSet<DpaDriver> DpaDrivers { get; set; } = null!;
         public DbSet<FciReport> FciReports { get; set; } = null!;
+        public DbSet<DciReport> DciReports { get; set; } = null!;
         public DbSet<RciReport> RciReports { get; set; } = null!;
+        public DbSet<SpiReport> SpiReports { get; set; } = null!;
+        public DbSet<GciReport> GciReports { get; set; } = null!;
         public DbSet<RciMember> RciMembers { get; set; } = null!;
         public DbSet<IncidentNews> IncidentNewsList { get; set; } = null!;
         public DbSet<AttendanceEvent> AttendanceEvents { get; set; } = null!;
@@ -100,6 +103,9 @@ namespace Indexsafe.Api.Data
 
             modelBuilder.Entity<FciReport>()
                 .ToTable("tbl_t_fci_report");
+
+            modelBuilder.Entity<DciReport>()
+                .ToTable("tbl_t_dci_report");
 
             modelBuilder.Entity<RciReport>()
                 .ToTable("tbl_t_rci_report")

@@ -33,13 +33,6 @@ List<LinkNewsModel> listNews() {
 
 List<LinkMenuModel> listMenuSap = <LinkMenuModel>[
   LinkMenuModel(
-    title: 'SAP Report',
-    icon: Icons.manage_search_sharp,
-    image: 'assets/icons/sap-01.png',
-    route: '/sap_report',
-    opacity: 1,
-  ),
-  LinkMenuModel(
     title: 'Inspection\n& Weekly',
     icon: Icons.manage_search_sharp,
     image: 'assets/icons/sap-02.png',
@@ -82,7 +75,7 @@ List<LinkMenuModel> listMenuSap = <LinkMenuModel>[
     opacity: 1,
   ),
   LinkMenuModel(
-    title: 'Index\nCondition',
+    title: 'Condition\nIndex (CI)',
     icon: Icons.analytics_rounded,
     image: '',
     route: '/ci_assessment',
@@ -125,28 +118,35 @@ List<LinkMenuModel> listMenuOhs2 = <LinkMenuModel>[];
 
 List<LinkMenuModel> listMenuExtra = <LinkMenuModel>[
   LinkMenuModel(
-    title: 'Performa\nIndividu',
+    title: 'SAP Report',
+    icon: Icons.bar_chart_rounded,
+    image: 'assets/icons/sap-01.png',
+    route: '/sap_report',
+    opacity: 1,
+  ),
+  LinkMenuModel(
+    title: 'Kinerja\nIndividu',
     icon: Icons.person_pin_rounded,
     image: '',
     route: '/sap_achievement',
     opacity: 1,
   ),
   LinkMenuModel(
-    title: 'Klasemen\nDepartemen',
+    title: 'Peringkat\nDepartemen',
     icon: Icons.emoji_events_rounded,
     image: '',
     route: '/sap_league',
     opacity: 1,
   ),
   LinkMenuModel(
-    title: 'Klasemen\nKaryawan',
+    title: 'Peringkat\nKaryawan',
     icon: Icons.groups_rounded,
     image: '',
     route: '/sap_employee_league',
     opacity: 1,
   ),
   LinkMenuModel(
-    title: 'Kualitas\nLaporan SAP',
+    title: 'Evaluasi\nKualitas SAP',
     icon: Icons.verified_rounded,
     image: '',
     route: '/sap_quality',
@@ -160,28 +160,28 @@ List<LinkMenuModel> listMenuExtra = <LinkMenuModel>[
     opacity: 1,
   ),
   LinkMenuModel(
-    title: 'Action\nTracker',
+    title: 'Pelacakan\nTindak Lanjut',
     icon: Icons.assignment_turned_in_rounded,
     image: '',
     route: '/sap_action_plan',
     opacity: 1,
   ),
   LinkMenuModel(
-    title: 'Pusat Laporan\nK3 & SAP',
+    title: 'Laporan\nEksekutif',
     icon: Icons.assessment_rounded,
     image: '',
     route: '/sap_reports',
     opacity: 1,
   ),
   LinkMenuModel(
-    title: 'Safety Updates\n(Info Insiden)',
+    title: 'Informasi\nInsiden & K3',
     icon: Icons.campaign_rounded,
     image: '',
     route: '/sap_incident_information',
     opacity: 1,
   ),
   LinkMenuModel(
-    title: 'Driver Assessment\n(DPA)',
+    title: 'Evaluasi\nPengemudi (DPA)',
     icon: Icons.drive_eta_rounded,
     image: '',
     route: '/dpa',

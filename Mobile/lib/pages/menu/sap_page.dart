@@ -199,8 +199,6 @@ class _ModuleStyle {
 }
 
 const _styles = [
-  _ModuleStyle(Color(0xFF16A34A), Icons.bar_chart_rounded,
-      'Laporan aktivitas keselamatan'),
   _ModuleStyle(Color(0xFF2677E8), Icons.find_in_page_rounded,
       'Inspeksi area dan peralatan'),
   _ModuleStyle(Color(0xFFF59E0B), Icons.warning_amber_rounded,
@@ -214,7 +212,5 @@ const _styles = [
   _ModuleStyle(Color(0xFF2481D4), Icons.groups_3_rounded,
       'Perilaku aman di tempat kerja'),
   _ModuleStyle(Color(0xFF159947), Icons.analytics_rounded,
-      'Pantau kondisi dan indikator'),
-  _ModuleStyle(Color(0xFF0F766E), Icons.calendar_view_week_rounded,
-      'Inspeksi mingguan berkala'),
+      'Pemantauan Condition Index (CI)'),
 ];

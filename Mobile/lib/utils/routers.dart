@@ -4,6 +4,12 @@ import '../pages/bbs/bbs_page.dart';
 import '../pages/ci_assessment/ci_page.dart';
 import '../pages/ci_assessment/fci_form_page.dart';
 import '../pages/ci_assessment/fci_index_page.dart';
+import '../pages/ci_assessment/dci_form_page.dart';
+import '../pages/ci_assessment/dci_index_page.dart';
+import '../pages/ci_assessment/spi_form_page.dart';
+import '../pages/ci_assessment/spi_index_page.dart';
+import '../pages/ci_assessment/gci_form_page.dart';
+import '../pages/ci_assessment/gci_index_page.dart';
 import '../pages/coaching/coaching_form_page.dart';
 import '../pages/coaching/coaching_page.dart';
 import '../pages/coming_soon_page.dart';
@@ -54,6 +60,54 @@ void routePage(BuildContext ctx, String route, {String? title}) {
       ctx,
       MaterialPageRoute(
         builder: (context) => const FciFormPage(),
+      ),
+    );
+  }
+  if (route == '/dci') {
+    Navigator.push(
+      ctx,
+      MaterialPageRoute(
+        builder: (context) => const DciIndexPage(),
+      ),
+    );
+  }
+  if (route == '/form_dci') {
+    Navigator.push(
+      ctx,
+      MaterialPageRoute(
+        builder: (context) => const DciFormPage(),
+      ),
+    );
+  }
+  if (route == '/spi') {
+    Navigator.push(
+      ctx,
+      MaterialPageRoute(
+        builder: (context) => const SpiIndexPage(),
+      ),
+    );
+  }
+  if (route == '/form_spi') {
+    Navigator.push(
+      ctx,
+      MaterialPageRoute(
+        builder: (context) => const SpiFormPage(),
+      ),
+    );
+  }
+  if (route == '/gci') {
+    Navigator.push(
+      ctx,
+      MaterialPageRoute(
+        builder: (context) => const GciIndexPage(),
+      ),
+    );
+  }
+  if (route == '/form_gci') {
+    Navigator.push(
+      ctx,
+      MaterialPageRoute(
+        builder: (context) => const GciFormPage(),
       ),
     );
   }

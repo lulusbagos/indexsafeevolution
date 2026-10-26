@@ -29,6 +29,7 @@ class FciReportItem {
   final String? tindakanPerbaikan;
   final String? pic;
   final String? fotoUrl;
+  final String? fotoTindakanUrl;
   final DateTime? createdAt;
 
   FciReportItem({
@@ -62,6 +63,7 @@ class FciReportItem {
     this.tindakanPerbaikan,
     this.pic,
     this.fotoUrl,
+    this.fotoTindakanUrl,
     this.createdAt,
   });
 
@@ -130,6 +132,7 @@ class FciReportItem {
       tindakanPerbaikan: json['tindakanPerbaikan'] ?? json['TindakanPerbaikan'],
       pic: json['pic'] ?? json['Pic'],
       fotoUrl: json['fotoUrl'] ?? json['FotoUrl'],
+      fotoTindakanUrl: json['fotoTindakanUrl'] ?? json['FotoTindakanUrl'] ?? json['foto_tindakan_url'],
       createdAt: json['createdAt'] != null
           ? DateTime.tryParse(json['createdAt'].toString())
           : (json['CreatedAt'] != null ? DateTime.tryParse(json['CreatedAt'].toString()) : null),

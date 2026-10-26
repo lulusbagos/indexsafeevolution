@@ -108,7 +108,8 @@ namespace Indexsafe.Api.Controllers
                                                departemen = d != null ? d.NamaDepartemen : "GENERAL",
                                                jabatan = j != null ? j.NamaJabatan : "Staff",
                                                perusahaan = c != null ? c.NamaPerusahaan : "PT INDEXIM COALINDO",
-                                               company_id = k.IdPerusahaan
+                                               company_id = k.IdPerusahaan,
+                                               foto = k.PathFoto
                                            })
                                            .Take(limit)
                                            .ToListAsync();
@@ -234,9 +235,70 @@ namespace Indexsafe.Api.Controllers
                     };
                     return Ok(new { data = safety });
 
+                case "company":
+                case "companies":
+                case "perusahaan":
+                    var compList = await _companyHierarchyService.GetCompaniesAsync();
+                    if (compList == null || compList.Count == 0)
+                    {
+                        compList = await _context.Perusahaans.AsNoTracking()
+                            .Where(p => p.StatusAktif)
+                            .OrderBy(p => p.NamaPerusahaan)
+                            .Select(p => new CompanyDropdownItem
+                            {
+                                Id = p.PerusahaanId,
+                                Kode = p.KodePerusahaan ?? "",
+                                Nama = p.NamaPerusahaan ?? ""
+                            })
+                            .ToListAsync();
+                    }
+                    var compData = compList.Take(limit).Select(c => new
+                    {
+                        id = c.Id,
+                        code = c.Kode,
+                        name = c.Nama,
+                        type = "company"
+                    }).ToList();
+                    return Ok(new { data = compData });
+
                 default:
                     return Ok(new { data = new List<object>() });
             }
+        }
+
+        /// <summary>
+        /// GET /api/companies
+        /// Returns all active partner companies.
+        /// </summary>
+        [AllowAnonymous]
+        [HttpGet("companies")]
+        public async Task<IActionResult> GetAllCompanies()
+        {
+            try
+            {
+                var companies = await _companyHierarchyService.GetCompaniesAsync();
+                if (companies != null && companies.Count > 0)
+                {
+                    return Ok(new { status = true, data = companies });
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[GetAllCompanies] Error: {ex.Message}");
+            }
+
+            var fallback = await _context.Perusahaans.AsNoTracking()
+                .Where(p => p.StatusAktif)
+                .OrderBy(p => p.NamaPerusahaan)
+                .Select(p => new CompanyDropdownItem
+                {
+                    Id = p.PerusahaanId,
+                    Kode = p.KodePerusahaan ?? "",
+                    Nama = p.NamaPerusahaan ?? ""
+                })
+                .ToListAsync();
+
+            return Ok(new { status = true, data = fallback });
         }
 
         /// <summary>
@@ -267,23 +329,45 @@ namespace Indexsafe.Api.Controllers
         }
 
         /// <summary>
+        /// Retrieves departments for a specific company matching web ObservationController.
+        /// Source: [ONE_DB_MITRA].dbo.vw_m_departemen_dropdown
+        /// </summary>
+        [AllowAnonymous]
+        [HttpGet("observation/departments")]
+        [HttpGet("departments")]
+        public async Task<IActionResult> GetDepartmentsByCompany([FromQuery] int companyId)
+        {
+            var depts = await _companyHierarchyService.GetDepartmentsByCompanyAsync(companyId);
+            return Ok(new { status = true, data = depts });
+        }
+
+        /// <summary>
         /// Mobile Observation dropdown source. Values are read from the shared
         /// MBS tables/views; no sample enum values are returned here.
         /// </summary>
+        [AllowAnonymous]
         [HttpGet("observation/options")]
         public async Task<IActionResult> GetObservationOptions([FromQuery] int? perusahaanId)
         {
             var currentCompanyId = GetCurrentCompanyId();
-            var allowedIds = await _companyHierarchyService.GetAccessibleCompanyIdsAsync(currentCompanyId);
-            var companyId = perusahaanId.HasValue && allowedIds.Contains(perusahaanId.Value)
-                ? perusahaanId.Value : currentCompanyId;
+            var companyId = (perusahaanId.HasValue && perusahaanId.Value > 0)
+                ? perusahaanId.Value
+                : currentCompanyId;
 
-            var companies = await _context.Perusahaans.AsNoTracking()
-                .Where(p => allowedIds.Contains(p.PerusahaanId) && p.StatusAktif)
-                .OrderBy(p => p.NamaPerusahaan)
-                .Select(p => new { id = p.PerusahaanId, name = p.NamaPerusahaan })
-                .ToListAsync();
+            // Load list of active companies matching web ObservationController
+            var compList = await _companyHierarchyService.GetCompaniesAsync();
+            var companies = compList.Select(c => new { id = c.Id, name = c.Nama, code = c.Kode }).ToList();
+            if (companies.Count == 0)
+            {
+                companies = await _context.Perusahaans.AsNoTracking()
+                    .Where(p => p.StatusAktif)
+                    .OrderBy(p => p.NamaPerusahaan)
+                    .Select(p => new { id = p.PerusahaanId, name = p.NamaPerusahaan, code = p.KodePerusahaan ?? "" })
+                    .ToListAsync();
+            }
+
             var departments = await _companyHierarchyService.GetDepartmentsByCompanyAsync(companyId);
+            var companyDeptMap = await _companyHierarchyService.GetAllCompanyDepartmentsMapAsync();
 
             var benchmarkQuery = _context.Benchmarks.AsNoTracking();
             if (await benchmarkQuery.AnyAsync(b => b.PerusahaanId == companyId))
@@ -316,6 +400,7 @@ namespace Indexsafe.Api.Controllers
             return Ok(new {
                 companies,
                 departments = departments.Select((name, index) => new { id = index + 1, name }),
+                companyDeptMap,
                 areas,
                 locations,
                 documents = documents.Select((name, index) => new { id = index + 1, name }),
@@ -353,7 +438,8 @@ namespace Indexsafe.Api.Controllers
                         departemen = d != null ? d.NamaDepartemen : "GENERAL",
                         jabatan = j != null ? j.NamaJabatan : "Staff",
                         perusahaan = c != null ? c.NamaPerusahaan : "PT INDEXIM COALINDO",
-                        companyId = k.IdPerusahaan
+                        companyId = k.IdPerusahaan,
+                        foto = k.PathFoto
                     };
 
             if (allowedIds != null && allowedIds.Count > 0)
@@ -371,6 +457,47 @@ namespace Indexsafe.Api.Controllers
             var effectiveLimit = limit ?? (string.IsNullOrEmpty(cleanQuery) ? 10000 : 50);
             var list = await q.Take(effectiveLimit).ToListAsync();
             return Ok(list);
+        }
+
+        [AllowAnonymous]
+        [HttpGet("bbs/workers")]
+        public async Task<IActionResult> GetBbsWorkers([FromQuery] string? q, [FromQuery] int? companyId, [FromQuery] int limit = 30)
+        {
+            var cleanQuery = (q ?? string.Empty).Trim().ToLowerInvariant();
+
+            var query = from k in _context.Karyawans.AsNoTracking()
+                        join p in _context.Personals.AsNoTracking() on k.IdPersonal equals p.IdPersonal
+                        join j in _context.Jabatans.AsNoTracking() on k.IdJabatan equals j.JabatanId into jg
+                        from j in jg.DefaultIfEmpty()
+                        join d in _context.Departemens.AsNoTracking() on k.IdDepartemen equals d.DepartemenId into dg
+                        from d in dg.DefaultIfEmpty()
+                        join c in _context.Perusahaans.AsNoTracking() on k.IdPerusahaan equals c.PerusahaanId into cg
+                        from c in cg.DefaultIfEmpty()
+                        where k.StatusAktif
+                        select new
+                        {
+                            nik = k.NoNik.Trim(),
+                            nama = p.NamaLengkap.Trim(),
+                            jabatan = j != null ? j.NamaJabatan : "",
+                            departemen = d != null ? d.NamaDepartemen : "",
+                            perusahaanId = k.IdPerusahaan,
+                            perusahaan = c != null ? c.NamaPerusahaan : "",
+                            foto = k.PathFoto
+                        };
+
+            if (companyId.HasValue && companyId.Value > 0)
+            {
+                query = query.Where(x => x.perusahaanId == companyId.Value);
+            }
+
+            if (!string.IsNullOrEmpty(cleanQuery))
+            {
+                query = query.Where(x => x.nama.ToLower().Contains(cleanQuery) ||
+                                         x.nik.ToLower().Contains(cleanQuery));
+            }
+
+            var workers = await query.Take(limit).ToListAsync();
+            return Ok(workers);
         }
 
         [AllowAnonymous]

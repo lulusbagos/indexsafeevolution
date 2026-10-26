@@ -33,7 +33,7 @@ class ExtraPage extends StatelessWidget {
                               fontWeight: FontWeight.w900)),
                       SizedBox(height: 4),
                       Text(
-                          'Pantau pencapaian, klasemen, dan tindak lanjut terpadu.',
+                          'Pantau pencapaian, peringkat kinerja, dan laporan analitik terpadu.',
                           style: TextStyle(
                               color: Color(0xFF68757B), fontSize: 12)),
                     ],
@@ -145,9 +145,10 @@ class _HubStyle {
 }
 
 const _hubStyles = [
-  _HubStyle(Color(0xFF16A34A), Icons.person_pin_rounded),
+  _HubStyle(Color(0xFF16A34A), Icons.bar_chart_rounded),
+  _HubStyle(Color(0xFF0284C7), Icons.person_pin_rounded),
   _HubStyle(Color(0xFFF59E0B), Icons.emoji_events_rounded),
-  _HubStyle(Color(0xFF0284C7), Icons.groups_rounded),
+  _HubStyle(Color(0xFF6366F1), Icons.groups_rounded),
   _HubStyle(Color(0xFF7C4DE8), Icons.verified_rounded),
   _HubStyle(Color(0xFF2563EB), Icons.calendar_month_rounded),
   _HubStyle(Color(0xFF0D9488), Icons.assignment_turned_in_rounded),

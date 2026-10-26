@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Security.Claims;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Indexsafe.Api.Data;
 using Indexsafe.Api.Models;
@@ -182,6 +183,7 @@ END";
 
                 var cleanNik = !string.IsNullOrWhiteSpace(userNik) ? userNik.Trim() : "";
                 var cleanNama = !string.IsNullOrWhiteSpace(userNama) ? userNama.Trim().ToLower() : "";
+                var isIndeximOwner = !string.IsNullOrWhiteSpace(effectiveCompanyName) && effectiveCompanyName.ToLower().Contains("indexim");
 
                 // Scope / History filter:
                 // User requirement: "history adalah history yang saya buat kecuali saya dijadikan pic"
@@ -210,23 +212,24 @@ END";
                 }
                 else if (scope == "all")
                 {
-                    // Pastikan bagian semua jalan HANYA tampilkan inspeksi perusahaan yang sama persis dengan login
-                    if (effectiveCompanyId.HasValue && effectiveCompanyId.Value > 0 && !string.IsNullOrWhiteSpace(effectiveCompanyName))
+                    // Pastikan bagian semua jalan tampilkan inspeksi perusahaan yang sesuai atau seluruh hirarki
+                    if (!isIndeximOwner)
                     {
-                        var cleanComp = effectiveCompanyName.Trim().ToLower();
-                        query = query.Where(r =>
-                            (r.PerusahaanId.HasValue && r.PerusahaanId.Value == effectiveCompanyId.Value) ||
-                            (r.Perusahaan != null && r.Perusahaan.ToLower() == cleanComp)
-                        );
-                    }
-                    else if (effectiveCompanyId.HasValue && effectiveCompanyId.Value > 0)
-                    {
-                        query = query.Where(r => r.PerusahaanId.HasValue && r.PerusahaanId.Value == effectiveCompanyId.Value);
-                    }
-                    else if (!string.IsNullOrWhiteSpace(effectiveCompanyName))
-                    {
-                        var cleanComp = effectiveCompanyName.Trim().ToLower();
-                        query = query.Where(r => r.Perusahaan != null && r.Perusahaan.ToLower() == cleanComp);
+                        List<int>? allowedIds = null;
+                        if (effectiveCompanyId.HasValue && effectiveCompanyId.Value > 0)
+                        {
+                            allowedIds = await _companyHierarchyService.GetAccessibleCompanyIdsAsync(effectiveCompanyId.Value);
+                        }
+
+                        if (allowedIds != null && allowedIds.Count > 0)
+                        {
+                            query = query.Where(r => r.PerusahaanId.HasValue && allowedIds.Contains(r.PerusahaanId.Value));
+                        }
+                        else if (!string.IsNullOrWhiteSpace(effectiveCompanyName))
+                        {
+                            var cleanComp = effectiveCompanyName.Trim().ToLower();
+                            query = query.Where(r => r.Perusahaan != null && r.Perusahaan.ToLower() == cleanComp);
+                        }
                     }
                 }
 
@@ -245,9 +248,9 @@ END";
                     {
                         query = query.Where(r => r.Status == "Pending");
                     }
-                    else if (statusFilter == "Approved")
+                    else if (statusFilter == "Approved" || statusFilter == "Closed")
                     {
-                        query = query.Where(r => r.Status == "Approved");
+                        query = query.Where(r => r.Status == "Approved" || r.Status == "Closed");
                     }
                 }
 
@@ -299,22 +302,23 @@ END";
                     .AsNoTracking()
                     .Where(r => !r.IsDeleted && r.Tanggal >= thirtyDaysAgo);
 
-                if (effectiveCompanyId.HasValue && effectiveCompanyId.Value > 0 && !string.IsNullOrWhiteSpace(effectiveCompanyName))
+                if (!isIndeximOwner)
                 {
-                    var cleanComp = effectiveCompanyName.Trim().ToLower();
-                    statsQuery = statsQuery.Where(r =>
-                        (r.PerusahaanId.HasValue && r.PerusahaanId.Value == effectiveCompanyId.Value) ||
-                        (r.Perusahaan != null && r.Perusahaan.ToLower() == cleanComp)
-                    );
-                }
-                else if (effectiveCompanyId.HasValue && effectiveCompanyId.Value > 0)
-                {
-                    statsQuery = statsQuery.Where(r => r.PerusahaanId.HasValue && r.PerusahaanId.Value == effectiveCompanyId.Value);
-                }
-                else if (!string.IsNullOrWhiteSpace(effectiveCompanyName))
-                {
-                    var cleanComp = effectiveCompanyName.Trim().ToLower();
-                    statsQuery = statsQuery.Where(r => r.Perusahaan != null && r.Perusahaan.ToLower() == cleanComp);
+                    List<int>? allowedIds = null;
+                    if (effectiveCompanyId.HasValue && effectiveCompanyId.Value > 0)
+                    {
+                        allowedIds = await _companyHierarchyService.GetAccessibleCompanyIdsAsync(effectiveCompanyId.Value);
+                    }
+
+                    if (allowedIds != null && allowedIds.Count > 0)
+                    {
+                        statsQuery = statsQuery.Where(r => r.PerusahaanId.HasValue && allowedIds.Contains(r.PerusahaanId.Value));
+                    }
+                    else if (!string.IsNullOrWhiteSpace(effectiveCompanyName))
+                    {
+                        var cleanComp = effectiveCompanyName.Trim().ToLower();
+                        statsQuery = statsQuery.Where(r => r.Perusahaan != null && r.Perusahaan.ToLower() == cleanComp);
+                    }
                 }
 
                 var recentReports = await statsQuery.ToListAsync();
@@ -326,7 +330,8 @@ END";
                 var fairCount = recentReports.Count(r => r.KategoriIndex == "Sedang");
                 var poorCount = recentReports.Count(r => r.KategoriIndex == "Kurang");
                 var pendingCount = recentReports.Count(r => r.Status == "Pending");
-                var approvedCount = recentReports.Count(r => r.Status == "Approved");
+                var approvedCount = recentReports.Count(r => r.Status == "Approved" || r.Status == "Closed");
+                var closedCount = recentReports.Count(r => r.Status == "Closed");
                 var myPendingApprovalsCount = cleanNik != "" ? recentReports.Count(r => r.Members.Any(m => m.Role == "Approver" && m.Nik == cleanNik && m.Status == "Pending")) : 0;
                 var myJointCount = cleanNik != "" ? recentReports.Count(r => r.Nik == cleanNik || r.Members.Any(m => m.Role == "Creator" && m.Nik == cleanNik)) : 0;
 
@@ -365,33 +370,71 @@ END";
         }
 
         [HttpGet("search-employees")]
-        public async Task<IActionResult> SearchEmployees([FromQuery] string? q)
+        public async Task<IActionResult> SearchEmployees([FromQuery] string? q, [FromQuery] int? companyId, [FromQuery] string? companyName, [FromQuery] int limit = 60)
         {
-            if (string.IsNullOrWhiteSpace(q) || q.Trim().Length < 2)
-                return Ok(new { status = true, data = new List<object>() });
-
-            var term = q.Trim().ToLower();
-
             try
             {
-                var empQuery = from k in _context.Karyawans.AsNoTracking()
-                               join p in _context.Personals.AsNoTracking() on k.IdPersonal equals p.IdPersonal
-                               join c in _context.Perusahaans.AsNoTracking() on k.IdPerusahaan equals c.PerusahaanId into cg
-                               from c in cg.DefaultIfEmpty()
-                               join j in _context.Jabatans.AsNoTracking() on k.IdJabatan equals j.JabatanId into jg
-                               from j in jg.DefaultIfEmpty()
-                               where k.StatusAktif
-                                     && (p.NamaLengkap.ToLower().Contains(term) || (k.NoNik != null && k.NoNik.ToLower().Contains(term)))
-                               select new
-                               {
-                                   nik = k.NoNik ?? "",
-                                   nama = p.NamaLengkap ?? "",
-                                   jabatan = j != null ? j.NamaJabatan : "Staff",
-                                   perusahaan = c != null ? c.NamaPerusahaan : "PT MEGA GLOBAL ENERGY",
-                                   perusahaanId = (int?)k.IdPerusahaan
-                               };
+                var qEmp = from k in _context.MitraKaryawanAktifs.AsNoTracking()
+                           join m in _context.KaryawanJabatanMappings.AsNoTracking() on k.IdKaryawan equals m.KaryawanId
+                           where k.StatusAktifEfektif
+                                 && ((m.TargetInspeksi ?? 0) > 0 
+                                     || (m.TargetObservasi ?? 0) > 0 
+                                     || (m.TargetHazardReport ?? 0) > 0 
+                                     || (m.TargetCoaching ?? 0) > 0 
+                                     || (m.TargetSafetyTalk ?? 0) > 0 
+                                     || (m.KategoriPengawas != null 
+                                         && m.KategoriPengawas != "NON SAP" 
+                                         && m.KategoriPengawas != "NON SAP (Target 0 / Jabatan Tidak Masuk)" 
+                                         && m.KategoriPengawas != "-"))
+                           select new
+                           {
+                               nik = k.NoNik,
+                               nama = k.NamaLengkap ?? "",
+                               departemen = k.NamaDepartemen ?? "",
+                               jabatan = k.NamaJabatan ?? k.NamaPosisi ?? "Staff",
+                               perusahaan = k.NamaPerusahaan ?? "",
+                               perusahaanId = k.IdPerusahaan,
+                               foto = k.PathFoto ?? "",
+                               kategoriPengawas = m.KategoriPengawas ?? ""
+                           };
 
-                var list = await empQuery.Take(30).ToListAsync();
+                var cleanQ = (q ?? string.Empty).Trim().ToLower();
+                var terms = cleanQ.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                var hasQuery = terms.Length > 0;
+
+                if (hasQuery)
+                {
+                    foreach (var term in terms)
+                    {
+                        var t = term;
+                        qEmp = qEmp.Where(x => x.nama.ToLower().Contains(t) || x.nik.ToLower().Contains(t) || x.perusahaan.ToLower().Contains(t));
+                    }
+                }
+
+                int? compIdVal = companyId;
+                if (!compIdVal.HasValue || compIdVal <= 0)
+                {
+                    if (int.TryParse(User.FindFirst("CompanyId")?.Value, out var cid) && cid > 0)
+                    {
+                        compIdVal = cid;
+                    }
+                }
+                var effectiveCompanyId = compIdVal;
+                var cleanCompName = (companyName ?? User.FindFirst("Company")?.Value ?? Request.Headers["company"].FirstOrDefault() ?? string.Empty).Trim().ToLower();
+
+                var list = await qEmp.OrderBy(x => (
+                                         (effectiveCompanyId.HasValue && x.perusahaanId == effectiveCompanyId.Value) ||
+                                         (!string.IsNullOrEmpty(cleanCompName) && (x.perusahaan.ToLower() == cleanCompName || x.perusahaan.ToLower().Contains(cleanCompName)))
+                                      ) ? 0 : 1)
+                                     .ThenBy(x => hasQuery 
+                                         ? (x.nama.ToLower().StartsWith(cleanQ) ? 0 
+                                            : (x.nama.ToLower().StartsWith(terms[0]) ? 1 
+                                            : (x.nama.ToLower().Contains(" " + cleanQ) ? 2 : 3)))
+                                         : 0)
+                                     .ThenBy(x => x.nama)
+                                     .Take(limit)
+                                     .ToListAsync();
+
                 return Ok(new { status = true, data = list });
             }
             catch (Exception ex)
@@ -662,6 +705,45 @@ END";
                     await RebuildMembersAsync(report, creatorNiks, approverNiks, userNik, userName, userComp, compId);
                     await _context.SaveChangesAsync();
 
+                    // Kirim notifikasi ke seluruh Penyetuju (Approver) & PIC Tindakan Perbaikan
+                    try
+                    {
+                        var picNik = await ExtractPicNikAsync(report.Pic);
+
+                        // 1. Notifikasi Permintaan Persetujuan ke setiap Penyetuju
+                        foreach (var aNik in approverNiks.Distinct())
+                        {
+                            AddNotification(
+                                recipientNik: aNik,
+                                title: $"Permintaan Persetujuan RCI: {report.NamaJalan}",
+                                message: $"{report.Nama} mengajukan inspeksi RCI {report.NamaJalan} ({report.SegmentJalan}) dengan nilai {actualRoadScore:0.00} / 4.00 ({achievement}%). Menunggu persetujuan Anda.",
+                                url: $"/Rci/Detail/{report.Id}",
+                                notifType: "rci_approval_request",
+                                senderName: report.Nama,
+                                priority: "high",
+                                actionText: "Setujui Sekarang"
+                            );
+                        }
+
+                        // 2. Notifikasi Tugas ke PIC Tindakan Perbaikan
+                        if (!string.IsNullOrEmpty(picNik))
+                        {
+                            AddNotification(
+                                recipientNik: picNik,
+                                title: $"Tugas Tindakan Perbaikan RCI: {report.NamaJalan}",
+                                message: $"Anda ditugaskan sebagai PIC Tindakan Perbaikan RCI {report.NamaJalan} ({report.SegmentJalan}) oleh {report.Nama}. Tindakan: {report.TindakanPerbaikan ?? "Perbaikan jalan hauling sesuai standar"}. Menunggu persetujuan tim penyetuju.",
+                                url: $"/Rci/Detail/{report.Id}",
+                                notifType: "rci_pic_task",
+                                senderName: report.Nama,
+                                priority: "normal",
+                                actionText: "Lihat Rincian"
+                            );
+                        }
+
+                        await _context.SaveChangesAsync();
+                    }
+                    catch { }
+
                     return Ok(new
                     {
                         status = true,
@@ -786,13 +868,48 @@ END";
         }
 
         [HttpPost("{id}/approve")]
-        public async Task<IActionResult> Approve(int id, [FromForm] string? catatan, [FromForm] string? approverNik)
+        public async Task<IActionResult> Approve(int id)
         {
             try
             {
-                var userNik = User.FindFirst(ClaimTypes.NameIdentifier)?.Value?.Trim()
-                    ?? approverNik?.Trim()
-                    ?? "";
+                string? userNik = User.FindFirst(ClaimTypes.NameIdentifier)?.Value?.Trim();
+                string? catatan = null;
+
+                if (Request.HasJsonContentType())
+                {
+                    try
+                    {
+                        using var reader = new StreamReader(Request.Body);
+                        var json = await reader.ReadToEndAsync();
+                        if (!string.IsNullOrWhiteSpace(json))
+                        {
+                            using var doc = JsonDocument.Parse(json);
+                            var root = doc.RootElement;
+                            if (string.IsNullOrWhiteSpace(userNik))
+                            {
+                                if (root.TryGetProperty("approverNik", out var anProp)) userNik = anProp.GetString();
+                                else if (root.TryGetProperty("nik", out var nProp)) userNik = nProp.GetString();
+                            }
+                            if (root.TryGetProperty("catatan", out var cProp)) catatan = cProp.GetString();
+                            else if (root.TryGetProperty("notes", out var notProp)) catatan = notProp.GetString();
+                        }
+                    }
+                    catch { }
+                }
+                else if (Request.HasFormContentType)
+                {
+                    var form = await Request.ReadFormAsync();
+                    if (string.IsNullOrWhiteSpace(userNik))
+                    {
+                        userNik = form["approverNik"].FirstOrDefault()?.Trim() ?? form["nik"].FirstOrDefault()?.Trim();
+                    }
+                    catatan ??= form["catatan"].FirstOrDefault() ?? form["notes"].FirstOrDefault();
+                }
+
+                if (string.IsNullOrWhiteSpace(userNik))
+                {
+                    userNik = Request.Query["approverNik"].FirstOrDefault()?.Trim() ?? Request.Query["nik"].FirstOrDefault()?.Trim();
+                }
 
                 if (string.IsNullOrWhiteSpace(userNik))
                 {
@@ -805,6 +922,12 @@ END";
                 var member = report.Members.FirstOrDefault(m => m.Role == "Approver" && m.Nik == userNik);
                 if (member == null)
                 {
+                    // Fallback: match by trimmed NIK or name
+                    member = report.Members.FirstOrDefault(m => m.Role == "Approver" && m.Nik.Trim() == userNik.Trim());
+                }
+
+                if (member == null)
+                {
                     return BadRequest(new { status = false, message = "Anda tidak terdaftar sebagai penyetuju pada laporan RCI ini." });
                 }
 
@@ -813,13 +936,124 @@ END";
                 member.ActionAt = DateTime.Now;
                 _context.RciMembers.Update(member);
 
-                // If all approvers have approved, mark report as Approved
+                // Tandai notifikasi permintaan persetujuan untuk penyetuju ini sudah ditindaklanjuti & dibaca
+                try
+                {
+                    var pendingNotifs = await _context.Notifications
+                        .Where(n => n.RecipientNik == userNik && n.Url == $"/Rci/Detail/{report.Id}" && !n.IsActioned)
+                        .ToListAsync();
+                    foreach (var pn in pendingNotifs)
+                    {
+                        pn.IsActioned = true;
+                        pn.IsRead = true;
+                    }
+                }
+                catch { }
+
+                // Periksa apakah seluruh penyetuju telah menyetujui
                 bool allApproved = report.Members.Where(m => m.Role == "Approver").All(m => m.Status == "Approved");
+                var picNik = await ExtractPicNikAsync(report.Pic);
+
                 if (allApproved)
                 {
-                    report.Status = "Approved";
+                    // Persyaratan user: "samapai semua di setujui dinyatakan RCI akan close"
+                    report.Status = "Closed";
                     report.ApprovedAt = DateTime.Now;
                     _context.RciReports.Update(report);
+
+                    // 1. Notifikasi ke PIC Perbaikan: Laporan RCI Disetujui Penuh & Resmi CLOSED
+                    if (!string.IsNullOrEmpty(picNik))
+                    {
+                        AddNotification(
+                            recipientNik: picNik,
+                            title: $"RCI Closed & Disetujui Penuh: {report.NamaJalan}",
+                            message: $"Laporan RCI {report.NamaJalan} ({report.SegmentJalan}) telah disetujui oleh {member.Nama} dan seluruh tim penyetuju. Status laporan resmi dinyatakan CLOSED. Silakan laksanakan tindakan perbaikan: {report.TindakanPerbaikan ?? "Perbaikan jalan hauling sesuai standar"}.",
+                            url: $"/Rci/Detail/{report.Id}",
+                            notifType: "rci_closed",
+                            senderName: member.Nama,
+                            priority: "high",
+                            actionText: "Lihat Rincian"
+                        );
+                    }
+
+                    // 2. Notifikasi ke seluruh Penyetuju (Approvers): RCI dinyatakan CLOSED
+                    foreach (var app in report.Members.Where(m => m.Role == "Approver"))
+                    {
+                        AddNotification(
+                            recipientNik: app.Nik,
+                            title: $"RCI Selesai Disetujui (Closed): {report.NamaJalan}",
+                            message: $"Laporan RCI {report.NamaJalan} ({report.SegmentJalan}) telah selesai disetujui oleh seluruh tim penyetuju dan status resmi dinyatakan CLOSED.",
+                            url: $"/Rci/Detail/{report.Id}",
+                            notifType: "rci_closed",
+                            senderName: member.Nama,
+                            priority: "normal",
+                            actionText: "Lihat Rincian"
+                        );
+                    }
+
+                    // 3. Notifikasi ke Pembuat / Pelapor (Creator): RCI dinyatakan CLOSED
+                    if (!string.IsNullOrWhiteSpace(report.Nik))
+                    {
+                        AddNotification(
+                            recipientNik: report.Nik,
+                            title: $"Laporan RCI Closed & Disetujui Penuh: {report.NamaJalan}",
+                            message: $"Kabar baik! Laporan inspeksi RCI {report.NamaJalan} ({report.SegmentJalan}) Anda telah disetujui seluruh penyetuju dan resmi dinyatakan CLOSED.",
+                            url: $"/Rci/Detail/{report.Id}",
+                            notifType: "rci_closed",
+                            senderName: member.Nama,
+                            priority: "high",
+                            actionText: "Lihat Rincian"
+                        );
+                    }
+                }
+                else
+                {
+                    // Persetujuan Parsial (Masih ada penyetuju lain yang belum menyetujui)
+                    // 1. Notifikasi ke PIC Perbaikan: disetujui oleh member (Dian / approver terkait)
+                    if (!string.IsNullOrEmpty(picNik))
+                    {
+                        AddNotification(
+                            recipientNik: picNik,
+                            title: $"Persetujuan RCI: {report.NamaJalan}",
+                            message: $"Laporan RCI {report.NamaJalan} ({report.SegmentJalan}) telah disetujui oleh {member.Nama} ({member.Jabatan ?? "Penyetuju"}). Menunggu persetujuan penyetuju lainnya.",
+                            url: $"/Rci/Detail/{report.Id}",
+                            notifType: "rci_partial_approval",
+                            senderName: member.Nama,
+                            priority: "normal",
+                            actionText: "Lihat Rincian"
+                        );
+                    }
+
+                    // 2. Notifikasi ke Penyetuju lain yang belum menyetujui (Pengingat)
+                    var pendingApprovers = report.Members.Where(m => m.Role == "Approver" && m.Status == "Pending" && m.Nik != userNik);
+                    foreach (var pApp in pendingApprovers)
+                    {
+                        AddNotification(
+                            recipientNik: pApp.Nik,
+                            title: $"Pengingat Persetujuan RCI: {report.NamaJalan}",
+                            message: $"{member.Nama} telah menyetujui laporan RCI {report.NamaJalan} ({report.SegmentJalan}). Mohon segera meninjau dan memberikan persetujuan Anda.",
+                            url: $"/Rci/Detail/{report.Id}",
+                            notifType: "rci_approval_request",
+                            senderName: member.Nama,
+                            priority: "high",
+                            actionText: "Setujui Sekarang"
+                        );
+                    }
+
+                    // 3. Notifikasi progres ke Pembuat / Pelapor
+                    if (!string.IsNullOrWhiteSpace(report.Nik) && report.Nik != userNik)
+                    {
+                        AddNotification(
+                            recipientNik: report.Nik,
+                            title: $"Progres Persetujuan RCI: {report.NamaJalan}",
+                            message: $"Laporan RCI {report.NamaJalan} ({report.SegmentJalan}) Anda telah disetujui oleh {member.Nama} ({member.Jabatan ?? "Penyetuju"}). Menunggu persetujuan penyetuju lainnya.",
+                            url: $"/Rci/Detail/{report.Id}",
+                            notifType: "rci_partial_approval",
+                            senderName: member.Nama,
+                            priority: "normal",
+                            actionText: "Lihat Rincian"
+                        );
+                    }
                 }
 
                 await _context.SaveChangesAsync();
@@ -827,7 +1061,9 @@ END";
                 return Ok(new
                 {
                     status = true,
-                    message = $"Laporan RCI berhasil disetujui oleh {member.Nama}!",
+                    message = allApproved
+                        ? $"Laporan RCI berhasil disetujui penuh oleh seluruh penyetuju dan dinyatakan CLOSED!"
+                        : $"Laporan RCI berhasil disetujui oleh {member.Nama}!",
                     data = report
                 });
             }
@@ -835,6 +1071,60 @@ END";
             {
                 return StatusCode(500, new { status = false, message = "Gagal memproses persetujuan: " + ex.Message });
             }
+        }
+
+        private async Task<string?> ExtractPicNikAsync(string? pic)
+        {
+            if (string.IsNullOrWhiteSpace(pic)) return null;
+
+            var match = Regex.Match(pic, @"\(([^)]+)\)");
+            if (match.Success)
+            {
+                var inside = match.Groups[1].Value.Trim();
+                var numInParentheses = Regex.Match(inside, @"\b\d{5,15}\b");
+                if (numInParentheses.Success) return numInParentheses.Value;
+                if (!string.IsNullOrEmpty(inside)) return inside;
+            }
+
+            var numMatch = Regex.Match(pic, @"\b\d{5,15}\b");
+            if (numMatch.Success) return numMatch.Value;
+
+            try
+            {
+                var cleanName = pic.Trim().ToLower();
+                var empNik = await _context.MitraKaryawanAktifs.AsNoTracking()
+                    .Where(k => k.NamaLengkap != null && k.NamaLengkap.ToLower().Contains(cleanName))
+                    .Select(k => k.NoNik)
+                    .FirstOrDefaultAsync();
+                if (!string.IsNullOrEmpty(empNik)) return empNik;
+            }
+            catch { }
+
+            return null;
+        }
+
+        private void AddNotification(string recipientNik, string title, string message, string url, string notifType, string senderName, string priority = "normal", string? actionText = null)
+        {
+            if (string.IsNullOrWhiteSpace(recipientNik)) return;
+            try
+            {
+                _context.Notifications.Add(new Notification
+                {
+                    RecipientNik = recipientNik.Trim(),
+                    Title = title,
+                    Message = message,
+                    Url = url,
+                    NotifType = notifType,
+                    Category = "rci",
+                    SenderName = senderName,
+                    Priority = priority,
+                    ActionText = actionText,
+                    IsRead = false,
+                    IsActioned = false,
+                    CreatedAt = DateTime.Now
+                });
+            }
+            catch { }
         }
 
         [HttpDelete("{id}")]

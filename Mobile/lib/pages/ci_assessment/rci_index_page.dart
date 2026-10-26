@@ -11,6 +11,7 @@ import '../../services/preference.dart';
 import '../../widgets/top_bar.dart';
 import 'rci_form_page.dart';
 import 'rci_model.dart';
+import 'rci_pdf_page.dart';
 
 class RciIndexPage extends StatefulWidget {
   const RciIndexPage({super.key});
@@ -289,20 +290,28 @@ class _RciIndexPageState extends State<RciIndexPage> {
             ),
             onPressed: () async {
               Navigator.pop(ctx);
-              final res = await _api.deleteRciReport(item.id);
-              res.fold(
-                (err) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(err['message']?.toString() ?? 'Gagal menghapus laporan')),
-                  );
-                },
-                (_) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Laporan RCI berhasil dihapus.')),
-                  );
-                  _fetchData();
-                },
-              );
+              try {
+                final res = await _api.deleteRciReport(item.id);
+                res.fold(
+                  (err) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(err['message']?.toString() ?? 'Gagal menghapus laporan')),
+                    );
+                  },
+                  (_) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Laporan RCI berhasil dihapus.')),
+                    );
+                  },
+                );
+              } catch (_) {}
+
+              try {
+                final db = await DatabaseService().database;
+                await db.delete('tbl_t_rci_report', where: 'id = ?', whereArgs: [item.id]);
+              } catch (_) {}
+
+              _fetchData();
             },
             child: const Text('Hapus'),
           ),
@@ -516,25 +525,30 @@ _Generated via SAP IndexSafe Evolution Mobile_''';
                       ],
                     ),
                   ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: item.status == 'Approved'
-                          ? _emeraldColor.withValues(alpha: 0.15)
-                          : const Color(0xFFF59E0B).withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(
-                        color: item.status == 'Approved' ? _emeraldColor : const Color(0xFFF59E0B),
-                      ),
-                    ),
-                    child: Text(
-                      item.status.toUpperCase(),
-                      style: TextStyle(
-                        color: item.status == 'Approved' ? _emeraldColor : const Color(0xFFF59E0B),
-                        fontWeight: FontWeight.bold,
-                        fontSize: 11,
-                      ),
-                    ),
+                  Builder(
+                    builder: (context) {
+                      final isDone = item.status == 'Approved' || item.status == 'Closed';
+                      return Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: isDone
+                              ? _emeraldColor.withValues(alpha: 0.15)
+                              : const Color(0xFFF59E0B).withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: isDone ? _emeraldColor : const Color(0xFFF59E0B),
+                          ),
+                        ),
+                        child: Text(
+                          item.status.toUpperCase(),
+                          style: TextStyle(
+                            color: isDone ? _emeraldColor : const Color(0xFFF59E0B),
+                            fontWeight: FontWeight.bold,
+                            fontSize: 11,
+                          ),
+                        ),
+                      );
+                    },
                   ),
                 ],
               ),
@@ -725,7 +739,56 @@ _Generated via SAP IndexSafe Evolution Mobile_''';
                   ),
                 ),
               ],
-              const SizedBox(height: 24),
+              const SizedBox(height: 18),
+              // Action Buttons: PDF and Share
+              Row(
+                children: [
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: _blueColor,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        elevation: 0,
+                      ),
+                      icon: const Icon(Icons.picture_as_pdf_rounded, size: 18),
+                      label: const Text(
+                        'Lihat & Unduh PDF',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                      ),
+                      onPressed: () {
+                        Navigator.pop(ctx);
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => RciPdfPage(item)),
+                        );
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFF047857),
+                        side: const BorderSide(color: Color(0xFF10B981), width: 1.2),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      icon: const Icon(Icons.share_rounded, size: 18),
+                      label: const Text(
+                        'Bagikan WhatsApp',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                      ),
+                      onPressed: () {
+                        Navigator.pop(ctx);
+                        _shareWhatsApp(item);
+                      },
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
             ],
           ),
         ),
@@ -1178,8 +1241,8 @@ _Generated via SAP IndexSafe Evolution Mobile_''';
 
   Widget _reportCard(RciReportItem item) {
     final scoreColor = _getScoreColor(item.actualRoadScore, item.achievement);
-    final isApproved = item.status == 'Approved';
-    final isPendingApprover = item.members.any(
+    final isApproved = item.status == 'Approved' || item.status == 'Closed';
+    final isPendingApprover = !isApproved && item.members.any(
       (m) => m.role == 'Approver' && m.nik == _currentUserNik && m.status == 'Pending',
     );
     final canEdit = item.nik == _currentUserNik;
@@ -1236,7 +1299,7 @@ _Generated via SAP IndexSafe Evolution Mobile_''';
                                   borderRadius: BorderRadius.circular(6),
                                 ),
                                 child: Text(
-                                  isApproved ? 'APPROVED' : 'PENDING',
+                                  item.status.toUpperCase(),
                                   style: TextStyle(
                                     fontSize: 9.5,
                                     fontWeight: FontWeight.bold,
@@ -1367,8 +1430,21 @@ _Generated via SAP IndexSafe Evolution Mobile_''';
                     Row(
                       children: [
                         IconButton(
-                          icon: const Icon(Icons.share_rounded, size: 18, color: Colors.blueGrey),
-                          tooltip: 'Bagikan',
+                          icon: const Icon(Icons.picture_as_pdf_rounded, size: 20, color: _blueColor),
+                          tooltip: 'Lihat & Unduh PDF',
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(),
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (_) => RciPdfPage(item)),
+                            );
+                          },
+                        ),
+                        const SizedBox(width: 12),
+                        IconButton(
+                          icon: const Icon(Icons.share_rounded, size: 19, color: _emeraldColor),
+                          tooltip: 'Bagikan via WhatsApp',
                           padding: EdgeInsets.zero,
                           constraints: const BoxConstraints(),
                           onPressed: () => _shareWhatsApp(item),

@@ -62,6 +62,7 @@ class _SyncPageState extends State<SyncPage> {
 
   String _name = '';
   String _table = '...';
+  int _currentStep = 1;
 
   @override
   void initState() {
@@ -87,7 +88,10 @@ class _SyncPageState extends State<SyncPage> {
           }
 
           if (mounted) {
-            setState(() => _table = friendly);
+            setState(() {
+              _table = friendly;
+              _currentStep = mIdx + 1;
+            });
           }
           _progress.value = 0;
 
@@ -280,78 +284,331 @@ class _SyncPageState extends State<SyncPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          children: [
-            const Expanded(
-              child: Center(
-                child: Image(
-                  image: AssetImage('assets/images/data-sync.gif'),
-                  width: 300,
+      backgroundColor: const Color(0xFFF8FAFC),
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+          child: Column(
+            children: [
+              // 1. Top Brand Header
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF0D5C75).withOpacity(0.08),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: const Color(0xFF0D5C75).withOpacity(0.2)),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.shield_rounded, size: 16, color: Color(0xFF0D5C75)),
+                        SizedBox(width: 8),
+                        Text(
+                          'MBS SAP • MINING SAFETY SYSTEM',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 0.8,
+                            color: Color(0xFF0D5C75),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 14),
+
+              // 2. Center Illustration Card
+              Expanded(
+                child: Center(
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(24),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                      boxShadow: const [
+                        BoxShadow(
+                          color: Color(0x0A000000),
+                          blurRadius: 20,
+                          offset: Offset(0, 8),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(16),
+                          child: const Image(
+                            image: AssetImage('assets/images/data-sync.gif'),
+                            width: 200,
+                            height: 160,
+                            fit: BoxFit.contain,
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF1F5F9),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                width: 8,
+                                height: 8,
+                                decoration: const BoxDecoration(
+                                  color: Color(0xFF10B981),
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              const Text(
+                                'Sinkronisasi Otomatis Database Lokal',
+                                style: TextStyle(
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w600,
+                                  color: Color(0xFF334155),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               ),
-            ),
-            Card.filled(
-              color: Colors.blueGrey.shade50,
-              child: Padding(
-                padding: const EdgeInsets.all(10),
+
+              const SizedBox(height: 16),
+
+              // 3. User Welcome Card
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Color(0x06000000),
+                      blurRadius: 16,
+                      offset: Offset(0, 4),
+                    ),
+                  ],
+                ),
                 child: Column(
                   children: [
                     Text(
                       'Halo ${titleCase(_name)}, Semangat Pagi!',
                       textAlign: TextAlign.center,
-                      style: const TextStyle(fontSize: 18),
+                      style: const TextStyle(
+                        fontSize: 15.5,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF0F172A),
+                      ),
                     ),
+                    const SizedBox(height: 4),
                     Text(
                       (globals.reSync == true)
-                          ? 'Kami sedang melakukan sinkronisasi ulang master data, mohon menunggu sebentar'
-                          : (_dataSync != null &&
-                                  _dataSync!.length < _masters.length)
-                              ? 'Masih terdapat master data yang belum sinkron, mohon menunggu sebentar'
-                              : 'Selamat datang di aplikasi MBS SAP, kami sedang melakukan sinkronisasi master data, mohon menunggu sebentar',
+                          ? 'Sedang melakukan sinkronisasi ulang seluruh master data tambang...'
+                          : (_dataSync != null && _dataSync!.length < _masters.length)
+                              ? 'Memperbarui master data referensi inspeksi yang belum lengkap...'
+                              : 'Selamat datang di aplikasi MBS SAP! Menyiapkan data operasional tambang & referensi keselamatan kerja.',
                       textAlign: TextAlign.center,
-                      style: const TextStyle(fontSize: 16),
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Color(0xFF475569),
+                        height: 1.4,
+                      ),
                     ),
                   ],
                 ),
               ),
-            ),
-            const SizedBox(height: 30),
-            ValueListenableBuilder(
-              valueListenable: _progress,
-              builder: (context, value, snapshot) {
-                return Column(
+
+              const SizedBox(height: 14),
+
+              // 4. Modern Active Progress Card
+              ValueListenableBuilder(
+                valueListenable: _progress,
+                builder: (context, value, snapshot) {
+                  return Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: const Color(0xFFCBD5E1), width: 1.2),
+                      boxShadow: const [
+                        BoxShadow(
+                          color: Color(0x08000000),
+                          blurRadius: 16,
+                          offset: Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Header: Step pill & status
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(6),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF0D5C75).withOpacity(0.12),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: const Icon(
+                                    Icons.sync_rounded,
+                                    size: 16,
+                                    color: Color(0xFF0D5C75),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                const Text(
+                                  'SINKRONISASI DATA',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w800,
+                                    color: Color(0xFF0D5C75),
+                                    letterSpacing: 0.5,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF1F5F9),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: const Color(0xFFE2E8F0)),
+                              ),
+                              child: Text(
+                                'Tahap $_currentStep dari ${_masters.length}',
+                                style: const TextStyle(
+                                  fontSize: 10.5,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF475569),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+
+                        const SizedBox(height: 12),
+
+                        // Active Table / Module Name
+                        Text(
+                          _table,
+                          style: const TextStyle(
+                            fontSize: 14.5,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF0F172A),
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 2),
+                        const Text(
+                          'Mengunduh & memvalidasi tabel referensi lokal...',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: Color(0xFF64748B),
+                          ),
+                        ),
+
+                        const SizedBox(height: 14),
+
+                        // Modern Progress Bar
+                        LinearPercentIndicator(
+                          padding: EdgeInsets.zero,
+                          barRadius: const Radius.circular(8),
+                          lineHeight: 10,
+                          percent: (_progress.value / 100).clamp(0.0, 1.0),
+                          backgroundColor: const Color(0xFFF1F5F9),
+                          linearGradient: const LinearGradient(
+                            colors: [Color(0xFF0D5C75), Color(0xFF10B981)],
+                          ),
+                        ),
+
+                        const SizedBox(height: 8),
+
+                        // Percentage & Status
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              '${_progress.value}% Selesai',
+                              style: const TextStyle(
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF0F172A),
+                              ),
+                            ),
+                            Text(
+                              _progress.value == 100 ? 'Data Tersinkron' : 'Sedang Memproses...',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: _progress.value == 100 ? const Color(0xFF10B981) : const Color(0xFF0D5C75),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+
+              const SizedBox(height: 14),
+
+              // 5. Offline-Ready Assurance Footer
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFECFDF5),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFFA7F3D0)),
+                ),
+                child: const Row(
                   mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    Text(
-                      '${_progress.value}%',
-                      style: const TextStyle(
-                        fontSize: 30,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.black,
+                    Icon(Icons.offline_pin_rounded, size: 16, color: Color(0xFF059669)),
+                    SizedBox(width: 8),
+                    Flexible(
+                      child: Text(
+                        'Data tersimpan aman di HP untuk mode offline tanpa sinyal.',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF065F46),
+                        ),
+                        textAlign: TextAlign.center,
                       ),
                     ),
-                    const SizedBox(height: 15),
-                    Text(
-                      'Sync Data $_table'.toUpperCase(),
-                      style: const TextStyle(color: Colors.red),
-                    ),
-                    const SizedBox(height: 15),
-                    LinearPercentIndicator(
-                      barRadius: const Radius.circular(10),
-                      lineHeight: 15,
-                      percent: _progress.value / 100,
-                      backgroundColor: Colors.grey.shade300,
-                      progressColor: Colors.green,
-                    ),
                   ],
-                );
-              },
-            ),
-            const SizedBox(height: 30),
-          ],
+                ),
+              ),
+
+              const SizedBox(height: 8),
+            ],
+          ),
         ),
       ),
     );

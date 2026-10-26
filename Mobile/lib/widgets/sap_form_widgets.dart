@@ -4,6 +4,8 @@ import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../services/database.dart';
+import '../services/api.dart';
+import '../services/preference.dart';
 import 'snackbar_msg.dart';
 
 class SapFormIntroCard extends StatelessWidget {
@@ -158,12 +160,18 @@ class CompanyDropdown extends StatefulWidget {
     required this.onChanged,
     this.initialCompanyId,
     this.initialCompanyName,
+    this.onChangedFull,
+    this.decoration,
+    this.hideLabel = false,
     super.key,
   });
 
   final int? initialCompanyId;
   final String? initialCompanyName;
   final ValueChanged<int?> onChanged;
+  final void Function(int? id, String? name)? onChangedFull;
+  final InputDecoration? decoration;
+  final bool hideLabel;
 
   @override
   State<CompanyDropdown> createState() => _CompanyDropdownState();
@@ -188,56 +196,94 @@ class _CompanyDropdownState extends State<CompanyDropdown> {
   }
 
   Future<void> _loadCompanies() async {
-    final rows = await _db.rawQuery('''select id, "name"
+    // 1. Fetch from SQLite first
+    var rows = await _db.rawQuery('''select id, "name"
       from enum_masters
       where deleted_at is null and type='company'
       order by "name"''');
+
+    // 2. Fetch all companies from server API to sync database
+    try {
+      final apiList = await ApiService().getCompanies();
+      if (apiList.isNotEmpty) {
+        for (final item in apiList) {
+          final cid = item['id'] is int ? item['id'] as int : int.tryParse('${item['id']}') ?? 0;
+          final cname = '${item['nama'] ?? item['name'] ?? ''}'.trim();
+          if (cid != 0 && cname.isNotEmpty) {
+            await _db.insert('enum_masters', {
+              'id': cid,
+              'name': cname,
+              'type': 'company',
+            });
+          }
+        }
+        rows = await _db.rawQuery('''select id, "name"
+          from enum_masters
+          where deleted_at is null and type='company'
+          order by "name"''');
+      }
+    } catch (_) {}
+
     if (!mounted) return;
 
     final databaseCompanies = rows
         .where((row) => row['id'] != null && row['name'] != null)
         .map((row) => MapEntry(row['id'] as int, '${row['name']}'))
         .toList();
+
     final byName = <String, MapEntry<int, String>>{
       for (final company in databaseCompanies)
         _normalize(company.value): company,
     };
 
-    MapEntry<int, String> baseCompany(
-      int fallbackId,
-      String name,
-      bool Function(String normalized) matches,
-    ) {
-      return databaseCompanies.firstWhere(
-        (company) => matches(_normalize(company.value)),
-        orElse: () => MapEntry(fallbackId, name),
-      );
-    }
+    // Baseline mining contractors in Indexim area if SQLite empty
+    final fallbackList = [
+      const MapEntry(-10001, 'PT INDEXIM COALINDO'),
+      const MapEntry(-10002, 'PT UNGGUL DINAMIKA UTAMA'),
+      const MapEntry(-10003, 'PT CIPTA KRIDATAMA'),
+      const MapEntry(-10004, 'PT BUKIT MAKMUR MANDIRI UTAMA'),
+      const MapEntry(-10005, 'PT PAMAPERSADA NUSANTARA'),
+      const MapEntry(-10006, 'PT MADHANI TALATAH NUSANTARA'),
+      const MapEntry(-10007, 'PT RICOBANA ABADI'),
+      const MapEntry(-10008, 'PT KALIMANTAN PRIMA PERSADA'),
+      const MapEntry(-10009, 'PT PETROSEA TBK'),
+      const MapEntry(-10010, 'PT THIESS CONTRACTORS INDONESIA'),
+      const MapEntry(-10011, 'PT MACMAHON MINING SERVICES'),
+      const MapEntry(-10012, 'PT UNITED TRACTORS'),
+      const MapEntry(-10013, 'PT HEXINDO ADIPERKASA'),
+      const MapEntry(-10014, 'PT TRAKTOR NUSANTARA'),
+      const MapEntry(-10015, 'PT SANGGAR SARANA BAJA'),
+      const MapEntry(-10016, 'PT JENDAR FAMILY KARYA'),
+      const MapEntry(-10017, 'PT KANANI ENERGI'),
+    ];
 
-    final indexim = baseCompany(
-      -10001,
-      'PT INDEXIM COALINDO',
-      (name) => name.contains('indexim coalindo'),
-    );
-    final udu = baseCompany(
-      -10002,
-      'PT UNGGUL DINAMIKA UTAMA',
-      (name) => name.contains('unggul dinamika utama') || name == 'udu',
-    );
-    byName[_normalize(indexim.value)] = indexim;
-    byName[_normalize(udu.value)] = udu;
+    for (final fb in fallbackList) {
+      final key = _normalize(fb.value);
+      if (!byName.containsKey(key)) {
+        byName[key] = fb;
+      }
+    }
 
     final companies = byName.values.toList()
       ..sort((a, b) => a.value.compareTo(b.value));
+
+    // Auto-detect login user's company
+    final profile = PreferenceService.getProfile();
+    final loginCompName = profile?.company ?? 'PT INDEXIM COALINDO';
+    final loginCompId = profile?.companyId;
+
     MapEntry<int, String>? selected;
-    for (final company in companies) {
-      if (company.key == widget.initialCompanyId) {
-        selected = company;
-        break;
+    // Match by initialCompanyId
+    if (widget.initialCompanyId != null) {
+      for (final company in companies) {
+        if (company.key == widget.initialCompanyId) {
+          selected = company;
+          break;
+        }
       }
     }
-    if (selected == null &&
-        widget.initialCompanyName?.trim().isNotEmpty == true) {
+    // Match by initialCompanyName
+    if (selected == null && widget.initialCompanyName?.trim().isNotEmpty == true) {
       final initialName = _normalize(widget.initialCompanyName!);
       for (final company in companies) {
         if (_normalize(company.value).contains(initialName) ||
@@ -247,7 +293,29 @@ class _CompanyDropdownState extends State<CompanyDropdown> {
         }
       }
     }
-    selected ??= indexim;
+    // Match by login user's company
+    if (selected == null && loginCompId != null) {
+      for (final company in companies) {
+        if (company.key == loginCompId) {
+          selected = company;
+          break;
+        }
+      }
+    }
+    if (selected == null && loginCompName.trim().isNotEmpty) {
+      final initialName = _normalize(loginCompName);
+      for (final company in companies) {
+        if (_normalize(company.value).contains(initialName) ||
+            initialName.contains(_normalize(company.value))) {
+          selected = company;
+          break;
+        }
+      }
+    }
+    selected ??= companies.firstWhere(
+      (c) => _normalize(c.value).contains('indexim'),
+      orElse: () => companies.first,
+    );
 
     setState(() {
       _companies
@@ -257,10 +325,49 @@ class _CompanyDropdownState extends State<CompanyDropdown> {
       _loading = false;
     });
     widget.onChanged(_selectedId);
+    widget.onChangedFull?.call(_selectedId, selected.value);
   }
 
   @override
   Widget build(BuildContext context) {
+    final dropdown = DropdownButtonFormField<int>(
+      key: ValueKey('company-${_selectedId ?? 'loading'}'),
+      initialValue: _selectedId,
+      isExpanded: true,
+      decoration: widget.decoration ??
+          InputDecoration(
+            hintText:
+                _loading ? 'Memuat daftar perusahaan...' : 'Pilih perusahaan',
+            prefixIcon: const Padding(
+              padding: EdgeInsets.only(left: 10),
+              child: Icon(Icons.apartment_rounded, size: 24),
+            ),
+          ),
+      items: _companies
+          .map((company) => DropdownMenuItem<int>(
+                value: company.key,
+                child: Text(
+                  company.value,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ))
+          .toList(),
+      onChanged: _loading
+          ? null
+          : (value) {
+              setState(() => _selectedId = value);
+              widget.onChanged(value);
+              final found = _companies.firstWhere(
+                (c) => c.key == value,
+                orElse: () => MapEntry(value ?? 0, ''),
+              );
+              widget.onChangedFull?.call(value, found.value);
+            },
+    );
+
+    if (widget.hideLabel) return dropdown;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -269,35 +376,7 @@ class _CompanyDropdownState extends State<CompanyDropdown> {
           style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
         ),
         const SizedBox(height: 10),
-        DropdownButtonFormField<int>(
-          key: ValueKey('company-${_selectedId ?? 'loading'}'),
-          initialValue: _selectedId,
-          isExpanded: true,
-          decoration: InputDecoration(
-            hintText:
-                _loading ? 'Memuat daftar perusahaan...' : 'Pilih perusahaan',
-            prefixIcon: const Padding(
-              padding: EdgeInsets.only(left: 10),
-              child: Icon(Icons.apartment_rounded, size: 24),
-            ),
-          ),
-          items: _companies
-              .map((company) => DropdownMenuItem<int>(
-                    value: company.key,
-                    child: Text(
-                      company.value,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ))
-              .toList(),
-          onChanged: _loading
-              ? null
-              : (value) {
-                  setState(() => _selectedId = value);
-                  widget.onChanged(value);
-                },
-        ),
+        dropdown,
         const SizedBox(height: 15),
       ],
     );
@@ -930,6 +1009,755 @@ class SapTimePickerTile extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class SapEmployeeItem {
+  final String nik;
+  final String nama;
+  final String departemen;
+  final String jabatan;
+  final String perusahaan;
+  final int? perusahaanId;
+  final String? foto;
+
+  SapEmployeeItem({
+    required this.nik,
+    required this.nama,
+    this.departemen = '',
+    this.jabatan = '',
+    this.perusahaan = '',
+    this.perusahaanId,
+    this.foto,
+  });
+
+  String get displayName => '$nama ($nik)';
+}
+
+class SapEmployeeAvatar extends StatefulWidget {
+  final String? photo;
+  final String name;
+  final String nik;
+  final double radius;
+  final Color? fallbackBg;
+  final Color? fallbackFg;
+
+  const SapEmployeeAvatar({
+    super.key,
+    required this.photo,
+    required this.name,
+    required this.nik,
+    this.radius = 18,
+    this.fallbackBg,
+    this.fallbackFg,
+  });
+
+  @override
+  State<SapEmployeeAvatar> createState() => _SapEmployeeAvatarState();
+}
+
+class _SapEmployeeAvatarState extends State<SapEmployeeAvatar> {
+  int _attempt = 0;
+
+  String? _getUrl(int attempt) {
+    final baseUrl = ApiService().baseUrl;
+    final photo = widget.photo?.trim();
+    if (attempt == 0) {
+      if (photo != null && photo.isNotEmpty) {
+        if (photo.startsWith('http://') || photo.startsWith('https://')) return photo;
+        if (photo.startsWith('/uploads/') || photo.startsWith('/')) return '$baseUrl$photo';
+        return '$baseUrl/api/image/${Uri.encodeComponent(photo)}';
+      }
+      if (widget.nik.isNotEmpty) {
+        return '$baseUrl/api/image/${Uri.encodeComponent(widget.nik)}.jpg';
+      }
+      return null;
+    } else if (attempt == 1) {
+      if (widget.nik.isNotEmpty && photo != '${widget.nik}.jpg') {
+        return '$baseUrl/api/image/${Uri.encodeComponent(widget.nik)}.jpg';
+      }
+      return null;
+    }
+    return null;
+  }
+
+  @override
+  void didUpdateWidget(covariant SapEmployeeAvatar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.photo != widget.photo || oldWidget.nik != widget.nik) {
+      _attempt = 0;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final initial = widget.name.trim().isNotEmpty ? widget.name.trim()[0].toUpperCase() : 'U';
+    final bg = widget.fallbackBg ?? const Color(0xFFE0F2FE);
+    final fg = widget.fallbackFg ?? const Color(0xFF0284C7);
+
+    final url = _getUrl(_attempt);
+    if (url == null || _attempt >= 2) {
+      return CircleAvatar(
+        radius: widget.radius,
+        backgroundColor: bg,
+        child: Text(
+          initial,
+          style: TextStyle(color: fg, fontWeight: FontWeight.bold, fontSize: widget.radius * 0.85),
+        ),
+      );
+    }
+
+    return ClipOval(
+      child: SizedBox(
+        width: widget.radius * 2,
+        height: widget.radius * 2,
+        child: Image.network(
+          url,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted && _attempt < 2) {
+                setState(() => _attempt++);
+              }
+            });
+            return CircleAvatar(
+              radius: widget.radius,
+              backgroundColor: bg,
+              child: Text(
+                initial,
+                style: TextStyle(color: fg, fontWeight: FontWeight.bold, fontSize: widget.radius * 0.85),
+              ),
+            );
+          },
+          loadingBuilder: (context, child, loadingProgress) {
+            if (loadingProgress == null) return child;
+            return CircleAvatar(
+              radius: widget.radius,
+              backgroundColor: bg,
+              child: Text(
+                initial,
+                style: TextStyle(color: fg, fontWeight: FontWeight.bold, fontSize: widget.radius * 0.85),
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+class SapEmployeePickerModal {
+  static Future<SapEmployeeItem?> show(BuildContext context, {String title = 'Pilih PIC Penanggung Jawab'}) async {
+    return showModalBottomSheet<SapEmployeeItem>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => _SapEmployeePickerSheet(title: title),
+    );
+  }
+}
+
+class _SapEmployeePickerSheet extends StatefulWidget {
+  final String title;
+  const _SapEmployeePickerSheet({required this.title});
+
+  @override
+  State<_SapEmployeePickerSheet> createState() => _SapEmployeePickerSheetState();
+}
+
+class _SapEmployeePickerSheetState extends State<_SapEmployeePickerSheet> {
+  final _searchCtrl = TextEditingController();
+  List<SapEmployeeItem> _results = [];
+  bool _isLoading = true;
+  late String _userCompany;
+  late int _userCompanyId;
+
+  @override
+  void initState() {
+    super.initState();
+    final profile = PreferenceService.getProfile();
+    _userCompany = (profile?.company ?? '').trim();
+    _userCompanyId = profile?.companyId ?? 0;
+    _search('');
+  }
+
+  bool _isMyCompany(String perush, int? compId) {
+    if (_userCompanyId > 0 && compId != null && compId == _userCompanyId) return true;
+    if (_userCompany.isNotEmpty) {
+      final cu = _userCompany.toLowerCase();
+      final cp = perush.toLowerCase();
+      return cp == cu || cp.contains(cu) || cu.contains(cp);
+    }
+    return false;
+  }
+
+  Future<void> _search(String query) async {
+    setState(() => _isLoading = true);
+    final cleanQ = query.trim();
+    final safeQ = cleanQ.replaceAll("'", "''");
+    final safeComp = _userCompany.replaceAll("'", "''");
+    final list = <SapEmployeeItem>[];
+
+    try {
+      final db = await DatabaseService().database;
+      final String sql;
+      if (cleanQ.isEmpty) {
+        sql = '''
+          SELECT no_nik, nama_lengkap, depart, posisi, departemen, jabatan, perusahaan, foto, company_id 
+          FROM employees 
+          WHERE no_nik IS NOT NULL AND nama_lengkap IS NOT NULL AND nama_lengkap != ''
+          ORDER BY 
+            CASE 
+              WHEN ($_userCompanyId > 0 AND company_id = $_userCompanyId) OR (perusahaan IS NOT NULL AND perusahaan = '$safeComp') THEN 0 
+              WHEN ('$safeComp' != '' AND perusahaan LIKE '%$safeComp%') THEN 1 
+              ELSE 2 
+            END,
+            nama_lengkap ASC
+          LIMIT 60
+        ''';
+      } else {
+        sql = '''
+          SELECT no_nik, nama_lengkap, depart, posisi, departemen, jabatan, perusahaan, foto, company_id 
+          FROM employees 
+          WHERE (no_nik LIKE '%$safeQ%' OR nama_lengkap LIKE '%$safeQ%' OR depart LIKE '%$safeQ%' OR departemen LIKE '%$safeQ%' OR jabatan LIKE '%$safeQ%' OR posisi LIKE '%$safeQ%' OR perusahaan LIKE '%$safeQ%')
+            AND nama_lengkap IS NOT NULL AND nama_lengkap != ''
+          ORDER BY 
+            CASE 
+              WHEN ($_userCompanyId > 0 AND company_id = $_userCompanyId) OR (perusahaan IS NOT NULL AND perusahaan = '$safeComp') THEN 0 
+              WHEN ('$safeComp' != '' AND perusahaan LIKE '%$safeComp%') THEN 1 
+              ELSE 2 
+            END,
+            nama_lengkap ASC
+          LIMIT 60
+        ''';
+      }
+      final rows = await db.rawQuery(sql);
+
+      for (final r in rows) {
+        final rawCompId = r['company_id'];
+        final int? compId = rawCompId is int ? rawCompId : int.tryParse(rawCompId?.toString() ?? '');
+        list.add(SapEmployeeItem(
+          nik: r['no_nik']?.toString().trim() ?? '',
+          nama: r['nama_lengkap']?.toString().trim() ?? '',
+          departemen: (r['departemen'] ?? r['depart'])?.toString().trim() ?? '',
+          jabatan: (r['jabatan'] ?? r['posisi'])?.toString().trim() ?? '',
+          perusahaan: r['perusahaan']?.toString().trim() ?? '',
+          perusahaanId: compId,
+          foto: r['foto']?.toString().trim(),
+        ));
+      }
+    } catch (_) {}
+
+    // Online fallback if empty or few
+    if (list.length < 5 && cleanQ.isNotEmpty) {
+      try {
+        final res = await ApiService().searchPja(cleanQ, lintasPerusahaan: true);
+        res.fold((_) {}, (serverData) {
+          for (final item in serverData) {
+            final nik = item['nik']?.toString().trim() ?? '';
+            final nama = item['nama']?.toString().trim() ?? '';
+            if (nik.isNotEmpty && nama.isNotEmpty && !list.any((x) => x.nik == nik)) {
+              list.add(SapEmployeeItem(
+                nik: nik,
+                nama: nama,
+                departemen: (item['departemen'] ?? item['depart'])?.toString().trim() ?? '',
+                jabatan: (item['jabatan'] ?? item['posisi'])?.toString().trim() ?? '',
+                perusahaan: item['perusahaan']?.toString().trim() ?? '',
+                perusahaanId: item['perusahaanId'] is int ? item['perusahaanId'] : int.tryParse(item['perusahaanId']?.toString() ?? ''),
+                foto: item['foto']?.toString().trim(),
+              ));
+            }
+          }
+        });
+      } catch (_) {}
+    }
+
+    if (mounted) {
+      setState(() {
+        _results = list;
+        _isLoading = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.88,
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      child: Column(
+        children: [
+          const SizedBox(height: 12),
+          Container(
+            width: 44,
+            height: 4,
+            decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2)),
+          ),
+          const SizedBox(height: 14),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(widget.title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1E293B))),
+                      Text(
+                        _userCompany.isNotEmpty ? 'Prioritas: $_userCompany (Bisa cari semua)' : 'Data karyawan & pengawas perusahaan',
+                        style: const TextStyle(color: Color(0xFF64748B), fontSize: 12),
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  onPressed: () => Navigator.pop(context),
+                  icon: const Icon(Icons.close_rounded),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: TextField(
+              controller: _searchCtrl,
+              autofocus: false,
+              decoration: InputDecoration(
+                hintText: 'Cari Nama, NIK, atau Perusahaan...',
+                prefixIcon: const Icon(Icons.search_rounded, color: Color(0xFF0D5C75)),
+                suffixIcon: _searchCtrl.text.isNotEmpty
+                    ? IconButton(icon: const Icon(Icons.clear_rounded), onPressed: () { _searchCtrl.clear(); _search(''); })
+                    : null,
+                filled: true,
+                fillColor: const Color(0xFFF1F5F9),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
+                contentPadding: const EdgeInsets.symmetric(vertical: 12),
+              ),
+              onChanged: _search,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Expanded(
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : _results.isEmpty
+                    ? Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.person_off_rounded, size: 48, color: Colors.grey.shade400),
+                            const SizedBox(height: 8),
+                            const Text('Tidak ada karyawan ditemukan', style: TextStyle(color: Color(0xFF64748B))),
+                          ],
+                        ),
+                      )
+                    : ListView.separated(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        itemCount: _results.length,
+                        separatorBuilder: (_, __) => const Divider(height: 1, color: Color(0xFFE2E8F0)),
+                        itemBuilder: (ctx, i) {
+                          final emp = _results[i];
+                          final isMyComp = _isMyCompany(emp.perusahaan, emp.perusahaanId);
+
+                          return ListTile(
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            leading: SapEmployeeAvatar(
+                              photo: emp.foto,
+                              name: emp.nama,
+                              nik: emp.nik,
+                              radius: 20,
+                            ),
+                            title: Row(
+                              children: [
+                                Flexible(
+                                  child: Text(emp.nama, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5)),
+                                ),
+                                if (isMyComp) ...[
+                                  const SizedBox(width: 6),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFDCFCE7),
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: const Text('Perusahaan Anda', style: TextStyle(color: Color(0xFF166534), fontSize: 9, fontWeight: FontWeight.bold)),
+                                  ),
+                                ],
+                              ],
+                            ),
+                            subtitle: Text(
+                              'NIK: ${emp.nik}${emp.departemen.isNotEmpty ? ' • ${emp.departemen}' : ''}${emp.jabatan.isNotEmpty ? ' • ${emp.jabatan}' : ''} • ${emp.perusahaan}',
+                              style: const TextStyle(fontSize: 11.5, color: Color(0xFF64748B)),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            trailing: const Icon(Icons.chevron_right_rounded, color: Color(0xFF94A3B8)),
+                            onTap: () => Navigator.pop(context, emp),
+                          );
+                        },
+                      ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class SapPicField extends StatelessWidget {
+  final String label;
+  final String? picText;
+  final SapEmployeeItem? selectedEmployee;
+  final VoidCallback onTap;
+  final VoidCallback? onClear;
+  final VoidCallback? onAutoRecommend;
+
+  const SapPicField({
+    super.key,
+    this.label = 'PIC Penanggung Jawab Tindak Lanjut',
+    required this.picText,
+    this.selectedEmployee,
+    required this.onTap,
+    this.onClear,
+    this.onAutoRecommend,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final hasVal = (picText != null && picText!.trim().isNotEmpty);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.person_pin_rounded, size: 16, color: Color(0xFF0D5C75)),
+                const SizedBox(width: 6),
+                Text(
+                  label,
+                  style: const TextStyle(
+                    color: Color(0xFF0F172A),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+            if (onAutoRecommend != null)
+              InkWell(
+                onTap: onAutoRecommend,
+                borderRadius: BorderRadius.circular(6),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0D5C75).withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: const Color(0xFF0D5C75).withOpacity(0.3)),
+                  ),
+                  child: const Row(
+                    children: [
+                      Icon(Icons.auto_awesome_rounded, size: 13, color: Color(0xFF0D5C75)),
+                      SizedBox(width: 3),
+                      Text('Auto Rekomendasi', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: Color(0xFF0D5C75))),
+                    ],
+                  ),
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(14),
+          child: Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: hasVal ? const Color(0xFFF0FDF4) : const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: hasVal ? const Color(0xFF16A34A) : const Color(0xFFCBD5E1),
+                width: 1.2,
+              ),
+            ),
+            child: Row(
+              children: [
+                if (selectedEmployee != null)
+                  SapEmployeeAvatar(
+                    photo: selectedEmployee!.foto,
+                    name: selectedEmployee!.nama,
+                    nik: selectedEmployee!.nik,
+                    radius: 20,
+                    fallbackBg: const Color(0xFFDCFCE7),
+                    fallbackFg: const Color(0xFF16A34A),
+                  )
+                else
+                  CircleAvatar(
+                    radius: 20,
+                    backgroundColor: hasVal ? const Color(0xFFDCFCE7) : const Color(0xFFE2E8F0),
+                    child: Icon(
+                      hasVal ? Icons.person_rounded : Icons.person_search_rounded,
+                      color: hasVal ? const Color(0xFF16A34A) : const Color(0xFF0D5C75),
+                    ),
+                  ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        hasVal ? (selectedEmployee?.nama ?? picText!) : 'Pilih PIC dari Data Karyawan',
+                        style: TextStyle(
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w700,
+                          color: hasVal ? const Color(0xFF14532D) : const Color(0xFF0F172A),
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        hasVal
+                            ? (selectedEmployee != null
+                                ? 'NIK: ${selectedEmployee!.nik}${selectedEmployee!.departemen.isNotEmpty ? ' • ${selectedEmployee!.departemen}' : ''}'
+                                : 'PIC Terpilih')
+                            : 'Ketuk untuk mencari nama atau NIK pengawas...',
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w500,
+                          color: hasVal ? const Color(0xFF166534) : const Color(0xFF334155),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (hasVal && onClear != null)
+                  IconButton(
+                    icon: const Icon(Icons.close_rounded, size: 18, color: Color(0xFF64748B)),
+                    onPressed: onClear,
+                    tooltip: 'Hapus PIC',
+                  )
+                else
+                  const Icon(Icons.chevron_right_rounded, color: Color(0xFF0D5C75), size: 22),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class SapGpsLocationCard extends StatefulWidget {
+  final TextEditingController latController;
+  final TextEditingController lngController;
+  final TextEditingController? lokasiController;
+  final Color primaryColor;
+
+  const SapGpsLocationCard({
+    super.key,
+    required this.latController,
+    required this.lngController,
+    this.lokasiController,
+    this.primaryColor = const Color(0xFF0D5C75),
+  });
+
+  @override
+  State<SapGpsLocationCard> createState() => _SapGpsLocationCardState();
+}
+
+class _SapGpsLocationCardState extends State<SapGpsLocationCard> {
+  bool _isLoading = false;
+  String? _statusText;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.latController.text.trim().isEmpty || widget.lngController.text.trim().isEmpty) {
+      _autoFetchGps();
+    }
+  }
+
+  Future<void> _autoFetchGps() async {
+    if (!mounted) return;
+    setState(() {
+      _isLoading = true;
+      _statusText = 'Mendeteksi koordinat GPS...';
+    });
+
+    try {
+      // 1. Instant check with last known position
+      final lastPos = await Geolocator.getLastKnownPosition();
+      if (lastPos != null && mounted) {
+        widget.latController.text = lastPos.latitude.toStringAsFixed(6);
+        widget.lngController.text = lastPos.longitude.toStringAsFixed(6);
+      }
+
+      // 2. Accurate current position
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        if (mounted) setState(() { _isLoading = false; _statusText = 'GPS tidak aktif'; });
+        return;
+      }
+
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          if (mounted) setState(() { _isLoading = false; _statusText = 'Izin GPS ditolak'; });
+          return;
+        }
+      }
+
+      final pos = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+        timeLimit: const Duration(seconds: 8),
+      );
+
+      if (mounted) {
+        setState(() {
+          widget.latController.text = pos.latitude.toStringAsFixed(6);
+          widget.lngController.text = pos.longitude.toStringAsFixed(6);
+          if (widget.lokasiController != null && widget.lokasiController!.text.isEmpty) {
+            widget.lokasiController!.text = 'GPS: ${widget.latController.text}, ${widget.lngController.text}';
+          }
+          _isLoading = false;
+          _statusText = 'GPS Terkunci Otomatis (Akurat)';
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _statusText = widget.latController.text.isNotEmpty ? 'GPS Terkunci' : 'Gagal mendeteksi GPS';
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final hasCoords = widget.latController.text.isNotEmpty && widget.lngController.text.isNotEmpty;
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: hasCoords ? const Color(0xFFBAE6FD) : const Color(0xFFE2E8F0)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                hasCoords ? Icons.gps_fixed_rounded : Icons.gps_not_fixed_rounded,
+                size: 18,
+                color: hasCoords ? const Color(0xFF0284C7) : const Color(0xFF64748B),
+              ),
+              const SizedBox(width: 8),
+              const Expanded(
+                child: Text(
+                  'Koordinat GPS Lokasi (Otomatis)',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF1E293B),
+                  ),
+                ),
+              ),
+              if (_isLoading)
+                const SizedBox(
+                  width: 14,
+                  height: 14,
+                  child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF0284C7)),
+                )
+              else
+                InkWell(
+                  onTap: _autoFetchGps,
+                  borderRadius: BorderRadius.circular(8),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE0F2FE),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.refresh_rounded, size: 14, color: Color(0xFF0369A1)),
+                        SizedBox(width: 4),
+                        Text('Perbarui', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF0369A1))),
+                      ],
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: const Color(0xFFCBD5E1)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Latitude', style: TextStyle(fontSize: 10, color: Color(0xFF64748B), fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 2),
+                      Text(
+                        widget.latController.text.isNotEmpty ? widget.latController.text : '- - -',
+                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: const Color(0xFFCBD5E1)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Longitude', style: TextStyle(fontSize: 10, color: Color(0xFF64748B), fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 2),
+                      Text(
+                        widget.lngController.text.isNotEmpty ? widget.lngController.text : '- - -',
+                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+          if (_statusText != null) ...[
+            const SizedBox(height: 6),
+            Text(
+              _statusText!,
+              style: TextStyle(
+                fontSize: 11,
+                color: hasCoords ? const Color(0xFF059669) : const Color(0xFFE11D48),
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+          ],
+        ],
+      ),
     );
   }
 }

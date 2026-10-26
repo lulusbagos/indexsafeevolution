@@ -378,17 +378,17 @@ Future<bool> syncTran(
       cleanMap['area'] = (row['area'] ?? row['area_name'] ?? 'AREA OPERASIONAL').toString();
       cleanMap['lokasi'] = (row['lokasi'] ?? row['location_name'] ?? row['location_detail'] ?? 'LOKASI KERJA').toString();
       cleanMap['detil_lokasi'] = (row['location_detail'] ?? '').toString();
-      cleanMap['judul'] = (row['title'] ?? 'Safety Talk Rutin').toString();
-      cleanMap['keterangan'] = (row['remark'] ?? '').toString();
+      cleanMap['judul'] = (row['judul'] ?? row['title'] ?? 'Safety Talk Rutin').toString();
+      cleanMap['keterangan'] = (row['keterangan'] ?? row['remark'] ?? '').toString();
 
-      final selfImg = row['self_image'] ?? row['image'];
+      final selfImg = row['self_image'] ?? row['foto_diri'] ?? row['image'];
       if (selfImg != null && selfImg.toString().isNotEmpty) {
         final f = File(selfImg.toString());
         if (await f.exists()) {
           cleanMap['foto_diri'] = await MultipartFile.fromFile(f.path);
         }
       }
-      final evtImg = row['event_image'] ?? row['repair_image'];
+      final evtImg = row['event_image'] ?? row['foto_kegiatan'] ?? row['repair_image'];
       if (evtImg != null && evtImg.toString().isNotEmpty) {
         final f = File(evtImg.toString());
         if (await f.exists()) {
@@ -398,6 +398,63 @@ Future<bool> syncTran(
 
       res = await api.dio.post(
         '/tran/safety',
+        data: FormData.fromMap(cleanMap),
+        options: Options(
+          headers: {
+            'Authorization': 'Bearer ${api.getToken}',
+          },
+        ),
+      );
+    } else if (name == 'coaching') {
+      final cleanMap = <String, dynamic>{};
+      cleanMap['tanggal'] = (row['date'] ?? DateTime.now().toString().substring(0, 10)).toString();
+      cleanMap['waktu'] = (row['time'] ?? '08:00').toString();
+      cleanMap['area'] = (row['area'] ?? row['area_name'] ?? 'AREA OPERASIONAL').toString();
+      cleanMap['lokasi'] = (row['lokasi'] ?? row['location_name'] ?? row['location_detail'] ?? 'LOKASI KERJA').toString();
+      cleanMap['detil_lokasi'] = (row['location_detail'] ?? row['detil_lokasi'] ?? '').toString();
+      cleanMap['tema'] = (row['tema'] ?? row['purpose'] ?? row['title'] ?? 'Safety Coaching').toString();
+      cleanMap['komitmen'] = (row['komitmen'] ?? row['title'] ?? '').toString();
+      cleanMap['feedback'] = (row['feedback'] ?? row['remark'] ?? '').toString();
+
+      final sqldb = await db.database;
+      final details = await sqldb.rawQuery('SELECT * FROM coaching_details WHERE tran_id = ? ORDER BY id ASC', [id]);
+      if (details.isNotEmpty) {
+        final list = details.map((d) {
+          final rawName = d['name']?.toString() ?? '';
+          var nik = d['no_nik']?.toString() ?? d['nik']?.toString() ?? '';
+          var nama = d['nama_lengkap']?.toString() ?? d['nama']?.toString() ?? '';
+          if (nik.isEmpty && rawName.contains('-')) {
+            final parts = rawName.split('-');
+            nik = parts[0].trim();
+            nama = parts.length > 1 ? parts.sublist(1).join('-').trim() : nik;
+          } else if (nama.isEmpty) {
+            nama = rawName;
+          }
+          return {
+            'no_nik': nik,
+            'nik': nik,
+            'nama_lengkap': nama,
+            'nama': nama,
+            'posisi': d['posisi']?.toString() ?? d['remark']?.toString() ?? '',
+            'departemen': d['departemen']?.toString() ?? '',
+            'perusahaan': d['perusahaan']?.toString() ?? '',
+          };
+        }).toList();
+        cleanMap['participants_json'] = jsonEncode(list);
+      } else if (row['participants_json'] != null && row['participants_json'].toString().isNotEmpty) {
+        cleanMap['participants_json'] = row['participants_json'].toString();
+      }
+
+      final coachImg = row['foto'] ?? row['image'];
+      if (coachImg != null && coachImg.toString().isNotEmpty) {
+        final f = File(coachImg.toString());
+        if (await f.exists()) {
+          cleanMap['image'] = await MultipartFile.fromFile(f.path);
+        }
+      }
+
+      res = await api.dio.post(
+        '/tran/coaching',
         data: FormData.fromMap(cleanMap),
         options: Options(
           headers: {
@@ -834,6 +891,7 @@ Future<bool> syncAllMasterData({
                   final namaVal =
                       (row['nama_lengkap'] ?? row['nama'])?.toString() ?? '';
                   final compIdVal = row['company_id'] ?? row['companyId'] ?? 1;
+                  final fotoVal = (row['foto'] ?? row['path_foto'] ?? row['pathFoto'] ?? row['url_foto'])?.toString() ?? '';
 
                   row = <String, dynamic>{
                     'no_nik': nikVal,
@@ -845,6 +903,7 @@ Future<bool> syncAllMasterData({
                     'jabatan': jab,
                     'perusahaan': perush,
                     'company_id': compIdVal,
+                    'foto': fotoVal,
                   };
                   if (item['id'] != null && item['id'] is int) {
                     row['id'] = item['id'];

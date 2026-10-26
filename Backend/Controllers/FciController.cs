@@ -72,10 +72,18 @@ BEGIN
         [TindakanPerbaikan] NVARCHAR(2000) NULL,
         [Pic] NVARCHAR(100) NULL,
         [FotoUrl] NVARCHAR(500) NULL,
+        [FotoTindakanUrl] NVARCHAR(500) NULL,
         [is_deleted] BIT NOT NULL DEFAULT 0,
         [CreatedAt] DATETIME2 NOT NULL DEFAULT GETDATE(),
         [UpdatedAt] DATETIME2 NULL
     );
+END
+ELSE
+BEGIN
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[tbl_t_fci_report]') AND name = 'FotoTindakanUrl')
+    BEGIN
+        ALTER TABLE [tbl_t_fci_report] ADD [FotoTindakanUrl] NVARCHAR(500) NULL;
+    END
 END";
                 await _context.Database.ExecuteSqlRawAsync(sql);
                 _schemaEnsured = true;
@@ -358,12 +366,19 @@ END";
                 totalScore = Math.Round(totalScore, 1);
                 string kategoriIndex = totalScore >= 85 ? "Baik" : (totalScore >= 70 ? "Sedang" : "Kurang");
 
-                // Handle Photo Upload
+                // Handle Photo Upload (Foto Temuan & Dokumen/Foto Tindakan Perbaikan)
                 var imageFile = form.Files["foto"] ?? form.Files["image"] ?? form.Files["foto_url"];
                 string? fotoUrl = null;
                 if (imageFile != null && imageFile.Length > 0)
                 {
                     fotoUrl = await _imageUploadService.UploadAndCompressImageAsync(imageFile, "fci", "fci");
+                }
+
+                var imageTindakanFile = form.Files["foto_tindakan"] ?? form.Files["fotoTindakan"] ?? form.Files["dokumen_tindakan"];
+                string? fotoTindakanUrl = null;
+                if (imageTindakanFile != null && imageTindakanFile.Length > 0)
+                {
+                    fotoTindakanUrl = await _imageUploadService.UploadAndCompressImageAsync(imageTindakanFile, "fci_tindakan", "fci");
                 }
 
                 FciReport report;
@@ -400,6 +415,10 @@ END";
                     if (!string.IsNullOrEmpty(fotoUrl))
                     {
                         report.FotoUrl = fotoUrl;
+                    }
+                    if (!string.IsNullOrEmpty(fotoTindakanUrl))
+                    {
+                        report.FotoTindakanUrl = fotoTindakanUrl;
                     }
 
                     _context.FciReports.Update(report);
@@ -445,11 +464,42 @@ END";
                         TindakanPerbaikan = tindakanPerbaikan,
                         Pic = pic,
                         FotoUrl = fotoUrl,
+                        FotoTindakanUrl = fotoTindakanUrl,
                         CreatedAt = DateTime.Now
                     };
 
                     _context.FciReports.Add(report);
                     await _context.SaveChangesAsync();
+
+                    // Send informational notification to PIC with FCI Score info (no follow-up needed)
+                    if (!string.IsNullOrWhiteSpace(report.Pic))
+                    {
+                        try
+                        {
+                            var match = System.Text.RegularExpressions.Regex.Match(report.Pic, @"\(([^)]+)\)");
+                            var picNik = match.Success ? match.Groups[1].Value.Trim() : report.Pic.Trim();
+                            if (!string.IsNullOrEmpty(picNik))
+                            {
+                                _context.Notifications.Add(new Notification
+                                {
+                                    RecipientNik = picNik,
+                                    Title = "Informasi Nilai FCI (Front Condition Index)",
+                                    Message = $"Informasi Nilai FCI: {report.TotalScore}% ({report.KategoriIndex}) di {report.NamaFront ?? report.Lokasi}. Rekomendasi: {report.TindakanPerbaikan ?? "Pemantauan rutin"}. Notifikasi ini bersifat informasi kondisi front dan tidak perlu di-follow up.",
+                                    Url = $"/Fci/Detail/{report.Id}",
+                                    NotifType = "ci_pic_info",
+                                    Category = "info",
+                                    SenderName = report.Nama ?? "Auditor FCI",
+                                    Priority = "normal",
+                                    ActionText = null,
+                                    IsRead = false,
+                                    IsActioned = true,
+                                    CreatedAt = DateTime.Now
+                                });
+                                await _context.SaveChangesAsync();
+                            }
+                        }
+                        catch {}
+                    }
 
                     return Ok(new
                     {
@@ -481,6 +531,66 @@ END";
                 status = true,
                 message = "Laporan FCI berhasil dihapus."
             });
+        }
+
+        /// <summary>
+        /// Mengambil daftar PIC Karyawan yang HANYA memiliki Target SAP (bukan semua karyawan)
+        /// Diurutkan A-Z dengan prioritas perusahaan user di atas
+        /// Mendukung pencarian NIK, nama lengkap (multi kata), dan nama perusahaan
+        /// </summary>
+        [HttpGet("pic-employees")]
+        public async Task<IActionResult> GetPicEmployees([FromQuery] string? query, [FromQuery] int? companyId, [FromQuery] string? companyName, [FromQuery] int limit = 100)
+        {
+            try
+            {
+                var q = from k in _context.MitraKaryawanAktifs.AsNoTracking()
+                        join m in _context.KaryawanJabatanMappings.AsNoTracking() on k.IdKaryawan equals m.KaryawanId
+                        where k.StatusAktifEfektif
+                              && ((m.TargetInspeksi ?? 0) > 0 
+                                  || (m.TargetObservasi ?? 0) > 0 
+                                  || (m.TargetHazardReport ?? 0) > 0 
+                                  || (m.TargetCoaching ?? 0) > 0 
+                                  || (m.TargetSafetyTalk ?? 0) > 0 
+                                  || (m.KategoriPengawas != null 
+                                      && m.KategoriPengawas != "NON SAP" 
+                                      && m.KategoriPengawas != "NON SAP (Target 0 / Jabatan Tidak Masuk)" 
+                                      && m.KategoriPengawas != "-"))
+                        select new
+                        {
+                            nik = k.NoNik,
+                            nama = k.NamaLengkap ?? "",
+                            departemen = k.NamaDepartemen ?? "",
+                            jabatan = k.NamaJabatan ?? k.NamaPosisi ?? "Staff",
+                            perusahaan = k.NamaPerusahaan ?? "",
+                            companyId = k.IdPerusahaan ?? 0,
+                            foto = k.PathFoto ?? "",
+                            kategoriPengawas = m.KategoriPengawas ?? ""
+                        };
+
+                if (!string.IsNullOrWhiteSpace(query))
+                {
+                    var terms = query.Trim().ToLower().Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                    foreach (var term in terms)
+                    {
+                        var t = term;
+                        q = q.Where(x => x.nama.ToLower().Contains(t) || x.nik.ToLower().Contains(t) || x.perusahaan.ToLower().Contains(t));
+                    }
+                }
+
+                var effectiveCompanyId = companyId ?? 1;
+                var cleanCompName = (companyName ?? string.Empty).Trim().ToLower();
+
+                var list = await q.OrderBy(x => (x.companyId == effectiveCompanyId || (!string.IsNullOrEmpty(cleanCompName) && x.perusahaan.ToLower() == cleanCompName)) ? 0 : 1)
+                                  .ThenBy(x => x.nama)
+                                  .Take(limit)
+                                  .ToListAsync();
+
+                return Ok(new { status = true, data = list });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { status = false, message = "Gagal mengambil daftar PIC target SAP: " + ex.Message });
+            }
         }
     }
 }

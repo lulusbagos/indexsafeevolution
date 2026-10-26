@@ -54,16 +54,56 @@ namespace Indexsafe.Api.Controllers
         {
             try
             {
-                var dir = GetAdDirectory();
-                if (!Directory.Exists(dir))
+                if (Directory.Exists(@"C:\MinePermitFiles\MBS") && !Directory.Exists(PrimaryFolder))
                 {
-                    Directory.CreateDirectory(dir);
+                    Directory.CreateDirectory(PrimaryFolder);
+                }
+                var localFolder = Path.Combine(_env.WebRootPath ?? Path.Combine(_env.ContentRootPath, "wwwroot"), "uploads", "iklan");
+                if (!Directory.Exists(localFolder))
+                {
+                    Directory.CreateDirectory(localFolder);
                 }
             }
             catch (Exception ex)
             {
                 _logger.LogWarning("[PopupAd] Failed to ensure ad directory: {Msg}", ex.Message);
             }
+        }
+
+        private List<FileInfo> GetAllImageFiles()
+        {
+            var folderPaths = new List<string>();
+            if (Directory.Exists(PrimaryFolder))
+            {
+                folderPaths.Add(PrimaryFolder);
+            }
+            var localFolder = Path.Combine(_env.WebRootPath ?? Path.Combine(_env.ContentRootPath, "wwwroot"), "uploads", "iklan");
+            if (Directory.Exists(localFolder) && !folderPaths.Contains(localFolder))
+            {
+                folderPaths.Add(localFolder);
+            }
+
+            var files = new Dictionary<string, FileInfo>(StringComparer.OrdinalIgnoreCase);
+            foreach (var folder in folderPaths)
+            {
+                try
+                {
+                    var di = new DirectoryInfo(folder);
+                    foreach (var f in di.GetFiles())
+                    {
+                        if (ValidExtensions.Contains(f.Extension.ToLowerInvariant()) && f.Length > 0)
+                        {
+                            if (!files.TryGetValue(f.Name, out var existing) || f.LastWriteTimeUtc > existing.LastWriteTimeUtc)
+                            {
+                                files[f.Name] = f;
+                            }
+                        }
+                    }
+                }
+                catch { }
+            }
+
+            return files.Values.OrderByDescending(f => f.LastWriteTimeUtc).ToList();
         }
 
         /// <summary>
@@ -75,23 +115,7 @@ namespace Indexsafe.Api.Controllers
         [HttpGet("popup")]
         public IActionResult GetActivePopupAd()
         {
-            var adDir = GetAdDirectory();
-            if (!Directory.Exists(adDir))
-            {
-                return Ok(new
-                {
-                    status = true,
-                    has_ad = false,
-                    message = "Folder iklan belum tersedia.",
-                    data = (object?)null
-                });
-            }
-
-            var dirInfo = new DirectoryInfo(adDir);
-            var imageFiles = dirInfo.GetFiles()
-                .Where(f => ValidExtensions.Contains(f.Extension.ToLowerInvariant()) && f.Length > 0)
-                .OrderByDescending(f => f.LastWriteTimeUtc)
-                .ToList();
+            var imageFiles = GetAllImageFiles();
 
             if (imageFiles.Count == 0)
             {
@@ -130,16 +154,7 @@ namespace Indexsafe.Api.Controllers
         [HttpGet("list")]
         public IActionResult GetAllAds()
         {
-            var adDir = GetAdDirectory();
-            if (!Directory.Exists(adDir))
-            {
-                return Ok(new { status = true, total = 0, data = Array.Empty<object>() });
-            }
-
-            var dirInfo = new DirectoryInfo(adDir);
-            var imageFiles = dirInfo.GetFiles()
-                .Where(f => ValidExtensions.Contains(f.Extension.ToLowerInvariant()) && f.Length > 0)
-                .OrderByDescending(f => f.LastWriteTimeUtc)
+            var imageFiles = GetAllImageFiles()
                 .Select(f => new
                 {
                     fileName = f.Name,
@@ -156,6 +171,7 @@ namespace Indexsafe.Api.Controllers
                 data = imageFiles
             });
         }
+
 
         /// <summary>
         /// POST /api/ads/upload

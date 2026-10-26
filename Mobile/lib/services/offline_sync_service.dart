@@ -253,6 +253,10 @@ class OfflineSyncService {
         if (photoPath != null && await File(photoPath).exists()) {
           map['foto'] = await MultipartFile.fromFile(photoPath);
         }
+        final photoTindakanPath = job.payload['photoTindakanPath']?.toString();
+        if (photoTindakanPath != null && await File(photoTindakanPath).exists()) {
+          map['foto_tindakan'] = await MultipartFile.fromFile(photoTindakanPath);
+        }
         final formData = FormData.fromMap(map);
         final res = await _api.saveFciReport(formData);
         bool ok = false;
@@ -285,6 +289,96 @@ class OfflineSyncService {
         }
         final formData = FormData.fromMap(map);
         final res = await _api.saveRciReport(formData);
+        bool ok = false;
+        res.fold((err) => ok = false, (succ) => ok = true);
+        if (ok) {
+          await discard(feature: job.feature, localId: job.localId);
+          success++;
+        } else {
+          failed++;
+        }
+      } catch (_) {
+        failed++;
+      }
+    }
+    await refresh();
+    return (success: success, failed: failed);
+  }
+
+  Future<({int success, int failed})> syncDciPending() async {
+    if (!state.value.isOnline) return (success: 0, failed: 0);
+    var success = 0;
+    var failed = 0;
+    for (final job in await _jobs()) {
+      if (job.feature != 'dci') continue;
+      try {
+        final map = Map<String, dynamic>.from(job.payload['map'] as Map);
+        final photoPath = job.payload['photoPath']?.toString();
+        if (photoPath != null && await File(photoPath).exists()) {
+          map['foto'] = await MultipartFile.fromFile(photoPath);
+        }
+        final formData = FormData.fromMap(map);
+        final res = await _api.saveDciReport(formData);
+        bool ok = false;
+        res.fold((err) => ok = false, (succ) => ok = true);
+        if (ok) {
+          await discard(feature: job.feature, localId: job.localId);
+          success++;
+        } else {
+          failed++;
+        }
+      } catch (_) {
+        failed++;
+      }
+    }
+    await refresh();
+    return (success: success, failed: failed);
+  }
+
+  Future<({int success, int failed})> syncSpiPending() async {
+    if (!state.value.isOnline) return (success: 0, failed: 0);
+    var success = 0;
+    var failed = 0;
+    for (final job in await _jobs()) {
+      if (job.feature != 'spi') continue;
+      try {
+        final map = Map<String, dynamic>.from(job.payload['map'] as Map);
+        final photoPath = job.payload['photoPath']?.toString();
+        if (photoPath != null && await File(photoPath).exists()) {
+          map['foto'] = await MultipartFile.fromFile(photoPath);
+        }
+        final formData = FormData.fromMap(map);
+        final res = await _api.saveSpiReport(formData);
+        bool ok = false;
+        res.fold((err) => ok = false, (succ) => ok = true);
+        if (ok) {
+          await discard(feature: job.feature, localId: job.localId);
+          success++;
+        } else {
+          failed++;
+        }
+      } catch (_) {
+        failed++;
+      }
+    }
+    await refresh();
+    return (success: success, failed: failed);
+  }
+
+  Future<({int success, int failed})> syncGciPending() async {
+    if (!state.value.isOnline) return (success: 0, failed: 0);
+    var success = 0;
+    var failed = 0;
+    for (final job in await _jobs()) {
+      if (job.feature != 'gci') continue;
+      try {
+        final map = Map<String, dynamic>.from(job.payload['map'] as Map);
+        final photoPath = job.payload['photoPath']?.toString();
+        if (photoPath != null && await File(photoPath).exists()) {
+          map['foto'] = await MultipartFile.fromFile(photoPath);
+        }
+        final formData = FormData.fromMap(map);
+        final res = await _api.saveGciReport(formData);
         bool ok = false;
         res.fold((err) => ok = false, (succ) => ok = true);
         if (ok) {
@@ -363,6 +457,9 @@ class OfflineSyncService {
       await syncBbsPending();
       await syncFciPending();
       await syncRciPending();
+      await syncDciPending();
+      await syncSpiPending();
+      await syncGciPending();
 
     } finally {
       _syncing = false;
@@ -658,6 +755,54 @@ class OfflineSyncService {
             imagePath: job.payload['photoPath']?.toString(),
             rawData: map,
           ));
+        } else if (job.feature == 'dci') {
+          final map = Map<String, dynamic>.from(job.payload['map'] as Map? ?? {});
+          items.add(PendingSyncItem(
+            id: job.id.hashCode,
+            tableKey: 'dci',
+            moduleTitle: 'Disposal Condition Index (DCI)',
+            title: 'DCI - ${map['disposal'] ?? map['nama_dump'] ?? map['area'] ?? 'Disposal Tambang'}',
+            date: map['tanggal']?.toString() ?? '',
+            time: map['waktu']?.toString() ?? '',
+            location: '${map['area'] ?? ''} ${map['disposal'] ?? ''}',
+            icon: Icons.delete_sweep_rounded,
+            color: const Color(0xFFEA580C),
+            detailText: 'PIC: ${map['pic'] ?? ''}',
+            imagePath: job.payload['photoPath']?.toString(),
+            rawData: map,
+          ));
+        } else if (job.feature == 'spi') {
+          final map = Map<String, dynamic>.from(job.payload['map'] as Map? ?? {});
+          items.add(PendingSyncItem(
+            id: job.id.hashCode,
+            tableKey: 'spi',
+            moduleTitle: 'Sediment Pond Index (SPI)',
+            title: 'SPI - ${map['nama_kolam'] ?? map['lokasi'] ?? 'Kolam Sedimen'}',
+            date: map['tanggal']?.toString() ?? '',
+            time: map['waktu']?.toString() ?? '',
+            location: '${map['area'] ?? ''} ${map['nama_kolam'] ?? ''}',
+            icon: Icons.water_drop_rounded,
+            color: const Color(0xFF0D9488),
+            detailText: 'PIC: ${map['pic'] ?? ''}',
+            imagePath: job.payload['photoPath']?.toString(),
+            rawData: map,
+          ));
+        } else if (job.feature == 'gci') {
+          final map = Map<String, dynamic>.from(job.payload['map'] as Map? ?? {});
+          items.add(PendingSyncItem(
+            id: job.id.hashCode,
+            tableKey: 'gci',
+            moduleTitle: 'Geotechnical Condition Index (GCI)',
+            title: 'GCI - ${map['judul_temuan'] ?? map['nama_lereng'] ?? map['pit'] ?? 'Lereng Geoteknik'}',
+            date: map['tanggal']?.toString() ?? '',
+            time: map['waktu']?.toString() ?? '',
+            location: '${map['pit'] ?? ''} ${map['nama_lereng'] ?? ''}',
+            icon: Icons.landscape_rounded,
+            color: const Color(0xFF0284C7),
+            detailText: 'PIC: ${map['pic'] ?? ''}',
+            imagePath: job.payload['photoPath']?.toString(),
+            rawData: map,
+          ));
         }
       }
     } catch (e) {
@@ -708,6 +853,15 @@ class OfflineSyncService {
         return res.success > 0;
       } else if (item.tableKey == 'rci') {
         final res = await syncRciPending();
+        return res.success > 0;
+      } else if (item.tableKey == 'dci') {
+        final res = await syncDciPending();
+        return res.success > 0;
+      } else if (item.tableKey == 'spi') {
+        final res = await syncSpiPending();
+        return res.success > 0;
+      } else if (item.tableKey == 'gci') {
+        final res = await syncGciPending();
         return res.success > 0;
       }
 
@@ -772,6 +926,18 @@ class OfflineSyncService {
     final rciResult = await syncRciPending();
     success += rciResult.success;
     failed += rciResult.failed;
+
+    final dciResult = await syncDciPending();
+    success += dciResult.success;
+    failed += dciResult.failed;
+
+    final spiResult = await syncSpiPending();
+    success += spiResult.success;
+    failed += spiResult.failed;
+
+    final gciResult = await syncGciPending();
+    success += gciResult.success;
+    failed += gciResult.failed;
 
     await refreshPendingCount();
     return (success: success, failed: failed);

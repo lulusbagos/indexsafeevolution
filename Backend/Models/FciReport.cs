@@ -79,6 +79,10 @@ namespace Indexsafe.Api.Models
         [MaxLength(500)]
         public string? FotoUrl { get; set; }
 
+        [NotMapped]
+        [MaxLength(500)]
+        public string? FotoTindakanUrl { get; set; }
+
         [Column("is_deleted")]
         public bool IsDeleted { get; set; } = false;
 

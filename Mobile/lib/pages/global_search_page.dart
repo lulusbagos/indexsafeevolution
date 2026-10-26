@@ -68,11 +68,12 @@ class _GlobalSearchPageState extends State<GlobalSearchPage> {
       return (name: 'Modul OHS', color: const Color(0xFF0F9F8F), desc: desc);
     } else {
       String desc = 'Kinerja, jadwal, dan pencapaian karyawan';
+      if (menu.route == '/sap_report') desc = 'Dashboard interaktif & laporan analitik SAP';
       if (menu.route.contains('roster')) desc = 'Jadwal kerja, shift lapangan & approval roster';
-      if (menu.route.contains('league')) desc = 'Klasemen perolehan poin & peringkat keselamatan';
+      if (menu.route.contains('league')) desc = 'Peringkat perolehan poin & performa keselamatan';
       if (menu.route.contains('incident')) desc = 'Buletin keselamatan & informasi insiden tambang';
       if (menu.route.contains('achievement')) desc = 'Pencapaian KPI safety individu dan tim';
-      if (menu.route.contains('quality')) desc = 'Indeks kualitas pelaporan SAP';
+      if (menu.route.contains('quality')) desc = 'Evaluasi & indeks kualitas pelaporan SAP';
       if (menu.route.contains('action')) desc = 'Pelacakan penyelesaian rekomendasi tindakan';
       if (menu.route.contains('reports')) desc = 'Pusat ekspor & rekapitulasi data keselamatan eksekutif';
       if (menu.route.contains('dpa')) desc = 'Evaluasi kepatuhan dan performa berkendara pengemudi';

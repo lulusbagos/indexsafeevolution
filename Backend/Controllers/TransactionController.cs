@@ -720,6 +720,52 @@ namespace Indexsafe.Api.Controllers
                     _context.Coachings.Add(coaching);
                     await _context.SaveChangesAsync();
 
+                    var participantsJson = form["participants_json"].FirstOrDefault() ?? form["trainees_json"].FirstOrDefault() ?? form["details_json"].FirstOrDefault();
+                    if (!string.IsNullOrEmpty(participantsJson))
+                    {
+                        try
+                        {
+                            using var doc = JsonDocument.Parse(participantsJson);
+                            if (doc.RootElement.ValueKind == JsonValueKind.Array)
+                            {
+                                foreach (var elem in doc.RootElement.EnumerateArray())
+                                {
+                                    string pNik = string.Empty;
+                                    string pNama = string.Empty;
+                                    if (elem.ValueKind == JsonValueKind.Object)
+                                    {
+                                        if (elem.TryGetProperty("no_nik", out var p1) || elem.TryGetProperty("nik", out p1))
+                                            pNik = p1.GetString() ?? string.Empty;
+                                        if (elem.TryGetProperty("nama_lengkap", out var p2) || elem.TryGetProperty("nama", out p2) || elem.TryGetProperty("name", out p2))
+                                            pNama = p2.GetString() ?? string.Empty;
+                                    }
+                                    else if (elem.ValueKind == JsonValueKind.String)
+                                    {
+                                        var str = elem.GetString() ?? string.Empty;
+                                        var parts = str.Split('-', 2);
+                                        pNik = parts[0].Trim();
+                                        pNama = parts.Length > 1 ? parts[1].Trim() : pNik;
+                                    }
+
+                                    if (!string.IsNullOrWhiteSpace(pNik) || !string.IsNullOrWhiteSpace(pNama))
+                                    {
+                                        _context.CoachingParticipants.Add(new CoachingParticipant
+                                        {
+                                            CoachingId = coaching.Id,
+                                            Nik = string.IsNullOrWhiteSpace(pNik) ? "NON-NIK" : pNik,
+                                            Nama = string.IsNullOrWhiteSpace(pNama) ? pNik : pNama
+                                        });
+                                    }
+                                }
+                                await _context.SaveChangesAsync();
+                            }
+                        }
+                        catch
+                        {
+                            // ignore malformed participants JSON
+                        }
+                    }
+
                     sw.Stop();
                     _monitor.RecordTransaction(new TransactionEvent
                     {
@@ -1153,12 +1199,50 @@ namespace Indexsafe.Api.Controllers
 
             if (targetName == "coaching")
             {
-                var list = await _context.Coachings
+                var coachings = await _context.Coachings
                     .AsNoTracking()
-                    .Where(c => !c.IsDeleted && (c.Nik == userNik || (c.PerusahaanId.HasValue && allowedCompanyIds.Contains(c.PerusahaanId.Value))))
+                    .Include(c => c.Participants)
+                    .Where(c => !c.IsDeleted && (c.Nik == userNik || _context.CoachingParticipants.Any(cp => cp.CoachingId == c.Id && cp.Nik == userNik) || (c.PerusahaanId.HasValue && allowedCompanyIds.Contains(c.PerusahaanId.Value))))
                     .OrderByDescending(c => c.CreatedAt)
                     .Take(limit)
                     .ToListAsync();
+
+                var list = coachings.Select(c => new
+                {
+                    id = c.Id,
+                    code = $"COACH-{c.Id}",
+                    title = c.Tema ?? "Safety Coaching",
+                    tema = c.Tema ?? "Safety Coaching",
+                    purpose = c.Tema,
+                    feedback = c.Feedback,
+                    komitmen = c.Komitmen,
+                    remark = c.Feedback,
+                    date = c.Tanggal.ToString("yyyy-MM-dd"),
+                    time = c.Waktu.ToString(@"hh\:mm"),
+                    area = c.Area,
+                    lokasi = c.Lokasi,
+                    detil_lokasi = c.DetilLokasi,
+                    location_detail = c.DetilLokasi,
+                    area_name = c.Area ?? "-",
+                    location_name = c.Lokasi ?? "-",
+                    nik = c.Nik,
+                    nama = c.Nama,
+                    coach_name = c.Nama,
+                    coach_nik = c.Nik,
+                    foto = c.Foto,
+                    image = c.Foto,
+                    participants = c.Participants.Select(p => new
+                    {
+                        id = p.Id,
+                        coaching_id = p.CoachingId,
+                        no_nik = p.Nik,
+                        nik = p.Nik,
+                        nama_lengkap = p.Nama,
+                        nama = p.Nama
+                    }).ToList(),
+                    created_at = c.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss")
+                }).ToList();
+
                 return Ok(new { status = true, data = list });
             }
 
@@ -1247,6 +1331,32 @@ namespace Indexsafe.Api.Controllers
             return Ok(new { status = true, data = new List<object>() });
         }
 
+        [HttpDelete("tran/coaching/{id:int}")]
+        public async Task<IActionResult> DeleteCoaching(int id)
+        {
+            var userNik = GetCurrentNik();
+            var coaching = await _context.Coachings
+                .FirstOrDefaultAsync(c => c.Id == id && !c.IsDeleted && (c.Nik == userNik || _context.CoachingParticipants.Any(cp => cp.CoachingId == c.Id && cp.Nik == userNik)));
+            if (coaching == null)
+                return NotFound(new { message = "Coaching tidak ditemukan atau bukan milik pengguna." });
+            coaching.IsDeleted = true;
+            await _context.SaveChangesAsync();
+            return Ok(new { status = true });
+        }
+
+        [HttpDelete("tran/safety/{id:int}")]
+        public async Task<IActionResult> DeleteSafety(int id)
+        {
+            var userNik = GetCurrentNik();
+            var safety = await _context.SafetyTalks
+                .FirstOrDefaultAsync(s => s.Id == id && !s.IsDeleted && s.Nik == userNik);
+            if (safety == null)
+                return NotFound(new { message = "Safety Talk tidak ditemukan atau bukan milik pengguna." });
+            safety.IsDeleted = true;
+            await _context.SaveChangesAsync();
+            return Ok(new { status = true });
+        }
+
         [HttpDelete("tran/observation/{id:int}")]
         public async Task<IActionResult> DeleteObservation(int id)
         {
@@ -1300,6 +1410,32 @@ namespace Indexsafe.Api.Controllers
         {
             var refIdStr = form["ref_id"].FirstOrDefault() ?? form["tran_id"].FirstOrDefault();
             int.TryParse(refIdStr, out var refId);
+
+            if (name == "coaching" && refId > 0)
+            {
+                var nameVal = form["name"].FirstOrDefault() ?? string.Empty;
+                var nikVal = form["no_nik"].FirstOrDefault() ?? form["nik"].FirstOrDefault() ?? string.Empty;
+                if (string.IsNullOrEmpty(nikVal) && nameVal.Contains('-'))
+                {
+                    var spl = nameVal.Split('-', 2);
+                    nikVal = spl[0].Trim();
+                    nameVal = spl.Length > 1 ? spl[1].Trim() : nikVal;
+                }
+                if (!string.IsNullOrWhiteSpace(nikVal) || !string.IsNullOrWhiteSpace(nameVal))
+                {
+                    var exists = await _context.CoachingParticipants.AnyAsync(cp => cp.CoachingId == refId && (cp.Nik == nikVal || cp.Nama == nameVal));
+                    if (!exists)
+                    {
+                        _context.CoachingParticipants.Add(new CoachingParticipant
+                        {
+                            CoachingId = refId,
+                            Nik = string.IsNullOrWhiteSpace(nikVal) ? "NON-NIK" : nikVal,
+                            Nama = string.IsNullOrWhiteSpace(nameVal) ? nikVal : nameVal
+                        });
+                        await _context.SaveChangesAsync();
+                    }
+                }
+            }
 
             var photoFile = form.Files["image"] ?? form.Files["repair_image"];
             string? photoUrl = null;
