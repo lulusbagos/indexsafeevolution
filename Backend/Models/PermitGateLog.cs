@@ -59,6 +59,16 @@ namespace Indexsafe.Api.Models
         [Column("created_by_name")]
         public string? CreatedByName { get; set; }
 
+        [Column("latitude")]
+        public double? Latitude { get; set; }
+
+        [Column("longitude")]
+        public double? Longitude { get; set; }
+
+        [MaxLength(255)]
+        [Column("detil_lokasi")]
+        public string? DetilLokasi { get; set; }
+
         [Column("created_at")]
         public DateTime CreatedAt { get; set; } = DateTime.Now;
     }

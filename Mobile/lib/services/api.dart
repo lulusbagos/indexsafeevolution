@@ -61,6 +61,14 @@ class ApiService {
 
     dio.interceptors.add(
       InterceptorsWrapper(
+        onRequest: (options, handler) {
+          _restoreStoredToken();
+          final token = _token ?? PreferenceService.getAuth()?.token ?? '';
+          if (token.isNotEmpty && !options.headers.containsKey('Authorization')) {
+            options.headers['Authorization'] = 'Bearer $token';
+          }
+          return handler.next(options);
+        },
         onError: (DioException err, ErrorInterceptorHandler handler) async {
           if (err.type == DioExceptionType.connectionError ||
               err.type == DioExceptionType.connectionTimeout ||
@@ -106,7 +114,23 @@ class ApiService {
   static String? _mbsSessionCookie;
   static Future<void>? _mbsSessionRefresh;
 
+  static void _restoreStoredToken() {
+    if (_token != null &&
+        _token!.isNotEmpty &&
+        !_token!.startsWith('offline_token_')) {
+      return;
+    }
+    final saved =
+        PreferenceService.getAuth()?.token ?? PreferenceService.getBgToken();
+    if (saved != null &&
+        saved.isNotEmpty &&
+        !saved.startsWith('offline_token_')) {
+      _token = saved;
+    }
+  }
+
   String get getToken {
+    _restoreStoredToken();
     return _token ?? '';
   }
 
@@ -1002,6 +1026,12 @@ class ApiService {
     String? photoPath,
   }) async {
     try {
+      _restoreStoredToken();
+      final token = getToken;
+      if (token.isNotEmpty) {
+        dio.options.headers['Authorization'] = 'Bearer $token';
+      }
+
       final mapData = <String, dynamic>{
         'id': id.toString(),
         'action_id': id.toString(),
@@ -1027,13 +1057,48 @@ class ApiService {
       }
 
       final formData = FormData.fromMap(mapData);
-      final res = await dio.post('/action/hazard', data: formData);
+      Response res;
+      try {
+        res = await dio.post('/action/hazard', data: formData);
+      } on DioException catch (dioErr) {
+        if (dioErr.type == DioExceptionType.connectionTimeout ||
+            dioErr.type == DioExceptionType.connectionError ||
+            dioErr.type == DioExceptionType.unknown ||
+            dioErr.response?.statusCode == 404) {
+          final fallbackHost = baseUrl.contains('192.168.')
+              ? 'http://127.0.0.1:5200'
+              : baseUrl;
+          final fallbackDio = Dio(BaseOptions(
+            baseUrl: '$fallbackHost/api',
+            headers: {
+              ...dio.options.headers,
+              if (token.isNotEmpty) 'Authorization': 'Bearer $token',
+            },
+            connectTimeout: const Duration(seconds: 10),
+          ));
+          final retryFormData = FormData.fromMap({
+            ...mapData,
+            if (photoPath != null && photoPath.isNotEmpty)
+              'repair_image': await MultipartFile.fromFile(
+                photoPath,
+                filename: 'repair_${DateTime.now().millisecondsSinceEpoch}.jpg',
+              ),
+          });
+          res = await fallbackDio.post('/action/hazard', data: retryFormData);
+        } else {
+          rethrow;
+        }
+      }
       if (res.data is Map) {
         return Right(Map<String, dynamic>.from(res.data as Map));
       }
       return const Right({});
     } on DioException catch (err) {
+      debugPrint('[ApiService] updateActionPlan DioException: ${err.message}, code=${err.response?.statusCode}, data=${err.response?.data}');
       return Left(errorHandler(err));
+    } catch (e) {
+      debugPrint('[ApiService] updateActionPlan Exception: $e');
+      return Left({'message': 'Gagal memperbarui Action Plan: $e'});
     }
   }
 
@@ -2279,21 +2344,6 @@ class ApiService {
       debugPrint('[ApiService] MBS ID recovery failed: $e');
     }
     return null;
-  }
-
-  void _restoreStoredToken() {
-    if (_token != null &&
-        _token!.isNotEmpty &&
-        !_token!.startsWith('offline_token_')) {
-      return;
-    }
-    final saved =
-        PreferenceService.getAuth()?.token ?? PreferenceService.getBgToken();
-    if (saved != null &&
-        saved.isNotEmpty &&
-        !saved.startsWith('offline_token_')) {
-      _token = saved;
-    }
   }
 
   Future<List<String>> getBenchmarks(String areaUtama,

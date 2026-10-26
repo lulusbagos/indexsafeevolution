@@ -1463,14 +1463,16 @@ namespace Indexsafe.Api.Controllers
         [Consumes("multipart/form-data")]
         public async Task<IActionResult> UpdateActionPlan(string name, [FromForm] IFormCollection form)
         {
-            var userNik = GetCurrentNik();
-            var userName = GetCurrentName();
-
-            var actionIdStr = form["id"].FirstOrDefault() ?? form["action_id"].FirstOrDefault();
-            if (!int.TryParse(actionIdStr, out var actionId) || actionId <= 0)
+            try
             {
-                return BadRequest(new { message = "ID Action Plan tidak valid." });
-            }
+                var userNik = GetCurrentNik();
+                var userName = GetCurrentName();
+
+                var actionIdStr = form["id"].FirstOrDefault() ?? form["action_id"].FirstOrDefault();
+                if (!int.TryParse(actionIdStr, out var actionId) || actionId <= 0)
+                {
+                    return BadRequest(new { message = "ID Action Plan tidak valid." });
+                }
 
             var plan = await _context.ActionPlans.FirstOrDefaultAsync(a => a.Id == actionId && !a.IsDeleted);
             if (plan == null)
@@ -1635,15 +1637,21 @@ namespace Indexsafe.Api.Controllers
                 Summary = $"Status: {plan.Status} | Tindakan: {plan.Perbaikan ?? "Update Tindak Lanjut"}"
             });
 
-            return Ok(new
-            {
-                status = true,
-                data = new
+                return Ok(new
                 {
-                    id = plan.Id,
-                    updated_at = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")
-                }
-            });
+                    status = true,
+                    data = new
+                    {
+                        id = plan.Id,
+                        updated_at = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[UpdateActionPlan] Error updating Action Plan: {ex}");
+                return StatusCode(500, new { message = $"Gagal menyimpan Action Plan: {ex.Message}" });
+            }
         }
 
         /// <summary>

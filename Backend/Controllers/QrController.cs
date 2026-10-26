@@ -89,6 +89,7 @@ namespace Indexsafe.Api.Controllers
             bool isExplicitPermit = scanTarget.Equals("Mine Permit", StringComparison.OrdinalIgnoreCase) || scanTarget.Equals("Permit", StringComparison.OrdinalIgnoreCase);
             bool isExplicitEvent = scanTarget.Equals("Absen Acara", StringComparison.OrdinalIgnoreCase) || scanTarget.Equals("Attendance", StringComparison.OrdinalIgnoreCase) || scanTarget.Equals("Acara K3", StringComparison.OrdinalIgnoreCase);
             bool isExplicitVehicle = scanTarget.Equals("Vehicle", StringComparison.OrdinalIgnoreCase) || scanTarget.Equals("Kendaraan", StringComparison.OrdinalIgnoreCase);
+            bool isExplicitPelanggaran = scanTarget.Equals("Pelanggaran", StringComparison.OrdinalIgnoreCase) || scanTarget.Equals("Pelanggaran K3", StringComparison.OrdinalIgnoreCase);
 
             // Extract token if code is a full URL (e.g. http://.../QrAttendance/Scan/{token})
             var token = rawCode;
@@ -113,7 +114,13 @@ namespace Indexsafe.Api.Controllers
                         {
                             Status = false,
                             ActionType = "Denied",
-                            Message = "Akses Ditolak: Izin presensi acara Anda dinonaktifkan oleh Administrator."
+                            Message = "Otorisasi Terbatas: Akun Anda belum memiliki izin untuk memindai presensi Acara K3. Silakan hubungi Administrator K3 melalui menu Manajemen User Scan.",
+                            Data = new
+                            {
+                                required_permission = "can_scan_acara",
+                                module = "Presensi Acara K3",
+                                is_authorized = false
+                            }
                         });
                     }
 
@@ -271,10 +278,11 @@ namespace Indexsafe.Api.Controllers
                     {
                         Status = false,
                         ActionType = "Denied",
-                        Message = "Akses Ditolak: Anda tidak memiliki izin untuk memindai SIMPER / Mine Permit. Hubungi Administrator di menu User Scan.",
+                        Message = "Otorisasi Terbatas: Anda belum memiliki wewenang verifikasi untuk modul SIMPER / Mine Permit. Hubungi Administrator K3 untuk aktivasi hak akses di menu Manajemen User Scan.",
                         Data = new
                         {
-                            required_permission = "Simper",
+                            required_permission = "can_scan_simper",
+                            module = "Verifikasi SIMPER",
                             is_authorized = false
                         }
                     });
@@ -422,6 +430,7 @@ namespace Indexsafe.Api.Controllers
                                   {
                                       k.IdKaryawan,
                                       k.NoNik,
+                                      k.IdPerusahaan,
                                       p.NamaLengkap,
                                       Departemen = d != null ? d.NamaDepartemen : "GENERAL",
                                       Jabatan = j != null ? j.NamaJabatan : "Staff",
@@ -440,10 +449,11 @@ namespace Indexsafe.Api.Controllers
                     {
                         Status = false,
                         ActionType = "Denied",
-                        Message = "Akses Ditolak: Anda tidak memiliki izin untuk memindai Mine Permit (Detail / Pelanggaran / Keluar Masuk). Hubungi Administrator di menu User Scan.",
+                        Message = "Otorisasi Terbatas: Anda belum memiliki hak akses untuk memverifikasi Mine Permit maupun mencatat tindakan operasional (Keluar-Masuk / Pelanggaran). Silakan hubungi Administrator K3 untuk otorisasi di menu Manajemen User Scan.",
                         Data = new
                         {
-                            required_permission = "MinePermit",
+                            required_permission = "can_scan_minepermit",
+                            module = "Pemeriksaan Mine Permit",
                             is_authorized = false
                         }
                     });
@@ -477,6 +487,29 @@ namespace Indexsafe.Api.Controllers
                 catch (Exception ex)
                 {
                     Console.WriteLine($"[QrController] Error fetching SIMPER for {finalNik}: {ex.Message}");
+                }
+
+                // Cek hierarki perusahaan untuk wewenang input pelanggaran:
+                // Pengawas TIDAK BISA mencatat pelanggaran terhadap karyawan perusahaan Parent (atau Owner jika pengawas bukan Owner).
+                // Hanya bisa mencatat untuk karyawan setara (perusahaan sendiri/selevel) atau perusahaan child-nya.
+                var hierarchyCheck = await CheckViolationHierarchyPermissionAsync(userNik, finalNik, employee?.IdPerusahaan);
+                bool canInputPelanggaranFinal = canPelanggaran && hierarchyCheck.CanViolate;
+
+                if (isExplicitPelanggaran && !hierarchyCheck.CanViolate)
+                {
+                    return Ok(new QrScanResponse
+                    {
+                        Status = false,
+                        ActionType = "Denied",
+                        Message = hierarchyCheck.Reason,
+                        Data = new
+                        {
+                            required_permission = "hierarchy_restriction",
+                            module = "Pencatatan Pelanggaran K3",
+                            relation = hierarchyCheck.Relation,
+                            is_authorized = false
+                        }
+                    });
                 }
 
                 return Ok(new QrScanResponse
@@ -514,9 +547,12 @@ namespace Indexsafe.Api.Controllers
                         simper_masa_berlaku = simperInfo?.MasaBerlaku ?? simperInfo?.SimperExpiredDate ?? "-",
                         is_simper_active = simperInfo?.IsSimperActive ?? false,
                         simper_units = simperInfo?.Units ?? new List<SimperUnitDto>(),
-                        can_input_pelanggaran = canPelanggaran,
+                        can_input_pelanggaran = canInputPelanggaranFinal,
                         can_input_keluar_masuk = canKeluarMasuk,
-                        can_view_detail = canMine
+                        can_view_detail = canMine,
+                        hierarchy_violation_allowed = hierarchyCheck.CanViolate,
+                        hierarchy_relation = hierarchyCheck.Relation,
+                        hierarchy_restriction_reason = hierarchyCheck.CanViolate ? null : hierarchyCheck.Reason
                     }
                 });
             }
@@ -543,10 +579,11 @@ namespace Indexsafe.Api.Controllers
                     {
                         Status = false,
                         ActionType = "Denied",
-                        Message = "Akses Ditolak: Anda tidak memiliki izin untuk memindai Commissioning Unit / Alat Berat. Hubungi Administrator di menu User Scan.",
+                        Message = "Otorisasi Terbatas: Akun Anda belum diberi wewenang untuk inspeksi Commissioning Unit Kendaraan / Alat Berat. Hubungi Administrator K3 untuk pengajuan akses.",
                         Data = new
                         {
-                            required_permission = "Commissioning",
+                            required_permission = "can_scan_commissioning",
+                            module = "Commissioning Unit",
                             is_authorized = false
                         }
                     });
@@ -567,16 +604,43 @@ namespace Indexsafe.Api.Controllers
                 });
             }
 
-            // 4. Fallback general QR content
+            // 4. Fallback intelligent classification for unrecognized or external QR content
+            bool isUrl = Uri.TryCreate(rawCode, UriKind.Absolute, out var uriResult) 
+                         && (uriResult?.Scheme == Uri.UriSchemeHttp || uriResult?.Scheme == Uri.UriSchemeHttps);
+            bool isInternalDomain = isUrl && uriResult != null && 
+                (uriResult.Host.EndsWith("indexim.id", StringComparison.OrdinalIgnoreCase) || uriResult.Host.Contains("192.168.") || uriResult.Host.Contains("127.0.0.1"));
+
+            string scanCategory;
+            string smartMessage;
+            string previewSnippet = rawCode.Length > 200 ? rawCode.Substring(0, 197) + "..." : rawCode;
+
+            if (isUrl)
+            {
+                scanCategory = isInternalDomain ? "Tautan Internal Indexim" : "Tautan Web Eksternal (Luar Sistem)";
+                smartMessage = isInternalDomain
+                    ? "Kode QR terdeteksi sebagai tautan portal web Indexim, namun bukan merupakan token registrasi QR scanner operasional (Mine Permit, SIMPER, Presensi, atau Stiker Unit)."
+                    : "Kode QR terdeteksi sebagai tautan publik eksternal yang berada di luar ekosistem operasional PT Indexim Coalindo.";
+            }
+            else
+            {
+                scanCategory = "Kode Non-Sistem";
+                smartMessage = "Kode yang dipindai tidak terdaftar dalam database operasional Indexsafe (Bukan format resmi Mine Permit, SIMPER karyawan, Presensi Acara K3, atau Stiker Unit Commissioning).";
+            }
+
             return Ok(new QrScanResponse
             {
-                Status = true,
-                ActionType = "General",
-                Message = "Kode berhasil dibaca.",
+                Status = false,
+                ActionType = "UnrecognizedQr",
+                Message = smartMessage,
                 Data = new
                 {
                     raw_content = rawCode,
-                    read_at = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")
+                    snippet = previewSnippet,
+                    is_url = isUrl,
+                    url = isUrl ? rawCode : null,
+                    category = scanCategory,
+                    hint = "Pastikan Anda memindai QR resmi Mine Permit, SIMPER karyawan, barcode Presensi Acara K3, atau Stiker QR Unit Commissioning PT Indexim Coalindo.",
+                    scanned_at = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")
                 }
             });
         }
@@ -834,7 +898,18 @@ namespace Indexsafe.Api.Controllers
                 return StatusCode(StatusCodes.Status403Forbidden, new
                 {
                     status = false,
-                    message = "Akses Ditolak: Anda tidak memiliki wewenang untuk mencatat pelanggaran permit. Hubungi Administrator di menu User Scan."
+                    message = "Otorisasi Terbatas: Anda belum memiliki wewenang untuk mencatat pelanggaran K3 Mine Permit. Silakan hubungi Administrator K3 untuk pengajuan otorisasi."
+                });
+            }
+
+            // Validasi Hierarki Perusahaan: Pemeriksa dilarang mencatat pelanggaran terhadap Parent Company
+            var hierCheck = await CheckViolationHierarchyPermissionAsync(userNik, req.ViolatorNik);
+            if (!hierCheck.CanViolate)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, new
+                {
+                    status = false,
+                    message = hierCheck.Reason
                 });
             }
 
@@ -1088,7 +1163,7 @@ namespace Indexsafe.Api.Controllers
                 return StatusCode(StatusCodes.Status403Forbidden, new
                 {
                     status = false,
-                    message = "Akses Ditolak: Anda tidak memiliki wewenang untuk mencatat keluar/masuk permit. Hubungi Administrator di menu User Scan."
+                    message = "Otorisasi Terbatas: Anda belum memiliki wewenang untuk mencatat lalu lintas keluar/masuk pos permit. Silakan hubungi Administrator K3 untuk pengajuan otorisasi."
                 });
             }
 
@@ -1103,6 +1178,9 @@ namespace Indexsafe.Api.Controllers
                 NomorUnit = req.NomorUnit?.Trim(),
                 Keperluan = req.Keperluan.Trim(),
                 LokasiPos = string.IsNullOrWhiteSpace(req.LokasiPos) ? "Pos Security Utama" : req.LokasiPos.Trim(),
+                Latitude = req.Latitude,
+                Longitude = req.Longitude,
+                DetilLokasi = req.DetilLokasi ?? ((req.Latitude.HasValue && req.Longitude.HasValue) ? $"[GPS: {req.Latitude.Value:F6}, {req.Longitude.Value:F6}]" : null),
                 CreatedByNik = userNik,
                 CreatedByName = userName,
                 CreatedAt = DateTime.Now
@@ -1110,6 +1188,25 @@ namespace Indexsafe.Api.Controllers
 
             _context.PermitGateLogs.Add(log);
             await _context.SaveChangesAsync();
+
+            _monitor.RecordTransaction(new TransactionEvent
+            {
+                Type = "Permit In/Out",
+                Source = "Mobile QR Gate Scanner",
+                ServerId = log.Id,
+                Code = $"GATE-{log.Id}",
+                Nik = log.Nik,
+                Nama = log.Nama ?? log.Nik,
+                Perusahaan = log.Perusahaan ?? "MITRA KERJA",
+                Area = log.LokasiPos ?? "POS SECURITY",
+                Lokasi = log.LokasiPos ?? "Pintu Masuk/Keluar",
+                DetilLokasi = log.DetilLokasi ?? $"Arah: {log.Direction} | Unit: {log.NomorUnit ?? "-"}",
+                Latitude = log.Latitude,
+                Longitude = log.Longitude,
+                InspectionDate = DateTime.Today,
+                Status = log.Direction,
+                Summary = $"Lalu Lintas {log.Direction}: {log.Nama} ({log.Nik}) - Pos {log.LokasiPos}"
+            });
 
             // Create in-app notification for the scanned employee
             try
@@ -1150,6 +1247,9 @@ namespace Indexsafe.Api.Controllers
                     nomor_unit = log.NomorUnit,
                     keperluan = log.Keperluan,
                     lokasi_pos = log.LokasiPos,
+                    latitude = log.Latitude,
+                    longitude = log.Longitude,
+                    detil_lokasi = log.DetilLokasi,
                     created_at = log.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss")
                 }
             });
@@ -1421,6 +1521,168 @@ namespace Indexsafe.Api.Controllers
                 _ => "image/jpeg"
             };
         }
+
+        /// <summary>
+        /// Validates company hierarchy for safety violation recording:
+        /// - Scanner CANNOT record violation against employees of their PARENT company (or Owner if scanner is not Owner).
+        /// - Scanner CAN ONLY record violation against employees of their SAME company (Setara) or CHILD company (perusahaan turunan).
+        /// - PT INDEXIM COALINDO (id_perusahaan = 1) is the highest Root / Owner and can audit all companies.
+        /// </summary>
+        private async Task<(bool CanViolate, string Reason, string Relation, int ScannerCompId, int TargetCompId)> CheckViolationHierarchyPermissionAsync(
+            string scannerNik, 
+            string targetNik, 
+            int? explicitTargetCompanyId = null)
+        {
+            try
+            {
+                var conn = _context.Database.GetDbConnection();
+                bool wasClosed = conn.State == System.Data.ConnectionState.Closed;
+                if (wasClosed) await conn.OpenAsync();
+                try
+                {
+                    // 1. Resolve Scanner Company & Tier Level from tbl_t_karyawan & vw_hirarki_perusahaan_jenis
+                    int scannerCompId = 1;
+                    string scannerCompName = "PT INDEXIM COALINDO";
+                    int scannerLevel = 4; // Default Owner level (4=Owner, 3=Main Contractor, 2=Sub Contractor, 1=Vendor)
+
+                    using (var cmd = conn.CreateCommand())
+                    {
+                        cmd.CommandText = @"
+                            SELECT TOP 1 
+                                k.id_perusahaan, 
+                                pr.nama_perusahaan,
+                                ISNULL(MAX(tp.level_urut), 1) as max_level
+                            FROM [ONE_DB_MITRA].dbo.tbl_t_karyawan k
+                            JOIN [ONE_DB_MITRA].dbo.tbl_m_perusahaan pr ON k.id_perusahaan = pr.id
+                            LEFT JOIN [ONE_DB_MITRA].dbo.vw_hirarki_perusahaan_jenis hj ON hj.id_perusahaan = k.id_perusahaan
+                            LEFT JOIN [ONE_DB_MITRA].dbo.tbl_m_tipe_perusahaan tp ON tp.tipe_perusahaan_id = hj.id_jenis_perusahaan
+                            WHERE (k.no_nik = @nik OR k.no_nik = @cleanNik) AND k.status_aktif = 1
+                            GROUP BY k.id_perusahaan, pr.nama_perusahaan
+                            ORDER BY k.id_perusahaan ASC;";
+                        var p1 = cmd.CreateParameter(); p1.ParameterName = "@nik"; p1.Value = scannerNik.Trim(); cmd.Parameters.Add(p1);
+                        var p2 = cmd.CreateParameter(); p2.ParameterName = "@cleanNik"; p2.Value = scannerNik.Trim().Replace("IC", ""); cmd.Parameters.Add(p2);
+
+                        using var r = await cmd.ExecuteReaderAsync();
+                        if (await r.ReadAsync())
+                        {
+                            scannerCompId = r.GetInt32(0);
+                            scannerCompName = r.IsDBNull(1) ? "Perusahaan Pemeriksa" : r.GetString(1);
+                            scannerLevel = r.IsDBNull(2) ? 1 : Convert.ToInt32(r.GetValue(2));
+                        }
+                    }
+
+                    // 2. Resolve Target Company & Tier Level
+                    int targetCompId = explicitTargetCompanyId ?? 1;
+                    string targetCompName = "PT INDEXIM COALINDO";
+                    int targetLevel = 4;
+
+                    using (var cmd = conn.CreateCommand())
+                    {
+                        cmd.CommandText = @"
+                            SELECT TOP 1 
+                                k.id_perusahaan, 
+                                pr.nama_perusahaan,
+                                ISNULL(MAX(tp.level_urut), 1) as max_level
+                            FROM [ONE_DB_MITRA].dbo.tbl_t_karyawan k
+                            JOIN [ONE_DB_MITRA].dbo.tbl_m_perusahaan pr ON k.id_perusahaan = pr.id
+                            LEFT JOIN [ONE_DB_MITRA].dbo.vw_hirarki_perusahaan_jenis hj ON hj.id_perusahaan = k.id_perusahaan
+                            LEFT JOIN [ONE_DB_MITRA].dbo.tbl_m_tipe_perusahaan tp ON tp.tipe_perusahaan_id = hj.id_jenis_perusahaan
+                            WHERE (k.no_nik = @nik OR k.no_nik = @cleanNik OR k.id_perusahaan = @explicitId) AND k.status_aktif = 1
+                            GROUP BY k.id_perusahaan, pr.nama_perusahaan
+                            ORDER BY k.id_perusahaan ASC;";
+                        var p1 = cmd.CreateParameter(); p1.ParameterName = "@nik"; p1.Value = targetNik.Trim(); cmd.Parameters.Add(p1);
+                        var p2 = cmd.CreateParameter(); p2.ParameterName = "@cleanNik"; p2.Value = targetNik.Trim().Replace("IC", ""); cmd.Parameters.Add(p2);
+                        var p3 = cmd.CreateParameter(); p3.ParameterName = "@explicitId"; p3.Value = explicitTargetCompanyId.HasValue ? explicitTargetCompanyId.Value : -1; cmd.Parameters.Add(p3);
+
+                        using var r = await cmd.ExecuteReaderAsync();
+                        if (await r.ReadAsync())
+                        {
+                            targetCompId = r.GetInt32(0);
+                            targetCompName = r.IsDBNull(1) ? "Perusahaan Target" : r.GetString(1);
+                            targetLevel = r.IsDBNull(2) ? 1 : Convert.ToInt32(r.GetValue(2));
+                        }
+                    }
+
+                    // 3. Jika pemeriksa adalah PT INDEXIM COALINDO (Owner tertinggi, id = 1) -> Selalu diizinkan
+                    if (scannerCompId == 1)
+                    {
+                        return (true, "Otoritas Owner PT Indexim Coalindo (Akses Pengawasan Penuh).", "ROOT_OWNER", scannerCompId, targetCompId);
+                    }
+
+                    // 4. Jika target adalah PT INDEXIM COALINDO (Owner, id = 1) dan scanner BUKAN Indexim -> Ditolak
+                    if (targetCompId == 1 && scannerCompId != 1)
+                    {
+                        return (false, $"Otorisasi Terbatas: Anda ({scannerCompName}) tidak dapat mencatat pelanggaran terhadap karyawan {targetCompName} (Perusahaan Induk / Owner).", "PARENT_OWNER", scannerCompId, targetCompId);
+                    }
+
+                    // 5. Jika perusahaan sama -> Setara -> Diizinkan
+                    if (scannerCompId == targetCompId)
+                    {
+                        return (true, "Perusahaan yang sama (Internal Perusahaan).", "SAME_COMPANY", scannerCompId, targetCompId);
+                    }
+
+                    // 6. Cek relasi Tree (Ancestors & Descendants) di tbl_r_perusahaan dan tingkat hierarki
+                    using (var cmd = conn.CreateCommand())
+                    {
+                        cmd.CommandText = @"
+                            WITH Ancestors AS (
+                                SELECT TRY_CAST(r.id_parent AS INT) AS parent_id, 1 AS depth
+                                FROM [ONE_DB_MITRA].dbo.tbl_r_perusahaan r
+                                WHERE r.id_perusahaan = @scannerCompId AND r.status_aktif = 'aktif' AND TRY_CAST(r.id_parent AS INT) > 0
+                                UNION ALL
+                                SELECT TRY_CAST(r.id_parent AS INT), a.depth + 1
+                                FROM [ONE_DB_MITRA].dbo.tbl_r_perusahaan r
+                                JOIN Ancestors a ON r.id_perusahaan = a.parent_id
+                                WHERE r.status_aktif = 'aktif' AND TRY_CAST(r.id_parent AS INT) > 0 AND a.depth < 10
+                            ),
+                            Descendants AS (
+                                SELECT r.id_perusahaan AS child_id, 1 AS depth
+                                FROM [ONE_DB_MITRA].dbo.tbl_r_perusahaan r
+                                WHERE TRY_CAST(r.id_parent AS INT) = @scannerCompId AND r.status_aktif = 'aktif'
+                                UNION ALL
+                                SELECT r.id_perusahaan, d.depth + 1
+                                FROM [ONE_DB_MITRA].dbo.tbl_r_perusahaan r
+                                JOIN Descendants d ON TRY_CAST(r.id_parent AS INT) = d.child_id
+                                WHERE r.status_aktif = 'aktif' AND d.depth < 10
+                            )
+                            SELECT 
+                                CASE 
+                                    WHEN EXISTS (SELECT 1 FROM Ancestors WHERE parent_id = @targetCompId) THEN 'PARENT_COMPANY'
+                                    WHEN EXISTS (SELECT 1 FROM Descendants WHERE child_id = @targetCompId) THEN 'CHILD_COMPANY'
+                                    WHEN @targetLevel > @scannerLevel THEN 'PARENT_TIER'
+                                    WHEN @targetLevel = @scannerLevel THEN 'PEER_COMPANY'
+                                    WHEN @targetLevel < @scannerLevel THEN 'CHILD_TIER'
+                                    ELSE 'PEER_COMPANY'
+                                END AS relation_result;";
+
+                        var pS = cmd.CreateParameter(); pS.ParameterName = "@scannerCompId"; pS.Value = scannerCompId; cmd.Parameters.Add(pS);
+                        var pT = cmd.CreateParameter(); pT.ParameterName = "@targetCompId"; pT.Value = targetCompId; cmd.Parameters.Add(pT);
+                        var pSL = cmd.CreateParameter(); pSL.ParameterName = "@scannerLevel"; pSL.Value = scannerLevel; cmd.Parameters.Add(pSL);
+                        var pTL = cmd.CreateParameter(); pTL.ParameterName = "@targetLevel"; pTL.Value = targetLevel; cmd.Parameters.Add(pTL);
+
+                        var relScalar = await cmd.ExecuteScalarAsync();
+                        string rel = relScalar?.ToString() ?? "PEER_COMPANY";
+
+                        if (rel == "PARENT_COMPANY" || rel == "PARENT_TIER" || rel == "PARENT_OWNER")
+                        {
+                            return (false, $"Otorisasi Terbatas: Anda ({scannerCompName}) tidak dapat mencatat pelanggaran terhadap karyawan {targetCompName} (Perusahaan Induk / Parent Company).", rel, scannerCompId, targetCompId);
+                        }
+
+                        // Relasi CHILD_COMPANY, PEER_COMPANY (Setara), CHILD_TIER -> Diizinkan
+                        return (true, $"Diizinkan: Hubungan hierarki ({rel}) memenuhi otorisasi pengawasan K3.", rel, scannerCompId, targetCompId);
+                    }
+                }
+                finally
+                {
+                    if (wasClosed) await conn.CloseAsync();
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[CheckViolationHierarchyPermissionAsync] Error: {ex.Message}");
+                return (true, "Validasi hierarki selesai (Default).", "FALLBACK_ALLOWED", 1, 1);
+            }
+        }
     }
 
     public class CreatePermitMovementRequest
@@ -1434,6 +1696,9 @@ namespace Indexsafe.Api.Controllers
         public string? NomorUnit { get; set; }
         public string Keperluan { get; set; } = string.Empty;
         public string? LokasiPos { get; set; }
+        public double? Latitude { get; set; }
+        public double? Longitude { get; set; }
+        public string? DetilLokasi { get; set; }
     }
 
     public class CreatePermitViolationRequest
