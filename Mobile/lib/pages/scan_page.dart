@@ -451,109 +451,7 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
                     height: 1.4,
                   ),
                 ),
-                const SizedBox(height: 18),
-
-                // Quick Officer Action Header if user has permit officer permissions
-                if (isMinePermit && data != null && (canKeluarMasuk || canPelanggaran)) ...[
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF0FDFA),
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: const Color(0xFF5EEAD4), width: 1.5),
-                      boxShadow: [
-                        BoxShadow(
-                          color: const Color(0xFF0D9488).withValues(alpha: .08),
-                          blurRadius: 10,
-                          offset: const Offset(0, 3),
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            const Icon(Icons.verified_user_rounded, size: 16, color: Color(0xFF0D9488)),
-                            const SizedBox(width: 7),
-                            const Expanded(
-                              child: Text(
-                                'AKSI HAK AKSES PETUGAS',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w900,
-                                  letterSpacing: 0.6,
-                                  color: Color(0xFF0F766E),
-                                ),
-                              ),
-                            ),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF0D9488).withValues(alpha: .15),
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: const Text(
-                                'AKTIF',
-                                style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.w900, color: Color(0xFF0D9488)),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 10),
-                        Row(
-                          children: [
-                            if (canKeluarMasuk)
-                              Expanded(
-                                child: ElevatedButton.icon(
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: const Color(0xFF0D9488),
-                                    foregroundColor: Colors.white,
-                                    padding: const EdgeInsets.symmetric(vertical: 12),
-                                    elevation: 2,
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                  ),
-                                  onPressed: () {
-                                    Navigator.pop(ctx);
-                                    _showInputGateLogSheet(data);
-                                  },
-                                  icon: const Icon(Icons.door_sliding_outlined, size: 16),
-                                  label: const Text(
-                                    'Keluar Masuk',
-                                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w900),
-                                  ),
-                                ),
-                              ),
-                            if (canKeluarMasuk && canPelanggaran) const SizedBox(width: 8),
-                            if (canPelanggaran)
-                              Expanded(
-                                child: ElevatedButton.icon(
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: const Color(0xFFDC2626),
-                                    foregroundColor: Colors.white,
-                                    padding: const EdgeInsets.symmetric(vertical: 12),
-                                    elevation: 2,
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                  ),
-                                  onPressed: () {
-                                    Navigator.pop(ctx);
-                                    _showInputViolationSheet(data);
-                                  },
-                                  icon: const Icon(Icons.report_problem_rounded, size: 16),
-                                  label: const Text(
-                                    'Pelanggaran K3',
-                                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w900),
-                                  ),
-                                ),
-                              ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                ],
+                const SizedBox(height: 16),
 
                 // Detail Card if attendance event
                 if (isAttendance && eventName.isNotEmpty) ...[
@@ -705,7 +603,54 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
 
                 // Actions
                 if (isMinePermit && data != null) ...[
-                  if (canKeluarMasuk) ...[
+                  if (canKeluarMasuk && canPelanggaran) ...[
+                    Row(
+                      children: [
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF0D9488),
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              elevation: 0,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                            ),
+                            onPressed: () {
+                              Navigator.pop(ctx);
+                              _showInputGateLogSheet(data);
+                            },
+                            icon: const Icon(Icons.door_sliding_outlined, size: 18),
+                            label: const Text(
+                              'Keluar Masuk',
+                              style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFFDC2626),
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              elevation: 0,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                            ),
+                            onPressed: () {
+                              Navigator.pop(ctx);
+                              _showInputViolationSheet(data);
+                            },
+                            icon: const Icon(Icons.report_problem_rounded, size: 18),
+                            label: const Text(
+                              'Pelanggaran K3',
+                              style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                  ] else if (canKeluarMasuk) ...[
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton.icon(
@@ -713,23 +658,22 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
                           backgroundColor: const Color(0xFF0D9488),
                           foregroundColor: Colors.white,
                           padding: const EdgeInsets.symmetric(vertical: 14),
+                          elevation: 0,
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                          elevation: 2,
                         ),
                         onPressed: () {
                           Navigator.pop(ctx);
                           _showInputGateLogSheet(data);
                         },
-                        icon: const Icon(Icons.door_sliding_outlined, size: 20),
+                        icon: const Icon(Icons.door_sliding_outlined, size: 19),
                         label: const Text(
                           'Input Keluar Masuk Karyawan',
-                          style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14),
+                          style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13.5),
                         ),
                       ),
                     ),
                     const SizedBox(height: 10),
-                  ],
-                  if (canPelanggaran) ...[
+                  ] else if (canPelanggaran) ...[
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton.icon(
@@ -737,28 +681,27 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
                           backgroundColor: const Color(0xFFDC2626),
                           foregroundColor: Colors.white,
                           padding: const EdgeInsets.symmetric(vertical: 14),
+                          elevation: 0,
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                          elevation: 2,
                         ),
                         onPressed: () {
                           Navigator.pop(ctx);
                           _showInputViolationSheet(data);
                         },
-                        icon: const Icon(Icons.report_problem_rounded, size: 20),
+                        icon: const Icon(Icons.report_problem_rounded, size: 19),
                         label: const Text(
                           'Catat Pelanggaran K3',
-                          style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14),
+                          style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13.5),
                         ),
                       ),
                     ),
                     const SizedBox(height: 10),
-                  ],
-                  if (!canPelanggaran && !canKeluarMasuk) ...[
+                  ] else ...[
                     Container(
                       width: double.infinity,
                       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFF1F5F9),
+                        color: const Color(0xFFF8FAFC),
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(color: const Color(0xFFE2E8F0)),
                       ),
@@ -777,17 +720,44 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
                     ),
                     const SizedBox(height: 10),
                   ],
-                  SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton(
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 13),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                        side: const BorderSide(color: Color(0xFFCBD5E1)),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                            side: const BorderSide(color: Color(0xFFCBD5E1), width: 1.2),
+                          ),
+                          onPressed: () => Navigator.pop(ctx),
+                          child: const Text(
+                            'Tutup',
+                            style: TextStyle(fontWeight: FontWeight.w800, color: Color(0xFF475569)),
+                          ),
+                        ),
                       ),
-                      onPressed: () => Navigator.pop(ctx),
-                      child: const Text('Tutup', style: TextStyle(fontWeight: FontWeight.w700, color: Color(0xFF475569))),
-                    ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF0284C7),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                          ),
+                          onPressed: () {
+                            Navigator.pop(ctx);
+                            _scannerController?.start();
+                          },
+                          icon: const Icon(Icons.qr_code_scanner_rounded, size: 18),
+                          label: const Text(
+                            'Pindai Lagi',
+                            style: TextStyle(fontWeight: FontWeight.w800),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ] else if (actionType == 'Attendance') ...[
                   Row(
