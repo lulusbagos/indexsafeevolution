@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:geolocator/geolocator.dart';
@@ -38,11 +39,13 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
   bool _canScanSpecialPermit = false;
   bool _canScanOther = false;
 
-  // Event List State
+  // Event List State & Search
   bool _isLoadingEvents = false;
   List<Map<String, dynamic>> _events = [];
   String _eventFilter = 'all'; // 'all', 'today', 'ongoing', 'attended'
   String? _eventsErrorMessage;
+  final TextEditingController _eventSearchCtrl = TextEditingController();
+  String _eventSearchQuery = '';
 
   // Animation for laser scan line
   late AnimationController _animController;
@@ -67,6 +70,7 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
 
   @override
   void dispose() {
+    _eventSearchCtrl.dispose();
     _animController.dispose();
     _scannerController?.dispose();
     super.dispose();
@@ -2713,7 +2717,18 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
 
   List<Map<String, dynamic>> get _filteredEvents {
     final now = DateTime.now();
+    final q = _eventSearchQuery.trim().toLowerCase();
+
     return _events.where((e) {
+      if (q.isNotEmpty) {
+        final name = (e['event_name'] ?? '').toString().toLowerCase();
+        final loc = (e['event_location'] ?? '').toString().toLowerCase();
+        final desc = (e['event_description'] ?? '').toString().toLowerCase();
+        if (!name.contains(q) && !loc.contains(q) && !desc.contains(q)) {
+          return false;
+        }
+      }
+
       if (_eventFilter == 'all') return true;
 
       final start = DateTime.tryParse(e['start_at']?.toString() ?? '');
@@ -2727,28 +2742,23 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
           e['status_state'] == 'late_allowed' ||
           (start != null && end != null && now.isAfter(start) && now.isBefore(end.add(const Duration(hours: 12))));
 
-      if (_eventFilter == 'today') {
-        return isToday;
-      }
-      if (_eventFilter == 'ongoing') {
-        return isOngoing;
-      }
-      if (_eventFilter == 'attended') {
-        return isAttended;
-      }
+      if (_eventFilter == 'today') return isToday;
+      if (_eventFilter == 'ongoing') return isOngoing;
+      if (_eventFilter == 'attended') return isAttended;
       return true;
     }).toList();
   }
 
   @override
   Widget build(BuildContext context) {
+    final isDark = _selectedTab == 0;
     return Scaffold(
-      backgroundColor: const Color(0xFF0F172A),
+      backgroundColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
       body: SafeArea(
         bottom: false,
         child: Column(
           children: [
-            _buildTopAppBar(),
+            _buildTopAppBar(isDark),
             Expanded(
               child: _selectedTab == 0 ? _buildScannerView() : _buildEventsView(),
             ),
@@ -2758,14 +2768,26 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
     );
   }
 
-  Widget _buildTopAppBar() {
+  Widget _buildTopAppBar(bool isDark) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(20, 14, 20, 16),
-      decoration: const BoxDecoration(
-        color: Color(0xFF0F172A),
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 14),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF0F172A) : Colors.white,
         border: Border(
-          bottom: BorderSide(color: Color(0xFF1E293B), width: 1),
+          bottom: BorderSide(
+            color: isDark ? const Color(0xFF1E293B) : const Color(0xFFE2E8F0),
+            width: 1,
+          ),
         ),
+        boxShadow: isDark
+            ? null
+            : [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: .02),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -2773,40 +2795,40 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
           Row(
             children: [
               Container(
-                width: 38,
-                height: 38,
+                width: 40,
+                height: 40,
                 decoration: BoxDecoration(
                   gradient: const LinearGradient(
                     colors: [Color(0xFF0284C7), Color(0xFF0EA5E9)],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
-                  borderRadius: BorderRadius.circular(11),
+                  borderRadius: BorderRadius.circular(12),
                   boxShadow: [
                     BoxShadow(
-                      color: const Color(0xFF0284C7).withValues(alpha: .3),
+                      color: const Color(0xFF0284C7).withValues(alpha: .35),
                       blurRadius: 10,
                       offset: const Offset(0, 3),
                     ),
                   ],
                 ),
-                child: const Icon(Icons.qr_code_scanner_rounded, color: Colors.white, size: 21),
+                child: const Icon(Icons.qr_code_scanner_rounded, color: Colors.white, size: 22),
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
+                    Text(
                       'Presensi & Scan K3',
                       style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 17,
+                        color: isDark ? Colors.white : const Color(0xFF0F172A),
+                        fontSize: 18,
                         fontWeight: FontWeight.w900,
                         letterSpacing: 0.2,
                       ),
                     ),
-                    const SizedBox(height: 3),
+                    const SizedBox(height: 2),
                     SingleChildScrollView(
                       scrollDirection: Axis.horizontal,
                       physics: const BouncingScrollPhysics(),
@@ -2847,9 +2869,9 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
                               !_canScanOther)
                             Text(
                               _canScanAcara ? 'Scan QR Acara & Mine Permit' : 'Akses Scan Terbatas',
-                              style: const TextStyle(
-                                color: Color(0xFF94A3B8),
-                                fontSize: 11,
+                              style: TextStyle(
+                                color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                                fontSize: 11.5,
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
@@ -2860,7 +2882,7 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
                 ),
               ),
               const SizedBox(width: 10),
-              // Refresh or Switch button
+              // Refresh button
               IconButton(
                 onPressed: () {
                   HapticFeedback.lightImpact();
@@ -2871,40 +2893,43 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
                 },
                 tooltip: 'Refresh',
                 style: IconButton.styleFrom(
-                  backgroundColor: const Color(0xFF1E293B),
-                  foregroundColor: const Color(0xFFE2E8F0),
+                  backgroundColor: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+                  foregroundColor: isDark ? const Color(0xFFE2E8F0) : const Color(0xFF475569),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
                 icon: const Icon(Icons.refresh_rounded, size: 20),
               ),
             ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
 
-          // Segmented Tab Selector
+          // Modern Segmented Tab Selector
           Container(
             padding: const EdgeInsets.all(4),
             decoration: BoxDecoration(
-              color: const Color(0xFF1E293B),
+              color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
               borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: isDark ? const Color(0xFF334155).withValues(alpha: .5) : const Color(0xFFE2E8F0),
+              ),
             ),
             child: Row(
               children: [
                 Expanded(
                   child: _buildTabButton(
                     index: 0,
-                    icon: Icons.camera_alt_rounded,
-                    label: 'Scan QR Absensi',
-                    subtitle: '/QrCode',
+                    icon: Icons.qr_code_scanner_rounded,
+                    label: 'Pindai QR',
+                    isDark: isDark,
                   ),
                 ),
                 Expanded(
                   child: _buildTabButton(
                     index: 1,
-                    icon: Icons.calendar_month_rounded,
-                    label: 'Daftar Acara',
-                    subtitle: '/EventQr',
+                    icon: Icons.event_available_rounded,
+                    label: 'Daftar Acara K3',
                     badgeCount: _events.length,
+                    isDark: isDark,
                   ),
                 ),
               ],
@@ -2917,7 +2942,7 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
 
   Widget _buildRolePill(String roleName, Color color) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2.5),
       decoration: BoxDecoration(
         color: color.withValues(alpha: .15),
         borderRadius: BorderRadius.circular(8),
@@ -2949,7 +2974,7 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
     required int index,
     required IconData icon,
     required String label,
-    required String subtitle,
+    required bool isDark,
     int? badgeCount,
   }) {
     final isSelected = _selectedTab == index;
@@ -2960,7 +2985,7 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
       },
       borderRadius: BorderRadius.circular(11),
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 220),
+        duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 10),
         decoration: BoxDecoration(
           color: isSelected ? const Color(0xFF0284C7) : Colors.transparent,
@@ -2981,7 +3006,9 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
             Icon(
               icon,
               size: 16,
-              color: isSelected ? Colors.white : const Color(0xFF94A3B8),
+              color: isSelected
+                  ? Colors.white
+                  : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
             ),
             const SizedBox(width: 8),
             Flexible(
@@ -2989,8 +3016,10 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
                 label,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
-                  color: isSelected ? Colors.white : const Color(0xFFCBD5E1),
-                  fontSize: 12,
+                  color: isSelected
+                      ? Colors.white
+                      : (isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155)),
+                  fontSize: 12.5,
                   fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
                 ),
               ),
@@ -3000,13 +3029,15 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
-                  color: isSelected ? Colors.white.withValues(alpha: .25) : const Color(0xFF334155),
+                  color: isSelected
+                      ? Colors.white.withValues(alpha: .25)
+                      : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Text(
                   '$badgeCount',
-                  style: const TextStyle(
-                    color: Colors.white,
+                  style: TextStyle(
+                    color: isSelected ? Colors.white : (isDark ? Colors.white : const Color(0xFF475569)),
                     fontSize: 10,
                     fontWeight: FontWeight.w800,
                   ),
@@ -3037,13 +3068,13 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Container(
-                width: 72,
-                height: 72,
+                width: 76,
+                height: 76,
                 decoration: BoxDecoration(
                   color: const Color(0xFFEF4444).withValues(alpha: .15),
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(Icons.camera_alt_outlined, size: 36, color: Color(0xFFEF4444)),
+                child: const Icon(Icons.camera_alt_outlined, size: 38, color: Color(0xFFEF4444)),
               ),
               const SizedBox(height: 18),
               const Text(
@@ -3052,7 +3083,7 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
               ),
               const SizedBox(height: 8),
               const Text(
-                'Aplikasi membutuhkan izin akses kamera untuk memindai QR Code kegiatan & verifikasi presensi.',
+                'Aplikasi membutuhkan izin akses kamera untuk memindai QR Code kegiatan & verifikasi presensi K3.',
                 textAlign: TextAlign.center,
                 style: TextStyle(color: Color(0xFF94A3B8), fontSize: 13, height: 1.4),
               ),
@@ -3076,7 +3107,7 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final boxSize = constraints.maxWidth * 0.72;
+        final boxSize = (constraints.maxWidth * 0.74).clamp(240.0, 320.0);
 
         return Stack(
           alignment: Alignment.center,
@@ -3091,7 +3122,7 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
             // Semi-transparent Overlay Mask
             ColorFiltered(
               colorFilter: ColorFilter.mode(
-                Colors.black.withValues(alpha: .6),
+                Colors.black.withValues(alpha: .65),
                 BlendMode.srcOut,
               ),
               child: Stack(
@@ -3109,7 +3140,7 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
                       height: boxSize,
                       decoration: BoxDecoration(
                         color: Colors.white,
-                        borderRadius: BorderRadius.circular(24),
+                        borderRadius: BorderRadius.circular(26),
                       ),
                     ),
                   ),
@@ -3128,14 +3159,23 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
                     // Reticle Border Corners
                     _buildReticleCorners(),
 
+                    // Center subtle watermarked QR target
+                    Center(
+                      child: Icon(
+                        Icons.qr_code_2_rounded,
+                        size: 48,
+                        color: const Color(0xFF38BDF8).withValues(alpha: .15),
+                      ),
+                    ),
+
                     // Animated Laser Scanning Line
                     AnimatedBuilder(
                       animation: _laserAnimation,
                       builder: (context, child) {
                         return Positioned(
                           top: boxSize * _laserAnimation.value,
-                          left: 12,
-                          right: 12,
+                          left: 14,
+                          right: 14,
                           child: Container(
                             height: 3,
                             decoration: BoxDecoration(
@@ -3150,8 +3190,8 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
                               ),
                               boxShadow: [
                                 BoxShadow(
-                                  color: const Color(0xFF38BDF8).withValues(alpha: .7),
-                                  blurRadius: 12,
+                                  color: const Color(0xFF38BDF8).withValues(alpha: .75),
+                                  blurRadius: 14,
                                   spreadRadius: 2,
                                 ),
                               ],
@@ -3165,119 +3205,140 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
               ),
             ),
 
-            // Top Instructions Pill
+            // Top Instructions Pill with Frosted Glass
             Positioned(
-              top: 24,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF0F172A).withValues(alpha: .85),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: Colors.white.withValues(alpha: .1)),
-                ),
-                child: const Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.center_focus_strong_rounded, size: 15, color: Color(0xFF38BDF8)),
-                    SizedBox(width: 8),
-                    Text(
-                      'Arahkan kamera tepat ke QR Acara',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                      ),
+              top: 20,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(22),
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8.5),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF0F172A).withValues(alpha: .80),
+                      borderRadius: BorderRadius.circular(22),
+                      border: Border.all(color: Colors.white.withValues(alpha: .15)),
                     ),
-                  ],
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.center_focus_strong_rounded, size: 16, color: Color(0xFF38BDF8)),
+                        SizedBox(width: 8),
+                        Text(
+                          'Arahkan kamera ke QR Acara atau Mine Permit',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               ),
             ),
 
-            // Bottom Camera Controls Bar
+            // Bottom Camera Controls Bar (Safely above bottom navigation bar)
             Positioned(
-              bottom: 120, // Di atas bottom navigation bar
-              left: 24,
-              right: 24,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF0F172A).withValues(alpha: .85),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: Colors.white.withValues(alpha: .1)),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: .4),
-                      blurRadius: 16,
-                      offset: const Offset(0, 6),
-                    ),
-                  ],
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: [
-                    // Flash Toggle
-                    IconButton(
-                      tooltip: 'Senter',
-                      onPressed: () async {
-                        HapticFeedback.lightImpact();
-                        await _scannerController?.toggleTorch();
-                        setState(() => _isTorchOn = !_isTorchOn);
-                      },
-                      style: IconButton.styleFrom(
-                        backgroundColor: _isTorchOn ? const Color(0xFFF59E0B) : const Color(0xFF1E293B),
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                      ),
-                      icon: Icon(_isTorchOn ? Icons.flash_on_rounded : Icons.flash_off_rounded, size: 20),
-                    ),
-
-                    // Zoom Indicator / Slider Toggle
-                    Expanded(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 14),
-                        child: Row(
-                          children: [
-                            const Icon(Icons.zoom_in_rounded, size: 16, color: Color(0xFF94A3B8)),
-                            Expanded(
-                              child: SliderTheme(
-                                data: SliderTheme.of(context).copyWith(
-                                  activeTrackColor: const Color(0xFF0284C7),
-                                  inactiveTrackColor: const Color(0xFF334155),
-                                  thumbColor: const Color(0xFF38BDF8),
-                                  thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
-                                  trackHeight: 3,
-                                ),
-                                child: Slider(
-                                  value: _zoomScale,
-                                  min: 0.0,
-                                  max: 1.0,
-                                  onChanged: (val) {
-                                    setState(() => _zoomScale = val);
-                                    _scannerController?.setZoomScale(val);
-                                  },
-                                ),
-                              ),
-                            ),
-                          ],
+              bottom: MediaQuery.of(context).padding.bottom + 95,
+              left: 20,
+              right: 20,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(22),
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF0F172A).withValues(alpha: .85),
+                      borderRadius: BorderRadius.circular(22),
+                      border: Border.all(color: Colors.white.withValues(alpha: .15)),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: .35),
+                          blurRadius: 20,
+                          offset: const Offset(0, 8),
                         ),
-                      ),
+                      ],
                     ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        // Flash Toggle
+                        IconButton(
+                          tooltip: 'Senter',
+                          onPressed: () async {
+                            HapticFeedback.lightImpact();
+                            await _scannerController?.toggleTorch();
+                            setState(() => _isTorchOn = !_isTorchOn);
+                          },
+                          style: IconButton.styleFrom(
+                            backgroundColor: _isTorchOn
+                                ? const Color(0xFFF59E0B)
+                                : Colors.white.withValues(alpha: .10),
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                          ),
+                          icon: Icon(
+                            _isTorchOn ? Icons.flash_on_rounded : Icons.flash_off_rounded,
+                            size: 20,
+                          ),
+                        ),
 
-                    // Switch Camera
-                    IconButton(
-                      tooltip: 'Ganti Kamera',
-                      onPressed: () async {
-                        HapticFeedback.lightImpact();
-                        await _scannerController?.switchCamera();
-                      },
-                      style: IconButton.styleFrom(
-                        backgroundColor: const Color(0xFF1E293B),
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                      ),
-                      icon: const Icon(Icons.cameraswitch_rounded, size: 20),
+                        // Quick Zoom Preset Buttons (1x & 2x) & Fine Tune Slider
+                        Expanded(
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                _buildZoomPresetPill('1x', 0.0),
+                                const SizedBox(width: 6),
+                                _buildZoomPresetPill('2x', 0.5),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: SliderTheme(
+                                    data: SliderTheme.of(context).copyWith(
+                                      activeTrackColor: const Color(0xFF0284C7),
+                                      inactiveTrackColor: Colors.white.withValues(alpha: .15),
+                                      thumbColor: const Color(0xFF38BDF8),
+                                      thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
+                                      trackHeight: 3,
+                                    ),
+                                    child: Slider(
+                                      value: _zoomScale,
+                                      min: 0.0,
+                                      max: 1.0,
+                                      onChanged: (val) {
+                                        setState(() => _zoomScale = val);
+                                        _scannerController?.setZoomScale(val);
+                                      },
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+
+                        // Switch Camera
+                        IconButton(
+                          tooltip: 'Ganti Kamera',
+                          onPressed: () async {
+                            HapticFeedback.lightImpact();
+                            await _scannerController?.switchCamera();
+                          },
+                          style: IconButton.styleFrom(
+                            backgroundColor: Colors.white.withValues(alpha: .10),
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                          ),
+                          icon: const Icon(Icons.cameraswitch_rounded, size: 20),
+                        ),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
               ),
             ),
@@ -3287,8 +3348,38 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
     );
   }
 
+  Widget _buildZoomPresetPill(String label, double scale) {
+    final isSelected = (_zoomScale - scale).abs() < 0.15;
+    return InkWell(
+      onTap: () {
+        HapticFeedback.selectionClick();
+        setState(() => _zoomScale = scale);
+        _scannerController?.setZoomScale(scale);
+      },
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: isSelected ? const Color(0xFF0284C7) : Colors.white.withValues(alpha: .10),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: isSelected ? const Color(0xFF38BDF8) : Colors.white.withValues(alpha: .12),
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 11,
+            fontWeight: isSelected ? FontWeight.w900 : FontWeight.w600,
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildReticleCorners() {
-    const cornerSize = 26.0;
+    const cornerSize = 28.0;
     const cornerThickness = 4.0;
     const color = Color(0xFF38BDF8);
 
@@ -3306,7 +3397,7 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
                 top: BorderSide(color: color, width: cornerThickness),
                 left: BorderSide(color: color, width: cornerThickness),
               ),
-              borderRadius: BorderRadius.only(topLeft: Radius.circular(16)),
+              borderRadius: BorderRadius.only(topLeft: Radius.circular(18)),
             ),
           ),
         ),
@@ -3322,7 +3413,7 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
                 top: BorderSide(color: color, width: cornerThickness),
                 right: BorderSide(color: color, width: cornerThickness),
               ),
-              borderRadius: BorderRadius.only(topRight: Radius.circular(16)),
+              borderRadius: BorderRadius.only(topRight: Radius.circular(18)),
             ),
           ),
         ),
@@ -3338,7 +3429,7 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
                 bottom: BorderSide(color: color, width: cornerThickness),
                 left: BorderSide(color: color, width: cornerThickness),
               ),
-              borderRadius: BorderRadius.only(bottomLeft: Radius.circular(16)),
+              borderRadius: BorderRadius.only(bottomLeft: Radius.circular(18)),
             ),
           ),
         ),
@@ -3354,7 +3445,7 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
                 bottom: BorderSide(color: color, width: cornerThickness),
                 right: BorderSide(color: color, width: cornerThickness),
               ),
-              borderRadius: BorderRadius.only(bottomRight: Radius.circular(16)),
+              borderRadius: BorderRadius.only(bottomRight: Radius.circular(18)),
             ),
           ),
         ),
@@ -3376,11 +3467,49 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
           slivers: [
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 16, 20, 10),
+                padding: const EdgeInsets.fromLTRB(20, 14, 20, 10),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Dynamic counts calculation
+                    // Search Bar
+                    Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: .02),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: TextField(
+                        controller: _eventSearchCtrl,
+                        onChanged: (val) => setState(() => _eventSearchQuery = val),
+                        style: const TextStyle(fontSize: 13.5, color: Color(0xFF0F172A), fontWeight: FontWeight.w600),
+                        decoration: InputDecoration(
+                          hintText: 'Cari nama acara, topik, atau lokasi...',
+                          hintStyle: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
+                          prefixIcon: const Icon(Icons.search_rounded, color: Color(0xFF0284C7), size: 20),
+                          suffixIcon: _eventSearchQuery.isNotEmpty
+                              ? IconButton(
+                                  icon: const Icon(Icons.close_rounded, size: 18, color: Color(0xFF94A3B8)),
+                                  onPressed: () {
+                                    _eventSearchCtrl.clear();
+                                    setState(() => _eventSearchQuery = '');
+                                  },
+                                )
+                              : null,
+                          border: InputBorder.none,
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Filter Chips
                     Builder(
                       builder: (context) {
                         final totalAll = _events.length;
@@ -3405,6 +3534,7 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
 
                         return SingleChildScrollView(
                           scrollDirection: Axis.horizontal,
+                          physics: const BouncingScrollPhysics(),
                           child: Row(
                             children: [
                               _buildFilterChip('all', 'Semua Acara', Icons.all_inclusive_rounded, count: totalAll),
@@ -3441,6 +3571,7 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
                         ),
                         InkWell(
                           onTap: () {
+                            HapticFeedback.lightImpact();
                             setState(() => _selectedTab = 0);
                           },
                           child: const Row(
@@ -3530,7 +3661,10 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
                         Text(
                           _eventFilter == 'attended'
                               ? 'Anda belum memiliki riwayat presensi acara K3 yang terekam.'
-                              : 'Belum ada kegiatan yang sesuai filter saat ini.',
+                              : (_eventSearchQuery.isNotEmpty
+                                  ? 'Tidak ditemukan kegiatan dengan kata kunci "$_eventSearchQuery".'
+                                  : 'Belum ada kegiatan yang sesuai filter saat ini.'),
+                          textAlign: TextAlign.center,
                           style: const TextStyle(color: Color(0xFF64748B), fontSize: 12),
                         ),
                       ],
@@ -3664,7 +3798,7 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: isAttended ? const Color(0xFF10B981).withValues(alpha: .35) : const Color(0xFFE2E8F0),
+          color: isAttended ? const Color(0xFF10B981).withValues(alpha: .4) : const Color(0xFFE2E8F0),
           width: isAttended ? 1.5 : 1,
         ),
         boxShadow: [
