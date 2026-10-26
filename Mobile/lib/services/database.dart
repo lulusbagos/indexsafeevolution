@@ -304,6 +304,8 @@ class DatabaseService {
 
   static Future<void> _ensureInspectionTransColumns(Database db) async {
     final cols = [
+      'nik',
+      'nama',
       'area',
       'lokasi',
       'jenis_inspeksi',
