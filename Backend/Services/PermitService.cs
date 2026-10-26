@@ -93,6 +93,15 @@ namespace Indexsafe.Api.Services
         [JsonPropertyName("is_simper_active")]
         public bool IsSimperActive { get; set; }
 
+        [JsonPropertyName("card_photo_path")]
+        public string? CardPhotoPath { get; set; }
+
+        [JsonPropertyName("card_photo_scan_path")]
+        public string? CardPhotoScanPath { get; set; }
+
+        [JsonPropertyName("permit_doc_photo_path")]
+        public string? PermitDocPhotoPath { get; set; }
+
         [JsonPropertyName("error_message")]
         public string? ErrorMessage { get; set; }
     }
@@ -412,6 +421,62 @@ namespace Indexsafe.Api.Services
                             }
 
                             result.IsSimperActive = isSimperPrinted && (maxSimperDate == null || maxSimperDate.Value.Date >= DateTime.Today);
+                        }
+                    }
+
+                    // 3. Ambil data FOTO RESMI Mine Permit dari public.employee_card (Indexsafemission)
+                    try
+                    {
+                        const string sqlCard = @"
+                            SELECT id_card_photo, id_card_photo_scan, simper_card_photo
+                            FROM public.employee_card
+                            WHERE (nik IS NOT NULL AND (TRIM(nik) = @nikClean OR (@nikNoZero <> '' AND TRIM(nik) = @nikNoZero)))
+                            ORDER BY id DESC
+                            LIMIT 1;";
+                        await using (var cmdCard = new NpgsqlCommand(sqlCard, activeConn))
+                        {
+                            cmdCard.Parameters.AddWithValue("@nikClean", nikClean);
+                            cmdCard.Parameters.AddWithValue("@nikNoZero", nikNoZero);
+                            await using var cardReader = await cmdCard.ExecuteReaderAsync();
+                            if (await cardReader.ReadAsync())
+                            {
+                                result.CardPhotoPath = cardReader.IsDBNull(0) ? null : cardReader.GetString(0);
+                                result.CardPhotoScanPath = cardReader.IsDBNull(1) ? null : cardReader.GetString(1);
+                                _logger.LogInformation("[PermitService] employee_card found for {Nik}: id_card_photo={P1}, scan={P2}", nik, result.CardPhotoPath, result.CardPhotoScanPath);
+                            }
+                        }
+                    }
+                    catch (Exception exCard)
+                    {
+                        _logger.LogWarning("[PermitService] Query employee_card failed: {Msg}", exCard.Message);
+                    }
+
+                    // 4. Jika belum ada di employee_card, cari lampiran FOTO dari public.tb_permit_doc
+                    if (string.IsNullOrEmpty(result.CardPhotoPath) && permitId.HasValue)
+                    {
+                        try
+                        {
+                            const string sqlDoc = @"
+                                SELECT file_path, file_name, document_name
+                                FROM public.tb_permit_doc
+                                WHERE permit_id = @permitId
+                                  AND (document_name ILIKE '%FOTO%' OR document_name ILIKE '%PHOTO%')
+                                ORDER BY id DESC
+                                LIMIT 1;";
+                            await using (var cmdDoc = new NpgsqlCommand(sqlDoc, activeConn))
+                            {
+                                cmdDoc.Parameters.AddWithValue("@permitId", permitId.Value);
+                                await using var docReader = await cmdDoc.ExecuteReaderAsync();
+                                if (await docReader.ReadAsync())
+                                {
+                                    result.PermitDocPhotoPath = docReader.IsDBNull(0) ? (docReader.IsDBNull(1) ? null : docReader.GetString(1)) : docReader.GetString(0);
+                                    _logger.LogInformation("[PermitService] tb_permit_doc found for {Nik}: path={Path}", nik, result.PermitDocPhotoPath);
+                                }
+                            }
+                        }
+                        catch (Exception exDoc)
+                        {
+                            _logger.LogWarning("[PermitService] Query tb_permit_doc failed: {Msg}", exDoc.Message);
                         }
                     }
                 }

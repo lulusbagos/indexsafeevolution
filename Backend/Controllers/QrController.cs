@@ -380,8 +380,7 @@ namespace Indexsafe.Api.Controllers
                 // Ambil foto karyawan dari vw_m_karyawan_aktif dan password overrides
                 var kaView = await _context.MitraKaryawanAktifs.AsNoTracking().FirstOrDefaultAsync(k => k.NoNik == finalNik);
                 var overridePwd = await _context.PasswordOverrides.AsNoTracking().FirstOrDefaultAsync(po => po.Nrp == finalNik);
-                string? photoPath = overridePwd?.ProfilePicture ?? kaView?.PathFoto;
-                string photoUrl = $"/api/profile/photo/{finalNik}";
+                string photoUrl = $"/api/qr/permit/photo/{finalNik}";
 
                 // Ambil data SIMPER yang terhubung
                 PermitSimperDto? simperInfo = null;
@@ -419,7 +418,7 @@ namespace Indexsafe.Api.Controllers
                         no_hp = employee?.Hp1 ?? "-",
                         jenis_kelamin = employee?.JenisKelamin ?? "-",
                         akses_lokasi = finalAksesLokasi,
-                        foto = photoPath,
+                        foto = photoUrl,
                         photo_url = photoUrl,
                         has_simper = simperInfo?.HasSimper ?? false,
                         simper_nomor = simperInfo?.SimperNomor ?? "-",
@@ -1067,6 +1066,273 @@ namespace Indexsafe.Api.Controllers
                     created_at = log.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss")
                 }
             });
+        }
+
+        /// <summary>
+        /// GET /api/qr/permit/photo/{nik}
+        /// Returns official Mine Permit / Employee photo from Indexsafemission / Bima database
+        /// </summary>
+        [HttpGet("permit/photo/{nik}")]
+        [AllowAnonymous]
+        public async Task<IActionResult> GetPermitPhoto(string nik)
+        {
+            if (string.IsNullOrWhiteSpace(nik))
+            {
+                return NotFound("NIK is required");
+            }
+
+            var nikClean = nik.Trim();
+            var permit = await _permitService.GetLatestPermitSimperAsync(nikClean);
+
+            var candidatePaths = new List<string>();
+            if (permit != null)
+            {
+                if (!string.IsNullOrWhiteSpace(permit.CardPhotoPath)) candidatePaths.Add(permit.CardPhotoPath);
+                if (!string.IsNullOrWhiteSpace(permit.CardPhotoScanPath)) candidatePaths.Add(permit.CardPhotoScanPath);
+                if (!string.IsNullOrWhiteSpace(permit.PermitDocPhotoPath)) candidatePaths.Add(permit.PermitDocPhotoPath);
+            }
+
+            // Juga coba dari ONE_DB_MITRA (vw_m_karyawan_aktif)
+            var kaView = await _context.MitraKaryawanAktifs.AsNoTracking().FirstOrDefaultAsync(k => k.NoNik == nikClean);
+            if (kaView != null && !string.IsNullOrWhiteSpace(kaView.PathFoto))
+            {
+                candidatePaths.Add(kaView.PathFoto);
+            }
+
+            var rootDrives = new[]
+            {
+                @"C:\MinePermitFiles",
+                @"D:\MinePermitFiles",
+                @"C:\MinePermitFiles\ONEDBEV",
+                @"D:\4. PROJECT\2. Web\Indexsavemission\indexsafemission"
+            };
+
+            foreach (var rawPath in candidatePaths)
+            {
+                if (string.IsNullOrWhiteSpace(rawPath)) continue;
+
+                var clean = rawPath.Replace("~", "\\").Trim();
+
+                // 1. Cek langsung file path fisik
+                if (System.IO.File.Exists(clean))
+                {
+                    return PhysicalFile(clean, GetMimeType(clean));
+                }
+
+                // 2. Cek drive swap D: <-> C:
+                if (clean.Length > 2 && clean[1] == ':')
+                {
+                    var altDrive = clean.StartsWith("D:", StringComparison.OrdinalIgnoreCase)
+                        ? "C:" + clean.Substring(2)
+                        : "D:" + clean.Substring(2);
+                    if (System.IO.File.Exists(altDrive))
+                    {
+                        return PhysicalFile(altDrive, GetMimeType(altDrive));
+                    }
+                }
+
+                // 3. Cek kombinasi dengan rootDrives
+                var arr = clean.Split(new[] { '\\', '/' }, StringSplitOptions.RemoveEmptyEntries);
+                foreach (var root in rootDrives)
+                {
+                    var testPath = Path.Combine(root, clean.TrimStart('\\', '/'));
+                    if (System.IO.File.Exists(testPath))
+                    {
+                        return PhysicalFile(testPath, GetMimeType(testPath));
+                    }
+
+                    // Slicing arr[2..] seperti di ApiIndexsafemission
+                    if (arr.Length >= 3)
+                    {
+                        var sliced = Path.Combine(root, string.Join("\\", arr.Skip(2)));
+                        if (System.IO.File.Exists(sliced))
+                        {
+                            return PhysicalFile(sliced, GetMimeType(sliced));
+                        }
+                    }
+
+                    // Filename saja
+                    var fn = Path.GetFileName(clean);
+                    var testFn = Path.Combine(root, fn);
+                    if (System.IO.File.Exists(testFn))
+                    {
+                        return PhysicalFile(testFn, GetMimeType(testFn));
+                    }
+                }
+
+                // 4. Jika file berada di API Indexsafemission (remote/local port)
+                if (clean.Contains("IDCARD_PHOTO") || clean.Contains("CARD") || clean.Contains("FOTO"))
+                {
+                    var remoteUrls = new[]
+                    {
+                        $"http://localhost:5266/api/Attachment/file/byfilename/{clean.Replace("\\", "~")}",
+                        $"http://172.16.1.96:5266/api/Attachment/file/byfilename/{clean.Replace("\\", "~")}",
+                        $"https://localhost:7274/api/Attachment/file/byfilename/{clean.Replace("\\", "~")}"
+                    };
+                    using var httpClient = new System.Net.Http.HttpClient { Timeout = TimeSpan.FromSeconds(3) };
+                    foreach (var url in remoteUrls)
+                    {
+                        try
+                        {
+                            var resp = await httpClient.GetAsync(url);
+                            if (resp.IsSuccessStatusCode)
+                            {
+                                var bytes = await resp.Content.ReadAsByteArrayAsync();
+                                var cType = resp.Content.Headers.ContentType?.MediaType ?? "image/jpeg";
+                                return File(bytes, cType);
+                            }
+                        }
+                        catch { }
+                    }
+                }
+            }
+
+            // 5. Cek via FTP repository (Indexsafemission source)
+            var ftpCachedFile = await TryFetchPhotoFromFtpAsync(nikClean);
+            if (!string.IsNullOrEmpty(ftpCachedFile) && System.IO.File.Exists(ftpCachedFile))
+            {
+                return PhysicalFile(ftpCachedFile, GetMimeType(ftpCachedFile));
+            }
+
+            // 6. Cek file karyawan di ONEDBEV jika ada
+            try
+            {
+                if (Directory.Exists(@"C:\MinePermitFiles\ONEDBEV"))
+                {
+                    var matches = Directory.GetFiles(@"C:\MinePermitFiles\ONEDBEV", $"*{nikClean}*.*", SearchOption.AllDirectories)
+                        .Where(f => f.EndsWith(".jpg", StringComparison.OrdinalIgnoreCase) || f.EndsWith(".png", StringComparison.OrdinalIgnoreCase) || f.EndsWith(".jpeg", StringComparison.OrdinalIgnoreCase))
+                        .ToList();
+                    if (matches.Any())
+                    {
+                        return PhysicalFile(matches.First(), GetMimeType(matches.First()));
+                    }
+                }
+            }
+            catch { }
+
+            // 7. Jika tidak ada foto resmi Mine Permit dari Indexsafemission, kembalikan 404 (jangan pakai foto avatar pemandangan)
+            return NotFound("Foto Mine Permit resmi karyawan tidak ditemukan di sistem Indexsafemission.");
+        }
+
+        private async Task<string?> TryFetchPhotoFromFtpAsync(string nikClean)
+        {
+            try
+            {
+                var cacheDir = @"C:\MinePermitFiles\CARD\Cache";
+                if (!Directory.Exists(cacheDir))
+                {
+                    Directory.CreateDirectory(cacheDir);
+                }
+
+                var localCachedPath = Path.Combine(cacheDir, $"{nikClean}_permit.jpg");
+                if (System.IO.File.Exists(localCachedPath))
+                {
+                    return localCachedPath;
+                }
+
+                int? idPersonal = null;
+                int? idPerusahaan = null;
+                string? pathFoto = null;
+
+                var kaView = await _context.MitraKaryawanAktifs.AsNoTracking().FirstOrDefaultAsync(k => k.NoNik == nikClean);
+                if (kaView != null)
+                {
+                    idPersonal = kaView.IdPersonal;
+                    idPerusahaan = kaView.IdPerusahaan;
+                    pathFoto = kaView.PathFoto;
+                }
+
+                const string ftpUser = "onedb_kary";
+                const string ftpPass = "x0r4ngIDC#apps@2023";
+
+                // A. Cek /karyawan/{md5(idPersonal)}/
+                if (idPersonal.HasValue && idPersonal.Value > 0)
+                {
+                    string hash;
+                    using (var md5 = System.Security.Cryptography.MD5.Create())
+                    {
+                        var bytes = System.Text.Encoding.UTF8.GetBytes(idPersonal.Value.ToString());
+                        hash = string.Concat(md5.ComputeHash(bytes).Select(b => b.ToString("x2")));
+                    }
+
+                    var dirUrl = $"ftp://192.168.125.234/karyawan/{hash}/";
+                    var listReq = (System.Net.FtpWebRequest)System.Net.WebRequest.Create(dirUrl);
+                    listReq.Credentials = new System.Net.NetworkCredential(ftpUser, ftpPass);
+                    listReq.Method = System.Net.WebRequestMethods.Ftp.ListDirectory;
+                    listReq.Timeout = 4000;
+
+                    string[] fileList = Array.Empty<string>();
+                    try
+                    {
+                        using var listResp = (System.Net.FtpWebResponse)await listReq.GetResponseAsync();
+                        using var reader = new StreamReader(listResp.GetResponseStream());
+                        var content = await reader.ReadToEndAsync();
+                        fileList = content.Split(new[] { "\r\n", "\n" }, StringSplitOptions.RemoveEmptyEntries);
+                    }
+                    catch { }
+
+                    var photoFile = fileList.FirstOrDefault(f => f.Contains("FOTO", StringComparison.OrdinalIgnoreCase)
+                                                             || f.EndsWith(".jpg", StringComparison.OrdinalIgnoreCase)
+                                                             || f.EndsWith(".png", StringComparison.OrdinalIgnoreCase)
+                                                             || f.EndsWith(".jpeg", StringComparison.OrdinalIgnoreCase));
+
+                    if (!string.IsNullOrEmpty(photoFile))
+                    {
+                        var fileUrl = $"{dirUrl}{photoFile}";
+                        var fileReq = (System.Net.FtpWebRequest)System.Net.WebRequest.Create(fileUrl);
+                        fileReq.Credentials = new System.Net.NetworkCredential(ftpUser, ftpPass);
+                        fileReq.Method = System.Net.WebRequestMethods.Ftp.DownloadFile;
+                        fileReq.Timeout = 8000;
+
+                        using var fileResp = (System.Net.FtpWebResponse)await fileReq.GetResponseAsync();
+                        using var stream = fileResp.GetResponseStream();
+                        using var outStream = System.IO.File.Create(localCachedPath);
+                        await stream.CopyToAsync(outStream);
+
+                        return localCachedPath;
+                    }
+                }
+
+                // B. Cek /foto/{idPerusahaan}/{filename}
+                if (idPerusahaan.HasValue && !string.IsNullOrWhiteSpace(pathFoto))
+                {
+                    var fileName = Path.GetFileName(pathFoto);
+                    var fileUrl = $"ftp://192.168.125.234/foto/{idPerusahaan.Value}/{fileName}";
+                    try
+                    {
+                        var fileReq = (System.Net.FtpWebRequest)System.Net.WebRequest.Create(fileUrl);
+                        fileReq.Credentials = new System.Net.NetworkCredential(ftpUser, ftpPass);
+                        fileReq.Method = System.Net.WebRequestMethods.Ftp.DownloadFile;
+                        fileReq.Timeout = 8000;
+
+                        using var fileResp = (System.Net.FtpWebResponse)await fileReq.GetResponseAsync();
+                        using var stream = fileResp.GetResponseStream();
+                        using var outStream = System.IO.File.Create(localCachedPath);
+                        await stream.CopyToAsync(outStream);
+
+                        return localCachedPath;
+                    }
+                    catch { }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[TryFetchPhotoFromFtpAsync] Error: {ex.Message}");
+            }
+
+            return null;
+        }
+
+        private static string GetMimeType(string path)
+        {
+            var ext = Path.GetExtension(path).ToLowerInvariant();
+            return ext switch
+            {
+                ".png" => "image/png",
+                ".gif" => "image/gif",
+                ".webp" => "image/webp",
+                _ => "image/jpeg"
+            };
         }
     }
 
