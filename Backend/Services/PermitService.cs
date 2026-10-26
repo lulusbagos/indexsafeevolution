@@ -93,6 +93,9 @@ namespace Indexsafe.Api.Services
         [JsonPropertyName("is_simper_active")]
         public bool IsSimperActive { get; set; }
 
+        [JsonPropertyName("units")]
+        public List<SimperUnitDto> Units { get; set; } = new();
+
         [JsonPropertyName("card_photo_path")]
         public string? CardPhotoPath { get; set; }
 
@@ -424,6 +427,41 @@ namespace Indexsafe.Api.Services
                         }
                     }
 
+                    // Query tb_simper_unit
+                    if (result.SimperId.HasValue)
+                    {
+                        try
+                        {
+                            const string sqlUnits = @"
+                                SELECT id, simper_id, kendaraan, kewenangan, jam_min, jam_aktual, equipment_classification, equipment_type, equipment_model
+                                FROM public.tb_simper_unit
+                                WHERE simper_id = @sId
+                                ORDER BY id ASC;";
+                            await using var cmdUnits = new NpgsqlCommand(sqlUnits, activeConn);
+                            cmdUnits.Parameters.AddWithValue("@sId", result.SimperId.Value);
+                            await using var uReader = await cmdUnits.ExecuteReaderAsync();
+                            while (await uReader.ReadAsync())
+                            {
+                                result.Units.Add(new SimperUnitDto
+                                {
+                                    Id = uReader.GetInt64(0),
+                                    SimperId = uReader.GetInt64(1),
+                                    Kendaraan = uReader.IsDBNull(2) ? null : uReader.GetString(2),
+                                    Kewenangan = uReader.IsDBNull(3) ? null : uReader.GetString(3),
+                                    JamMin = uReader.IsDBNull(4) ? null : Convert.ToInt32(uReader.GetValue(4)),
+                                    JamAktual = uReader.IsDBNull(5) ? null : Convert.ToInt32(uReader.GetValue(5)),
+                                    EquipmentClassification = uReader.IsDBNull(6) ? null : uReader.GetString(6),
+                                    EquipmentType = uReader.IsDBNull(7) ? null : uReader.GetString(7),
+                                    EquipmentModel = uReader.IsDBNull(8) ? null : uReader.GetString(8),
+                                });
+                            }
+                        }
+                        catch (Exception exUnits)
+                        {
+                            _logger.LogWarning("[PermitService] Query tb_simper_unit in GetLatestPermitSimperAsync failed: {Msg}", exUnits.Message);
+                        }
+                    }
+
                     // 3. Ambil data FOTO RESMI Mine Permit dari public.employee_card (Indexsafemission)
                     try
                     {
@@ -641,6 +679,334 @@ namespace Indexsafe.Api.Services
 
             return null;
         }
+
+        public async Task<SimperFullDetailDto?> GetFullSimperDetailAsync(string queryCode)
+        {
+            if (string.IsNullOrWhiteSpace(queryCode)) return null;
+
+            var cleanCode = queryCode.Trim();
+
+            NpgsqlConnection? activeConn = null;
+            foreach (var host in _candidateHosts)
+            {
+                var dbsToTry = new List<string> { "Bima", "BimaTest", "sysinteg_indexsafe2", "postgres" };
+                foreach (var db in dbsToTry)
+                {
+                    try
+                    {
+                        var builder = new NpgsqlConnectionStringBuilder
+                        {
+                            Host = host,
+                            Port = 5432,
+                            Database = db,
+                            Username = User,
+                            Password = Pass,
+                            Timeout = 3,
+                            CommandTimeout = 5
+                        };
+                        var conn = new NpgsqlConnection(builder.ConnectionString);
+                        await conn.OpenAsync();
+
+                        await using (var checkCmd = new NpgsqlCommand("SELECT to_regclass('public.tb_simper')::text;", conn))
+                        {
+                            var reg = await checkCmd.ExecuteScalarAsync();
+                            if (reg != null && reg != DBNull.Value && !string.IsNullOrWhiteSpace(reg.ToString()))
+                            {
+                                activeConn = conn;
+                                break;
+                            }
+                        }
+                        await conn.DisposeAsync();
+                    }
+                    catch { }
+                }
+                if (activeConn != null) break;
+            }
+
+            if (activeConn == null) return null;
+
+            await using (activeConn)
+            {
+                try
+                {
+                    const string sqlSimper = @"
+                        SELECT id, permit_id, req_id, tanggal, nomor, status, nomor_sim, masa_berlaku, masa_berlaku_sio, kacamata, nilai_praktek, nilai_teori, employee_id, jenis_simper, ref_id, company_id, departemen, created_by, updated_by, deleted_by, created_at, updated_at, deleted_at, ketentuan_hauling, tes_simper, praktek_simper, qr_encrypt, qr_decrypt, expired_date, created_company_id, created_department_id, printed_at, printed_count, jenis_sim
+                        FROM public.tb_simper
+                        WHERE TRIM(qr_encrypt) = @code
+                           OR TRIM(qr_decrypt) = @code
+                           OR TRIM(nomor) = @code
+                           OR TRIM(req_id::text) = @code
+                           OR TRIM(employee_id) = @code
+                        ORDER BY id DESC
+                        LIMIT 1;";
+
+                    SimperFullDetailDto? dto = null;
+                    await using (var cmd = new NpgsqlCommand(sqlSimper, activeConn))
+                    {
+                        cmd.Parameters.AddWithValue("@code", cleanCode);
+                        await using var r = await cmd.ExecuteReaderAsync();
+                        if (await r.ReadAsync())
+                        {
+                            dto = new SimperFullDetailDto
+                            {
+                                Id = r.GetInt64(r.GetOrdinal("id")),
+                                PermitId = r.IsDBNull(r.GetOrdinal("permit_id")) ? null : r.GetInt64(r.GetOrdinal("permit_id")),
+                                ReqId = r.IsDBNull(r.GetOrdinal("req_id")) ? null : r.GetValue(r.GetOrdinal("req_id"))?.ToString(),
+                                Nomor = r.IsDBNull(r.GetOrdinal("nomor")) ? null : r.GetString(r.GetOrdinal("nomor")),
+                                Status = r.IsDBNull(r.GetOrdinal("status")) ? null : r.GetString(r.GetOrdinal("status")),
+                                NomorSim = r.IsDBNull(r.GetOrdinal("nomor_sim")) ? null : r.GetString(r.GetOrdinal("nomor_sim")),
+                                JenisSim = r.IsDBNull(r.GetOrdinal("jenis_sim")) ? null : r.GetString(r.GetOrdinal("jenis_sim")),
+                                EmployeeId = r.IsDBNull(r.GetOrdinal("employee_id")) ? cleanCode : r.GetString(r.GetOrdinal("employee_id")),
+                                JenisSimper = r.IsDBNull(r.GetOrdinal("jenis_simper")) ? null : r.GetString(r.GetOrdinal("jenis_simper")),
+                                Departemen = r.IsDBNull(r.GetOrdinal("departemen")) ? null : r.GetString(r.GetOrdinal("departemen")),
+                                QrEncrypt = r.IsDBNull(r.GetOrdinal("qr_encrypt")) ? null : r.GetString(r.GetOrdinal("qr_encrypt")),
+                                QrDecrypt = r.IsDBNull(r.GetOrdinal("qr_decrypt")) ? null : r.GetString(r.GetOrdinal("qr_decrypt")),
+                            };
+
+                            if (!r.IsDBNull(r.GetOrdinal("kacamata")))
+                            {
+                                var kVal = r.GetValue(r.GetOrdinal("kacamata"));
+                                dto.Kacamata = kVal is bool b ? (b ? "WAJIB KACAMATA" : "TIDAK") : kVal.ToString();
+                            }
+
+                            if (!r.IsDBNull(r.GetOrdinal("ketentuan_hauling")))
+                            {
+                                var hVal = r.GetValue(r.GetOrdinal("ketentuan_hauling"));
+                                dto.KetentuanHauling = hVal is bool b ? b : false;
+                            }
+
+                            if (!r.IsDBNull(r.GetOrdinal("nilai_teori")))
+                            {
+                                dto.NilaiTeori = Convert.ToDouble(r.GetValue(r.GetOrdinal("nilai_teori")));
+                            }
+
+                            if (!r.IsDBNull(r.GetOrdinal("nilai_praktek")))
+                            {
+                                dto.NilaiPraktek = Convert.ToDouble(r.GetValue(r.GetOrdinal("nilai_praktek")));
+                            }
+
+                            if (!r.IsDBNull(r.GetOrdinal("printed_count")))
+                            {
+                                dto.PrintedCount = Convert.ToInt32(r.GetValue(r.GetOrdinal("printed_count")));
+                            }
+
+                            if (!r.IsDBNull(r.GetOrdinal("printed_at")))
+                            {
+                                dto.PrintedAt = r.GetValue(r.GetOrdinal("printed_at"))?.ToString();
+                            }
+
+                            DateTime? dtTanggal = ParseDateFlexible(r.GetValue(r.GetOrdinal("tanggal")));
+                            if (dtTanggal.HasValue) dto.Tanggal = dtTanggal.Value.ToString("yyyy-MM-dd");
+
+                            DateTime? dtMasaBerlaku = ParseDateFlexible(r.GetValue(r.GetOrdinal("masa_berlaku")));
+                            if (dtMasaBerlaku.HasValue) dto.MasaBerlaku = dtMasaBerlaku.Value.ToString("yyyy-MM-dd");
+
+                            DateTime? dtExpired = ParseDateFlexible(r.GetValue(r.GetOrdinal("expired_date")));
+                            if (dtExpired.HasValue) dto.ExpiredDate = dtExpired.Value.ToString("yyyy-MM-dd");
+
+                            DateTime? effectiveExpiry = dtMasaBerlaku ?? dtExpired;
+                            if (effectiveExpiry.HasValue)
+                            {
+                                dto.DaysLeft = (effectiveExpiry.Value.Date - DateTime.Today).Days;
+                                dto.IsExpired = DateTime.Today > effectiveExpiry.Value.Date;
+                            }
+
+                            string rawStatus = dto.Status?.Trim() ?? "";
+                            bool isPrinted = rawStatus.Contains("PRINT", StringComparison.OrdinalIgnoreCase) || dto.PrintedCount > 0 || !string.IsNullOrEmpty(dto.PrintedAt);
+                            dto.IsSimperActive = isPrinted && (!effectiveExpiry.HasValue || effectiveExpiry.Value.Date >= DateTime.Today);
+                        }
+                    }
+
+                    if (dto != null)
+                    {
+                        // Fetch units from tb_simper_unit
+                        const string sqlUnits = @"
+                            SELECT id, simper_id, kendaraan, kewenangan, jam_min, jam_aktual, equipment_classification, equipment_type, equipment_model
+                            FROM public.tb_simper_unit
+                            WHERE simper_id = @sId
+                            ORDER BY id ASC;";
+                        await using (var cmdUnits = new NpgsqlCommand(sqlUnits, activeConn))
+                        {
+                            cmdUnits.Parameters.AddWithValue("@sId", dto.Id);
+                            await using var uReader = await cmdUnits.ExecuteReaderAsync();
+                            while (await uReader.ReadAsync())
+                            {
+                                dto.Units.Add(new SimperUnitDto
+                                {
+                                    Id = uReader.GetInt64(0),
+                                    SimperId = uReader.GetInt64(1),
+                                    Kendaraan = uReader.IsDBNull(2) ? null : uReader.GetString(2),
+                                    Kewenangan = uReader.IsDBNull(3) ? null : uReader.GetString(3),
+                                    JamMin = uReader.IsDBNull(4) ? null : Convert.ToInt32(uReader.GetValue(4)),
+                                    JamAktual = uReader.IsDBNull(5) ? null : Convert.ToInt32(uReader.GetValue(5)),
+                                    EquipmentClassification = uReader.IsDBNull(6) ? null : uReader.GetString(6),
+                                    EquipmentType = uReader.IsDBNull(7) ? null : uReader.GetString(7),
+                                    EquipmentModel = uReader.IsDBNull(8) ? null : uReader.GetString(8),
+                                });
+                            }
+                        }
+
+                        return dto;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "[PermitService] Error in GetFullSimperDetailAsync: {Msg}", ex.Message);
+                }
+            }
+
+            return null;
+        }
+    }
+
+    public class SimperUnitDto
+    {
+        [JsonPropertyName("id")]
+        public long Id { get; set; }
+
+        [JsonPropertyName("simper_id")]
+        public long SimperId { get; set; }
+
+        [JsonPropertyName("kendaraan")]
+        public string? Kendaraan { get; set; }
+
+        [JsonPropertyName("kewenangan")]
+        public string? Kewenangan { get; set; }
+
+        [JsonPropertyName("jam_min")]
+        public int? JamMin { get; set; }
+
+        [JsonPropertyName("jam_aktual")]
+        public int? JamAktual { get; set; }
+
+        [JsonPropertyName("equipment_classification")]
+        public string? EquipmentClassification { get; set; }
+
+        [JsonPropertyName("equipment_type")]
+        public string? EquipmentType { get; set; }
+
+        [JsonPropertyName("equipment_model")]
+        public string? EquipmentModel { get; set; }
+    }
+
+    public class SimperFullDetailDto
+    {
+        [JsonPropertyName("id")]
+        public long Id { get; set; }
+
+        [JsonPropertyName("permit_id")]
+        public long? PermitId { get; set; }
+
+        [JsonPropertyName("req_id")]
+        public string? ReqId { get; set; }
+
+        [JsonPropertyName("tanggal")]
+        public string? Tanggal { get; set; }
+
+        [JsonPropertyName("nomor")]
+        public string? Nomor { get; set; }
+
+        [JsonPropertyName("status")]
+        public string? Status { get; set; }
+
+        [JsonPropertyName("nomor_sim")]
+        public string? NomorSim { get; set; }
+
+        [JsonPropertyName("jenis_sim")]
+        public string? JenisSim { get; set; }
+
+        [JsonPropertyName("masa_berlaku")]
+        public string? MasaBerlaku { get; set; }
+
+        [JsonPropertyName("masa_berlaku_sio")]
+        public string? MasaBerlakuSio { get; set; }
+
+        [JsonPropertyName("expired_date")]
+        public string? ExpiredDate { get; set; }
+
+        [JsonPropertyName("kacamata")]
+        public string? Kacamata { get; set; }
+
+        [JsonPropertyName("nilai_praktek")]
+        public double? NilaiPraktek { get; set; }
+
+        [JsonPropertyName("nilai_teori")]
+        public double? NilaiTeori { get; set; }
+
+        [JsonPropertyName("employee_id")]
+        public string EmployeeId { get; set; } = string.Empty;
+
+        [JsonPropertyName("jenis_simper")]
+        public string? JenisSimper { get; set; }
+
+        [JsonPropertyName("company_id")]
+        public int? CompanyId { get; set; }
+
+        [JsonPropertyName("departemen")]
+        public string? Departemen { get; set; }
+
+        [JsonPropertyName("ketentuan_hauling")]
+        public bool? KetentuanHauling { get; set; }
+
+        [JsonPropertyName("qr_encrypt")]
+        public string? QrEncrypt { get; set; }
+
+        [JsonPropertyName("qr_decrypt")]
+        public string? QrDecrypt { get; set; }
+
+        [JsonPropertyName("printed_at")]
+        public string? PrintedAt { get; set; }
+
+        [JsonPropertyName("printed_count")]
+        public int PrintedCount { get; set; }
+
+        [JsonPropertyName("is_simper_active")]
+        public bool IsSimperActive { get; set; }
+
+        [JsonPropertyName("days_left")]
+        public int DaysLeft { get; set; }
+
+        [JsonPropertyName("is_expired")]
+        public bool IsExpired { get; set; }
+
+        [JsonPropertyName("nama")]
+        public string? Nama { get; set; }
+
+        [JsonPropertyName("nik")]
+        public string? Nik { get; set; }
+
+        [JsonPropertyName("perusahaan")]
+        public string? Perusahaan { get; set; }
+
+        [JsonPropertyName("jabatan")]
+        public string? Jabatan { get; set; }
+
+        [JsonPropertyName("posisi")]
+        public string? Posisi { get; set; }
+
+        [JsonPropertyName("email")]
+        public string? Email { get; set; }
+
+        [JsonPropertyName("no_hp")]
+        public string? NoHp { get; set; }
+
+        [JsonPropertyName("jenis_kelamin")]
+        public string? JenisKelamin { get; set; }
+
+        [JsonPropertyName("foto")]
+        public string? Foto { get; set; }
+
+        [JsonPropertyName("photo_url")]
+        public string? PhotoUrl { get; set; }
+
+        [JsonPropertyName("units")]
+        public List<SimperUnitDto> Units { get; set; } = new();
+
+        [JsonPropertyName("can_input_pelanggaran")]
+        public bool CanInputPelanggaran { get; set; }
+
+        [JsonPropertyName("can_input_keluar_masuk")]
+        public bool CanInputKeluarMasuk { get; set; }
     }
 
     public class PermitFullDetailDto

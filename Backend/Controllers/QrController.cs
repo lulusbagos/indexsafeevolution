@@ -247,6 +247,92 @@ namespace Indexsafe.Api.Controllers
             }
             var cleanNik = rawCode.Trim();
 
+            // 1b. Check if scanned code matches a SIMPER (by qr_encrypt, qr_decrypt, nomor, req_id, or NIK)
+            bool isExplicitSimper = scanTarget.Equals("Simper", StringComparison.OrdinalIgnoreCase) || scanTarget.Equals("SIMPER", StringComparison.OrdinalIgnoreCase);
+            SimperFullDetailDto? simperDetail = null;
+            try
+            {
+                simperDetail = await _permitService.GetFullSimperDetailAsync(rawCode.Trim());
+                if (simperDetail == null && (rawCode.Contains("SP/") || rawCode.Contains("/SP") || isExplicitSimper))
+                {
+                    simperDetail = await _permitService.GetFullSimperDetailAsync(cleanNik);
+                }
+            }
+            catch (Exception exSimper)
+            {
+                Console.WriteLine($"[QrController] Error checking SIMPER: {exSimper.Message}");
+            }
+
+            if (simperDetail != null && (isExplicitSimper || simperDetail.QrEncrypt == rawCode.Trim() || simperDetail.QrDecrypt == rawCode.Trim() || simperDetail.Nomor == rawCode.Trim() || rawCode.Contains("==") || rawCode.Length >= 18 || rawCode.Contains("SP/")))
+            {
+                if (!canSimper && !canMine && !canPelanggaran && !canKeluarMasuk)
+                {
+                    return Ok(new QrScanResponse
+                    {
+                        Status = false,
+                        ActionType = "Denied",
+                        Message = "Akses Ditolak: Anda tidak memiliki izin untuk memindai SIMPER / Mine Permit. Hubungi Administrator di menu User Scan.",
+                        Data = new
+                        {
+                            required_permission = "Simper",
+                            is_authorized = false
+                        }
+                    });
+                }
+
+                var finalNik = simperDetail.EmployeeId;
+                var simperEmp = await (from k in _context.Karyawans.AsNoTracking()
+                                      join p in _context.Personals.AsNoTracking() on k.IdPersonal equals p.IdPersonal
+                                      join c in _context.Perusahaans.AsNoTracking() on k.IdPerusahaan equals c.PerusahaanId into cg
+                                      from c in cg.DefaultIfEmpty()
+                                      join d in _context.Departemens.AsNoTracking() on k.IdDepartemen equals d.DepartemenId into dg
+                                      from d in dg.DefaultIfEmpty()
+                                      join j in _context.Jabatans.AsNoTracking() on k.IdJabatan equals j.JabatanId into jg
+                                      from j in jg.DefaultIfEmpty()
+                                      where k.NoNik == finalNik
+                                      select new
+                                      {
+                                          k.IdKaryawan,
+                                          k.NoNik,
+                                          p.NamaLengkap,
+                                          Departemen = d != null ? d.NamaDepartemen : "GENERAL",
+                                          Jabatan = j != null ? j.NamaJabatan : "Staff",
+                                          Perusahaan = c != null ? c.NamaPerusahaan : "PT INDEXIM COALINDO",
+                                          k.StatusAktif,
+                                          p.Hp1,
+                                          p.EmailPribadi,
+                                          p.JenisKelamin
+                                      }).FirstOrDefaultAsync();
+
+                var finalNama = simperEmp?.NamaLengkap ?? "Karyawan Tambang";
+                var finalDept = !string.IsNullOrEmpty(simperDetail.Departemen) ? simperDetail.Departemen : (simperEmp?.Departemen ?? "-");
+                var finalPerusahaan = simperEmp?.Perusahaan ?? "PT INDEXIM COALINDO";
+                var finalJabatan = simperEmp?.Jabatan ?? "-";
+                string photoUrl = $"/api/qr/permit/photo/{finalNik}";
+
+                simperDetail.Nama = finalNama;
+                simperDetail.Nik = finalNik;
+                simperDetail.Departemen = finalDept;
+                simperDetail.Perusahaan = finalPerusahaan;
+                simperDetail.Jabatan = finalJabatan;
+                simperDetail.Posisi = finalJabatan;
+                simperDetail.Email = simperEmp?.EmailPribadi ?? "-";
+                simperDetail.NoHp = simperEmp?.Hp1 ?? "-";
+                simperDetail.JenisKelamin = simperEmp?.JenisKelamin ?? "-";
+                simperDetail.Foto = photoUrl;
+                simperDetail.PhotoUrl = photoUrl;
+                simperDetail.CanInputPelanggaran = canPelanggaran;
+                simperDetail.CanInputKeluarMasuk = canKeluarMasuk;
+
+                return Ok(new QrScanResponse
+                {
+                    Status = true,
+                    ActionType = "Simper",
+                    Message = simperDetail.IsExpired ? "SIMPER telah habis masa berlaku!" : "Data SIMPER berhasil diverifikasi.",
+                    Data = simperDetail
+                });
+            }
+
             // Extract last segment if code is a URL (e.g. http://.../permit/detail/24010091)
             if (cleanNik.Contains('/') && !cleanNik.Contains("/QrAttendance/Scan/", StringComparison.OrdinalIgnoreCase))
             {
@@ -427,6 +513,7 @@ namespace Indexsafe.Api.Controllers
                         nomor_sim = simperInfo?.NomorSim ?? "-",
                         simper_masa_berlaku = simperInfo?.MasaBerlaku ?? simperInfo?.SimperExpiredDate ?? "-",
                         is_simper_active = simperInfo?.IsSimperActive ?? false,
+                        simper_units = simperInfo?.Units ?? new List<SimperUnitDto>(),
                         can_input_pelanggaran = canPelanggaran,
                         can_input_keluar_masuk = canKeluarMasuk,
                         can_view_detail = canMine
