@@ -1531,38 +1531,66 @@ namespace Indexsafe.Api.Controllers
                             if (!string.IsNullOrEmpty(plan.Perbaikan))
                             {
                                 hazard.Perbaikan = plan.Perbaikan;
+                                hazard.TindakanPerbaikan = plan.Perbaikan;
                             }
                         }
                     }
                 }
             }
 
-            // Sync PIC if pic_id or nik_pic was provided
+            // Sync PIC & Departemen PIC if provided
+            var picForm = form["pic"].FirstOrDefault()?.Trim() ?? form["pic_perbaikan"].FirstOrDefault()?.Trim();
+            if (!string.IsNullOrEmpty(picForm))
+            {
+                plan.Pic = picForm;
+            }
+
+            var deptPicForm = form["departemen_pic"].FirstOrDefault()?.Trim() ?? form["departemenPic"].FirstOrDefault()?.Trim() ?? form["dept_pic"].FirstOrDefault()?.Trim();
+            if (!string.IsNullOrEmpty(deptPicForm))
+            {
+                plan.DepartemenPic = deptPicForm;
+            }
+
             var picIdStr = form["pic_id"].FirstOrDefault();
             if (!string.IsNullOrEmpty(picIdStr) && int.TryParse(picIdStr, out var picIdInt) && picIdInt > 0)
             {
                 var picKaryawan = await (from k in _context.Karyawans.AsNoTracking()
                                          join p in _context.Personals.AsNoTracking() on k.IdPersonal equals p.IdPersonal
+                                         join d in _context.Departemens.AsNoTracking() on k.IdDepartemen equals d.DepartemenId into dg
+                                         from d in dg.DefaultIfEmpty()
                                          where k.IdKaryawan == picIdInt
-                                         select new { k.NoNik, p.NamaLengkap }).FirstOrDefaultAsync();
+                                         select new { k.NoNik, p.NamaLengkap, NamaDept = d != null ? d.NamaDepartemen : null }).FirstOrDefaultAsync();
                 if (picKaryawan != null)
                 {
                     plan.NikPic = picKaryawan.NoNik;
                     plan.Pic = picKaryawan.NamaLengkap;
+                    if (string.IsNullOrEmpty(plan.DepartemenPic) && !string.IsNullOrEmpty(picKaryawan.NamaDept))
+                    {
+                        plan.DepartemenPic = picKaryawan.NamaDept;
+                    }
                 }
             }
 
-            var nikPicForm = form["nik_pic"].FirstOrDefault()?.Trim();
+            var nikPicForm = form["nik_pic"].FirstOrDefault()?.Trim() ?? form["nikPic"].FirstOrDefault()?.Trim();
             if (!string.IsNullOrEmpty(nikPicForm))
             {
                 plan.NikPic = nikPicForm;
-                var picKaryawan = await (from k in _context.Karyawans.AsNoTracking()
-                                         join p in _context.Personals.AsNoTracking() on k.IdPersonal equals p.IdPersonal
-                                         where k.NoNik != null && k.NoNik.Trim() == nikPicForm
-                                         select p.NamaLengkap).FirstOrDefaultAsync();
-                if (picKaryawan != null)
+                var picInfo = await (from k in _context.Karyawans.AsNoTracking()
+                                     join p in _context.Personals.AsNoTracking() on k.IdPersonal equals p.IdPersonal
+                                     join d in _context.Departemens.AsNoTracking() on k.IdDepartemen equals d.DepartemenId into dg
+                                     from d in dg.DefaultIfEmpty()
+                                     where k.NoNik != null && k.NoNik.Trim() == nikPicForm
+                                     select new { p.NamaLengkap, NamaDept = d != null ? d.NamaDepartemen : null }).FirstOrDefaultAsync();
+                if (picInfo != null)
                 {
-                    plan.Pic = picKaryawan;
+                    if (string.IsNullOrEmpty(plan.Pic))
+                    {
+                        plan.Pic = picInfo.NamaLengkap;
+                    }
+                    if (string.IsNullOrEmpty(plan.DepartemenPic) && !string.IsNullOrEmpty(picInfo.NamaDept))
+                    {
+                        plan.DepartemenPic = picInfo.NamaDept;
+                    }
                 }
             }
 

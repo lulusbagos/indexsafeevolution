@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -5,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 import '../../models/profile_model.dart';
 import '../../services/api.dart';
 import '../../services/preference.dart';
+import '../../widgets/sap_form_widgets.dart';
 
 class ActionTrackerPage extends StatefulWidget {
   const ActionTrackerPage({super.key});
@@ -1709,15 +1711,31 @@ class _ActionTrackerPageState extends State<ActionTrackerPage> {
   void _openUpdateActionPlanSheet(Map<String, dynamic> item) {
     final id = item['id'] as int? ?? 0;
     final statusKey = item['statusKey']?.toString() ?? 'outstanding';
-    final picCtrl = TextEditingController(text: item['pic']?.toString() ?? _profile?.namaLengkap ?? '');
-    final nikPicCtrl = TextEditingController(text: item['nikPic']?.toString() ?? _profile?.noNik ?? '');
-    final deptPicCtrl = TextEditingController(text: item['departemenPic']?.toString() ?? _profile?.depart ?? '');
+
+    // Smart default: If item PIC is empty, automatically prefill from logged-in user profile
+    final existingPic = (item['pic']?.toString() ?? '').trim();
+    final existingNik = (item['nikPic']?.toString() ?? item['nik']?.toString() ?? '').trim();
+    final existingDept = (item['departemenPic']?.toString() ?? item['departemen']?.toString() ?? '').trim();
+
+    final picCtrl = TextEditingController(
+      text: existingPic.isNotEmpty ? existingPic : (_profile?.namaLengkap ?? '').trim(),
+    );
+    final nikPicCtrl = TextEditingController(
+      text: existingNik.isNotEmpty ? existingNik : (_profile?.noNik ?? '').trim(),
+    );
+    final deptPicCtrl = TextEditingController(
+      text: existingDept.isNotEmpty ? existingDept : (_profile?.depart ?? '').trim(),
+    );
     final planCtrl = TextEditingController(text: item['rencanaPerbaikan']?.toString() ?? '');
     final perbaikanCtrl = TextEditingController(text: item['perbaikan']?.toString() ?? '');
 
     String selectedStatus = statusKey == 'closed' ? '2' : (statusKey == 'progress' ? '2' : '1');
     File? pickedPhoto;
     bool isSubmitting = false;
+    bool isResolvingPic = false;
+    String? picVerifiedStatus;
+    Timer? debounceTimer;
+    bool hasInitializedLookup = false;
 
     showModalBottomSheet(
       context: context,
@@ -1726,6 +1744,50 @@ class _ActionTrackerPageState extends State<ActionTrackerPage> {
       builder: (ctx) {
         return StatefulBuilder(
           builder: (context, setModalState) {
+            // Function to resolve PIC and Department from system by NIK
+            Future<void> resolvePic(String rawNik) async {
+              final qNik = rawNik.trim();
+              if (qNik.length < 4) return;
+              setModalState(() {
+                isResolvingPic = true;
+              });
+              try {
+                final res = await _api.searchPja(qNik, lintasPerusahaan: true);
+                res.fold((_) {
+                  setModalState(() => isResolvingPic = false);
+                }, (list) {
+                  if (list.isNotEmpty) {
+                    final match = list.firstWhere(
+                      (e) => (e['nik']?.toString().trim().toLowerCase() == qNik.toLowerCase()),
+                      orElse: () => list.first,
+                    );
+                    final nama = match['nama']?.toString().trim() ?? '';
+                    final dept = (match['departemen'] ?? match['depart'])?.toString().trim() ?? '';
+                    if (nama.isNotEmpty) picCtrl.text = nama;
+                    if (dept.isNotEmpty) deptPicCtrl.text = dept;
+                    setModalState(() {
+                      isResolvingPic = false;
+                      picVerifiedStatus = '$nama ($dept)';
+                    });
+                  } else {
+                    setModalState(() => isResolvingPic = false);
+                  }
+                });
+              } catch (_) {
+                setModalState(() => isResolvingPic = false);
+              }
+            }
+
+            // Auto-resolve department on first open if missing
+            if (!hasInitializedLookup) {
+              hasInitializedLookup = true;
+              if (nikPicCtrl.text.isNotEmpty && deptPicCtrl.text.isEmpty) {
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  resolvePic(nikPicCtrl.text);
+                });
+              }
+            }
+
             return Container(
               padding: EdgeInsets.only(
                 bottom: MediaQuery.of(context).viewInsets.bottom,
@@ -1768,7 +1830,10 @@ class _ActionTrackerPageState extends State<ActionTrackerPage> {
                           icon: const Icon(Icons.close_rounded, size: 20),
                           padding: EdgeInsets.zero,
                           constraints: const BoxConstraints(),
-                          onPressed: () => Navigator.pop(context),
+                          onPressed: () {
+                            debounceTimer?.cancel();
+                            Navigator.pop(context);
+                          },
                         ),
                       ],
                     ),
@@ -1840,32 +1905,175 @@ class _ActionTrackerPageState extends State<ActionTrackerPage> {
                     ),
                     const SizedBox(height: 14),
 
-                    // PIC fields
+                    // Header PIC & Smart Actions
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Penanggung Jawab PIC (Sistem):',
+                          style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: Color(0xFF334155)),
+                        ),
+                        Row(
+                          children: [
+                            InkWell(
+                              onTap: () {
+                                final myNik = (_profile?.noNik ?? '').trim();
+                                final myName = (_profile?.namaLengkap ?? '').trim();
+                                final myDept = (_profile?.depart ?? '').trim();
+                                nikPicCtrl.text = myNik;
+                                picCtrl.text = myName;
+                                deptPicCtrl.text = myDept;
+                                if (myDept.isEmpty && myNik.isNotEmpty) {
+                                  resolvePic(myNik);
+                                } else {
+                                  setModalState(() {
+                                    picVerifiedStatus = '$myName ($myDept)';
+                                  });
+                                }
+                              },
+                              borderRadius: BorderRadius.circular(6),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFF1F5F9),
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(color: const Color(0xFFCBD5E1)),
+                                ),
+                                child: const Row(
+                                  children: [
+                                    Icon(Icons.person_outline_rounded, size: 12, color: Color(0xFF0284C7)),
+                                    SizedBox(width: 3),
+                                    Text(
+                                      'Gunakan Saya',
+                                      style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF0284C7)),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            InkWell(
+                              onTap: () async {
+                                final selected = await SapEmployeePickerModal.show(context, title: 'Cari PIC dari Sistem');
+                                if (selected != null) {
+                                  nikPicCtrl.text = selected.nik;
+                                  picCtrl.text = selected.nama;
+                                  deptPicCtrl.text = selected.departemen;
+                                  setModalState(() {
+                                    picVerifiedStatus = '${selected.nama} (${selected.departemen})';
+                                  });
+                                }
+                              },
+                              borderRadius: BorderRadius.circular(6),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFE0F2FE),
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(color: const Color(0xFF7DD3FC)),
+                                ),
+                                child: const Row(
+                                  children: [
+                                    Icon(Icons.person_search_rounded, size: 12, color: Color(0xFF0369A1)),
+                                    SizedBox(width: 3),
+                                    Text(
+                                      'Cari Sistem',
+                                      style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF0369A1)),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+
+                    // NIK PIC with smart auto-complete & search icon
+                    _buildModalTextField(
+                      controller: nikPicCtrl,
+                      label: 'NIK PIC (Ketik untuk lookup otomatis)',
+                      hint: 'Contoh: 24051940986',
+                      suffixIcon: isResolvingPic
+                          ? const Padding(
+                              padding: EdgeInsets.all(12),
+                              child: SizedBox(
+                                width: 14,
+                                height: 14,
+                                child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF0284C7)),
+                              ),
+                            )
+                          : IconButton(
+                              icon: const Icon(Icons.person_search_rounded, color: Color(0xFF0284C7), size: 19),
+                              tooltip: 'Cari PIC dari Sistem',
+                              onPressed: () async {
+                                final selected = await SapEmployeePickerModal.show(context, title: 'Cari PIC dari Sistem');
+                                if (selected != null) {
+                                  nikPicCtrl.text = selected.nik;
+                                  picCtrl.text = selected.nama;
+                                  deptPicCtrl.text = selected.departemen;
+                                  setModalState(() {
+                                    picVerifiedStatus = '${selected.nama} (${selected.departemen})';
+                                  });
+                                }
+                              },
+                            ),
+                      onChanged: (val) {
+                        debounceTimer?.cancel();
+                        debounceTimer = Timer(const Duration(milliseconds: 450), () {
+                          resolvePic(val);
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 8),
+
+                    // Nama PIC & Departemen PIC (Auto-populated)
                     Row(
                       children: [
                         Expanded(
                           child: _buildModalTextField(
                             controller: picCtrl,
-                            label: 'Nama PIC',
+                            label: 'Nama PIC (Otomatis)',
                             hint: 'Nama PIC Perbaikan',
                           ),
                         ),
                         const SizedBox(width: 8),
                         Expanded(
                           child: _buildModalTextField(
-                            controller: nikPicCtrl,
-                            label: 'NIK PIC',
-                            hint: 'NIK PIC',
+                            controller: deptPicCtrl,
+                            label: 'Departemen PIC (Otomatis)',
+                            hint: 'Departemen PIC',
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 10),
-                    _buildModalTextField(
-                      controller: deptPicCtrl,
-                      label: 'Departemen PIC',
-                      hint: 'Departemen PIC',
-                    ),
+
+                    if (picVerifiedStatus != null || (deptPicCtrl.text.isNotEmpty && picCtrl.text.isNotEmpty)) ...[
+                      const SizedBox(height: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFECFDF5),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: const Color(0xFFA7F3D0)),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.check_circle_rounded, size: 12, color: Color(0xFF059669)),
+                            const SizedBox(width: 5),
+                            Expanded(
+                              child: Text(
+                                'PIC Terverifikasi: ${picCtrl.text} • ${deptPicCtrl.text}',
+                                style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF065F46)),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 10),
 
                     // Rencana Perbaikan
@@ -2023,6 +2231,10 @@ class _ActionTrackerPageState extends State<ActionTrackerPage> {
     required String label,
     required String hint,
     int maxLines = 1,
+    Widget? suffixIcon,
+    bool readOnly = false,
+    ValueChanged<String>? onChanged,
+    String? helperText,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -2035,12 +2247,17 @@ class _ActionTrackerPageState extends State<ActionTrackerPage> {
         TextField(
           controller: controller,
           maxLines: maxLines,
+          readOnly: readOnly,
+          onChanged: onChanged,
           style: const TextStyle(fontSize: 12, color: Color(0xFF0F172A)),
           decoration: InputDecoration(
             hintText: hint,
             hintStyle: const TextStyle(fontSize: 11.5, color: Color(0xFF94A3B8)),
+            suffixIcon: suffixIcon,
+            helperText: helperText,
+            helperStyle: const TextStyle(fontSize: 10, color: Color(0xFF059669), fontWeight: FontWeight.w600),
             filled: true,
-            fillColor: const Color(0xFFF8FAFC),
+            fillColor: readOnly ? const Color(0xFFF1F5F9) : const Color(0xFFF8FAFC),
             contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(10),

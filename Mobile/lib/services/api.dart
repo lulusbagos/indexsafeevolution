@@ -1007,8 +1007,14 @@ class ApiService {
         'action_id': id.toString(),
         'status': status,
         if (pic != null) 'pic': pic,
-        if (nikPic != null) 'nikPic': nikPic,
-        if (departemenPic != null) 'departemenPic': departemenPic,
+        if (nikPic != null) ...{
+          'nik_pic': nikPic,
+          'nikPic': nikPic,
+        },
+        if (departemenPic != null) ...{
+          'departemen_pic': departemenPic,
+          'departemenPic': departemenPic,
+        },
         if (rencanaPerbaikan != null) 'rencana_perbaikan': rencanaPerbaikan,
         if (perbaikan != null) 'perbaikan': perbaikan,
       };
