@@ -85,6 +85,11 @@ namespace Indexsafe.Api.Controllers
             bool canSpecial = userPerm?.CanScanSpecialPermit ?? false;
             bool canOther = userPerm?.CanScanOther ?? false;
 
+            var scanTarget = (req.ScanType ?? "Auto").Trim();
+            bool isExplicitPermit = scanTarget.Equals("Mine Permit", StringComparison.OrdinalIgnoreCase) || scanTarget.Equals("Permit", StringComparison.OrdinalIgnoreCase);
+            bool isExplicitEvent = scanTarget.Equals("Absen Acara", StringComparison.OrdinalIgnoreCase) || scanTarget.Equals("Attendance", StringComparison.OrdinalIgnoreCase) || scanTarget.Equals("Acara K3", StringComparison.OrdinalIgnoreCase);
+            bool isExplicitVehicle = scanTarget.Equals("Vehicle", StringComparison.OrdinalIgnoreCase) || scanTarget.Equals("Kendaraan", StringComparison.OrdinalIgnoreCase);
+
             // Extract token if code is a full URL (e.g. http://.../QrAttendance/Scan/{token})
             var token = rawCode;
             if (rawCode.Contains("/QrAttendance/Scan/", StringComparison.OrdinalIgnoreCase))
@@ -94,21 +99,23 @@ namespace Indexsafe.Api.Controllers
                 if (token.Contains('?')) token = token.Substring(0, token.IndexOf('?'));
             }
 
-            // 1. Check if token matches an AttendanceEvent in DB_SAP
-            var attendanceEvent = await _context.AttendanceEvents
-                .FirstOrDefaultAsync(e => e.QrToken == token && !e.IsDeleted);
-
-            if (attendanceEvent != null)
+            // 1. Check if token matches an AttendanceEvent in DB_SAP (only if not explicitly Permit or Vehicle)
+            if (!isExplicitPermit && !isExplicitVehicle)
             {
-                if (!canAcara)
+                var attendanceEvent = await _context.AttendanceEvents
+                    .FirstOrDefaultAsync(e => e.QrToken == token && !e.IsDeleted);
+
+                if (attendanceEvent != null)
                 {
-                    return Ok(new QrScanResponse
+                    if (!canAcara)
                     {
-                        Status = false,
-                        ActionType = "Denied",
-                        Message = "Akses Ditolak: Izin presensi acara Anda dinonaktifkan oleh Administrator."
-                    });
-                }
+                        return Ok(new QrScanResponse
+                        {
+                            Status = false,
+                            ActionType = "Denied",
+                            Message = "Akses Ditolak: Izin presensi acara Anda dinonaktifkan oleh Administrator."
+                        });
+                    }
 
                 if (!attendanceEvent.IsActive)
                 {
@@ -227,9 +234,34 @@ namespace Indexsafe.Api.Controllers
                     }
                 });
             }
+            } // Close if (!isExplicitPermit && !isExplicitVehicle)
 
-            // 2. Check if code matches an Employee NIK / Mine Permit Badge or ONE_DB_MITRA QR formula
+            if (isExplicitEvent)
+            {
+                return Ok(new QrScanResponse
+                {
+                    Status = false,
+                    ActionType = "Attendance",
+                    Message = "QR yang dipindai bukan merupakan kode presensi Acara K3 yang terdaftar."
+                });
+            }
             var cleanNik = rawCode.Trim();
+
+            // Extract last segment if code is a URL (e.g. http://.../permit/detail/24010091)
+            if (cleanNik.Contains('/') && !cleanNik.Contains("/QrAttendance/Scan/", StringComparison.OrdinalIgnoreCase))
+            {
+                var segments = cleanNik.Split('/', StringSplitOptions.RemoveEmptyEntries);
+                if (segments.Length > 0)
+                {
+                    var lastSeg = segments.Last().Trim();
+                    if (lastSeg.Contains('?')) lastSeg = lastSeg.Substring(0, lastSeg.IndexOf('?')).Trim();
+                    if (!string.IsNullOrEmpty(lastSeg))
+                    {
+                        cleanNik = lastSeg;
+                    }
+                }
+            }
+
             if (cleanNik.Contains(':'))
             {
                 cleanNik = cleanNik.Split(':').Last().Trim();
@@ -286,7 +318,9 @@ namespace Indexsafe.Api.Controllers
             var targetNik = matchedNikFromQr ?? cleanNik;
 
             // 2. Query Mine Permit dari PostgreSQL Bima (tb_permit)
-            var permit = await _permitService.GetFullPermitDetailAsync(targetNik);
+            var permit = await _permitService.GetFullPermitDetailAsync(targetNik)
+                      ?? await _permitService.GetFullPermitDetailAsync(cleanNik)
+                      ?? await _permitService.GetFullPermitDetailAsync(rawCode);
 
             // Cari data karyawan dari SQL Server (ONE_DB_MITRA / DB_SAP) sebagai fallback / pelengkap
             var employee = await (from k in _context.Karyawans.AsNoTracking()
@@ -398,6 +432,16 @@ namespace Indexsafe.Api.Controllers
                         can_input_keluar_masuk = canKeluarMasuk,
                         can_view_detail = canMine
                     }
+                });
+            }
+
+            if (isExplicitPermit)
+            {
+                return Ok(new QrScanResponse
+                {
+                    Status = false,
+                    ActionType = "MinePermit",
+                    Message = $"Data Mine Permit atau Karyawan dengan kode '{rawCode}' tidak ditemukan di database."
                 });
             }
 

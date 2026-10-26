@@ -207,7 +207,8 @@ namespace Indexsafe.Api.Services
                         FROM public.tb_permit
                         WHERE TRIM(nik) = @nikClean 
                            OR TRIM(employee_id) = @nikClean
-                           OR (@nikNoZero <> '' AND (TRIM(nik) = @nikNoZero OR TRIM(employee_id) = @nikNoZero))
+                           OR TRIM(nomor) = @nikClean
+                           OR (@nikNoZero <> '' AND (TRIM(nik) = @nikNoZero OR TRIM(employee_id) = @nikNoZero OR TRIM(nomor) = @nikNoZero))
                         ORDER BY created_at DESC NULLS LAST, id DESC
                         LIMIT 1;";
 
@@ -505,7 +506,10 @@ namespace Indexsafe.Api.Services
                             pengajuan,
                             berakhir_kerja
                         FROM public.tb_permit
-                        WHERE (TRIM(nik) = @nikClean OR TRIM(employee_id) = @nikClean OR (@nikNoZero <> '' AND (TRIM(nik) = @nikNoZero OR TRIM(employee_id) = @nikNoZero)))
+                        WHERE (TRIM(nik) = @nikClean 
+                            OR TRIM(employee_id) = @nikClean 
+                            OR TRIM(nomor) = @nikClean
+                            OR (@nikNoZero <> '' AND (TRIM(nik) = @nikNoZero OR TRIM(employee_id) = @nikNoZero OR TRIM(nomor) = @nikNoZero)))
                         ORDER BY nik, created_at DESC NULLS LAST, id DESC
                         LIMIT 1;";
 

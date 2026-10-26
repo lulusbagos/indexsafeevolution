@@ -28,6 +28,7 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
   bool _isTorchOn = false;
   bool _isProcessingScan = false;
   double _zoomScale = 0.0; // 0.0 to 1.0
+  String _selectedScanTarget = 'auto'; // 'auto', 'permit', 'event', 'vehicle'
 
   // User Scan Permissions (from Web Admin)
   bool _canScanAcara = true;
@@ -222,7 +223,7 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
       latitude: pos?.latitude,
       longitude: pos?.longitude,
       accuracy: pos?.accuracy,
-      scanType: 'Absen Acara',
+      scanType: _getScanTypeParam(),
     );
 
     if (!mounted) return;
@@ -232,7 +233,7 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
       (err) {
         _showResultDialog(
           isSuccess: false,
-          title: 'Presensi Gagal',
+          title: 'Pemindaian Belum Berhasil',
           message: err['message']?.toString() ?? 'QR tidak valid atau server bermasalah.',
           actionType: 'Error',
         );
@@ -244,11 +245,21 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
         final payload = data['data'] is Map ? Map<String, dynamic>.from(data['data'] as Map) : null;
 
         if (actionType == 'MinePermit' && isSuccess && payload != null) {
-          _showMinePermitActionSheet(payload);
+          _showResultDialog(
+            isSuccess: true,
+            title: 'Mine Permit Terverifikasi',
+            message: msg.isNotEmpty ? msg : 'Data identitas karyawan & permit valid.',
+            actionType: 'MinePermit',
+            data: payload,
+          );
         } else {
           _showResultDialog(
             isSuccess: isSuccess,
-            title: isSuccess ? 'Presensi Berhasil' : 'Informasi Presensi',
+            title: isSuccess
+                ? (actionType == 'Vehicle'
+                    ? 'Unit Kendaraan Ditemukan'
+                    : 'Presensi Berhasil')
+                : 'Informasi Pemindaian',
             message: msg,
             actionType: actionType,
             data: payload,
@@ -259,6 +270,19 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
         _loadEvents();
       },
     );
+  }
+
+  String _getScanTypeParam() {
+    switch (_selectedScanTarget) {
+      case 'permit':
+        return 'Mine Permit';
+      case 'event':
+        return 'Absen Acara';
+      case 'vehicle':
+        return 'Vehicle';
+      default:
+        return 'Auto';
+    }
   }
 
   void _showResultDialog({
@@ -645,7 +669,7 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
                       child: const Text('Tutup', style: TextStyle(fontWeight: FontWeight.w700, color: Color(0xFF475569))),
                     ),
                   ),
-                ] else ...[
+                ] else if (actionType == 'Attendance') ...[
                   Row(
                     children: [
                       Expanded(
@@ -677,6 +701,40 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
                           ),
                           onPressed: () => Navigator.pop(ctx),
                           child: const Text('Selesai', style: TextStyle(fontWeight: FontWeight.w800)),
+                        ),
+                      ),
+                    ],
+                  ),
+                ] else ...[
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                            side: const BorderSide(color: Color(0xFFCBD5E1)),
+                          ),
+                          onPressed: () => Navigator.pop(ctx),
+                          child: const Text('Tutup', style: TextStyle(fontWeight: FontWeight.w700, color: Color(0xFF475569))),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF0284C7),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                          ),
+                          onPressed: () {
+                            Navigator.pop(ctx);
+                            _scannerController?.start();
+                          },
+                          icon: const Icon(Icons.qr_code_scanner_rounded, size: 18),
+                          label: const Text('Pindai Ulang', style: TextStyle(fontWeight: FontWeight.w800)),
                         ),
                       ),
                     ],
@@ -2054,310 +2112,6 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
     );
   }
 
-  void _showMinePermitActionSheet(Map<String, dynamic> data) {
-    final nama = data['nama']?.toString() ?? '-';
-    final nik = data['nik']?.toString() ?? '-';
-    final perusahaan = data['perusahaan']?.toString() ?? '-';
-    final nomorPermit = data['nomor']?.toString() ?? '-';
-    final daysLeft = data['days_left'] is int
-        ? data['days_left'] as int
-        : int.tryParse(data['days_left']?.toString() ?? '0') ?? 0;
-    final isExpired = data['is_expired'] == true || daysLeft < 0;
-
-    final canPelanggaran = data['can_input_pelanggaran'] == true || _canScanPermitPelanggaran;
-    final canKeluarMasuk = data['can_input_keluar_masuk'] == true || _canScanPermitKeluarMasuk;
-
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (sheetCtx) {
-        return Container(
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-          ),
-          padding: const EdgeInsets.fromLTRB(20, 14, 20, 24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Handle bar
-              Center(
-                child: Container(
-                  width: 44,
-                  height: 5,
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade300,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-
-              // Worker Card Header
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: isExpired
-                        ? [const Color(0xFF7F1D1D), const Color(0xFF991B1B)]
-                        : [const Color(0xFF0F172A), const Color(0xFF1E293B)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  borderRadius: BorderRadius.circular(18),
-                  boxShadow: [
-                    BoxShadow(
-                      color: (isExpired ? const Color(0xFFEF4444) : const Color(0xFF0F172A)).withValues(alpha: .2),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 46,
-                      height: 46,
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: .15),
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white.withValues(alpha: .3)),
-                      ),
-                      child: Center(
-                        child: Text(
-                          nama.isNotEmpty ? nama[0].toUpperCase() : '?',
-                          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: Colors.white),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            nama,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: Colors.white),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            'NIK: $nik • $perusahaan',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8), fontWeight: FontWeight.w600),
-                          ),
-                          const SizedBox(height: 4),
-                          Row(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withValues(alpha: .15),
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                child: Text(
-                                  nomorPermit != '-' ? nomorPermit : 'NO PERMIT',
-                                  style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w800, color: Color(0xFF38BDF8)),
-                                ),
-                              ),
-                              const SizedBox(width: 6),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: (isExpired ? const Color(0xFFEF4444) : const Color(0xFF10B981)).withValues(alpha: .25),
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                child: Text(
-                                  isExpired ? 'KADALUARSA' : 'PERMIT AKTIF',
-                                  style: TextStyle(
-                                    fontSize: 9,
-                                    fontWeight: FontWeight.w800,
-                                    color: isExpired ? const Color(0xFFFCA5A5) : const Color(0xFF6EE7B7),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 18),
-
-              // Title Section
-              const Text(
-                'PILIH TINDAKAN OPERASIONAL',
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 0.8,
-                  color: Color(0xFF64748B),
-                ),
-              ),
-              const SizedBox(height: 12),
-
-              // Action 1: Cek Detail
-              _buildPermitActionTile(
-                title: 'Cek Detail',
-                subtitle: 'Lihat masa berlaku permit, zonasi tambang & biodata',
-                icon: Icons.badge_outlined,
-                accentColor: const Color(0xFF0284C7),
-                bgColor: const Color(0xFFF0F9FF),
-                borderColor: const Color(0xFFBAE6FD),
-                isEnabled: true,
-                onTap: () {
-                  Navigator.pop(sheetCtx);
-                  _showResultDialog(
-                    isSuccess: true,
-                    title: 'Mine Permit Terverifikasi',
-                    message: isExpired
-                        ? 'Peringatan: Masa aktif permit pekerja ini telah habis.'
-                        : 'Identitas dan masa aktif permit pekerja aktif terverifikasi.',
-                    actionType: 'MinePermit',
-                    data: data,
-                  );
-                },
-              ),
-              const SizedBox(height: 10),
-
-              // Action 2: Input Pelanggaran
-              _buildPermitActionTile(
-                title: 'Input Pelanggaran',
-                subtitle: canPelanggaran
-                    ? 'Catat temuan pelanggaran K3, SP, atau ketidakpatuhan SOP'
-                    : 'Akses pencatatan pelanggaran tidak aktif untuk akun Anda',
-                icon: Icons.report_problem_rounded,
-                accentColor: const Color(0xFFDC2626),
-                bgColor: canPelanggaran ? const Color(0xFFFEF2F2) : const Color(0xFFF8FAFC),
-                borderColor: canPelanggaran ? const Color(0xFFFECACA) : const Color(0xFFE2E8F0),
-                isEnabled: canPelanggaran,
-                onTap: () {
-                  Navigator.pop(sheetCtx);
-                  _showInputViolationSheet(data);
-                },
-              ),
-              const SizedBox(height: 10),
-
-              // Action 3: Input Keluar Masuk Karyawan
-              _buildPermitActionTile(
-                title: 'Input Keluar Masuk Karyawan',
-                subtitle: canKeluarMasuk
-                    ? 'Catat nomor unit dan keperluan melintas pos/gate'
-                    : 'Akses cek keluar masuk tidak aktif untuk akun Anda',
-                icon: Icons.door_sliding_outlined,
-                accentColor: const Color(0xFF0D9488),
-                bgColor: canKeluarMasuk ? const Color(0xFFF0FDFA) : const Color(0xFFF8FAFC),
-                borderColor: canKeluarMasuk ? const Color(0xFF99F6E4) : const Color(0xFFE2E8F0),
-                isEnabled: canKeluarMasuk,
-                onTap: () {
-                  Navigator.pop(sheetCtx);
-                  _showInputGateLogSheet(data);
-                },
-              ),
-              const SizedBox(height: 16),
-
-              // Cancel Button
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton(
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 13),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                    side: const BorderSide(color: Color(0xFFCBD5E1)),
-                  ),
-                  onPressed: () => Navigator.pop(sheetCtx),
-                  child: const Text('Batal / Scan Ulang', style: TextStyle(fontWeight: FontWeight.w700, color: Color(0xFF475569))),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildPermitActionTile({
-    required String title,
-    required String subtitle,
-    required IconData icon,
-    required Color accentColor,
-    required Color bgColor,
-    required Color borderColor,
-    required bool isEnabled,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-      onTap: isEnabled ? onTap : null,
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        decoration: BoxDecoration(
-          color: bgColor,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: borderColor, width: 1.2),
-        ),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: (isEnabled ? accentColor : const Color(0xFF94A3B8)).withValues(alpha: .15),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(icon, color: isEnabled ? accentColor : const Color(0xFF94A3B8), size: 22),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Text(
-                        title,
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w800,
-                          color: isEnabled ? const Color(0xFF0F172A) : const Color(0xFF94A3B8),
-                        ),
-                      ),
-                      if (!isEnabled) ...[
-                        const SizedBox(width: 6),
-                        const Icon(Icons.lock_rounded, size: 13, color: Color(0xFF94A3B8)),
-                      ],
-                    ],
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    subtitle,
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: isEnabled ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
-                      height: 1.3,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 8),
-            Icon(
-              Icons.chevron_right_rounded,
-              color: isEnabled ? accentColor : const Color(0xFFCBD5E1),
-              size: 20,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   void _showInputGateLogSheet(Map<String, dynamic> permitData) {
     final formKey = GlobalKey<FormState>();
     final nik = permitData['nik']?.toString() ?? '-';
@@ -3639,61 +3393,8 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
               ),
             ),
 
-            // Top Instructions Pill with Frosted Glass
-            Positioned(
-              top: 20,
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(22),
-                child: BackdropFilter(
-                  filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8.5),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF0F172A).withValues(alpha: .80),
-                      borderRadius: BorderRadius.circular(22),
-                      border: Border.all(
-                        color: (!_canScanAcara && !_canScanMinePermit)
-                            ? const Color(0xFFEF4444).withValues(alpha: .4)
-                            : Colors.white.withValues(alpha: .15),
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          (!_canScanAcara && !_canScanMinePermit)
-                              ? Icons.gpp_bad_rounded
-                              : (_canScanMinePermit && !_canScanAcara)
-                                  ? Icons.badge_rounded
-                                  : Icons.center_focus_strong_rounded,
-                          size: 16,
-                          color: (!_canScanAcara && !_canScanMinePermit)
-                              ? const Color(0xFFEF4444)
-                              : (_canScanMinePermit && !_canScanAcara)
-                                  ? const Color(0xFF10B981)
-                                  : const Color(0xFF38BDF8),
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          (!_canScanAcara && !_canScanMinePermit)
-                              ? 'Izin scan dinonaktifkan Admin (User Scan)'
-                              : (_canScanMinePermit && !_canScanAcara)
-                                  ? 'Mode Khusus: Scan Mine Permit & Petugas'
-                                  : 'Arahkan kamera ke QR Acara atau Mine Permit',
-                          style: TextStyle(
-                            color: (!_canScanAcara && !_canScanMinePermit)
-                                ? const Color(0xFFFCA5A5)
-                                : Colors.white,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
+            // Top Scan Target Mode Selector & Instructions
+            _buildScanTargetModeSelector(),
 
             // Bottom Camera Controls Bar (Safely above bottom navigation bar)
             Positioned(
@@ -3829,6 +3530,179 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
             fontSize: 11,
             fontWeight: isSelected ? FontWeight.w900 : FontWeight.w600,
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildScanTargetModeSelector() {
+    return Positioned(
+      top: 14,
+      left: 14,
+      right: 14,
+      child: Column(
+        children: [
+          // Mode Chips Bar
+          ClipRRect(
+            borderRadius: BorderRadius.circular(22),
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 5),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF0F172A).withValues(alpha: .85),
+                  borderRadius: BorderRadius.circular(22),
+                  border: Border.all(color: Colors.white.withValues(alpha: .15)),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: .25),
+                      blurRadius: 16,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  physics: const BouncingScrollPhysics(),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _buildScanTargetChip(
+                        target: 'auto',
+                        label: 'Otomatis',
+                        icon: Icons.auto_awesome_rounded,
+                        activeColor: const Color(0xFF38BDF8),
+                      ),
+                      const SizedBox(width: 5),
+                      _buildScanTargetChip(
+                        target: 'permit',
+                        label: 'Mine Permit',
+                        icon: Icons.badge_rounded,
+                        activeColor: const Color(0xFF10B981),
+                      ),
+                      const SizedBox(width: 5),
+                      _buildScanTargetChip(
+                        target: 'event',
+                        label: 'Acara K3',
+                        icon: Icons.event_available_rounded,
+                        activeColor: const Color(0xFF0EA5E9),
+                      ),
+                      if (_canScanCommissioning) ...[
+                        const SizedBox(width: 5),
+                        _buildScanTargetChip(
+                          target: 'vehicle',
+                          label: 'Kendaraan',
+                          icon: Icons.agriculture_rounded,
+                          activeColor: const Color(0xFFF59E0B),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+
+          // Sub-guidance Pill
+          ClipRRect(
+            borderRadius: BorderRadius.circular(16),
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF0F172A).withValues(alpha: .70),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: Colors.white.withValues(alpha: .1)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      _selectedScanTarget == 'permit'
+                          ? Icons.badge_rounded
+                          : _selectedScanTarget == 'event'
+                              ? Icons.event_available_rounded
+                              : _selectedScanTarget == 'vehicle'
+                                  ? Icons.directions_car_rounded
+                                  : Icons.center_focus_strong_rounded,
+                      size: 13,
+                      color: _selectedScanTarget == 'permit'
+                          ? const Color(0xFF10B981)
+                          : _selectedScanTarget == 'event'
+                              ? const Color(0xFF0EA5E9)
+                              : _selectedScanTarget == 'vehicle'
+                                  ? const Color(0xFFF59E0B)
+                                  : const Color(0xFF38BDF8),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      _selectedScanTarget == 'permit'
+                          ? 'Fokus scan Mine Permit, SIMPER & Karyawan'
+                          : _selectedScanTarget == 'event'
+                              ? 'Fokus scan Barcode Presensi Acara K3'
+                              : _selectedScanTarget == 'vehicle'
+                                  ? 'Fokus scan Commissioning Kendaraan / Unit'
+                                  : 'Mode Cerdas: Mendeteksi Acara, Permit, atau Unit',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildScanTargetChip({
+    required String target,
+    required String label,
+    required IconData icon,
+    required Color activeColor,
+  }) {
+    final isSelected = _selectedScanTarget == target;
+    return InkWell(
+      onTap: () {
+        HapticFeedback.selectionClick();
+        setState(() => _selectedScanTarget = target);
+      },
+      borderRadius: BorderRadius.circular(16),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: isSelected ? activeColor.withValues(alpha: .22) : Colors.transparent,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: isSelected ? activeColor : Colors.transparent,
+            width: 1.2,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 13,
+              color: isSelected ? activeColor : const Color(0xFF94A3B8),
+            ),
+            const SizedBox(width: 5),
+            Text(
+              label,
+              style: TextStyle(
+                color: isSelected ? Colors.white : const Color(0xFF94A3B8),
+                fontSize: 11.5,
+                fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+              ),
+            ),
+          ],
         ),
       ),
     );
