@@ -191,8 +191,12 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
     setState(() => _isProcessingScan = true);
     HapticFeedback.mediumImpact();
 
-    // Show temporary scanning overlay
+    // Hentikan camera sementara agar tidak frame-spam atau freeze di latar belakang
+    await _scannerController?.stop();
+
+    // Show temporary scanning overlay dengan pesan GENERAL
     if (!mounted) return;
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Row(
@@ -203,10 +207,10 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
               child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
             ),
             SizedBox(width: 14),
-            Text('Memverifikasi QR & Kehadiran...', style: TextStyle(fontWeight: FontWeight.w600)),
+            Text('Memproses & Memverifikasi QR Code...', style: TextStyle(fontWeight: FontWeight.w600)),
           ],
         ),
-        duration: Duration(seconds: 2),
+        duration: Duration(seconds: 4),
         backgroundColor: Color(0xFF0F172A),
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
@@ -227,25 +231,25 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
     );
 
     if (!mounted) return;
-    setState(() => _isProcessingScan = false);
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
 
-    res.fold(
-      (err) {
-        _showResultDialog(
+    await res.fold(
+      (err) async {
+        await _showResultDialog(
           isSuccess: false,
           title: 'Pemindaian Belum Berhasil',
           message: err['message']?.toString() ?? 'QR tidak valid atau server bermasalah.',
           actionType: 'Error',
         );
       },
-      (data) {
+      (data) async {
         final isSuccess = data['status'] == true;
         final msg = data['message']?.toString() ?? '';
         final actionType = data['actionType']?.toString() ?? 'Attendance';
         final payload = data['data'] is Map ? Map<String, dynamic>.from(data['data'] as Map) : null;
 
         if (actionType == 'MinePermit' && isSuccess && payload != null) {
-          _showResultDialog(
+          await _showResultDialog(
             isSuccess: true,
             title: 'Mine Permit Terverifikasi',
             message: msg.isNotEmpty ? msg : 'Data identitas karyawan & permit valid.',
@@ -253,7 +257,7 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
             data: payload,
           );
         } else {
-          _showResultDialog(
+          await _showResultDialog(
             isSuccess: isSuccess,
             title: isSuccess
                 ? (actionType == 'Vehicle'
@@ -270,6 +274,16 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
         _loadEvents();
       },
     );
+
+    // Setelah modal sheet ditutup (Back HP, tombol Tutup, atau swipe down):
+    // Reset flag dan hidupkan kembali scanner kamera!
+    if (mounted) {
+      setState(() => _isProcessingScan = false);
+      await Future.delayed(const Duration(milliseconds: 350));
+      if (mounted) {
+        await _scannerController?.start();
+      }
+    }
   }
 
   String _getScanTypeParam() {
@@ -285,14 +299,14 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
     }
   }
 
-  void _showResultDialog({
+  Future<void> _showResultDialog({
     required bool isSuccess,
     required String title,
     required String message,
     required String actionType,
     Map<String, dynamic>? data,
-  }) {
-    showModalBottomSheet<void>(
+  }) async {
+    await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
@@ -357,16 +371,19 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
           statusBadgeText = 'TEPAT WAKTU';
         }
 
+        final bottomPadding = MediaQuery.of(ctx).padding.bottom;
+
         return Container(
           constraints: BoxConstraints(
-            maxHeight: MediaQuery.of(ctx).size.height * 0.9,
+            maxHeight: MediaQuery.of(ctx).size.height * 0.92,
           ),
           decoration: const BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
           ),
-          padding: const EdgeInsets.fromLTRB(24, 16, 24, 28),
+          padding: EdgeInsets.fromLTRB(20, 16, 20, bottomPadding + 24),
           child: SingleChildScrollView(
+            physics: const BouncingScrollPhysics(),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -379,19 +396,19 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
                     borderRadius: BorderRadius.circular(10),
                   ),
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 18),
 
                 // Status Icon
                 Container(
-                  width: 68,
-                  height: 68,
+                  width: 64,
+                  height: 64,
                   decoration: BoxDecoration(
-                    color: primaryColor.withValues(alpha: .12),
+                    color: primaryColor.withValues(alpha: .14),
                     shape: BoxShape.circle,
                   ),
-                  child: Icon(iconData, size: 44, color: primaryColor),
+                  child: Icon(iconData, size: 40, color: primaryColor),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 14),
 
                 Text(
                   title,
@@ -400,6 +417,7 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
                     fontSize: 20,
                     fontWeight: FontWeight.w900,
                     color: Color(0xFF0F172A),
+                    letterSpacing: -0.3,
                   ),
                 ),
                 const SizedBox(height: 6),
@@ -410,19 +428,19 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
                   decoration: BoxDecoration(
                     color: primaryColor.withValues(alpha: .12),
                     borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: primaryColor.withValues(alpha: .25)),
+                    border: Border.all(color: primaryColor.withValues(alpha: .3), width: 1.2),
                   ),
                   child: Text(
                     statusBadgeText,
                     style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w800,
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w900,
                       letterSpacing: 0.5,
                       color: primaryColor,
                     ),
                   ),
                 ),
-                const SizedBox(height: 14),
+                const SizedBox(height: 10),
 
                 Text(
                   message,
@@ -433,7 +451,109 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
                     height: 1.4,
                   ),
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 18),
+
+                // Quick Officer Action Header if user has permit officer permissions
+                if (isMinePermit && data != null && (canKeluarMasuk || canPelanggaran)) ...[
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF0FDFA),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: const Color(0xFF5EEAD4), width: 1.5),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF0D9488).withValues(alpha: .08),
+                          blurRadius: 10,
+                          offset: const Offset(0, 3),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            const Icon(Icons.verified_user_rounded, size: 16, color: Color(0xFF0D9488)),
+                            const SizedBox(width: 7),
+                            const Expanded(
+                              child: Text(
+                                'AKSI HAK AKSES PETUGAS',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: 0.6,
+                                  color: Color(0xFF0F766E),
+                                ),
+                              ),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF0D9488).withValues(alpha: .15),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: const Text(
+                                'AKTIF',
+                                style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.w900, color: Color(0xFF0D9488)),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                        Row(
+                          children: [
+                            if (canKeluarMasuk)
+                              Expanded(
+                                child: ElevatedButton.icon(
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color(0xFF0D9488),
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(vertical: 12),
+                                    elevation: 2,
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                  ),
+                                  onPressed: () {
+                                    Navigator.pop(ctx);
+                                    _showInputGateLogSheet(data);
+                                  },
+                                  icon: const Icon(Icons.door_sliding_outlined, size: 16),
+                                  label: const Text(
+                                    'Keluar Masuk',
+                                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w900),
+                                  ),
+                                ),
+                              ),
+                            if (canKeluarMasuk && canPelanggaran) const SizedBox(width: 8),
+                            if (canPelanggaran)
+                              Expanded(
+                                child: ElevatedButton.icon(
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color(0xFFDC2626),
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(vertical: 12),
+                                    elevation: 2,
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                  ),
+                                  onPressed: () {
+                                    Navigator.pop(ctx);
+                                    _showInputViolationSheet(data);
+                                  },
+                                  icon: const Icon(Icons.report_problem_rounded, size: 16),
+                                  label: const Text(
+                                    'Pelanggaran K3',
+                                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w900),
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                ],
 
                 // Detail Card if attendance event
                 if (isAttendance && eventName.isNotEmpty) ...[
@@ -771,21 +891,19 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
         .where((z) => z.isNotEmpty)
         .toList();
 
-    final statusColor = isExpired ? const Color(0xFFEF4444) : const Color(0xFF10B981);
-
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
         color: const Color(0xFF0F172A),
         borderRadius: BorderRadius.circular(22),
         border: Border.all(
-          color: isExpired ? const Color(0xFFEF4444) : const Color(0xFF38BDF8).withValues(alpha: .35),
-          width: 1.5,
+          color: isExpired ? const Color(0xFFEF4444) : const Color(0xFF38BDF8),
+          width: 1.8,
         ),
         boxShadow: [
           BoxShadow(
-            color: (isExpired ? const Color(0xFFEF4444) : const Color(0xFF0284C7)).withValues(alpha: .2),
-            blurRadius: 18,
+            color: (isExpired ? const Color(0xFFEF4444) : const Color(0xFF0284C7)).withValues(alpha: .28),
+            blurRadius: 20,
             offset: const Offset(0, 6),
           ),
         ],
@@ -797,13 +915,18 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
-              color: isExpired
-                  ? const Color(0xFF7F1D1D).withValues(alpha: .4)
-                  : const Color(0xFF064E3B).withValues(alpha: .35),
+              gradient: LinearGradient(
+                colors: isExpired
+                    ? [const Color(0xFF991B1B), const Color(0xFF7F1D1D)]
+                    : [const Color(0xFF065F46), const Color(0xFF047857)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
               borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
               border: Border(
                 bottom: BorderSide(
-                  color: (isExpired ? const Color(0xFFEF4444) : const Color(0xFF10B981)).withValues(alpha: .3),
+                  color: isExpired ? const Color(0xFFFCA5A5) : const Color(0xFF34D399),
+                  width: 1.5,
                 ),
               ),
             ),
@@ -815,19 +938,19 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
                     children: [
                       Icon(
                         isExpired ? Icons.warning_rounded : Icons.verified_user_rounded,
-                        size: 16,
-                        color: statusColor,
+                        size: 18,
+                        color: Colors.white,
                       ),
                       const SizedBox(width: 8),
                       Flexible(
                         child: Text(
                           perusahaan.toUpperCase(),
                           overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 11,
+                          style: const TextStyle(
+                            fontSize: 12,
                             fontWeight: FontWeight.w900,
                             letterSpacing: 0.6,
-                            color: isExpired ? const Color(0xFFFCA5A5) : const Color(0xFF6EE7B7),
+                            color: Colors.white,
                           ),
                         ),
                       ),
@@ -837,17 +960,17 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
-                    color: statusColor.withValues(alpha: .2),
+                    color: Colors.black.withValues(alpha: .35),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: statusColor, width: 1),
+                    border: Border.all(color: Colors.white, width: 1.2),
                   ),
                   child: Text(
                     isExpired ? 'EXPIRED' : status.toUpperCase(),
-                    style: TextStyle(
-                      fontSize: 10,
+                    style: const TextStyle(
+                      fontSize: 10.5,
                       fontWeight: FontWeight.w900,
-                      color: statusColor,
-                      letterSpacing: 0.5,
+                      color: Colors.white,
+                      letterSpacing: 0.6,
                     ),
                   ),
                 ),
@@ -863,23 +986,23 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
                 // Nomor Permit Badge
                 Container(
                   width: double.infinity,
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
                   decoration: BoxDecoration(
                     color: const Color(0xFF1E293B),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: const Color(0xFF334155)),
+                    border: Border.all(color: const Color(0xFF0EA5E9), width: 1.5),
                   ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Row(
                         children: [
-                          const Icon(Icons.badge_outlined, size: 18, color: Color(0xFF38BDF8)),
+                          const Icon(Icons.badge_outlined, size: 19, color: Color(0xFF38BDF8)),
                           const SizedBox(width: 8),
                           Text(
                             nomor.isNotEmpty && nomor != '-' ? nomor : 'NO PERMIT TIDAK TERDATA',
                             style: const TextStyle(
-                              fontSize: 13,
+                              fontSize: 14,
                               fontWeight: FontWeight.w900,
                               color: Colors.white,
                               letterSpacing: 0.5,
@@ -888,16 +1011,17 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
                         ],
                       ),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF0284C7).withValues(alpha: .2),
+                          color: const Color(0xFF0284C7).withValues(alpha: .3),
                           borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: const Color(0xFF38BDF8), width: 1),
                         ),
                         child: Text(
                           pengajuan,
                           style: const TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w800,
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w900,
                             color: Color(0xFF38BDF8),
                           ),
                         ),
@@ -942,8 +1066,8 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
                               child: Stack(
                                 children: [
                                   Container(
-                                    width: 62,
-                                    height: 62,
+                                    width: 66,
+                                    height: 66,
                                     decoration: BoxDecoration(
                                       color: const Color(0xFF1E293B),
                                       borderRadius: BorderRadius.circular(16),
@@ -951,15 +1075,15 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
                                         color: isExpired
                                             ? const Color(0xFFEF4444)
                                             : const Color(0xFF38BDF8),
-                                        width: 1.8,
+                                        width: 2.2,
                                       ),
                                       boxShadow: [
                                         BoxShadow(
                                           color: (isExpired
                                                   ? const Color(0xFFEF4444)
                                                   : const Color(0xFF38BDF8))
-                                              .withValues(alpha: .25),
-                                          blurRadius: 10,
+                                              .withValues(alpha: .35),
+                                          blurRadius: 12,
                                           offset: const Offset(0, 3),
                                         ),
                                       ],
@@ -988,7 +1112,7 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
                                                   child: Text(
                                                     nama.isNotEmpty ? nama[0].toUpperCase() : '?',
                                                     style: const TextStyle(
-                                                      fontSize: 24,
+                                                      fontSize: 26,
                                                       fontWeight: FontWeight.w900,
                                                       color: Colors.white,
                                                     ),
@@ -1000,7 +1124,7 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
                                               child: Text(
                                                 nama.isNotEmpty ? nama[0].toUpperCase() : '?',
                                                 style: const TextStyle(
-                                                  fontSize: 24,
+                                                  fontSize: 26,
                                                   fontWeight: FontWeight.w900,
                                                   color: Colors.white,
                                                 ),
@@ -1013,14 +1137,14 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
                                     bottom: 0,
                                     right: 0,
                                     child: Container(
-                                      padding: const EdgeInsets.all(3),
+                                      padding: const EdgeInsets.all(3.5),
                                       decoration: const BoxDecoration(
                                         color: Color(0xFF0284C7),
                                         shape: BoxShape.circle,
                                       ),
                                       child: const Icon(
                                         Icons.zoom_in_rounded,
-                                        size: 11,
+                                        size: 12,
                                         color: Colors.white,
                                       ),
                                     ),
@@ -1036,30 +1160,30 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
                                   Text(
                                     nama,
                                     style: const TextStyle(
-                                      fontSize: 16,
+                                      fontSize: 17,
                                       fontWeight: FontWeight.w900,
                                       color: Colors.white,
                                       letterSpacing: 0.2,
                                     ),
                                   ),
-                                  const SizedBox(height: 3),
+                                  const SizedBox(height: 4),
                                   Row(
                                     children: [
                                       Text(
                                         'NIK: $nik',
                                         style: const TextStyle(
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w800,
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w900,
                                           color: Color(0xFF38BDF8),
                                         ),
                                       ),
                                       if (departemen.isNotEmpty && departemen != '-') ...[
-                                        const Text(' • ', style: TextStyle(color: Color(0xFF64748B))),
+                                        const Text(' • ', style: TextStyle(color: Color(0xFF94A3B8), fontWeight: FontWeight.w900)),
                                         Flexible(
                                           child: Text(
                                             departemen,
                                             overflow: TextOverflow.ellipsis,
-                                            style: const TextStyle(fontSize: 11.5, color: Color(0xFF94A3B8), fontWeight: FontWeight.w600),
+                                            style: const TextStyle(fontSize: 12, color: Color(0xFFF1F5F9), fontWeight: FontWeight.w700),
                                           ),
                                         ),
                                       ],
@@ -1069,7 +1193,7 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
                                     const SizedBox(height: 3),
                                     Text(
                                       jabatan,
-                                      style: const TextStyle(fontSize: 12, color: Color(0xFFE2E8F0), fontWeight: FontWeight.w600),
+                                      style: const TextStyle(fontSize: 13, color: Colors.white, fontWeight: FontWeight.w800),
                                     ),
                                   ],
                                 ],
@@ -1082,34 +1206,34 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
                         if ((noHp.isNotEmpty && noHp != '-') || (email.isNotEmpty && email != '-') || (gender.isNotEmpty && gender != '-')) ...[
                           const SizedBox(height: 12),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                             decoration: BoxDecoration(
-                              color: const Color(0xFF1E293B).withValues(alpha: .7),
+                              color: const Color(0xFF1E293B),
                               borderRadius: BorderRadius.circular(10),
-                              border: Border.all(color: const Color(0xFF334155)),
+                              border: Border.all(color: const Color(0xFF475569)),
                             ),
                             child: Row(
                               children: [
                                 if (noHp.isNotEmpty && noHp != '-') ...[
-                                  const Icon(Icons.phone_iphone_rounded, size: 13, color: Color(0xFF38BDF8)),
+                                  const Icon(Icons.phone_iphone_rounded, size: 14, color: Color(0xFF38BDF8)),
                                   const SizedBox(width: 5),
-                                  Text(noHp, style: const TextStyle(fontSize: 11, color: Colors.white, fontWeight: FontWeight.w600)),
+                                  Text(noHp, style: const TextStyle(fontSize: 12, color: Colors.white, fontWeight: FontWeight.w800)),
                                   const SizedBox(width: 12),
                                 ],
                                 if (gender.isNotEmpty && gender != '-') ...[
-                                  const Icon(Icons.person_outline_rounded, size: 13, color: Color(0xFF94A3B8)),
+                                  const Icon(Icons.person_outline_rounded, size: 14, color: Color(0xFF38BDF8)),
                                   const SizedBox(width: 4),
-                                  Text(gender, style: const TextStyle(fontSize: 11, color: Color(0xFFCBD5E1))),
+                                  Text(gender, style: const TextStyle(fontSize: 11.5, color: Color(0xFFE2E8F0), fontWeight: FontWeight.w700)),
                                   const SizedBox(width: 12),
                                 ],
                                 if (email.isNotEmpty && email != '-') ...[
-                                  const Icon(Icons.mail_outline_rounded, size: 13, color: Color(0xFF94A3B8)),
+                                  const Icon(Icons.mail_outline_rounded, size: 14, color: Color(0xFF38BDF8)),
                                   const SizedBox(width: 4),
                                   Flexible(
                                     child: Text(
                                       email,
                                       overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(fontSize: 10.5, color: Color(0xFF94A3B8)),
+                                      style: const TextStyle(fontSize: 11, color: Color(0xFFE2E8F0), fontWeight: FontWeight.w600),
                                     ),
                                   ),
                                 ],
@@ -1129,7 +1253,7 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
                   decoration: BoxDecoration(
                     color: const Color(0xFF1E293B),
                     borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: const Color(0xFF334155)),
+                    border: Border.all(color: const Color(0xFF475569), width: 1.2),
                   ),
                   child: Column(
                     children: [
@@ -1143,34 +1267,34 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
                               iconColor: const Color(0xFF38BDF8),
                             ),
                           ),
-                          Container(width: 1, height: 36, color: const Color(0xFF334155)),
+                          Container(width: 1, height: 38, color: const Color(0xFF475569)),
                           Expanded(
                             child: _buildPermitDateItem(
                               label: 'Masa Aktif Permit',
                               value: _formatDateOnly(masaAktif),
                               icon: isExpired ? Icons.event_busy_rounded : Icons.verified_rounded,
-                              iconColor: statusColor,
+                              iconColor: isExpired ? const Color(0xFFEF4444) : const Color(0xFF34D399),
                               isHighlight: true,
-                              highlightColor: statusColor,
+                              highlightColor: isExpired ? const Color(0xFFEF4444) : const Color(0xFF34D399),
                             ),
                           ),
                         ],
                       ),
-                      const Divider(height: 18, color: Color(0xFF334155)),
+                      const Divider(height: 18, color: Color(0xFF475569)),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Row(
                             children: [
-                              const Icon(Icons.timer_outlined, size: 14, color: Color(0xFF94A3B8)),
+                              Icon(Icons.timer_outlined, size: 15, color: isExpired ? const Color(0xFFF87171) : const Color(0xFF34D399)),
                               const SizedBox(width: 6),
                               Text(
                                 isExpired
                                     ? 'Kedaluwarsa (${daysLeft.abs()} hari lalu)'
                                     : 'Sisa Masa Aktif: $daysLeft hari',
                                 style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w700,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w900,
                                   color: isExpired ? const Color(0xFFF87171) : const Color(0xFF34D399),
                                 ),
                               ),
@@ -1179,7 +1303,7 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
                           if (berakhirKerja.isNotEmpty && berakhirKerja != '-')
                             Text(
                               'Kontrak: ${_formatDateOnly(berakhirKerja)}',
-                              style: const TextStyle(fontSize: 10, color: Color(0xFF94A3B8)),
+                              style: const TextStyle(fontSize: 11, color: Color(0xFFE2E8F0), fontWeight: FontWeight.w700),
                             ),
                         ],
                       ),
@@ -1198,8 +1322,9 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
                       borderRadius: BorderRadius.circular(14),
                       border: Border.all(
                         color: data['is_simper_active'] == true
-                            ? const Color(0xFF0EA5E9).withValues(alpha: .5)
-                            : const Color(0xFFEF4444).withValues(alpha: .5),
+                            ? const Color(0xFF0EA5E9)
+                            : const Color(0xFFEF4444),
+                        width: 1.5,
                       ),
                     ),
                     child: Column(
@@ -1210,12 +1335,12 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
                           children: [
                             const Row(
                               children: [
-                                Icon(Icons.drive_eta_rounded, size: 16, color: Color(0xFF38BDF8)),
+                                Icon(Icons.drive_eta_rounded, size: 17, color: Color(0xFF38BDF8)),
                                 SizedBox(width: 6),
                                 Text(
                                   'SIMPER TERDAFTAR',
                                   style: TextStyle(
-                                    fontSize: 11,
+                                    fontSize: 11.5,
                                     fontWeight: FontWeight.w900,
                                     letterSpacing: 0.8,
                                     color: Color(0xFF38BDF8),
@@ -1224,18 +1349,24 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
                               ],
                             ),
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                               decoration: BoxDecoration(
                                 color: (data['is_simper_active'] == true
                                         ? const Color(0xFF10B981)
                                         : const Color(0xFFEF4444))
-                                    .withValues(alpha: .2),
+                                    .withValues(alpha: .25),
                                 borderRadius: BorderRadius.circular(6),
+                                border: Border.all(
+                                  color: data['is_simper_active'] == true
+                                      ? const Color(0xFF34D399)
+                                      : const Color(0xFFF87171),
+                                  width: 1,
+                                ),
                               ),
                               child: Text(
                                 data['is_simper_active'] == true ? 'SIMPER AKTIF' : 'EXPIRED',
                                 style: TextStyle(
-                                  fontSize: 9.5,
+                                  fontSize: 10,
                                   fontWeight: FontWeight.w900,
                                   color: data['is_simper_active'] == true
                                       ? const Color(0xFF34D399)
@@ -1245,17 +1376,18 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
                             ),
                           ],
                         ),
-                        const SizedBox(height: 8),
+                        const SizedBox(height: 10),
                         Row(
                           children: [
                             Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  const Text('No. SIMPER', style: TextStyle(fontSize: 10, color: Color(0xFF94A3B8))),
+                                  const Text('No. SIMPER', style: TextStyle(fontSize: 10.5, color: Color(0xFFCBD5E1), fontWeight: FontWeight.w600)),
+                                  const SizedBox(height: 2),
                                   Text(
                                     data['simper_nomor']?.toString() ?? '-',
-                                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Colors.white),
+                                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900, color: Colors.white),
                                   ),
                                 ],
                               ),
@@ -1264,24 +1396,25 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  const Text('Jenis SIM & No', style: TextStyle(fontSize: 10, color: Color(0xFF94A3B8))),
+                                  const Text('Jenis SIM & No', style: TextStyle(fontSize: 10.5, color: Color(0xFFCBD5E1), fontWeight: FontWeight.w600)),
+                                  const SizedBox(height: 2),
                                   Text(
                                     '${data['jenis_sim'] ?? '-'} (${data['nomor_sim'] ?? '-'})',
-                                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFFCBD5E1)),
+                                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Colors.white),
                                   ),
                                 ],
                               ),
                             ),
                           ],
                         ),
-                        const SizedBox(height: 6),
+                        const SizedBox(height: 8),
                         Row(
                           children: [
-                            const Icon(Icons.event_outlined, size: 12, color: Color(0xFF94A3B8)),
-                            const SizedBox(width: 4),
+                            const Icon(Icons.event_outlined, size: 13, color: Color(0xFF38BDF8)),
+                            const SizedBox(width: 5),
                             Text(
                               'Masa Berlaku SIMPER: ${_formatDateOnly(data['simper_masa_berlaku']?.toString() ?? '-')}',
-                              style: const TextStyle(fontSize: 10.5, color: Color(0xFF94A3B8)),
+                              style: const TextStyle(fontSize: 11, color: Color(0xFFE2E8F0), fontWeight: FontWeight.w700),
                             ),
                           ],
                         ),
@@ -1294,22 +1427,22 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
                 // Zonasi Akses Tambang
                 const Row(
                   children: [
-                    Icon(Icons.shield_outlined, size: 14, color: Color(0xFF38BDF8)),
+                    Icon(Icons.shield_outlined, size: 15, color: Color(0xFF38BDF8)),
                     SizedBox(width: 6),
                     Text(
                       'ZONASI AKSES TAMBANG',
                       style: TextStyle(
-                        fontSize: 10,
+                        fontSize: 11,
                         fontWeight: FontWeight.w900,
                         letterSpacing: 0.8,
-                        color: Color(0xFF94A3B8),
+                        color: Color(0xFF38BDF8),
                       ),
                     ),
                   ],
                 ),
                 const SizedBox(height: 8),
                 if (zones.isEmpty)
-                  const Text('Tidak ada izin akses area yang tercatat', style: TextStyle(fontSize: 11, color: Color(0xFF64748B)))
+                  const Text('Tidak ada izin akses area yang tercatat', style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8)))
                 else
                   Wrap(
                     spacing: 6,
@@ -1339,17 +1472,17 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
         children: [
           Row(
             children: [
-              Icon(icon, size: 12, color: iconColor),
-              const SizedBox(width: 4),
-              Text(label, style: const TextStyle(fontSize: 10, color: Color(0xFF94A3B8), fontWeight: FontWeight.w600)),
+              Icon(icon, size: 13, color: iconColor),
+              const SizedBox(width: 5),
+              Text(label, style: const TextStyle(fontSize: 10.5, color: Color(0xFFCBD5E1), fontWeight: FontWeight.w700)),
             ],
           ),
-          const SizedBox(height: 3),
+          const SizedBox(height: 4),
           Text(
             value,
             style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w800,
+              fontSize: 13,
+              fontWeight: FontWeight.w900,
               color: isHighlight ? (highlightColor ?? Colors.white) : Colors.white,
             ),
           ),
@@ -1360,29 +1493,29 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
 
   Widget _buildZoneChip(String zone) {
     Color chipBg;
-    Color chipText;
+    Color chipBorder;
     IconData chipIcon;
 
     final upper = zone.toUpperCase();
     if (upper == 'PIT') {
-      chipBg = const Color(0xFFEA580C).withValues(alpha: .2);
-      chipText = const Color(0xFFFB923C);
+      chipBg = const Color(0xFF9A3412);
+      chipBorder = const Color(0xFFFB923C);
       chipIcon = Icons.terrain_rounded;
     } else if (upper == 'PORT') {
-      chipBg = const Color(0xFF0284C7).withValues(alpha: .2);
-      chipText = const Color(0xFF38BDF8);
+      chipBg = const Color(0xFF0369A1);
+      chipBorder = const Color(0xFF38BDF8);
       chipIcon = Icons.directions_boat_rounded;
     } else if (upper.contains('CPP')) {
-      chipBg = const Color(0xFF7C3AED).withValues(alpha: .2);
-      chipText = const Color(0xFFA78BFA);
+      chipBg = const Color(0xFF6B21A8);
+      chipBorder = const Color(0xFFC084FC);
       chipIcon = Icons.factory_rounded;
     } else if (upper == 'GNR' || upper == 'OFFICE') {
-      chipBg = const Color(0xFF059669).withValues(alpha: .2);
-      chipText = const Color(0xFF34D399);
+      chipBg = const Color(0xFF065F46);
+      chipBorder = const Color(0xFF34D399);
       chipIcon = Icons.domain_rounded;
     } else {
       chipBg = const Color(0xFF334155);
-      chipText = const Color(0xFFE2E8F0);
+      chipBorder = const Color(0xFF94A3B8);
       chipIcon = Icons.place_rounded;
     }
 
@@ -1391,20 +1524,20 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
       decoration: BoxDecoration(
         color: chipBg,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: chipText.withValues(alpha: .4)),
+        border: Border.all(color: chipBorder, width: 1.2),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(chipIcon, size: 12, color: chipText),
+          Icon(chipIcon, size: 13, color: Colors.white),
           const SizedBox(width: 5),
           Text(
             zone,
-            style: TextStyle(
-              fontSize: 11,
+            style: const TextStyle(
+              fontSize: 11.5,
               fontWeight: FontWeight.w900,
               letterSpacing: 0.5,
-              color: chipText,
+              color: Colors.white,
             ),
           ),
         ],
