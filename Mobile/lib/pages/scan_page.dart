@@ -849,79 +849,219 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
                 ),
                 const SizedBox(height: 14),
 
-                // Employee Identity
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      width: 44,
-                      height: 44,
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFF0284C7), Color(0xFF0369A1)],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Center(
-                        child: Text(
-                          nama.isNotEmpty ? nama[0].toUpperCase() : '?',
-                          style: const TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w900,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            nama,
-                            style: const TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w900,
-                              color: Colors.white,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Row(
-                            children: [
-                              Text(
-                                'NIK: $nik',
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w700,
-                                  color: Color(0xFF38BDF8),
-                                ),
-                              ),
-                              if (departemen.isNotEmpty && departemen != '-') ...[
-                                const Text(' • ', style: TextStyle(color: Color(0xFF64748B))),
-                                Flexible(
-                                  child: Text(
-                                    departemen,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
+                // Employee Identity with Real Photo & Zoom Preview
+                Builder(
+                  builder: (context) {
+                    final photoUrl = data['photo_url']?.toString() ?? '';
+                    final fullPhotoUrl = photoUrl.startsWith('http')
+                        ? photoUrl
+                        : photoUrl.isNotEmpty
+                            ? '${_api.baseUrl}$photoUrl'
+                            : '';
+                    final noHp = data['no_hp']?.toString() ?? '-';
+                    final email = data['email']?.toString() ?? '-';
+                    final gender = data['jenis_kelamin']?.toString() ?? '-';
+
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Photo Squircle with tap to preview
+                            GestureDetector(
+                              onTap: () {
+                                HapticFeedback.lightImpact();
+                                _showPhotoPreviewDialog(
+                                  context: context,
+                                  photoUrl: fullPhotoUrl,
+                                  name: nama,
+                                  nik: nik,
+                                  company: perusahaan,
+                                  job: jabatan,
+                                );
+                              },
+                              child: Stack(
+                                children: [
+                                  Container(
+                                    width: 62,
+                                    height: 62,
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF1E293B),
+                                      borderRadius: BorderRadius.circular(16),
+                                      border: Border.all(
+                                        color: isExpired
+                                            ? const Color(0xFFEF4444)
+                                            : const Color(0xFF38BDF8),
+                                        width: 1.8,
+                                      ),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: (isExpired
+                                                  ? const Color(0xFFEF4444)
+                                                  : const Color(0xFF38BDF8))
+                                              .withValues(alpha: .25),
+                                          blurRadius: 10,
+                                          offset: const Offset(0, 3),
+                                        ),
+                                      ],
+                                    ),
+                                    child: ClipRRect(
+                                      borderRadius: BorderRadius.circular(14),
+                                      child: fullPhotoUrl.isNotEmpty
+                                          ? Image.network(
+                                              fullPhotoUrl,
+                                              fit: BoxFit.cover,
+                                              loadingBuilder: (ctx, child, loading) {
+                                                if (loading == null) return child;
+                                                return const Center(
+                                                  child: SizedBox(
+                                                    width: 18,
+                                                    height: 18,
+                                                    child: CircularProgressIndicator(
+                                                      strokeWidth: 2,
+                                                      color: Color(0xFF38BDF8),
+                                                    ),
+                                                  ),
+                                                );
+                                              },
+                                              errorBuilder: (ctx, error, stack) {
+                                                return Center(
+                                                  child: Text(
+                                                    nama.isNotEmpty ? nama[0].toUpperCase() : '?',
+                                                    style: const TextStyle(
+                                                      fontSize: 24,
+                                                      fontWeight: FontWeight.w900,
+                                                      color: Colors.white,
+                                                    ),
+                                                  ),
+                                                );
+                                              },
+                                            )
+                                          : Center(
+                                              child: Text(
+                                                nama.isNotEmpty ? nama[0].toUpperCase() : '?',
+                                                style: const TextStyle(
+                                                  fontSize: 24,
+                                                  fontWeight: FontWeight.w900,
+                                                  color: Colors.white,
+                                                ),
+                                              ),
+                                            ),
+                                    ),
                                   ),
-                                ),
-                              ],
-                            ],
-                          ),
-                          if (jabatan.isNotEmpty && jabatan != '-') ...[
-                            const SizedBox(height: 2),
-                            Text(
-                              jabatan,
-                              style: const TextStyle(fontSize: 11, color: Color(0xFFCBD5E1), fontWeight: FontWeight.w500),
+                                  // Zoom badge hint
+                                  Positioned(
+                                    bottom: 0,
+                                    right: 0,
+                                    child: Container(
+                                      padding: const EdgeInsets.all(3),
+                                      decoration: const BoxDecoration(
+                                        color: Color(0xFF0284C7),
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: const Icon(
+                                        Icons.zoom_in_rounded,
+                                        size: 11,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 14),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    nama,
+                                    style: const TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w900,
+                                      color: Colors.white,
+                                      letterSpacing: 0.2,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 3),
+                                  Row(
+                                    children: [
+                                      Text(
+                                        'NIK: $nik',
+                                        style: const TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w800,
+                                          color: Color(0xFF38BDF8),
+                                        ),
+                                      ),
+                                      if (departemen.isNotEmpty && departemen != '-') ...[
+                                        const Text(' • ', style: TextStyle(color: Color(0xFF64748B))),
+                                        Flexible(
+                                          child: Text(
+                                            departemen,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: const TextStyle(fontSize: 11.5, color: Color(0xFF94A3B8), fontWeight: FontWeight.w600),
+                                          ),
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                                  if (jabatan.isNotEmpty && jabatan != '-') ...[
+                                    const SizedBox(height: 3),
+                                    Text(
+                                      jabatan,
+                                      style: const TextStyle(fontSize: 12, color: Color(0xFFE2E8F0), fontWeight: FontWeight.w600),
+                                    ),
+                                  ],
+                                ],
+                              ),
                             ),
                           ],
+                        ),
+
+                        // Contact & Gender Row if available
+                        if ((noHp.isNotEmpty && noHp != '-') || (email.isNotEmpty && email != '-') || (gender.isNotEmpty && gender != '-')) ...[
+                          const SizedBox(height: 12),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF1E293B).withValues(alpha: .7),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: const Color(0xFF334155)),
+                            ),
+                            child: Row(
+                              children: [
+                                if (noHp.isNotEmpty && noHp != '-') ...[
+                                  const Icon(Icons.phone_iphone_rounded, size: 13, color: Color(0xFF38BDF8)),
+                                  const SizedBox(width: 5),
+                                  Text(noHp, style: const TextStyle(fontSize: 11, color: Colors.white, fontWeight: FontWeight.w600)),
+                                  const SizedBox(width: 12),
+                                ],
+                                if (gender.isNotEmpty && gender != '-') ...[
+                                  const Icon(Icons.person_outline_rounded, size: 13, color: Color(0xFF94A3B8)),
+                                  const SizedBox(width: 4),
+                                  Text(gender, style: const TextStyle(fontSize: 11, color: Color(0xFFCBD5E1))),
+                                  const SizedBox(width: 12),
+                                ],
+                                if (email.isNotEmpty && email != '-') ...[
+                                  const Icon(Icons.mail_outline_rounded, size: 13, color: Color(0xFF94A3B8)),
+                                  const SizedBox(width: 4),
+                                  Flexible(
+                                    child: Text(
+                                      email,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(fontSize: 10.5, color: Color(0xFF94A3B8)),
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
                         ],
-                      ),
-                    ),
-                  ],
+                      ],
+                    );
+                  },
                 ),
                 const SizedBox(height: 16),
 
@@ -989,6 +1129,109 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
                   ),
                 ),
                 const SizedBox(height: 16),
+
+                // Connected SIMPER Section (if available)
+                if (data['has_simper'] == true) ...[
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF1E293B),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: data['is_simper_active'] == true
+                            ? const Color(0xFF0EA5E9).withValues(alpha: .5)
+                            : const Color(0xFFEF4444).withValues(alpha: .5),
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Row(
+                              children: [
+                                Icon(Icons.drive_eta_rounded, size: 16, color: Color(0xFF38BDF8)),
+                                SizedBox(width: 6),
+                                Text(
+                                  'SIMPER TERDAFTAR',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w900,
+                                    letterSpacing: 0.8,
+                                    color: Color(0xFF38BDF8),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: (data['is_simper_active'] == true
+                                        ? const Color(0xFF10B981)
+                                        : const Color(0xFFEF4444))
+                                    .withValues(alpha: .2),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                data['is_simper_active'] == true ? 'SIMPER AKTIF' : 'EXPIRED',
+                                style: TextStyle(
+                                  fontSize: 9.5,
+                                  fontWeight: FontWeight.w900,
+                                  color: data['is_simper_active'] == true
+                                      ? const Color(0xFF34D399)
+                                      : const Color(0xFFF87171),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text('No. SIMPER', style: TextStyle(fontSize: 10, color: Color(0xFF94A3B8))),
+                                  Text(
+                                    data['simper_nomor']?.toString() ?? '-',
+                                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Colors.white),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text('Jenis SIM & No', style: TextStyle(fontSize: 10, color: Color(0xFF94A3B8))),
+                                  Text(
+                                    '${data['jenis_sim'] ?? '-'} (${data['nomor_sim'] ?? '-'})',
+                                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFFCBD5E1)),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        Row(
+                          children: [
+                            const Icon(Icons.event_outlined, size: 12, color: Color(0xFF94A3B8)),
+                            const SizedBox(width: 4),
+                            Text(
+                              'Masa Berlaku SIMPER: ${_formatDateOnly(data['simper_masa_berlaku']?.toString() ?? '-')}',
+                              style: const TextStyle(fontSize: 10.5, color: Color(0xFF94A3B8)),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                ],
 
                 // Zonasi Akses Tambang
                 const Row(
@@ -1107,6 +1350,196 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  void _showPhotoPreviewDialog({
+    required BuildContext context,
+    required String photoUrl,
+    required String name,
+    required String nik,
+    required String company,
+    required String job,
+  }) {
+    showDialog<void>(
+      context: context,
+      barrierColor: Colors.black.withValues(alpha: .85),
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+        child: Container(
+          width: double.infinity,
+          constraints: const BoxConstraints(maxWidth: 380),
+          decoration: BoxDecoration(
+            color: const Color(0xFF0F172A),
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: const Color(0xFF38BDF8).withValues(alpha: .4), width: 1.5),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF0284C7).withValues(alpha: .3),
+                blurRadius: 28,
+                offset: const Offset(0, 8),
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Modal Header
+              Padding(
+                padding: const EdgeInsets.fromLTRB(18, 14, 10, 10),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            name,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 0.2,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            'NIK: $nik • $company',
+                            style: const TextStyle(
+                              color: Color(0xFF38BDF8),
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close_rounded, color: Colors.white70, size: 22),
+                      onPressed: () => Navigator.pop(ctx),
+                      style: IconButton.styleFrom(
+                        backgroundColor: Colors.white.withValues(alpha: .1),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 1, color: Color(0xFF334155)),
+
+              // HD Photo Canvas
+              Container(
+                width: double.infinity,
+                height: 320,
+                color: const Color(0xFF020617),
+                child: photoUrl.isNotEmpty
+                    ? Image.network(
+                        photoUrl,
+                        fit: BoxFit.contain,
+                        loadingBuilder: (ctx, child, progress) {
+                          if (progress == null) return child;
+                          return const Center(
+                            child: CircularProgressIndicator(
+                              color: Color(0xFF38BDF8),
+                              strokeWidth: 2.5,
+                            ),
+                          );
+                        },
+                        errorBuilder: (ctx, err, stack) => Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Container(
+                                width: 80,
+                                height: 80,
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF1E293B),
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(color: const Color(0xFF334155)),
+                                ),
+                                child: Center(
+                                  child: Text(
+                                    name.isNotEmpty ? name[0].toUpperCase() : '?',
+                                    style: const TextStyle(fontSize: 36, fontWeight: FontWeight.w900, color: Colors.white),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              const Text(
+                                'Foto profil fisik belum diunggah',
+                                style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
+                              ),
+                            ],
+                          ),
+                        ),
+                      )
+                    : Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Container(
+                              width: 80,
+                              height: 80,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF1E293B),
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(color: const Color(0xFF334155)),
+                              ),
+                              child: Center(
+                                child: Text(
+                                  name.isNotEmpty ? name[0].toUpperCase() : '?',
+                                  style: const TextStyle(fontSize: 36, fontWeight: FontWeight.w900, color: Colors.white),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            const Text(
+                              'Foto profil fisik belum diunggah',
+                              style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
+                            ),
+                          ],
+                        ),
+                      ),
+              ),
+
+              const Divider(height: 1, color: Color(0xFF334155)),
+
+              // Modal Footer
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.badge_rounded, size: 14, color: Color(0xFF38BDF8)),
+                        const SizedBox(width: 6),
+                        Text(
+                          job,
+                          style: const TextStyle(
+                            color: Color(0xFFCBD5E1),
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                    TextButton(
+                      onPressed: () => Navigator.pop(ctx),
+                      style: TextButton.styleFrom(
+                        foregroundColor: const Color(0xFF38BDF8),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      ),
+                      child: const Text('Tutup', style: TextStyle(fontWeight: FontWeight.w800)),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

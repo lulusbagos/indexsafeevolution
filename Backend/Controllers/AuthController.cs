@@ -924,6 +924,22 @@ namespace Indexsafe.Api.Controllers
                 return BadRequest(new { message = "NIK diperlukan." });
             }
 
+            // 0. Cek path_foto dari ONE_DB_MITRA (vw_m_karyawan_aktif)
+            var karyawanAktif = await _context.MitraKaryawanAktifs.AsNoTracking().FirstOrDefaultAsync(k => k.NoNik == userNik);
+            if (karyawanAktif != null && !string.IsNullOrWhiteSpace(karyawanAktif.PathFoto))
+            {
+                var cleanKaPath = karyawanAktif.PathFoto.TrimStart('/', '\\');
+                var fullKaPath = Path.Combine(@"C:\MinePermitFiles\MBS", cleanKaPath);
+                if (System.IO.File.Exists(fullKaPath))
+                {
+                    return PhysicalFile(fullKaPath, "image/jpeg");
+                }
+                if (System.IO.File.Exists(karyawanAktif.PathFoto))
+                {
+                    return PhysicalFile(karyawanAktif.PathFoto, "image/jpeg");
+                }
+            }
+
             // 1. Cek dari database PasswordOverrides
             var overridePwd = await _context.PasswordOverrides.FirstOrDefaultAsync(p => p.Nrp == userNik);
             if (overridePwd != null && !string.IsNullOrWhiteSpace(overridePwd.ProfilePicture))

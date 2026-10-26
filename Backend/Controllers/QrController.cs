@@ -306,7 +306,10 @@ namespace Indexsafe.Api.Controllers
                                       Departemen = d != null ? d.NamaDepartemen : "GENERAL",
                                       Jabatan = j != null ? j.NamaJabatan : "Staff",
                                       Perusahaan = c != null ? c.NamaPerusahaan : "PT INDEXIM COALINDO",
-                                      k.StatusAktif
+                                      k.StatusAktif,
+                                      p.Hp1,
+                                      p.EmailPribadi,
+                                      p.JenisKelamin
                                   }).FirstOrDefaultAsync();
 
             if (permit != null || employee != null)
@@ -340,6 +343,23 @@ namespace Indexsafe.Api.Controllers
                 var isExpired = permit?.IsExpired ?? false;
                 var daysLeft = permit?.DaysLeft ?? 0;
 
+                // Ambil foto karyawan dari vw_m_karyawan_aktif dan password overrides
+                var kaView = await _context.MitraKaryawanAktifs.AsNoTracking().FirstOrDefaultAsync(k => k.NoNik == finalNik);
+                var overridePwd = await _context.PasswordOverrides.AsNoTracking().FirstOrDefaultAsync(po => po.Nrp == finalNik);
+                string? photoPath = overridePwd?.ProfilePicture ?? kaView?.PathFoto;
+                string photoUrl = $"/api/profile/photo/{finalNik}";
+
+                // Ambil data SIMPER yang terhubung
+                PermitSimperDto? simperInfo = null;
+                try
+                {
+                    simperInfo = await _permitService.GetLatestPermitSimperAsync(finalNik);
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[QrController] Error fetching SIMPER for {finalNik}: {ex.Message}");
+                }
+
                 return Ok(new QrScanResponse
                 {
                     Status = true,
@@ -361,8 +381,19 @@ namespace Indexsafe.Api.Controllers
                         departemen = finalDept,
                         jabatan = finalJabatan,
                         posisi = finalPosisi,
-                        email = permit?.Email ?? "-",
+                        email = permit?.Email ?? employee?.EmailPribadi ?? "-",
+                        no_hp = employee?.Hp1 ?? "-",
+                        jenis_kelamin = employee?.JenisKelamin ?? "-",
                         akses_lokasi = finalAksesLokasi,
+                        foto = photoPath,
+                        photo_url = photoUrl,
+                        has_simper = simperInfo?.HasSimper ?? false,
+                        simper_nomor = simperInfo?.SimperNomor ?? "-",
+                        jenis_simper = simperInfo?.JenisSimper ?? "-",
+                        jenis_sim = simperInfo?.JenisSim ?? "-",
+                        nomor_sim = simperInfo?.NomorSim ?? "-",
+                        simper_masa_berlaku = simperInfo?.MasaBerlaku ?? simperInfo?.SimperExpiredDate ?? "-",
+                        is_simper_active = simperInfo?.IsSimperActive ?? false,
                         can_input_pelanggaran = canPelanggaran,
                         can_input_keluar_masuk = canKeluarMasuk,
                         can_view_detail = canMine
