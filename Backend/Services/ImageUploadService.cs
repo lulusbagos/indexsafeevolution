@@ -41,9 +41,28 @@ namespace Indexsafe.Api.Services
 
         public string BasePath => _basePath;
 
+        private static readonly HashSet<string> AllowedUploadExtensions = new(StringComparer.OrdinalIgnoreCase)
+        {
+            ".jpg", ".jpeg", ".png", ".webp", ".bmp", ".gif",
+            ".pdf", ".doc", ".docx", ".xls", ".xlsx", ".csv"
+        };
+
         public async Task<string?> UploadAndCompressImageAsync(IFormFile? file, string category, string prefix = "")
         {
             if (file == null || file.Length == 0) return null;
+
+            // Security: Sanitize category and prefix against directory traversal (CWE-22)
+            category = System.Text.RegularExpressions.Regex.Replace(category ?? "general", @"[^a-zA-Z0-9_\-]", "");
+            if (string.IsNullOrWhiteSpace(category)) category = "general";
+
+            prefix = System.Text.RegularExpressions.Regex.Replace(prefix ?? "", @"[^a-zA-Z0-9_\-]", "");
+
+            // Security: Enforce strict whitelist on uploaded file extensions (CWE-434)
+            var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
+            if (!AllowedUploadExtensions.Contains(extension))
+            {
+                return null;
+            }
 
             var sw = Stopwatch.StartNew();
             long originalSizeKb = file.Length / 1024;
@@ -57,7 +76,6 @@ namespace Indexsafe.Api.Services
                 Directory.CreateDirectory(uploadsFolder);
             }
 
-            var extension = Path.GetExtension(file.FileName).ToLower();
             bool isImage = extension == ".jpg" || extension == ".jpeg" || extension == ".png" || extension == ".webp" || extension == ".bmp";
 
             var uniqueFileName = (string.IsNullOrEmpty(prefix) ? "" : prefix + "_") + Guid.NewGuid().ToString()[..8];

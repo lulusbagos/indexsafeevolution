@@ -116,6 +116,20 @@ app.MapScalarApiReference(options =>
 
 app.UseCors("AllowAll");
 
+// Security Headers Middleware (OWASP recommended defense-in-depth)
+app.Use(async (context, next) =>
+{
+    context.Response.OnStarting(() =>
+    {
+        context.Response.Headers["X-Content-Type-Options"] = "nosniff";
+        context.Response.Headers["X-Frame-Options"] = "SAMEORIGIN";
+        context.Response.Headers["X-XSS-Protection"] = "1; mode=block";
+        context.Response.Headers["Referrer-Policy"] = "strict-origin-when-cross-origin";
+        return Task.CompletedTask;
+    });
+    await next();
+});
+
 // Serve Default Files (index.html at root /) and Static Files
 app.UseDefaultFiles();
 app.UseStaticFiles();

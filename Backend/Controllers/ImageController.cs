@@ -18,18 +18,18 @@ namespace Indexsafe.Api.Controllers
             @"C:\MinePermitFiles\MBS\avatars",
             @"C:\MinePermitFiles\MBS\profiles",
             @"C:\MinePermitFiles\ONEDBEV",
-            @"C:\MinePermitFiles\ONEDBEV\uploads",
-            @"D:\Publish\One_db\wwwroot\karyawan",
-            @"D:\Publish\one db mitra\wwwroot\uploads\karyawan",
-            @"D:\4. PROJECT\6. Android\API\shiftcornerAPI\uploads",
-            @"D:\4. PROJECT\6. Android\API\gtime\gtime\gtime\uploads",
-            @"D:\4. PROJECT\18. Backup\one_db\wwwroot\karyawan"
+            @"C:\MinePermitFiles\ONEDBEV\uploads"
         };
 
         public ImageController(ImageUploadService uploadService)
         {
             _uploadService = uploadService;
         }
+
+        private static readonly HashSet<string> AllowedExtensions = new(StringComparer.OrdinalIgnoreCase)
+        {
+            ".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp"
+        };
 
         [HttpGet("image/{**path}")]
         [HttpGet("api/image/{**path}")]
@@ -39,9 +39,23 @@ namespace Indexsafe.Api.Controllers
             if (string.IsNullOrWhiteSpace(path)) return NotFound();
 
             var cleanPath = Uri.UnescapeDataString(path).TrimStart('/', '\\');
+
+            // Security: Prevent path traversal attacks (CWE-22)
+            if (cleanPath.Contains("..") || cleanPath.Contains(':') || cleanPath.IndexOfAny(Path.GetInvalidPathChars()) >= 0)
+            {
+                return NotFound(new { message = "Invalid image path." });
+            }
+
             if (cleanPath.StartsWith("uploads/", StringComparison.OrdinalIgnoreCase))
             {
                 cleanPath = cleanPath.Substring(8);
+            }
+
+            // Security: If a file extension is specified in the path, it must be an allowed image extension
+            var ext = Path.GetExtension(cleanPath);
+            if (!string.IsNullOrEmpty(ext) && !AllowedExtensions.Contains(ext))
+            {
+                return NotFound(new { message = "File format not supported." });
             }
 
             var dirs = new List<string> { _uploadService.BasePath };
@@ -49,12 +63,26 @@ namespace Indexsafe.Api.Controllers
             dirs.Add(Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "uploads"));
             dirs.Add(Path.Combine(Directory.GetCurrentDirectory(), "wwwroot"));
 
-            // 1. Direct path check
+            // 1. Direct path check with canonical path verification
             foreach (var dir in dirs)
             {
                 if (!Directory.Exists(dir)) continue;
-                var direct = Path.Combine(dir, cleanPath);
-                if (System.IO.File.Exists(direct)) return ServeFile(direct);
+                try
+                {
+                    var direct = Path.Combine(dir, cleanPath);
+                    var fullDirect = Path.GetFullPath(direct);
+                    var fullDir = Path.GetFullPath(dir);
+
+                    // Ensure file stays strictly within the intended directory
+                    if (fullDirect.StartsWith(fullDir, StringComparison.OrdinalIgnoreCase) && System.IO.File.Exists(fullDirect))
+                    {
+                        return ServeFile(fullDirect);
+                    }
+                }
+                catch
+                {
+                    // Ignore path errors
+                }
             }
 
             // 2. Exact filename in candidate dirs
@@ -124,13 +152,19 @@ namespace Indexsafe.Api.Controllers
         private IActionResult ServeFile(string filePath)
         {
             var ext = Path.GetExtension(filePath).ToLower();
+            if (!AllowedExtensions.Contains(ext))
+            {
+                return NotFound(new { message = "Unsupported file type." });
+            }
+
             var contentType = ext switch
             {
                 ".jpg" or ".jpeg" => "image/jpeg",
                 ".png" => "image/png",
                 ".webp" => "image/webp",
                 ".gif" => "image/gif",
-                _ => "application/octet-stream"
+                ".bmp" => "image/bmp",
+                _ => "image/jpeg"
             };
             return PhysicalFile(filePath, contentType);
         }

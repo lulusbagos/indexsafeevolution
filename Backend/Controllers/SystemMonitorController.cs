@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Indexsafe.Api.Data;
 using Indexsafe.Api.Models;
 using Indexsafe.Api.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -24,6 +25,7 @@ namespace Indexsafe.Api.Controllers
         }
 
         [HttpGet("monitor")]
+        [Authorize]
         public async Task<IActionResult> GetMonitoringData()
         {
             var stats = _monitor.GetStats();
@@ -105,6 +107,7 @@ namespace Indexsafe.Api.Controllers
         /// Test endpoint to trigger a simulated offline sync packet for verification in the UI
         /// </summary>
         [HttpPost("test-sync")]
+        [Authorize]
         public IActionResult TriggerTestSync([FromQuery] string module = "hazard", [FromQuery] bool simulateError = false)
         {
             if (simulateError)
@@ -169,6 +172,7 @@ namespace Indexsafe.Api.Controllers
         /// Endpoint analitik makro untuk memantau pergerakan aplikasi dan gerbang tanpa mengekspos data pribadi
         /// </summary>
         [HttpGet("movement-analytics")]
+        [AllowAnonymous]
         public async Task<IActionResult> GetMovementAnalytics()
         {
             try
@@ -257,8 +261,8 @@ namespace Indexsafe.Api.Controllers
                     status = "ONLINE",
                     environment = "Production / Staging",
                     serverTime = nowWita.ToString("yyyy-MM-dd HH:mm:ss") + " WITA",
-                    databaseSap = "Connected (172.16.1.93)",
-                    databaseBima = "Connected (172.16.1.96)",
+                    databaseSap = "Connected (Secure)",
+                    databaseBima = "Connected (Secure)",
                     gpsTracked = allGateLogs.Count(l => l.Latitude.HasValue && l.Longitude.HasValue)
                 };
 
