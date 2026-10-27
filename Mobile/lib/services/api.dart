@@ -15,20 +15,65 @@ import 'database.dart';
 import 'preference.dart';
 
 class ApiService {
-  // Hotspot Tethering Laptop = http://192.168.137.1:7302
-  // Wi-Fi Kantor / LAN = http://192.168.130.236:7302
-  // USB ADB Reverse = http://127.0.0.1:7302
-  // PROD = https://indexsafeevolution.indexim.id
+  // Domain Utama = https://api_mbs.indexim.id
+  // Domain Cadangan = https://api_mbs.idcoal.id
+  // HTTP Fallback & Local Dev
   static const List<String> _candidateUrls = [
+    'https://api_mbs.indexim.id',
+    'https://api_mbs.idcoal.id',
+    'http://api_mbs.indexim.id',
+    'http://api_mbs.idcoal.id',
     'http://127.0.0.1:7302',
     'http://192.168.137.1:7302',
     'http://192.168.130.236:7302',
   ];
   static String _activeBaseUrl = const String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'http://127.0.0.1:7302',
+    defaultValue: 'https://api_mbs.indexim.id',
   );
   String get baseUrl => _activeBaseUrl;
+  static String get activeBaseUrl => _activeBaseUrl;
+
+  /// Candidate URL generator untuk modul dengan fallback multi-endpoint
+  static List<String> _buildCandidateUrls(String cleanPath) {
+    final List<String> list = [];
+    void addTarget(String base) {
+      final b = base.endsWith('/') ? base.substring(0, base.length - 1) : base;
+      final withApi = '$b/api$cleanPath';
+      final withoutApi = '$b$cleanPath';
+      if (!list.contains(withApi)) list.add(withApi);
+      if (!list.contains(withoutApi)) list.add(withoutApi);
+    }
+
+    // 1. Prioritaskan domain aktif saat ini (utama: indexim.id)
+    addTarget(_activeBaseUrl);
+
+    // 2. Tambahkan kandidat berikutnya (cadangan: idcoal.id, lalu fallback lokal)
+    for (final candidate in _candidateUrls) {
+      if (candidate == _activeBaseUrl) continue;
+      addTarget(candidate);
+    }
+    return list;
+  }
+
+  static void _updateActiveBaseUrlFromTarget(String targetUrl) {
+    for (final candidate in _candidateUrls) {
+      if (targetUrl.startsWith(candidate)) {
+        if (_activeBaseUrl != candidate) {
+          _activeBaseUrl = candidate;
+          debugPrint('[ApiService] Updated activeBaseUrl to: ');
+        }
+        break;
+      }
+    }
+  }
+
+  String get fallbackHost {
+    for (final candidate in _candidateUrls) {
+      if (candidate != _activeBaseUrl) return candidate;
+    }
+    return _activeBaseUrl;
+  }
 
   /// Aplikasi web MBS SAP adalah sumber aturan bisnis dan master Observasi.
   /// REST API Indexsafe tetap dipakai untuk modul yang sudah berbasis JWT.
@@ -70,9 +115,18 @@ class ApiService {
           return handler.next(options);
         },
         onError: (DioException err, ErrorInterceptorHandler handler) async {
-          if (err.type == DioExceptionType.connectionError ||
+          final isFailoverError = err.type == DioExceptionType.connectionError ||
               err.type == DioExceptionType.connectionTimeout ||
-              (err.error != null && err.error is SocketException)) {
+              err.type == DioExceptionType.sendTimeout ||
+              err.type == DioExceptionType.receiveTimeout ||
+              (err.type == DioExceptionType.badResponse &&
+                  (err.response?.statusCode == 500 ||
+                   err.response?.statusCode == 502 ||
+                   err.response?.statusCode == 503 ||
+                   err.response?.statusCode == 504)) ||
+              (err.error != null && err.error is SocketException);
+
+          if (isFailoverError) {
             for (final candidate in _candidateUrls) {
               if (candidate == _activeBaseUrl) continue;
               try {
@@ -81,16 +135,19 @@ class ApiService {
                   headers: err.requestOptions.headers,
                   contentType: err.requestOptions.contentType,
                   responseType: err.requestOptions.responseType,
-                  receiveTimeout: const Duration(seconds: 6),
-                  sendTimeout: const Duration(seconds: 6),
+                  receiveTimeout: const Duration(seconds: 5),
+                  sendTimeout: const Duration(seconds: 5),
                 );
                 String pathOnly = err.requestOptions.path;
                 if (pathOnly.startsWith('http://') || pathOnly.startsWith('https://')) {
-                  pathOnly = pathOnly.replaceFirst(RegExp(r'^https?://[^/]+/api'), '');
+                  pathOnly = pathOnly.replaceFirst(RegExp(r'^https?://[^/]+(/api)?'), '');
                 }
                 if (!pathOnly.startsWith('/')) pathOnly = '/$pathOnly';
                 final newUrl = '$candidate/api$pathOnly';
-                final fallbackDio = Dio(BaseOptions(connectTimeout: const Duration(seconds: 4)));
+                final fallbackDio = Dio(BaseOptions(
+                  connectTimeout: const Duration(seconds: 4),
+                  receiveTimeout: const Duration(seconds: 6),
+                ));
                 final res = await fallbackDio.request(
                   newUrl,
                   data: err.requestOptions.data,
@@ -99,7 +156,7 @@ class ApiService {
                 );
                 _activeBaseUrl = candidate;
                 dio.options.baseUrl = '$_activeBaseUrl/api';
-                debugPrint('[ApiService] Successfully switched activeBaseUrl to: $_activeBaseUrl');
+                debugPrint('[ApiService] Failover sukses! BaseUrl beralih ke: $_activeBaseUrl');
                 return handler.resolve(res);
               } catch (_) {}
             }
@@ -237,7 +294,7 @@ class ApiService {
         'password': pswd,
       };
 
-      Response res;
+      late Response res;
       try {
         final loginDio = Dio(BaseOptions(
           baseUrl: '$baseUrl/api',
@@ -249,24 +306,39 @@ class ApiService {
         ));
         res = await loginDio.post('/login', data: json.encode(loginPayload));
       } on DioException catch (dioErr) {
-        // If Wi-Fi IP is unreachable, automatically fall back to local ADB reverse bridge
-        if (dioErr.type == DioExceptionType.connectionTimeout ||
+        // If primary domain is unreachable, automatically fall back to secondary domain or candidates
+        final isFailoverError = dioErr.type == DioExceptionType.connectionTimeout ||
             dioErr.type == DioExceptionType.connectionError ||
             dioErr.type == DioExceptionType.sendTimeout ||
             dioErr.type == DioExceptionType.receiveTimeout ||
-            dioErr.type == DioExceptionType.unknown) {
-          final fallbackHost =
-              baseUrl.contains('192.168.') ? 'http://127.0.0.1:7302' : baseUrl;
-          final fallbackDio = Dio(BaseOptions(
-            baseUrl: '$fallbackHost/api',
-            headers: dio.options.headers,
-            contentType: Headers.jsonContentType,
-            connectTimeout: const Duration(seconds: 3),
-            receiveTimeout: const Duration(seconds: 5),
-          ));
-          res =
-              await fallbackDio.post('/login', data: json.encode(loginPayload));
-          dio.options.baseUrl = '$fallbackHost/api';
+            (dioErr.type == DioExceptionType.badResponse &&
+                (dioErr.response?.statusCode == 500 ||
+                 dioErr.response?.statusCode == 502 ||
+                 dioErr.response?.statusCode == 503 ||
+                 dioErr.response?.statusCode == 504)) ||
+            dioErr.type == DioExceptionType.unknown;
+
+        if (isFailoverError) {
+          bool succeeded = false;
+          for (final candidate in _candidateUrls) {
+            if (candidate == _activeBaseUrl) continue;
+            try {
+              final fallbackDio = Dio(BaseOptions(
+                baseUrl: '$candidate/api',
+                headers: dio.options.headers,
+                contentType: Headers.jsonContentType,
+                connectTimeout: const Duration(seconds: 4),
+                receiveTimeout: const Duration(seconds: 6),
+              ));
+              res = await fallbackDio.post('/login', data: json.encode(loginPayload));
+              _activeBaseUrl = candidate;
+              dio.options.baseUrl = '$_activeBaseUrl/api';
+              debugPrint('[ApiService] Login failover sukses! BaseUrl beralih ke: $_activeBaseUrl');
+              succeeded = true;
+              break;
+            } catch (_) {}
+          }
+          if (!succeeded) rethrow;
         } else {
           rethrow;
         }
@@ -3101,13 +3173,7 @@ class ApiService {
     Map<String, dynamic>? queryParameters,
   }) async {
     final cleanPath = path.startsWith('/') ? path : '/$path';
-    final List<String> targets = [
-      'http://127.0.0.1:7302/api$cleanPath',
-      'http://192.168.130.236:7302/api$cleanPath',
-      'http://192.168.137.1:7302/api$cleanPath',
-      '$baseUrl/api$cleanPath',
-      '$baseUrl$cleanPath',
-    ];
+    final List<String> targets = _buildCandidateUrls(cleanPath);
 
     DioException? lastDioError;
     Exception? lastException;
@@ -3135,6 +3201,7 @@ class ApiService {
         );
 
         if (res.statusCode != null && res.statusCode! >= 200 && res.statusCode! < 300) {
+          _updateActiveBaseUrlFromTarget(targetUrl);
           return res;
         }
       } on DioException catch (e) {
@@ -3262,13 +3329,7 @@ class ApiService {
     Map<String, dynamic>? queryParameters,
   }) async {
     final cleanPath = path.startsWith('/') ? path : '/$path';
-    final List<String> targets = [
-      'http://127.0.0.1:7302/api$cleanPath',
-      'http://192.168.130.236:7302/api$cleanPath',
-      'http://192.168.137.1:7302/api$cleanPath',
-      '$baseUrl/api$cleanPath',
-      '$baseUrl$cleanPath',
-    ];
+    final List<String> targets = _buildCandidateUrls(cleanPath);
 
     DioException? lastDioError;
     Exception? lastException;
@@ -3296,6 +3357,7 @@ class ApiService {
         );
 
         if (res.statusCode != null && res.statusCode! >= 200 && res.statusCode! < 300) {
+          _updateActiveBaseUrlFromTarget(targetUrl);
           return res;
         }
       } on DioException catch (e) {
@@ -3408,13 +3470,7 @@ class ApiService {
     Map<String, dynamic>? queryParameters,
   }) async {
     final cleanPath = path.startsWith('/') ? path : '/$path';
-    final List<String> targets = [
-      'http://127.0.0.1:7302/api$cleanPath',
-      'http://192.168.130.236:7302/api$cleanPath',
-      'http://192.168.137.1:7302/api$cleanPath',
-      '$baseUrl/api$cleanPath',
-      '$baseUrl$cleanPath',
-    ];
+    final List<String> targets = _buildCandidateUrls(cleanPath);
 
     DioException? lastDioError;
     Exception? lastException;
@@ -3442,6 +3498,7 @@ class ApiService {
         );
 
         if (res.statusCode != null && res.statusCode! >= 200 && res.statusCode! < 300) {
+          _updateActiveBaseUrlFromTarget(targetUrl);
           return res;
         }
       } on DioException catch (e) {
@@ -3638,16 +3695,7 @@ class ApiService {
     Map<String, dynamic>? queryParameters,
   }) async {
     final cleanPath = path.startsWith('/') ? path : '/$path';
-    final List<String> targets = [
-      'http://127.0.0.1:7302/api$cleanPath',
-      'http://127.0.0.1:7302$cleanPath',
-      'http://192.168.130.236:7302/api$cleanPath',
-      'http://192.168.130.236:7302$cleanPath',
-      'http://192.168.137.1:7302/api$cleanPath',
-      'http://192.168.137.1:7302$cleanPath',
-      '$baseUrl/api$cleanPath',
-      '$baseUrl$cleanPath',
-    ];
+    final List<String> targets = _buildCandidateUrls(cleanPath);
 
     DioException? lastDioError;
     Exception? lastException;
@@ -3675,6 +3723,7 @@ class ApiService {
         );
 
         if (res.statusCode != null && res.statusCode! >= 200 && res.statusCode! < 300) {
+          _updateActiveBaseUrlFromTarget(targetUrl);
           return res;
         }
       } on DioException catch (e) {

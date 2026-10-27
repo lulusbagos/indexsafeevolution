@@ -729,7 +729,7 @@ _Generated via SAP IndexSafe Evolution Mobile_''';
                   child: Image.network(
                     item.fotoUrl!.startsWith('http')
                         ? item.fotoUrl!
-                        : 'http://127.0.0.1:7302${item.fotoUrl}',
+                        : '${ApiService().baseUrl}${item.fotoUrl}',
                     fit: BoxFit.cover,
                     errorBuilder: (_, __, ___) => Container(
                       height: 120,
