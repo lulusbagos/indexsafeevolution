@@ -545,7 +545,9 @@ namespace Indexsafe.Api.Controllers
                         jenis_sim = simperInfo?.JenisSim ?? "-",
                         nomor_sim = simperInfo?.NomorSim ?? "-",
                         simper_masa_berlaku = simperInfo?.MasaBerlaku ?? simperInfo?.SimperExpiredDate ?? "-",
-                        is_simper_active = simperInfo?.IsSimperActive ?? false,
+                        is_simper_active = (simperInfo != null && simperInfo.HasSimper) ? simperInfo.IsSimperActive : false,
+                        simper_days_left = (simperInfo != null && simperInfo.HasSimper) ? simperInfo.SimperDaysLeft : (int?)null,
+                        simper_is_expired = (simperInfo != null && simperInfo.HasSimper) ? simperInfo.IsSimperExpired : false,
                         simper_units = simperInfo?.Units ?? new List<SimperUnitDto>(),
                         can_input_pelanggaran = canInputPelanggaranFinal,
                         can_input_keluar_masuk = canKeluarMasuk,
@@ -1176,6 +1178,7 @@ namespace Indexsafe.Api.Controllers
                 NomorPermit = req.NomorPermit,
                 Direction = string.Equals(req.Direction, "KELUAR", StringComparison.OrdinalIgnoreCase) ? "KELUAR" : "MASUK",
                 NomorUnit = req.NomorUnit?.Trim(),
+                JumlahPenumpang = req.JumlahPenumpang ?? 0,
                 Keperluan = req.Keperluan.Trim(),
                 LokasiPos = string.IsNullOrWhiteSpace(req.LokasiPos) ? "Pos Security Utama" : req.LokasiPos.Trim(),
                 Latitude = req.Latitude,
@@ -1200,12 +1203,12 @@ namespace Indexsafe.Api.Controllers
                 Perusahaan = log.Perusahaan ?? "MITRA KERJA",
                 Area = log.LokasiPos ?? "POS SECURITY",
                 Lokasi = log.LokasiPos ?? "Pintu Masuk/Keluar",
-                DetilLokasi = log.DetilLokasi ?? $"Arah: {log.Direction} | Unit: {log.NomorUnit ?? "-"}",
+                DetilLokasi = req.DetilLokasi ?? $"Arah: {log.Direction} | Unit: {log.NomorUnit ?? "-"} | Penumpang: {log.JumlahPenumpang} org",
                 Latitude = log.Latitude,
                 Longitude = log.Longitude,
                 InspectionDate = DateTime.Today,
                 Status = log.Direction,
-                Summary = $"Lalu Lintas {log.Direction}: {log.Nama} ({log.Nik}) - Pos {log.LokasiPos}"
+                Summary = $"Lalu Lintas {log.Direction}: {log.Nama} ({log.Nik}) - Pos {log.LokasiPos} (Unit: {log.NomorUnit ?? "-"}, Penumpang: {log.JumlahPenumpang})"
             });
 
             // Create in-app notification for the scanned employee
@@ -1215,7 +1218,7 @@ namespace Indexsafe.Api.Controllers
                 {
                     RecipientNik = req.Nik.Trim(),
                     Title = $"Pencatatan Gerbang: {log.Direction} Tambang",
-                    Message = $"Anda tercatat {log.Direction} melalui {log.LokasiPos} pada {log.CreatedAt:dd/MM/yyyy HH:mm} WITA. Keperluan: {log.Keperluan}{(string.IsNullOrWhiteSpace(log.NomorUnit) ? "" : $" | Unit: {log.NomorUnit}")}. Dicatat oleh Petugas {log.CreatedByName}.",
+                    Message = $"Anda tercatat {log.Direction} melalui {log.LokasiPos} pada {log.CreatedAt:dd/MM/yyyy HH:mm} WITA. Keperluan: {log.Keperluan}{(string.IsNullOrWhiteSpace(log.NomorUnit) ? "" : $" | Unit: {log.NomorUnit}")}{(log.JumlahPenumpang > 0 ? $" | Penumpang: {log.JumlahPenumpang} org" : "")}. Dicatat oleh Petugas {log.CreatedByName}.",
                     Url = $"/Permit/Movement/{log.Id}",
                     NotifType = "permit_gate_movement",
                     Category = "movement",
@@ -1245,6 +1248,7 @@ namespace Indexsafe.Api.Controllers
                     nama = log.Nama,
                     direction = log.Direction,
                     nomor_unit = log.NomorUnit,
+                    jumlah_penumpang = log.JumlahPenumpang,
                     keperluan = log.Keperluan,
                     lokasi_pos = log.LokasiPos,
                     latitude = log.Latitude,
@@ -1694,6 +1698,7 @@ namespace Indexsafe.Api.Controllers
         public string? NomorPermit { get; set; }
         public string Direction { get; set; } = "MASUK"; // 'MASUK' / 'KELUAR'
         public string? NomorUnit { get; set; }
+        public int? JumlahPenumpang { get; set; } = 0;
         public string Keperluan { get; set; } = string.Empty;
         public string? LokasiPos { get; set; }
         public double? Latitude { get; set; }

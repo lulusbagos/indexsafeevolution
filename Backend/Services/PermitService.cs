@@ -96,6 +96,12 @@ namespace Indexsafe.Api.Services
         [JsonPropertyName("units")]
         public List<SimperUnitDto> Units { get; set; } = new();
 
+        [JsonPropertyName("simper_days_left")]
+        public int SimperDaysLeft { get; set; }
+
+        [JsonPropertyName("simper_is_expired")]
+        public bool IsSimperExpired { get; set; }
+
         [JsonPropertyName("card_photo_path")]
         public string? CardPhotoPath { get; set; }
 
@@ -424,6 +430,16 @@ namespace Indexsafe.Api.Services
                             }
 
                             result.IsSimperActive = isSimperPrinted && (maxSimperDate == null || maxSimperDate.Value.Date >= DateTime.Today);
+                            if (maxSimperDate.HasValue)
+                            {
+                                result.SimperDaysLeft = (maxSimperDate.Value.Date - DateTime.Today).Days;
+                                result.IsSimperExpired = maxSimperDate.Value.Date < DateTime.Today;
+                            }
+                            else
+                            {
+                                result.SimperDaysLeft = 999;
+                                result.IsSimperExpired = false;
+                            }
                         }
                     }
 

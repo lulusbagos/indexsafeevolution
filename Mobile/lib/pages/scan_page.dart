@@ -181,6 +181,117 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
     }
   }
 
+  int? _extractDaysLeft(Map<String, dynamic>? data) {
+    if (data == null) return null;
+    final raw = data['days_left'];
+    if (raw is num) return raw.toInt();
+    if (raw != null) {
+      final p = int.tryParse(raw.toString());
+      if (p != null) return p;
+    }
+
+    final dateCandidates = [
+      data['masa_aktif_permit'],
+      data['simper_masa_berlaku'],
+      data['masa_berlaku'],
+      data['berakhir_kerja'],
+    ];
+
+    for (final candidate in dateCandidates) {
+      if (candidate == null) continue;
+      final str = candidate.toString().trim();
+      if (str.isEmpty || str == '-') continue;
+      try {
+        DateTime? dt;
+        if (str.contains('-')) {
+          final p = str.split('-');
+          if (p.length == 3) {
+            if (p[0].length == 4) {
+              dt = DateTime.tryParse(str);
+            } else {
+              dt = DateTime.tryParse('${p[2]}-${p[1].padLeft(2, '0')}-${p[0].padLeft(2, '0')}');
+            }
+          }
+        } else if (str.contains('/')) {
+          final p = str.split('/');
+          if (p.length == 3) {
+            if (p[2].length == 4) {
+              dt = DateTime.tryParse('${p[2]}-${p[1].padLeft(2, '0')}-${p[0].padLeft(2, '0')}');
+            }
+          }
+        }
+        if (dt != null) {
+          final now = DateTime.now();
+          final today = DateTime(now.year, now.month, now.day);
+          final target = DateTime(dt.year, dt.month, dt.day);
+          return target.difference(today).inDays;
+        }
+      } catch (_) {}
+    }
+    return null;
+  }
+
+  int? _extractSimperDaysLeft(Map<String, dynamic>? data) {
+    if (data == null) return null;
+    if (data['has_simper'] != true && (data['simper_nomor'] == null || data['simper_nomor'] == '-')) {
+      return null;
+    }
+    final raw = data['simper_days_left'];
+    if (raw is num) return raw.toInt();
+    if (raw != null) {
+      final p = int.tryParse(raw.toString());
+      if (p != null) return p;
+    }
+
+    final rawDate = data['simper_masa_berlaku']?.toString() ?? '';
+    if (rawDate.isNotEmpty && rawDate != '-') {
+      try {
+        DateTime? dt;
+        if (rawDate.contains('-')) {
+          final p = rawDate.split('-');
+          if (p.length == 3) {
+            if (p[0].length == 4) {
+              dt = DateTime.tryParse(rawDate);
+            } else {
+              dt = DateTime.tryParse('${p[2]}-${p[1].padLeft(2, '0')}-${p[0].padLeft(2, '0')}');
+            }
+          }
+        } else if (rawDate.contains('/')) {
+          final p = rawDate.split('/');
+          if (p.length == 3) {
+            if (p[2].length == 4) {
+              dt = DateTime.tryParse('${p[2]}-${p[1].padLeft(2, '0')}-${p[0].padLeft(2, '0')}');
+            }
+          }
+        }
+        if (dt != null) {
+          final now = DateTime.now();
+          final today = DateTime(now.year, now.month, now.day);
+          final target = DateTime(dt.year, dt.month, dt.day);
+          return target.difference(today).inDays;
+        }
+      } catch (_) {}
+    }
+    return null;
+  }
+
+  Future<void> _triggerWarningVibration() async {
+    try {
+      // 3 getaran berurutan yang terasa jelas di perangkat fisik (pattern peringatan K3)
+      for (int i = 0; i < 3; i++) {
+        await HapticFeedback.heavyImpact();
+        await HapticFeedback.vibrate();
+        if (i < 2) {
+          await Future.delayed(const Duration(milliseconds: 250));
+        }
+      }
+    } catch (_) {
+      try {
+        await HapticFeedback.vibrate();
+      } catch (_) {}
+    }
+  }
+
   Future<void> _onDetectQr(BarcodeCapture capture) async {
     if (_isProcessingScan) return;
     final barcode = capture.barcodes.firstOrNull;
@@ -195,28 +306,8 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
     // Hentikan camera sementara agar tidak frame-spam atau freeze di latar belakang
     await _scannerController?.stop();
 
-    // Show temporary scanning overlay dengan pesan GENERAL
     if (!mounted) return;
     ScaffoldMessenger.of(context).hideCurrentSnackBar();
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Row(
-          children: [
-            SizedBox(
-              width: 18,
-              height: 18,
-              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-            ),
-            SizedBox(width: 14),
-            Text('Memproses & Memverifikasi QR Code...', style: TextStyle(fontWeight: FontWeight.w600)),
-          ],
-        ),
-        duration: Duration(seconds: 4),
-        backgroundColor: Color(0xFF0F172A),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
-      ),
-    );
 
     Position? pos;
     try {
@@ -248,6 +339,26 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
         final msg = data['message']?.toString() ?? '';
         final actionType = data['actionType']?.toString() ?? 'Attendance';
         final payload = data['data'] is Map ? Map<String, dynamic>.from(data['data'] as Map) : null;
+
+        // Cek apakah masa aktif permit / SIMPER kurang dari 30 hari atau sudah kadaluarsa
+        if (isSuccess && payload != null && (actionType == 'MinePermit' || actionType == 'Simper')) {
+          final daysLeft = _extractDaysLeft(payload);
+          final bool hasSimper = payload['has_simper'] == true;
+          final simperDaysLeft = hasSimper ? _extractSimperDaysLeft(payload) : null;
+
+          final bool isPermitExpired = daysLeft != null && daysLeft < 0;
+          final bool isSimperExpired = hasSimper && simperDaysLeft != null && simperDaysLeft < 0;
+          final bool isExpired = payload['is_expired'] == true || isPermitExpired || isSimperExpired;
+
+          // HANYA getar jika masa aktif permit <= 30 hari atau SIMPER aktif <= 30 hari
+          final bool isPermitWarning30Days = daysLeft != null && daysLeft <= 30 && daysLeft >= 0;
+          final bool isSimperWarning30Days = hasSimper && simperDaysLeft != null && simperDaysLeft <= 30 && simperDaysLeft >= 0;
+
+          if (isExpired || isPermitWarning30Days || isSimperWarning30Days) {
+            // Getarkan perangkat seketika saat terdeteksi masa aktif < 30 hari
+            _triggerWarningVibration();
+          }
+        }
 
         if (actionType == 'MinePermit' && isSuccess && payload != null) {
           await _showResultDialog(
@@ -353,10 +464,19 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
         IconData iconData;
         String statusBadgeText;
 
+        final daysLeft = _extractDaysLeft(data);
+        final bool hasSimper = data?['has_simper'] == true;
+        final simperDaysLeft = hasSimper ? _extractSimperDaysLeft(data) : null;
+
+        final bool isPermitExpired = daysLeft != null && daysLeft < 0;
+        final bool isSimperExpired = hasSimper && simperDaysLeft != null && simperDaysLeft < 0;
         final isExpiredPermit = (isMinePermit || isSimper) &&
-            (data?['is_expired'] == true ||
-                (data?['days_left'] is int && (data?['days_left'] as int) < 0) ||
-                (int.tryParse(data?['days_left']?.toString() ?? '0') ?? 0) < 0);
+            (data?['is_expired'] == true || isPermitExpired || isSimperExpired);
+
+        final bool isPermitExpiring = daysLeft != null && daysLeft <= 30 && daysLeft >= 0;
+        final bool isSimperExpiring = hasSimper && simperDaysLeft != null && simperDaysLeft <= 30 && simperDaysLeft >= 0;
+        final bool isExpiringSoon = (isMinePermit || isSimper) &&
+            !isExpiredPermit && (isPermitExpiring || isSimperExpiring);
 
         // Strict permissions from backend scan payload, falling back to local fetched state
         final bool canPelanggaran = data != null && data.containsKey('can_input_pelanggaran')
@@ -380,7 +500,15 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
           if (isExpiredPermit) {
             primaryColor = const Color(0xFFEF4444);
             iconData = Icons.warning_amber_rounded;
-            statusBadgeText = 'MINE PERMIT KADALUARSA';
+            statusBadgeText = isPermitExpired ? 'MINE PERMIT KADALUARSA' : 'SIMPER KADALUARSA';
+          } else if (isExpiringSoon) {
+            primaryColor = const Color(0xFFF59E0B); // Amber Warning K3
+            iconData = Icons.warning_amber_rounded;
+            if (isPermitExpiring) {
+              statusBadgeText = 'MASA AKTIF < 30 HARI ($daysLeft HARI LAGI)';
+            } else {
+              statusBadgeText = 'SIMPER < 30 HARI ($simperDaysLeft HARI LAGI)';
+            }
           } else {
             primaryColor = const Color(0xFF10B981);
             iconData = Icons.verified_user_rounded;
@@ -391,6 +519,11 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
             primaryColor = const Color(0xFFEF4444);
             iconData = Icons.warning_amber_rounded;
             statusBadgeText = 'SIMPER KADALUARSA';
+          } else if (isExpiringSoon) {
+            primaryColor = const Color(0xFFF59E0B); // Amber Warning K3
+            iconData = Icons.warning_amber_rounded;
+            final d = daysLeft ?? 0;
+            statusBadgeText = 'MASA BERLAKU < 30 HARI ($d HARI LAGI)';
           } else {
             primaryColor = const Color(0xFF0D9488);
             iconData = Icons.drive_eta_rounded;
@@ -499,6 +632,48 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
                   ),
                 ),
                 const SizedBox(height: 16),
+
+                // Warning Banner jika masa aktif < 30 hari atau kadaluarsa (Perangkat Bergetar)
+                if (isExpiringSoon || isExpiredPermit) ...[
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    margin: const EdgeInsets.only(bottom: 16),
+                    decoration: BoxDecoration(
+                      color: (isExpiredPermit ? const Color(0xFFEF4444) : const Color(0xFFF59E0B)).withValues(alpha: .12),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: (isExpiredPermit ? const Color(0xFFEF4444) : const Color(0xFFF59E0B)).withValues(alpha: .35),
+                        width: 1.2,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          isExpiredPermit ? Icons.cancel_rounded : Icons.vibration_rounded,
+                          size: 22,
+                          color: isExpiredPermit ? const Color(0xFFEF4444) : const Color(0xFFD97706),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            isExpiredPermit
+                                ? 'Peringatan: Masa aktif permit atau SIMPER telah KADALUARSA! Harap segera perpanjang.'
+                                : (isPermitExpiring
+                                    ? 'Peringatan Getar: Masa aktif Mine Permit tersisa $daysLeft hari (< 30 hari). Segera lakukan perpanjangan izin kerja!'
+                                    : 'Peringatan Getar: Masa berlaku SIMPER tersisa $simperDaysLeft hari (< 30 hari). Segera perpanjang SIMPER!'),
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: isExpiredPermit ? const Color(0xFFB91C1C) : const Color(0xFFB45309),
+                              height: 1.35,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
 
                 // Detail Card if attendance event
                 if (isAttendance && eventName.isNotEmpty) ...[
@@ -1125,10 +1300,12 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
     final berakhirKerja = data['berakhir_kerja']?.toString() ?? '-';
     final pengajuan = data['pengajuan']?.toString() ?? 'REGULER';
     final status = data['status']?.toString() ?? 'PRINTED';
-    final daysLeft = data['days_left'] is int
-        ? data['days_left'] as int
-        : int.tryParse(data['days_left']?.toString() ?? '0') ?? 0;
+    final daysLeft = _extractDaysLeft(data) ??
+        (data['days_left'] is int
+            ? data['days_left'] as int
+            : int.tryParse(data['days_left']?.toString() ?? '0') ?? 0);
     final isExpired = data['is_expired'] == true || daysLeft < 0;
+    final isWarning = !isExpired && daysLeft <= 30;
     final rawAkses = data['akses_lokasi']?.toString() ?? '';
     final zones = rawAkses
         .split(RegExp(r'[,;|\s]+'))
@@ -1142,12 +1319,17 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
         color: const Color(0xFF0F172A),
         borderRadius: BorderRadius.circular(22),
         border: Border.all(
-          color: isExpired ? const Color(0xFFEF4444) : const Color(0xFF38BDF8),
+          color: isExpired
+              ? const Color(0xFFEF4444)
+              : (isWarning ? const Color(0xFFF59E0B) : const Color(0xFF38BDF8)),
           width: 1.8,
         ),
         boxShadow: [
           BoxShadow(
-            color: (isExpired ? const Color(0xFFEF4444) : const Color(0xFF0284C7)).withValues(alpha: .28),
+            color: (isExpired
+                    ? const Color(0xFFEF4444)
+                    : (isWarning ? const Color(0xFFF59E0B) : const Color(0xFF0284C7)))
+                .withValues(alpha: .28),
             blurRadius: 20,
             offset: const Offset(0, 6),
           ),
@@ -1163,14 +1345,18 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
               gradient: LinearGradient(
                 colors: isExpired
                     ? [const Color(0xFF991B1B), const Color(0xFF7F1D1D)]
-                    : [const Color(0xFF065F46), const Color(0xFF047857)],
+                    : (isWarning
+                        ? [const Color(0xFFB45309), const Color(0xFF92400E)]
+                        : [const Color(0xFF065F46), const Color(0xFF047857)]),
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
               borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
               border: Border(
                 bottom: BorderSide(
-                  color: isExpired ? const Color(0xFFFCA5A5) : const Color(0xFF34D399),
+                  color: isExpired
+                      ? const Color(0xFFFCA5A5)
+                      : (isWarning ? const Color(0xFFFCD34D) : const Color(0xFF34D399)),
                   width: 1.5,
                 ),
               ),
@@ -1182,7 +1368,9 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
                   child: Row(
                     children: [
                       Icon(
-                        isExpired ? Icons.warning_rounded : Icons.verified_user_rounded,
+                        isExpired
+                            ? Icons.warning_rounded
+                            : (isWarning ? Icons.notification_important_rounded : Icons.verified_user_rounded),
                         size: 18,
                         color: Colors.white,
                       ),
@@ -1210,7 +1398,9 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
                     border: Border.all(color: Colors.white, width: 1.2),
                   ),
                   child: Text(
-                    isExpired ? 'EXPIRED' : status.toUpperCase(),
+                    isExpired
+                        ? 'EXPIRED'
+                        : (isWarning ? '< 30 HARI' : status.toUpperCase()),
                     style: const TextStyle(
                       fontSize: 10.5,
                       fontWeight: FontWeight.w900,
@@ -1531,16 +1721,28 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
                         children: [
                           Row(
                             children: [
-                              Icon(Icons.timer_outlined, size: 15, color: isExpired ? const Color(0xFFF87171) : const Color(0xFF34D399)),
+                              Icon(
+                                isExpired
+                                    ? Icons.timer_off_outlined
+                                    : (isWarning ? Icons.notification_important_rounded : Icons.timer_outlined),
+                                size: 15,
+                                color: isExpired
+                                    ? const Color(0xFFF87171)
+                                    : (isWarning ? const Color(0xFFFBBF24) : const Color(0xFF34D399)),
+                              ),
                               const SizedBox(width: 6),
                               Text(
                                 isExpired
                                     ? 'Kedaluwarsa (${daysLeft.abs()} hari lalu)'
-                                    : 'Sisa Masa Aktif: $daysLeft hari',
+                                    : (isWarning
+                                        ? 'Sisa Masa Aktif: $daysLeft hari (Segera Habis)'
+                                        : 'Sisa Masa Aktif: $daysLeft hari'),
                                 style: TextStyle(
                                   fontSize: 12,
                                   fontWeight: FontWeight.w900,
-                                  color: isExpired ? const Color(0xFFF87171) : const Color(0xFF34D399),
+                                  color: isExpired
+                                      ? const Color(0xFFF87171)
+                                      : (isWarning ? const Color(0xFFFBBF24) : const Color(0xFF34D399)),
                                 ),
                               ),
                             ],
@@ -1669,31 +1871,8 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
                   const SizedBox(height: 16),
                 ],
 
-                // Zonasi Akses Tambang
-                const Row(
-                  children: [
-                    Icon(Icons.shield_outlined, size: 15, color: Color(0xFF38BDF8)),
-                    SizedBox(width: 6),
-                    Text(
-                      'ZONASI AKSES TAMBANG',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 0.8,
-                        color: Color(0xFF38BDF8),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                if (zones.isEmpty)
-                  const Text('Tidak ada izin akses area yang tercatat', style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8)))
-                else
-                  Wrap(
-                    spacing: 6,
-                    runSpacing: 6,
-                    children: zones.map((zone) => _buildZoneChip(zone)).toList(),
-                  ),
+                // Zonasi Akses Tambang - Desain Jelas, Informatif & Berstandar K3
+                _buildZonasiAksesSection(zones),
               ],
             ),
           ),
@@ -1720,10 +1899,12 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
     final nilaiTeori = data['nilai_teori'] != null ? data['nilai_teori'].toString() : '-';
     final nilaiPraktek = data['nilai_praktek'] != null ? data['nilai_praktek'].toString() : '-';
     final bool ketentuanHauling = data['ketentuan_hauling'] == true;
-    final int daysLeft = data['days_left'] is int
-        ? data['days_left'] as int
-        : int.tryParse(data['days_left']?.toString() ?? '0') ?? 0;
+    final int daysLeft = _extractDaysLeft(data) ??
+        (data['days_left'] is int
+            ? data['days_left'] as int
+            : int.tryParse(data['days_left']?.toString() ?? '0') ?? 0);
     final bool isExpired = data['is_expired'] == true || daysLeft < 0;
+    final bool isWarning = !isExpired && daysLeft <= 30;
 
     final rawUnits = data['units'] as List? ?? data['simper_units'] as List? ?? [];
     final List<Map<String, dynamic>> units = rawUnits.map((u) {
@@ -1738,12 +1919,17 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
         color: const Color(0xFF0F172A),
         borderRadius: BorderRadius.circular(22),
         border: Border.all(
-          color: isExpired ? const Color(0xFFEF4444) : const Color(0xFF0D9488),
+          color: isExpired
+              ? const Color(0xFFEF4444)
+              : (isWarning ? const Color(0xFFF59E0B) : const Color(0xFF0D9488)),
           width: 1.8,
         ),
         boxShadow: [
           BoxShadow(
-            color: (isExpired ? const Color(0xFFEF4444) : const Color(0xFF0D9488)).withValues(alpha: .28),
+            color: (isExpired
+                    ? const Color(0xFFEF4444)
+                    : (isWarning ? const Color(0xFFF59E0B) : const Color(0xFF0D9488)))
+                .withValues(alpha: .28),
             blurRadius: 20,
             offset: const Offset(0, 6),
           ),
@@ -1759,14 +1945,18 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
               gradient: LinearGradient(
                 colors: isExpired
                     ? [const Color(0xFF991B1B), const Color(0xFF7F1D1D)]
-                    : [const Color(0xFF0F766E), const Color(0xFF115E59)],
+                    : (isWarning
+                        ? [const Color(0xFFB45309), const Color(0xFF92400E)]
+                        : [const Color(0xFF0F766E), const Color(0xFF115E59)]),
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
               borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
               border: Border(
                 bottom: BorderSide(
-                  color: isExpired ? const Color(0xFFFCA5A5) : const Color(0xFF2DD4BF),
+                  color: isExpired
+                      ? const Color(0xFFFCA5A5)
+                      : (isWarning ? const Color(0xFFFCD34D) : const Color(0xFF2DD4BF)),
                   width: 1.5,
                 ),
               ),
@@ -1778,7 +1968,9 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
                   child: Row(
                     children: [
                       Icon(
-                        isExpired ? Icons.warning_rounded : Icons.drive_eta_rounded,
+                        isExpired
+                            ? Icons.warning_rounded
+                            : (isWarning ? Icons.notification_important_rounded : Icons.drive_eta_rounded),
                         size: 18,
                         color: Colors.white,
                       ),
@@ -1806,7 +1998,9 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
                     border: Border.all(color: Colors.white, width: 1.2),
                   ),
                   child: Text(
-                    isExpired ? 'EXPIRED' : status.toUpperCase(),
+                    isExpired
+                        ? 'EXPIRED'
+                        : (isWarning ? '< 30 HARI' : status.toUpperCase()),
                     style: const TextStyle(
                       fontSize: 10.5,
                       fontWeight: FontWeight.w900,
@@ -2206,10 +2400,16 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
                         width: double.infinity,
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                         decoration: BoxDecoration(
-                          color: (isExpired ? const Color(0xFFEF4444) : const Color(0xFF0D9488)).withValues(alpha: .12),
+                          color: (isExpired
+                                  ? const Color(0xFFEF4444)
+                                  : (isWarning ? const Color(0xFFF59E0B) : const Color(0xFF0D9488)))
+                              .withValues(alpha: .12),
                           borderRadius: BorderRadius.circular(8),
                           border: Border.all(
-                            color: (isExpired ? const Color(0xFFEF4444) : const Color(0xFF0D9488)).withValues(alpha: .3),
+                            color: (isExpired
+                                    ? const Color(0xFFEF4444)
+                                    : (isWarning ? const Color(0xFFF59E0B) : const Color(0xFF0D9488)))
+                                .withValues(alpha: .3),
                           ),
                         ),
                         child: Row(
@@ -2218,17 +2418,27 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
                             Row(
                               children: [
                                 Icon(
-                                  isExpired ? Icons.cancel_outlined : Icons.timer_outlined,
+                                  isExpired
+                                      ? Icons.cancel_outlined
+                                      : (isWarning ? Icons.notification_important_rounded : Icons.timer_outlined),
                                   size: 13,
-                                  color: isExpired ? const Color(0xFFEF4444) : const Color(0xFF2DD4BF),
+                                  color: isExpired
+                                      ? const Color(0xFFEF4444)
+                                      : (isWarning ? const Color(0xFFFBBF24) : const Color(0xFF2DD4BF)),
                                 ),
                                 const SizedBox(width: 6),
                                 Text(
-                                  isExpired ? 'Status SIMPER: Kadaluarsa' : 'Sisa Masa Aktif: $daysLeft hari',
+                                  isExpired
+                                      ? 'Status SIMPER: Kadaluarsa'
+                                      : (isWarning
+                                          ? 'Sisa Masa Aktif: $daysLeft hari (Segera Habis)'
+                                          : 'Sisa Masa Aktif: $daysLeft hari'),
                                   style: TextStyle(
                                     fontSize: 11,
                                     fontWeight: FontWeight.w800,
-                                    color: isExpired ? const Color(0xFFEF4444) : const Color(0xFF2DD4BF),
+                                    color: isExpired
+                                        ? const Color(0xFFEF4444)
+                                        : (isWarning ? const Color(0xFFFBBF24) : const Color(0xFF2DD4BF)),
                                   ),
                                 ),
                               ],
@@ -2435,59 +2645,350 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
     );
   }
 
-  Widget _buildZoneChip(String zone) {
-    Color chipBg;
-    Color chipBorder;
-    IconData chipIcon;
+  Widget _buildZonasiAksesSection(List<String> zones) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1E293B),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: const Color(0xFF38BDF8).withValues(alpha: .35),
+          width: 1.4,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: .3),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header Bar
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF0284C7).withValues(alpha: .25),
+                      shape: BoxShape.circle,
+                      border: Border.all(color: const Color(0xFF38BDF8), width: 1),
+                    ),
+                    child: const Icon(Icons.shield_rounded, size: 16, color: Color(0xFF38BDF8)),
+                  ),
+                  const SizedBox(width: 8),
+                  const Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'ZONASI AKSES TAMBANG',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 0.8,
+                          color: Color(0xFF38BDF8),
+                        ),
+                      ),
+                      Text(
+                        'Izin Resmi Masuk Area Operasional',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF94A3B8),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
+                decoration: BoxDecoration(
+                  color: (zones.isNotEmpty ? const Color(0xFF10B981) : const Color(0xFFEF4444)).withValues(alpha: .18),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: zones.isNotEmpty ? const Color(0xFF34D399) : const Color(0xFFF87171),
+                    width: 1,
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      zones.isNotEmpty ? Icons.verified_rounded : Icons.cancel_outlined,
+                      size: 12,
+                      color: zones.isNotEmpty ? const Color(0xFF34D399) : const Color(0xFFF87171),
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      zones.isNotEmpty ? '${zones.length} AREA AKTIF' : 'TANPA AKSES',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 0.4,
+                        color: zones.isNotEmpty ? const Color(0xFF34D399) : const Color(0xFFF87171),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
 
-    final upper = zone.toUpperCase();
-    if (upper == 'PIT') {
-      chipBg = const Color(0xFF9A3412);
-      chipBorder = const Color(0xFFFB923C);
-      chipIcon = Icons.terrain_rounded;
-    } else if (upper == 'PORT') {
-      chipBg = const Color(0xFF0369A1);
-      chipBorder = const Color(0xFF38BDF8);
-      chipIcon = Icons.directions_boat_rounded;
-    } else if (upper.contains('CPP')) {
-      chipBg = const Color(0xFF6B21A8);
-      chipBorder = const Color(0xFFC084FC);
-      chipIcon = Icons.factory_rounded;
-    } else if (upper == 'GNR' || upper == 'OFFICE') {
-      chipBg = const Color(0xFF065F46);
-      chipBorder = const Color(0xFF34D399);
-      chipIcon = Icons.domain_rounded;
-    } else {
-      chipBg = const Color(0xFF334155);
-      chipBorder = const Color(0xFF94A3B8);
-      chipIcon = Icons.place_rounded;
-    }
+          if (zones.isEmpty)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 10),
+              decoration: BoxDecoration(
+                color: const Color(0xFF0F172A),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFF334155)),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.info_outline_rounded, size: 16, color: Color(0xFFF87171)),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Tidak ada izin akses area tambang yang tercatat pada permit ini.',
+                      style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
+                    ),
+                  ),
+                ],
+              ),
+            )
+          else ...[
+            // Distinct list of clear cards
+            Column(
+              children: zones.map((zone) => _buildDetailedZoneTile(zone)).toList(),
+            ),
+            const SizedBox(height: 8),
+            // Security verification note
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: const Color(0xFF0F172A),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.check_circle_outline_rounded, size: 13, color: Color(0xFF34D399)),
+                  SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      'Pemegang permit terverifikasi sah memasuki zona di atas.',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFFCBD5E1),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDetailedZoneTile(String zone) {
+    final info = _getZoneInfo(zone);
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      margin: const EdgeInsets.only(bottom: 7),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
-        color: chipBg,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: chipBorder, width: 1.2),
+        color: const Color(0xFF0F172A),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: info.borderColor.withValues(alpha: .6), width: 1.2),
       ),
       child: Row(
-        mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(chipIcon, size: 13, color: Colors.white),
-          const SizedBox(width: 5),
-          Text(
-            zone,
-            style: const TextStyle(
-              fontSize: 11.5,
-              fontWeight: FontWeight.w900,
-              letterSpacing: 0.5,
-              color: Colors.white,
+          // Left Badge with Code & Icon
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: info.bgColor,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: info.borderColor, width: 1.2),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(info.icon, size: 15, color: info.color),
+                const SizedBox(width: 6),
+                Text(
+                  info.code,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 0.6,
+                    color: info.color,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          // Middle Details: Full Title & Description
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  info.title,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w900,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(height: 1),
+                Text(
+                  info.description,
+                  style: const TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w500,
+                    color: Color(0xFF94A3B8),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Right Status Pill: AKSES ✓
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+            decoration: BoxDecoration(
+              color: const Color(0xFF10B981).withValues(alpha: .15),
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(color: const Color(0xFF34D399), width: 0.8),
+            ),
+            child: const Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.check_rounded, size: 11, color: Color(0xFF34D399)),
+                SizedBox(width: 2),
+                Text(
+                  'AKSES',
+                  style: TextStyle(
+                    fontSize: 9.5,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 0.4,
+                    color: Color(0xFF34D399),
+                  ),
+                ),
+              ],
             ),
           ),
         ],
       ),
     );
   }
+
+  _ZoneInfo _getZoneInfo(String zone) {
+    final upper = zone.trim().toUpperCase();
+    if (upper == 'PIT') {
+      return const _ZoneInfo(
+        code: 'PIT',
+        title: 'Pit Tambang Aktif',
+        description: 'Area Front Penambangan & Loading',
+        icon: Icons.terrain_rounded,
+        color: Color(0xFFFB923C),
+        borderColor: Color(0xFFF97316),
+        bgColor: Color(0xFF431407),
+      );
+    } else if (upper == 'PORT') {
+      return const _ZoneInfo(
+        code: 'PORT',
+        title: 'Pelabuhan & Jetty',
+        description: 'Terminal Khusus Muat Tongkang',
+        icon: Icons.directions_boat_rounded,
+        color: Color(0xFF38BDF8),
+        borderColor: Color(0xFF0284C7),
+        bgColor: Color(0xFF082F49),
+      );
+    } else if (upper.contains('CPP')) {
+      return const _ZoneInfo(
+        code: 'CPP 33',
+        title: 'CPP KM 33 (Pabrik)',
+        description: 'Pabrik Crushing & Processing Batubara',
+        icon: Icons.factory_rounded,
+        color: Color(0xFFC084FC),
+        borderColor: Color(0xFF9333EA),
+        bgColor: Color(0xFF3B0764),
+      );
+    } else if (upper == 'GNR' || upper == 'OFFICE') {
+      return const _ZoneInfo(
+        code: 'GNR',
+        title: 'General & Office',
+        description: 'Perkantoran, Mess & Fasilitas Umum',
+        icon: Icons.apartment_rounded,
+        color: Color(0xFF34D399),
+        borderColor: Color(0xFF059669),
+        bgColor: Color(0xFF022C22),
+      );
+    } else if (upper == 'GHND' || upper.contains('HAUL')) {
+      return const _ZoneInfo(
+        code: 'GHND',
+        title: 'Jalur Hauling',
+        description: 'Jalur Angkutan Khusus Batubara',
+        icon: Icons.alt_route_rounded,
+        color: Color(0xFFFDE047),
+        borderColor: Color(0xFFEAB308),
+        bgColor: Color(0xFF422006),
+      );
+    } else if (upper == 'BLAST' || upper.contains('PELEDAKAN')) {
+      return const _ZoneInfo(
+        code: 'BLAST',
+        title: 'Area Peledakan',
+        description: 'Zona Bahaya Peledakan (Blasting)',
+        icon: Icons.warning_amber_rounded,
+        color: Color(0xFFF87171),
+        borderColor: Color(0xFFDC2626),
+        bgColor: Color(0xFF450A0A),
+      );
+    } else if (upper == 'QRY' || upper.contains('QUARRY')) {
+      return const _ZoneInfo(
+        code: 'QRY',
+        title: 'Quarry Batuan',
+        description: 'Area Tambang Batu & Agregat',
+        icon: Icons.landscape_rounded,
+        color: Color(0xFFCBD5E1),
+        borderColor: Color(0xFF94A3B8),
+        bgColor: Color(0xFF1E293B),
+      );
+    } else if (upper == 'WKP' || upper == 'WS' || upper.contains('WORK')) {
+      return const _ZoneInfo(
+        code: 'WKP',
+        title: 'Workshop Tambang',
+        description: 'Bengkel Perawatan Alat Berat',
+        icon: Icons.build_circle_outlined,
+        color: Color(0xFF67E8F9),
+        borderColor: Color(0xFF06B6D4),
+        bgColor: Color(0xFF164E63),
+      );
+    } else {
+      return _ZoneInfo(
+        code: upper,
+        title: 'Area $upper',
+        description: 'Area Operasional Resmi Tambang',
+        icon: Icons.place_rounded,
+        color: const Color(0xFF94A3B8),
+        borderColor: const Color(0xFF64748B),
+        bgColor: const Color(0xFF1E293B),
+      );
+    }
+  }
+
 
   void _showPhotoPreviewDialog({
     required BuildContext context,
@@ -3199,6 +3700,8 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
 
     String selectedDirection = 'MASUK'; // 'MASUK' or 'KELUAR'
     final unitController = TextEditingController();
+    int jumlahPenumpang = 0;
+    final penumpangController = TextEditingController(text: '0');
     final keperluanController = TextEditingController();
     final posController = TextEditingController(text: 'Pos Security Utama');
     bool isSubmitting = false;
@@ -3458,12 +3961,12 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
                                       padding: const EdgeInsets.symmetric(vertical: 12),
                                       decoration: BoxDecoration(
                                         color: selectedDirection == 'KELUAR'
-                                            ? const Color(0xFF0284C7).withValues(alpha: .12)
+                                            ? const Color(0xFFEF4444).withValues(alpha: .14)
                                             : const Color(0xFFF8FAFC),
                                         borderRadius: BorderRadius.circular(14),
                                         border: Border.all(
                                           color: selectedDirection == 'KELUAR'
-                                              ? const Color(0xFF0284C7)
+                                              ? const Color(0xFFDC2626)
                                               : const Color(0xFFE2E8F0),
                                           width: selectedDirection == 'KELUAR' ? 2 : 1,
                                         ),
@@ -3474,7 +3977,7 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
                                           Icon(
                                             Icons.logout_rounded,
                                             size: 18,
-                                            color: selectedDirection == 'KELUAR' ? const Color(0xFF0284C7) : const Color(0xFF64748B),
+                                            color: selectedDirection == 'KELUAR' ? const Color(0xFFDC2626) : const Color(0xFF64748B),
                                           ),
                                           const SizedBox(width: 8),
                                           Text(
@@ -3482,7 +3985,7 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
                                             style: TextStyle(
                                               fontWeight: FontWeight.w900,
                                               fontSize: 13,
-                                              color: selectedDirection == 'KELUAR' ? const Color(0xFF0284C7) : const Color(0xFF64748B),
+                                              color: selectedDirection == 'KELUAR' ? const Color(0xFFDC2626) : const Color(0xFF64748B),
                                             ),
                                           ),
                                         ],
@@ -3515,6 +4018,222 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
                                 if (val == null || val.trim().isEmpty) return 'Nomor unit wajib diisi.';
                                 return null;
                               },
+                            ),
+                            const SizedBox(height: 18),
+
+                            // Input Jumlah Penumpang
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Row(
+                                  children: [
+                                    Icon(
+                                      Icons.group_outlined,
+                                      size: 17,
+                                      color: selectedDirection == 'KELUAR' ? const Color(0xFFDC2626) : const Color(0xFF0D9488),
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      'Jumlah Penumpang',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w800,
+                                        fontSize: 13,
+                                        color: selectedDirection == 'KELUAR' ? const Color(0xFFDC2626) : const Color(0xFF1E293B),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2.5),
+                                  decoration: BoxDecoration(
+                                    color: selectedDirection == 'KELUAR' ? const Color(0xFFFEF2F2) : const Color(0xFFF1F5F9),
+                                    borderRadius: BorderRadius.circular(6),
+                                    border: Border.all(
+                                      color: selectedDirection == 'KELUAR' ? const Color(0xFFFCA5A5) : const Color(0xFFCBD5E1),
+                                      width: 0.8,
+                                    ),
+                                  ),
+                                  child: Text(
+                                    selectedDirection == 'KELUAR' ? 'Keluar (OUT) Merah' : 'Di luar pengemudi',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w700,
+                                      color: selectedDirection == 'KELUAR' ? const Color(0xFFDC2626) : const Color(0xFF64748B),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                              decoration: BoxDecoration(
+                                color: selectedDirection == 'KELUAR'
+                                    ? const Color(0xFFFEF2F2).withValues(alpha: .5)
+                                    : Colors.white,
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(
+                                  color: selectedDirection == 'KELUAR'
+                                      ? const Color(0xFFFCA5A5)
+                                      : const Color(0xFFCBD5E1),
+                                  width: selectedDirection == 'KELUAR' ? 1.5 : 1,
+                                ),
+                              ),
+                              child: Column(
+                                children: [
+                                  Row(
+                                    children: [
+                                      // Decrement Button
+                                      Material(
+                                        color: selectedDirection == 'KELUAR'
+                                            ? const Color(0xFFFEE2E2)
+                                            : const Color(0xFFF1F5F9),
+                                        borderRadius: BorderRadius.circular(10),
+                                        child: InkWell(
+                                          borderRadius: BorderRadius.circular(10),
+                                          onTap: () {
+                                            if (jumlahPenumpang > 0) {
+                                              setModalState(() {
+                                                jumlahPenumpang--;
+                                                penumpangController.text = jumlahPenumpang.toString();
+                                              });
+                                            }
+                                          },
+                                          child: Padding(
+                                            padding: const EdgeInsets.all(10),
+                                            child: Icon(
+                                              Icons.remove_rounded,
+                                              size: 20,
+                                              color: selectedDirection == 'KELUAR'
+                                                  ? const Color(0xFFDC2626)
+                                                  : const Color(0xFF334155),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 14),
+                                      // Number Display / Input
+                                      Expanded(
+                                        child: Column(
+                                          children: [
+                                            TextFormField(
+                                              controller: penumpangController,
+                                              keyboardType: TextInputType.number,
+                                              textAlign: TextAlign.center,
+                                              style: TextStyle(
+                                                fontSize: 22,
+                                                fontWeight: FontWeight.w900,
+                                                color: selectedDirection == 'KELUAR'
+                                                    ? const Color(0xFFDC2626)
+                                                    : const Color(0xFF0F172A),
+                                              ),
+                                              decoration: InputDecoration(
+                                                border: InputBorder.none,
+                                                isDense: true,
+                                                contentPadding: EdgeInsets.zero,
+                                                hintText: '0',
+                                                hintStyle: TextStyle(
+                                                  color: selectedDirection == 'KELUAR'
+                                                      ? const Color(0xFFF87171)
+                                                      : const Color(0xFF94A3B8),
+                                                ),
+                                              ),
+                                              onChanged: (val) {
+                                                final p = int.tryParse(val) ?? 0;
+                                                setModalState(() {
+                                                  jumlahPenumpang = p < 0 ? 0 : p;
+                                                });
+                                              },
+                                            ),
+                                            Text(
+                                              jumlahPenumpang == 0
+                                                  ? 'Hanya Sopir/Driver (0 Penumpang)'
+                                                  : '$jumlahPenumpang Orang Penumpang',
+                                              style: TextStyle(
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.w700,
+                                                color: selectedDirection == 'KELUAR'
+                                                    ? const Color(0xFFDC2626)
+                                                    : const Color(0xFF64748B),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      const SizedBox(width: 14),
+                                      // Increment Button
+                                      Material(
+                                        color: selectedDirection == 'KELUAR'
+                                            ? const Color(0xFFDC2626)
+                                            : const Color(0xFF0D9488),
+                                        borderRadius: BorderRadius.circular(10),
+                                        child: InkWell(
+                                          borderRadius: BorderRadius.circular(10),
+                                          onTap: () {
+                                            setModalState(() {
+                                              jumlahPenumpang++;
+                                              penumpangController.text = jumlahPenumpang.toString();
+                                            });
+                                          },
+                                          child: const Padding(
+                                            padding: EdgeInsets.all(10),
+                                            child: Icon(
+                                              Icons.add_rounded,
+                                              size: 20,
+                                              color: Colors.white,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 10),
+                                  // Quick Chips
+                                  Wrap(
+                                    spacing: 6,
+                                    runSpacing: 6,
+                                    children: [0, 1, 2, 3, 4, 5].map((count) {
+                                      final isSelected = jumlahPenumpang == count;
+                                      final isOut = selectedDirection == 'KELUAR';
+                                      return InkWell(
+                                        borderRadius: BorderRadius.circular(8),
+                                        onTap: () {
+                                          setModalState(() {
+                                            jumlahPenumpang = count;
+                                            penumpangController.text = count.toString();
+                                          });
+                                        },
+                                        child: AnimatedContainer(
+                                          duration: const Duration(milliseconds: 150),
+                                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                          decoration: BoxDecoration(
+                                            color: isSelected
+                                                ? (isOut ? const Color(0xFFDC2626) : const Color(0xFF0D9488))
+                                                : (isOut ? const Color(0xFFFFF1F2) : const Color(0xFFF1F5F9)),
+                                            borderRadius: BorderRadius.circular(8),
+                                            border: Border.all(
+                                              color: isSelected
+                                                  ? (isOut ? const Color(0xFFDC2626) : const Color(0xFF0D9488))
+                                                  : (isOut ? const Color(0xFFFECDD3) : const Color(0xFFE2E8F0)),
+                                              width: 1,
+                                            ),
+                                          ),
+                                          child: Text(
+                                            count == 0 ? 'Driver Saja (0)' : '$count Org',
+                                            style: TextStyle(
+                                              fontSize: 11,
+                                              fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                                              color: isSelected
+                                                  ? Colors.white
+                                                  : (isOut ? const Color(0xFFDC2626) : const Color(0xFF475569)),
+                                            ),
+                                          ),
+                                        ),
+                                      );
+                                    }).toList(),
+                                  ),
+                                ],
+                              ),
                             ),
                             const SizedBox(height: 18),
 
@@ -3589,6 +4308,8 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
                                           'nomorPermit': nomorPermit,
                                           'direction': selectedDirection,
                                           'nomorUnit': unitController.text.trim(),
+                                          'jumlahPenumpang': jumlahPenumpang,
+                                          'jumlah_penumpang': jumlahPenumpang,
                                           'keperluan': keperluanController.text.trim(),
                                           'lokasiPos': posController.text.trim(),
                                           'latitude': currentGps?.latitude,
@@ -3619,13 +4340,14 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
                                               selectedDirection,
                                               unitController.text.trim(),
                                               keperluanController.text.trim(),
+                                              jumlahPenumpang,
                                               gpsStr != null ? '$gpsStr (${posController.text.trim()})' : posController.text.trim(),
                                             );
                                           },
                                         );
                                       },
                                 style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color(0xFF0D9488),
+                                  backgroundColor: selectedDirection == 'KELUAR' ? const Color(0xFFDC2626) : const Color(0xFF0D9488),
                                   foregroundColor: Colors.white,
                                   padding: const EdgeInsets.symmetric(vertical: 14),
                                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
@@ -3637,9 +4359,11 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
                                         height: 18,
                                         child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                                       )
-                                    : const Icon(Icons.check_rounded, size: 20),
+                                    : Icon(selectedDirection == 'KELUAR' ? Icons.logout_rounded : Icons.login_rounded, size: 20),
                                 label: Text(
-                                  isSubmitting ? 'Menyimpan Log...' : 'Simpan Data Keluar Masuk',
+                                  isSubmitting
+                                      ? (selectedDirection == 'KELUAR' ? 'Menyimpan Log Keluar...' : 'Menyimpan Log Masuk...')
+                                      : (selectedDirection == 'KELUAR' ? 'Simpan Data Keluar (OUT)' : 'Simpan Data Masuk (IN)'),
                                   style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
                                 ),
                               ),
@@ -3658,7 +4382,14 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
     );
   }
 
-  void _showMovementRecordedDialog(String nama, String direction, String unit, String keperluan, [String? lokasiDetail]) {
+  void _showMovementRecordedDialog(
+    String nama,
+    String direction,
+    String unit,
+    String keperluan,
+    int jumlahPenumpang, [
+    String? lokasiDetail,
+  ]) {
     final isMasuk = direction == 'MASUK';
     showDialog<void>(
       context: context,
@@ -3669,10 +4400,14 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: const Color(0xFF0D9488).withValues(alpha: .15),
+                color: (isMasuk ? const Color(0xFF0D9488) : const Color(0xFFDC2626)).withValues(alpha: .15),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(Icons.verified_rounded, color: Color(0xFF0D9488), size: 24),
+              child: Icon(
+                isMasuk ? Icons.verified_rounded : Icons.logout_rounded,
+                color: isMasuk ? const Color(0xFF0D9488) : const Color(0xFFDC2626),
+                size: 24,
+              ),
             ),
             const SizedBox(width: 12),
             const Expanded(
@@ -3691,15 +4426,15 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
                   decoration: BoxDecoration(
                     color: isMasuk
                         ? const Color(0xFF10B981).withValues(alpha: .2)
-                        : const Color(0xFF0284C7).withValues(alpha: .2),
+                        : const Color(0xFFEF4444).withValues(alpha: .2),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
-                    isMasuk ? 'MASUK TAMBANG' : 'KELUAR TAMBANG',
+                    isMasuk ? 'MASUK TAMBANG (IN)' : 'KELUAR TAMBANG (OUT)',
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w900,
-                      color: isMasuk ? const Color(0xFF059669) : const Color(0xFF0284C7),
+                      color: isMasuk ? const Color(0xFF059669) : const Color(0xFFDC2626),
                     ),
                   ),
                 ),
@@ -3724,18 +4459,46 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
                 children: [
                   Text('Unit Kendaraan: $unit', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF1E293B))),
                   const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      const Text(
+                        'Penumpang: ',
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF475569)),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: !isMasuk ? const Color(0xFFFEF2F2) : const Color(0xFFF0FDF4),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(
+                            color: !isMasuk ? const Color(0xFFFCA5A5) : const Color(0xFF86EFAC),
+                            width: 0.8,
+                          ),
+                        ),
+                        child: Text(
+                          jumlahPenumpang == 0 ? '0 (Hanya Sopir)' : '$jumlahPenumpang Orang Penumpang',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w800,
+                            color: !isMasuk ? const Color(0xFFDC2626) : const Color(0xFF16A34A),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
                   Text('Keperluan: $keperluan', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF475569))),
                   if (lokasiDetail != null && lokasiDetail.isNotEmpty) ...[
                     const SizedBox(height: 6),
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Icon(Icons.my_location_rounded, size: 14, color: Color(0xFF0D9488)),
+                        Icon(Icons.my_location_rounded, size: 14, color: isMasuk ? const Color(0xFF0D9488) : const Color(0xFFDC2626)),
                         const SizedBox(width: 5),
                         Expanded(
                           child: Text(
                             'Lokasi GPS: $lokasiDetail',
-                            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF0D9488)),
+                            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: isMasuk ? const Color(0xFF0D9488) : const Color(0xFFDC2626)),
                           ),
                         ),
                       ],
@@ -3749,7 +4512,7 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
         actions: [
           ElevatedButton(
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF0D9488),
+              backgroundColor: isMasuk ? const Color(0xFF0D9488) : const Color(0xFFDC2626),
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
@@ -4671,9 +5434,191 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
                 ),
               ),
             ),
+
+            // High-Tech Professional Processing Overlay with Loading Bar
+            if (_isProcessingScan)
+              Positioned.fill(
+                child: _buildProfessionalProcessingOverlay(boxSize),
+              ),
           ],
         );
       },
+    );
+  }
+
+  Widget _buildProfessionalProcessingOverlay(double boxSize) {
+    return Container(
+      color: Colors.black.withValues(alpha: .6),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+        child: Center(
+          child: Container(
+            width: (boxSize + 40).clamp(280.0, 340.0),
+            padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 24),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFF0F172A), Color(0xFF1E293B)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(
+                color: const Color(0xFF38BDF8).withValues(alpha: .45),
+                width: 1.5,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF0284C7).withValues(alpha: .35),
+                  blurRadius: 30,
+                  spreadRadius: 2,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Top Glowing Shield Scanner Icon
+                Container(
+                  width: 58,
+                  height: 58,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF0284C7), Color(0xFF0369A1)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF38BDF8).withValues(alpha: .5),
+                        blurRadius: 18,
+                        spreadRadius: 1,
+                      ),
+                    ],
+                  ),
+                  child: const Center(
+                    child: Icon(
+                      Icons.qr_code_scanner_rounded,
+                      size: 30,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // System Badge
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0284C7).withValues(alpha: .18),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: const Color(0xFF38BDF8).withValues(alpha: .4),
+                      width: 1,
+                    ),
+                  ),
+                  child: const Text(
+                    'VERIFIKASI SISTEM K3',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 1.2,
+                      color: Color(0xFF38BDF8),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+
+                // Headline
+                const Text(
+                  'Memproses & Memvalidasi QR...',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.white,
+                    letterSpacing: -0.2,
+                  ),
+                ),
+                const SizedBox(height: 4),
+
+                // Subtitle
+                const Text(
+                  'Mengecek identitas, masa berlaku permit, dan otorisasi kerja ke server MBS SAP...',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    color: Color(0xFF94A3B8),
+                    height: 1.35,
+                  ),
+                ),
+                const SizedBox(height: 18),
+
+                // Professional Sleek Progress Bar with Rounded Ends
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Container(
+                    height: 6,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF334155),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const LinearProgressIndicator(
+                      minHeight: 6,
+                      backgroundColor: Color(0xFF334155),
+                      valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF38BDF8)),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+
+                // High-Tech Status Micro-row
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Row(
+                      children: [
+                        Icon(Icons.wifi_tethering_rounded, size: 12, color: Color(0xFF38BDF8)),
+                        SizedBox(width: 4),
+                        Text(
+                          'MBS API Link',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF94A3B8),
+                          ),
+                        ),
+                      ],
+                    ),
+                    Row(
+                      children: [
+                        Container(
+                          width: 6,
+                          height: 6,
+                          decoration: const BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: Color(0xFF10B981),
+                          ),
+                        ),
+                        const SizedBox(width: 5),
+                        const Text(
+                          'Mengambil Data...',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w800,
+                            color: Color(0xFF34D399),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 
@@ -5379,4 +6324,24 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
       ),
     );
   }
+}
+
+class _ZoneInfo {
+  final String code;
+  final String title;
+  final String description;
+  final IconData icon;
+  final Color color;
+  final Color borderColor;
+  final Color bgColor;
+
+  const _ZoneInfo({
+    required this.code,
+    required this.title,
+    required this.description,
+    required this.icon,
+    required this.color,
+    required this.borderColor,
+    required this.bgColor,
+  });
 }
