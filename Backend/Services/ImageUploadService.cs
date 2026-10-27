@@ -109,14 +109,8 @@ namespace Indexsafe.Api.Services
                 }
                 catch (Exception)
                 {
-                    uniqueFileName = uniqueFileName.Replace(".jpg", extension);
-                    var fallbackPath = Path.Combine(uploadsFolder, uniqueFileName);
-                    using (var fileStream = new FileStream(fallbackPath, FileMode.Create))
-                    {
-                        await file.CopyToAsync(fileStream);
-                    }
-                    var fi = new FileInfo(fallbackPath);
-                    compressedSizeKb = fi.Exists ? fi.Length / 1024 : originalSizeKb;
+                    // Security: If file claims to be an image but fails decoding, reject it to prevent disguised malware/trojans
+                    return null;
                 }
             }
             else
