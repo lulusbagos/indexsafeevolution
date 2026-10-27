@@ -2250,6 +2250,7 @@ class _DashboardPageState extends State<DashboardPage> with WidgetsBindingObserv
       _fetchHomeBanners();
       _fetchNotifCount();
       _checkApprovalAccess();
+      _checkSpecialPermitHighRiskAlerts();
       _initLocationAndProximity();
       _fetchHazardPointsFromApi();
     });
@@ -2275,6 +2276,31 @@ class _DashboardPageState extends State<DashboardPage> with WidgetsBindingObserv
     } catch (_) {}
   }
 
+  Future<void> _checkSpecialPermitHighRiskAlerts() async {
+    try {
+      final res = await _api.getSpecialPermitAlerts();
+      res.fold(
+        (err) {},
+        (data) async {
+          final alerts = (data['data'] as List<dynamic>?) ?? [];
+          if (alerts.isNotEmpty && mounted) {
+            final first = alerts.first as Map<String, dynamic>;
+            final actType = (first['activityType'] ?? 'Pekerjaan Khusus').toString().replaceAll('_', ' ');
+            final loc = first['workLocation'] ?? 'Area Operasional';
+
+            await NotificationService.display(
+              title: '⚠️ Peringatan Kegiatan High Risk!',
+              body: 'Sedang ada kegiatan $actType di $loc. PJO & Inspector segera lakukan inspeksi di area kerja!',
+              payload: '/special_permit',
+              priority: 'urgent',
+              notifType: 'special_permit',
+            );
+          }
+        },
+      );
+    } catch (_) {}
+  }
+
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.paused ||
@@ -2284,6 +2310,7 @@ class _DashboardPageState extends State<DashboardPage> with WidgetsBindingObserv
       _positionStreamSub = null;
     } else if (state == AppLifecycleState.resumed) {
       _checkApprovalAccess();
+      _checkSpecialPermitHighRiskAlerts();
       if (_positionStreamSub == null) {
         _initLocationAndProximity();
       }

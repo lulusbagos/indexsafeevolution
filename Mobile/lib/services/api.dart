@@ -4431,7 +4431,159 @@ class ApiService {
       return Left({'message': e.toString()});
     }
   }
+
+  // ==========================================
+  // SPECIAL PERMIT FOLLOW-UP & HIGH RISK ALERT
+  // ==========================================
+
+  Future<Either<Map<String, dynamic>, Map<String, dynamic>>> getSpecialPermits({
+    String? status,
+    String? search,
+  }) async {
+    try {
+      final user = PreferenceService.getUser();
+      final profile = PreferenceService.getProfile();
+      final activeNik = user ?? profile?.noNik ?? '';
+
+      final queryParams = <String>[];
+      if (activeNik.isNotEmpty) queryParams.add('nik=$activeNik');
+      if (status != null && status.isNotEmpty) queryParams.add('status=${Uri.encodeComponent(status)}');
+      if (search != null && search.isNotEmpty) queryParams.add('search=${Uri.encodeComponent(search)}');
+      final query = queryParams.isNotEmpty ? '?${queryParams.join('&')}' : '';
+
+      final targets = _buildCandidateUrls('/special-permit/list$query');
+      Response? lastResponse;
+      DioException? lastDioError;
+      for (final url in targets) {
+        try {
+          final res = await dio.get(url);
+          if (res.statusCode == 200 && res.data is Map) {
+            _updateActiveBaseUrlFromTarget(url);
+            return Right(Map<String, dynamic>.from(res.data as Map));
+          }
+          lastResponse = res;
+        } on DioException catch (de) {
+          lastDioError = de;
+        } catch (_) {}
+      }
+      if (lastResponse != null && lastResponse.data is Map) {
+        return Right(Map<String, dynamic>.from(lastResponse.data as Map));
+      }
+      if (lastDioError != null) {
+        return Left(errorHandler(lastDioError) as Map<String, dynamic>);
+      }
+      return const Left({'message': 'Gagal mengambil data special permit'});
+    } catch (e) {
+      return Left({'message': e.toString()});
+    }
+  }
+
+  Future<Either<Map<String, dynamic>, Map<String, dynamic>>> getSpecialPermitDetail(String permitId) async {
+    try {
+      final targets = _buildCandidateUrls('/special-permit/detail/$permitId');
+      Response? lastResponse;
+      DioException? lastDioError;
+      for (final url in targets) {
+        try {
+          final res = await dio.get(url);
+          if (res.statusCode == 200 && res.data is Map) {
+            _updateActiveBaseUrlFromTarget(url);
+            return Right(Map<String, dynamic>.from(res.data as Map));
+          }
+          lastResponse = res;
+        } on DioException catch (de) {
+          lastDioError = de;
+        } catch (_) {}
+      }
+      if (lastResponse != null && lastResponse.data is Map) {
+        return Right(Map<String, dynamic>.from(lastResponse.data as Map));
+      }
+      if (lastDioError != null) {
+        return Left(errorHandler(lastDioError) as Map<String, dynamic>);
+      }
+      return const Left({'message': 'Gagal mengambil detail special permit'});
+    } catch (e) {
+      return Left({'message': e.toString()});
+    }
+  }
+
+  Future<Either<Map<String, dynamic>, Map<String, dynamic>>> createSpecialPermitFollowup(
+    Map<String, dynamic> payload,
+  ) async {
+    try {
+      final user = PreferenceService.getUser();
+      final profile = PreferenceService.getProfile();
+      final activeNik = user ?? profile?.noNik ?? '';
+      final activeName = profile?.namaLengkap ?? '';
+
+      if ((payload['inspectorNik'] == null || payload['inspectorNik'].toString().isEmpty) && activeNik.isNotEmpty) {
+        payload['inspectorNik'] = activeNik;
+      }
+      if ((payload['inspectorName'] == null || payload['inspectorName'].toString().isEmpty) && activeName.isNotEmpty) {
+        payload['inspectorName'] = activeName;
+      }
+
+      final targets = _buildCandidateUrls('/special-permit/followup');
+      Response? lastResponse;
+      DioException? lastDioError;
+      for (final url in targets) {
+        try {
+          final res = await dio.post(url, data: payload);
+          if (res.statusCode == 200 && res.data is Map) {
+            _updateActiveBaseUrlFromTarget(url);
+            return Right(Map<String, dynamic>.from(res.data as Map));
+          }
+          lastResponse = res;
+        } on DioException catch (de) {
+          lastDioError = de;
+        } catch (_) {}
+      }
+      if (lastResponse != null && lastResponse.data is Map) {
+        return Right(Map<String, dynamic>.from(lastResponse.data as Map));
+      }
+      if (lastDioError != null) {
+        return Left(errorHandler(lastDioError) as Map<String, dynamic>);
+      }
+      return const Left({'message': 'Gagal menyimpan follow-up special permit'});
+    } catch (e) {
+      return Left({'message': e.toString()});
+    }
+  }
+
+  Future<Either<Map<String, dynamic>, Map<String, dynamic>>> getSpecialPermitAlerts() async {
+    try {
+      final user = PreferenceService.getUser();
+      final profile = PreferenceService.getProfile();
+      final activeNik = user ?? profile?.noNik ?? '';
+
+      final targets = _buildCandidateUrls('/special-permit/alerts?nik=$activeNik');
+      Response? lastResponse;
+      DioException? lastDioError;
+      for (final url in targets) {
+        try {
+          final res = await dio.get(url);
+          if (res.statusCode == 200 && res.data is Map) {
+            _updateActiveBaseUrlFromTarget(url);
+            return Right(Map<String, dynamic>.from(res.data as Map));
+          }
+          lastResponse = res;
+        } on DioException catch (de) {
+          lastDioError = de;
+        } catch (_) {}
+      }
+      if (lastResponse != null && lastResponse.data is Map) {
+        return Right(Map<String, dynamic>.from(lastResponse.data as Map));
+      }
+      if (lastDioError != null) {
+        return Left(errorHandler(lastDioError) as Map<String, dynamic>);
+      }
+      return const Left({'message': 'Gagal mengambil alert special permit'});
+    } catch (e) {
+      return Left({'message': e.toString()});
+    }
+  }
 }
+
 
 
 

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../pages/approval/approval_center_page.dart';
+import '../pages/special_permit/special_permit_list_page.dart';
 import '../pages/bbs/bbs_page.dart';
 import '../pages/ci_assessment/ci_page.dart';
 import '../pages/ci_assessment/fci_form_page.dart';
@@ -503,4 +504,13 @@ void routePage(BuildContext ctx, String route, {String? title}) {
       ),
     );
   }
+  if (route == '/special_permit') {
+    Navigator.push(
+      ctx,
+      MaterialPageRoute(
+        builder: (context) => const SpecialPermitListPage(),
+      ),
+    );
+  }
 }
+

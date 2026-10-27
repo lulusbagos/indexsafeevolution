@@ -19,6 +19,7 @@ class _OhsPageState extends State<OhsPage> {
   final ApiService _api = ApiService();
   bool _isApprovalRegistered = false;
   int _pendingApprovalCount = 0;
+  int _pendingSpecialPermitCount = 0;
 
   @override
   void initState() {
@@ -44,10 +45,34 @@ class _OhsPageState extends State<OhsPage> {
         },
       );
     } catch (_) {}
+
+    try {
+      final spRes = await _api.getSpecialPermitAlerts();
+      spRes.fold(
+        (err) {},
+        (data) {
+          if (mounted) {
+            final list = (data['data'] as List<dynamic>?) ?? [];
+            setState(() {
+              _pendingSpecialPermitCount = list.length;
+            });
+          }
+        },
+      );
+    } catch (_) {}
   }
 
   List<LinkMenuModel> _getMenuList() {
     final list = List<LinkMenuModel>.from(listMenuOhs1);
+    list.add(
+      LinkMenuModel(
+        title: 'Special\nPermit',
+        icon: Icons.warning_amber_rounded,
+        image: '',
+        route: '/special_permit',
+        opacity: 1,
+      ),
+    );
     if (_isApprovalRegistered) {
       list.add(
         LinkMenuModel(
@@ -102,9 +127,13 @@ class _OhsPageState extends State<OhsPage> {
                     (context, index) {
                       final item = menuItems[index];
                       final isApprovalCenter = item.route == '/approval_center';
+                      final isSpecialPermit = item.route == '/special_permit';
+                      int badge = 0;
+                      if (isApprovalCenter) badge = _pendingApprovalCount;
+                      if (isSpecialPermit) badge = _pendingSpecialPermitCount;
                       return _OhsModuleCard(
                         item: item,
-                        badgeCount: isApprovalCenter ? _pendingApprovalCount : 0,
+                        badgeCount: badge,
                       );
                     },
                     childCount: menuItems.length,
@@ -247,6 +276,8 @@ _OhsStyle _getOhsStyle(String route) {
       return const _OhsStyle(Color(0xFF159947), Icons.drive_eta_rounded);
     case '/approval_center':
       return const _OhsStyle(Color(0xFF0284C7), Icons.fact_check_rounded);
+    case '/special_permit':
+      return const _OhsStyle(Color(0xFFDC2626), Icons.warning_amber_rounded);
     case '/inspection':
       return const _OhsStyle(Color(0xFF2677E8), Icons.manage_search_rounded);
     case '/daily_inspection':

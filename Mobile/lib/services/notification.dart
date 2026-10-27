@@ -11,6 +11,7 @@ import '../pages/p2h/p2h_page.dart';
 import '../pages/performance/performance_hub_pages.dart';
 import '../pages/profile_page.dart';
 import '../pages/roster_settings_page.dart';
+import '../pages/special_permit/special_permit_list_page.dart';
 import '../utils/enums.dart';
 
 class NotificationService {
@@ -103,10 +104,14 @@ class NotificationService {
         t.startsWith('hazard_') ||
         t.startsWith('inspection_') ||
         t.startsWith('actionplan_') ||
+        t.startsWith('special_permit') ||
         combined.contains('temuan') ||
         combined.contains('penugasan') ||
         combined.contains('pic') ||
         combined.contains('pja') ||
+        combined.contains('special permit') ||
+        combined.contains('high risk') ||
+        combined.contains('kegiatan high risk') ||
         combined.contains('perlu mitigasi') ||
         combined.contains('tindakan perbaikan') ||
         combined.contains('action plan') ||
@@ -199,6 +204,8 @@ class NotificationService {
       nav.push(MaterialPageRoute(builder: (_) => const ProfilePage()));
     } else if (lower.contains('action') || lower.contains('actionplan')) {
       nav.push(MaterialPageRoute(builder: (_) => const ActionTrackerPage()));
+    } else if (lower.contains('special_permit') || lower.contains('specialpermit') || lower.contains('high_risk')) {
+      nav.push(MaterialPageRoute(builder: (_) => const SpecialPermitListPage()));
     } else {
       nav.push(MaterialPageRoute(builder: (_) => const NotifPage()));
     }
