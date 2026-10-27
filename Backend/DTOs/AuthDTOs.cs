@@ -16,12 +16,18 @@ namespace Indexsafe.Api.DTOs
 
         [JsonPropertyName("fcm_token")]
         public string? FcmToken { get; set; }
+
+        [JsonPropertyName("app_version")]
+        public string? AppVersion { get; set; }
     }
 
     public class UpdateFcmTokenRequest
     {
         [JsonPropertyName("fcm_token")]
         public string FcmToken { get; set; } = string.Empty;
+
+        [JsonPropertyName("app_version")]
+        public string? AppVersion { get; set; }
     }
 
     public class RegisterRequest

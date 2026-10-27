@@ -33,5 +33,9 @@ namespace Indexsafe.Api.Models
 
         [Column("terakhir_login")]
         public DateTime? TerakhirLogin { get; set; }
+
+        [MaxLength(50)]
+        [Column("app_version")]
+        public string? AppVersion { get; set; }
     }
 }

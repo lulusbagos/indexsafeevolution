@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:dartz/dartz.dart';
 import 'package:dio/dio.dart';
+import 'package:dio/io.dart';
 import 'package:flutter/material.dart';
 
 import '../models/auth_model.dart';
@@ -11,6 +12,7 @@ import '../models/incident_news_model.dart';
 import '../models/notification_item_model.dart';
 import '../models/popup_ad_model.dart';
 import '../models/profile_model.dart';
+import '../utils/globals.dart' as globals;
 import 'database.dart';
 import 'preference.dart';
 
@@ -104,6 +106,14 @@ class ApiService {
       ),
     );
 
+    dio.httpClientAdapter = IOHttpClientAdapter(
+      createHttpClient: () {
+        final client = HttpClient();
+        client.badCertificateCallback = (X509Certificate cert, String host, int port) => true;
+        return client;
+      },
+    );
+
     dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) {
@@ -124,7 +134,11 @@ class ApiService {
                    err.response?.statusCode == 502 ||
                    err.response?.statusCode == 503 ||
                    err.response?.statusCode == 504)) ||
-              (err.error != null && err.error is SocketException);
+              (err.error != null &&
+                  (err.error is SocketException ||
+                   err.error is HandshakeException ||
+                   err.error.toString().contains('CERTIFICATE') ||
+                   err.error.toString().contains('Handshake')));
 
           if (isFailoverError) {
             for (final candidate in _candidateUrls) {
@@ -289,11 +303,13 @@ class ApiService {
           : userStr;
 
       final fcmToken = PreferenceService.getFcmToken();
+      final appVersion = (globals.version.isNotEmpty) ? globals.version : '1.0.1';
       final loginPayload = <String, dynamic>{
         'email': emailParam,
         'nik': nikParam,
         'password': pswd,
         if (fcmToken != null && fcmToken.isNotEmpty) 'fcm_token': fcmToken,
+        'app_version': appVersion,
       };
 
       late Response res;
@@ -359,15 +375,40 @@ class ApiService {
 
   Future<bool> updateFcmToken(String fcmToken) async {
     try {
+      final appVersion = (globals.version.isNotEmpty) ? globals.version : '1.0.1';
       final res = await dio.post(
         '/auth/fcm-token',
-        data: {'fcm_token': fcmToken},
+        data: {
+          'fcm_token': fcmToken,
+          'app_version': appVersion,
+        },
       );
       return res.statusCode == 200;
     } catch (e) {
       debugPrint('[ApiService] updateFcmToken error: $e');
       return false;
     }
+  }
+
+  Future<Map<String, dynamic>?> checkAppVersion() async {
+    try {
+      for (final candidate in _candidateUrls) {
+        try {
+          final client = Dio(BaseOptions(
+            baseUrl: candidate,
+            connectTimeout: const Duration(seconds: 4),
+            receiveTimeout: const Duration(seconds: 4),
+          ));
+          final res = await client.get('/api/config/app-version');
+          if (res.statusCode == 200 && res.data is Map) {
+            return Map<String, dynamic>.from(res.data as Map);
+          }
+        } catch (_) {}
+      }
+    } catch (e) {
+      debugPrint('[ApiService] checkAppVersion error: $e');
+    }
+    return null;
   }
 
   Future<Either<Map, Map>> resetPassword(String nik, String birthDate) async {

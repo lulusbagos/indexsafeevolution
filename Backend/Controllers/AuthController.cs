@@ -278,7 +278,7 @@ namespace Indexsafe.Api.Controllers
             }
             await _context.SaveChangesAsync();
 
-            // Update tbl_m_pengguna_sandi: fcm_token & terakhir_login
+            // Update tbl_m_pengguna_sandi: fcm_token, terakhir_login, & app_version
             try
             {
                 if (overridePwd != null)
@@ -287,6 +287,10 @@ namespace Indexsafe.Api.Controllers
                     if (!string.IsNullOrWhiteSpace(req.FcmToken))
                     {
                         overridePwd.FcmToken = req.FcmToken;
+                    }
+                    if (!string.IsNullOrWhiteSpace(req.AppVersion))
+                    {
+                        overridePwd.AppVersion = req.AppVersion;
                     }
                 }
                 else
@@ -297,7 +301,8 @@ namespace Indexsafe.Api.Controllers
                         KataSandi = req.Password,
                         DiubahPada = DateTime.Now,
                         TerakhirLogin = DateTime.Now,
-                        FcmToken = req.FcmToken
+                        FcmToken = req.FcmToken,
+                        AppVersion = req.AppVersion
                     };
                     _context.PasswordOverrides.Add(overridePwd);
                 }
@@ -1190,6 +1195,10 @@ namespace Indexsafe.Api.Controllers
                 {
                     overridePwd.FcmToken = req.FcmToken;
                     overridePwd.TerakhirLogin = DateTime.Now;
+                    if (!string.IsNullOrWhiteSpace(req.AppVersion))
+                    {
+                        overridePwd.AppVersion = req.AppVersion;
+                    }
                 }
                 else
                 {
@@ -1199,7 +1208,8 @@ namespace Indexsafe.Api.Controllers
                         KataSandi = "123456",
                         DiubahPada = DateTime.Now,
                         TerakhirLogin = DateTime.Now,
-                        FcmToken = req.FcmToken
+                        FcmToken = req.FcmToken,
+                        AppVersion = req.AppVersion
                     };
                     _context.PasswordOverrides.Add(overridePwd);
                 }

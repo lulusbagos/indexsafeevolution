@@ -7,6 +7,7 @@ import '../services/database.dart';
 import '../services/preference.dart';
 import '../services/sync.dart';
 import '../utils/globals.dart' as globals;
+import 'package:url_launcher/url_launcher.dart';
 import 'home_page.dart';
 import 'login_page.dart';
 import 'permission_page.dart';
@@ -83,6 +84,52 @@ class _SplashPageState extends State<SplashPage>
     } catch (_) {}
 
     if (isOnline) {
+      if (mounted) {
+        setState(() {
+          _syncProgress = 0.08;
+          _syncStatus = 'Memeriksa versi aplikasi...';
+        });
+      }
+
+      // 1. Verifikasi Versi Aplikasi: Force update jika versi di HP lebih rendah dari batas minimum server
+      try {
+        final versionConfig = await _api.checkAppVersion();
+        if (versionConfig != null) {
+          final bool forceUpdate = versionConfig['force_update'] == true;
+          final String minVer = versionConfig['min_version']?.toString() ?? '1.0.1';
+          final String latestVer = versionConfig['latest_version']?.toString() ?? '1.0.1';
+          final int minBuild = (versionConfig['min_build'] is int)
+              ? versionConfig['min_build'] as int
+              : int.tryParse(versionConfig['min_build']?.toString() ?? '0') ?? 0;
+          final int currentBuild = int.tryParse(globals.buildNumber) ?? 0;
+          final String currentVer = (globals.version.isNotEmpty) ? globals.version : '1.0.1';
+          final String playStoreUrl = versionConfig['playstore_url']?.toString() ??
+              'https://play.google.com/store/apps/details?id=id.indexim.mbs';
+          final String dialogTitle = versionConfig['title']?.toString() ?? 'Update Aplikasi Diperlukan';
+          final String dialogMsg = versionConfig['message']?.toString() ??
+              'Versi aplikasi Anda saat ini sudah usang. Harap perbarui ke versi terbaru di Google Play Store untuk dapat melanjutkan penggunaan MBS SAP.';
+          final String releaseNotes = versionConfig['release_notes']?.toString() ?? '';
+
+          final bool isOutdated = _isVersionLower(currentVer, minVer) ||
+              (currentBuild > 0 && minBuild > 0 && currentBuild < minBuild) ||
+              (forceUpdate && _isVersionLower(currentVer, latestVer));
+
+          if (isOutdated && mounted) {
+            await _showForceUpdateDialog(
+              currentVersion: currentVer,
+              latestVersion: latestVer,
+              playStoreUrl: playStoreUrl,
+              title: dialogTitle,
+              message: dialogMsg,
+              releaseNotes: releaseNotes,
+            );
+            return; // Hentikan inisialisasi agar user wajib update ke Play Store
+          }
+        }
+      } catch (err) {
+        debugPrint('[SplashPage] Gagal memeriksa versi aplikasi: $err');
+      }
+
       if (mounted) {
         setState(() {
           _syncProgress = 0.12;
@@ -210,6 +257,178 @@ class _SplashPageState extends State<SplashPage>
         (route) => false,
       );
     }
+  }
+
+  bool _isVersionLower(String current, String target) {
+    try {
+      final cParts = current.split('.').map((e) => int.tryParse(e) ?? 0).toList();
+      final tParts = target.split('.').map((e) => int.tryParse(e) ?? 0).toList();
+      for (int i = 0; i < 3; i++) {
+        final c = i < cParts.length ? cParts[i] : 0;
+        final t = i < tParts.length ? tParts[i] : 0;
+        if (c < t) return true;
+        if (c > t) return false;
+      }
+    } catch (_) {}
+    return false;
+  }
+
+  Future<void> _showForceUpdateDialog({
+    required String currentVersion,
+    required String latestVersion,
+    required String playStoreUrl,
+    required String title,
+    required String message,
+    required String releaseNotes,
+  }) async {
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext ctx) {
+        return PopScope(
+          canPop: false,
+          child: Dialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+            elevation: 16,
+            backgroundColor: Colors.white,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 28),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 76,
+                    height: 76,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFF2563EB), Color(0xFF0D9488)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF2563EB).withValues(alpha: 0.35),
+                          blurRadius: 18,
+                          offset: const Offset(0, 8),
+                        ),
+                      ],
+                    ),
+                    child: const Icon(
+                      Icons.system_update_rounded,
+                      color: Colors.white,
+                      size: 40,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  Text(
+                    title,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF0F172A),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFEFF6FF),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFFBFDBFE)),
+                    ),
+                    child: Text(
+                      'Versi Anda: v$currentVersion  ➔  Wajib: v$latestVersion',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF1D4ED8),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  Text(
+                    message,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 13,
+                      height: 1.4,
+                      color: Colors.grey.shade700,
+                    ),
+                  ),
+                  if (releaseNotes.isNotEmpty) ...[
+                    const SizedBox(height: 14),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade50,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.grey.shade200),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Catatan Rilis:',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF475569),
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            releaseNotes,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey.shade800,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 24),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: ElevatedButton.icon(
+                      onPressed: () async {
+                        try {
+                          final uri = Uri.parse(playStoreUrl);
+                          await launchUrl(uri, mode: LaunchMode.externalApplication);
+                        } catch (_) {
+                          final fallbackUri = Uri.parse('https://play.google.com/store/apps/details?id=id.indexim.mbs');
+                          await launchUrl(fallbackUri, mode: LaunchMode.externalApplication);
+                        }
+                      },
+                      icon: const Icon(Icons.shop_2_rounded, color: Colors.white, size: 20),
+                      label: const Text(
+                        'Update Sekarang di Play Store',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF0F766E),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        elevation: 4,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
   }
 
   @override
