@@ -55,6 +55,7 @@ namespace Indexsafe.Api.DTOs
         public ApprovalItemDto Header { get; set; } = new();
         public List<ApprovalHistoryItemDto> History { get; set; } = new();
         public List<ApprovalDocItemDto> Documents { get; set; } = new();
+        public bool CanApprove { get; set; }
     }
 
     public class ApprovalHistoryItemDto

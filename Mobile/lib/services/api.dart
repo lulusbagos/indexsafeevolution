@@ -4311,9 +4311,10 @@ class ApiService {
     }
   }
 
-  Future<Either<Map<String, dynamic>, Map<String, dynamic>>> getApprovalDetail(int approvalId) async {
+  Future<Either<Map<String, dynamic>, Map<String, dynamic>>> getApprovalDetail(int approvalId, {String? nik}) async {
     try {
-      final targets = _buildCandidateUrls('/approval-center/detail/$approvalId');
+      final activeNik = nik ?? PreferenceService.getUser() ?? PreferenceService.getProfile()?.noNik ?? '';
+      final targets = _buildCandidateUrls('/approval-center/detail/$approvalId?nik=$activeNik');
       Response? lastResponse;
       DioException? lastDioError;
       for (final url in targets) {

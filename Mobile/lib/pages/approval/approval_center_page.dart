@@ -50,6 +50,9 @@ class _ApprovalCenterPageState extends State<ApprovalCenterPage>
       _loadPending(),
       _loadSubmissions(),
     ]);
+    if (mounted && _pendingList.isEmpty && _submissionList.isNotEmpty && _tabController.index == 0) {
+      _tabController.animateTo(1);
+    }
   }
 
   Future<void> _loadStatus() async {
@@ -423,7 +426,7 @@ class _ApprovalCenterPageState extends State<ApprovalCenterPage>
               children: [
                 const Icon(Icons.outbox_rounded, size: 18),
                 const SizedBox(width: 6),
-                const Text('Pengajuan Saya'),
+                const Text('Proses Pengajuan'),
                 if (_submissionList.isNotEmpty) ...[
                   const SizedBox(width: 6),
                   Container(
@@ -531,9 +534,13 @@ class _ApprovalCenterPageState extends State<ApprovalCenterPage>
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Color(0xFF0F2628)),
             ),
             const SizedBox(height: 6),
-            const Text(
-              'Semua permohonan telah selesai diproses.',
-              style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 32),
+              child: Text(
+                'Tidak ada permohonan yang memerlukan persetujuan dari role Anda saat ini. Silakan pantau status permohonan departemen pada tab Proses Pengajuan.',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 12, color: Color(0xFF64748B), height: 1.4),
+              ),
             ),
           ],
         ),
@@ -576,13 +583,17 @@ class _ApprovalCenterPageState extends State<ApprovalCenterPage>
             ),
             const SizedBox(height: 16),
             const Text(
-              'Belum Ada Pengajuan',
+              'Belum Ada Pengajuan Terpantau',
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Color(0xFF0F2628)),
             ),
             const SizedBox(height: 6),
-            const Text(
-              'Pengajuan yang Anda buat akan muncul di sini untuk pelacakan.',
-              style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 32),
+              child: Text(
+                'Pengajuan yang dibuat untuk departemen dan perusahaan Anda akan tampil di sini untuk pelacakan alur persetujuan.',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 12, color: Color(0xFF64748B), height: 1.4),
+              ),
             ),
           ],
         ),
@@ -1026,9 +1037,64 @@ class _ApprovalDetailBottomSheetState extends State<_ApprovalDetailBottomSheet> 
                     : _buildContent(),
           ),
 
-          // Action Buttons (if pending)
-          if (widget.isPendingTab && _detail != null) _buildActionBar(),
+          // Action Buttons (hanya jika berwenang approve)
+          if (_detail != null) ...[
+            if (_detail!['canApprove'] == true && ((_detail!['header'] as Map?)?['reqStatus'] == 'WAITING'))
+              _buildActionBar()
+            else
+              _buildMonitoringBanner(),
+          ],
         ],
+      ),
+    );
+  }
+
+  Widget _buildMonitoringBanner() {
+    final header = _detail!['header'] as Map<String, dynamic>? ?? {};
+    final status = header['reqStatus'] as String? ?? 'WAITING';
+    final level = header['level'] as int? ?? 1;
+    final roleName = header['roleName'] as String? ?? 'Approver';
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(20, 10, 20, 18),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Color(0x0C000000),
+            blurRadius: 10,
+            offset: Offset(0, -3),
+          ),
+        ],
+      ),
+      child: SafeArea(
+        top: false,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF1F5F9),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: const Color(0xFFE2E8F0)),
+          ),
+          child: Row(
+            children: [
+              const Icon(Icons.remove_red_eye_rounded, color: Color(0xFF0F2628), size: 22),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  status == 'WAITING'
+                      ? 'Mode Pantau: Menunggu persetujuan Level $level: $roleName.'
+                      : 'Status pengajuan saat ini: $status.',
+                  style: const TextStyle(
+                    color: Color(0xFF334155),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -1037,6 +1103,7 @@ class _ApprovalDetailBottomSheetState extends State<_ApprovalDetailBottomSheet> 
     final header = _detail!['header'] as Map<String, dynamic>? ?? {};
     final history = (_detail!['history'] as List<dynamic>?) ?? [];
     final docs = (_detail!['documents'] as List<dynamic>?) ?? [];
+    final canApprove = _detail!['canApprove'] == true && header['reqStatus'] == 'WAITING';
 
     final nomor = header['nomor'] as String? ?? '-';
     final reqId = header['reqId'] as String? ?? '-';
@@ -1160,8 +1227,8 @@ class _ApprovalDetailBottomSheetState extends State<_ApprovalDetailBottomSheet> 
             const SizedBox(height: 20),
           ],
 
-          // Catatan Approval
-          if (widget.isPendingTab) ...[
+          // Catatan Approval (hanya jika berwenang approve)
+          if (canApprove) ...[
             const Text(
               'Catatan Keputusan (Opsional untuk Setuju, Wajib untuk Tolak)',
               style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF475569)),

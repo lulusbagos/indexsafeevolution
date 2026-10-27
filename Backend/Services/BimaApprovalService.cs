@@ -65,13 +65,142 @@ namespace Indexsafe.Api.Services
             return null;
         }
 
+        private class BimaUserContext
+        {
+            public bool IsRegistered { get; set; }
+            public int? UserId { get; set; }
+            public string? Fullname { get; set; }
+            public string? EmployeeId { get; set; }
+            public int? RoleId { get; set; }
+            public string? RoleName { get; set; }
+            public string? Department { get; set; }
+            public string? CompanyName { get; set; }
+            public int? CompanyId { get; set; }
+            public int? DepartmentId { get; set; }
+            public List<long> RoleIds { get; set; } = new();
+            public List<long> CompanyIds { get; set; } = new();
+            public List<long> DepartmentIds { get; set; } = new();
+            public List<UserRoleInfoDto> Roles { get; set; } = new();
+        }
+
+        private async Task<BimaUserContext> GetUserContextAsync(NpgsqlConnection conn, string nik)
+        {
+            var ctx = new BimaUserContext { IsRegistered = false };
+            if (string.IsNullOrWhiteSpace(nik)) return ctx;
+
+            var nikClean = nik.Trim();
+            var nikTrimmed = nikClean.TrimStart('0');
+
+            const string sqlUser = @"
+                SELECT u.id, u.fullname, u.employee_id, u.role_id, r.role_name, 
+                       u.department, u.company_name, u.company_id, u.department_id, 
+                       u.active_company_id, u.active_department_id, u.is_active
+                FROM public.tb_user u
+                LEFT JOIN public.tb_role r ON u.role_id = r.id
+                WHERE (TRIM(u.employee_id) = @nik 
+                       OR LTRIM(TRIM(u.employee_id), '0') = @nikTrimmed 
+                       OR TRIM(u.username) = @nik)
+                  AND u.is_active = true
+                LIMIT 1;";
+
+            await using var cmdUser = new NpgsqlCommand(sqlUser, conn);
+            cmdUser.Parameters.AddWithValue("@nik", nikClean);
+            cmdUser.Parameters.AddWithValue("@nikTrimmed", nikTrimmed);
+
+            await using var rdr = await cmdUser.ExecuteReaderAsync();
+            if (!await rdr.ReadAsync())
+            {
+                return ctx;
+            }
+
+            ctx.IsRegistered = true;
+            ctx.UserId = rdr.IsDBNull(0) ? null : rdr.GetInt32(0);
+            ctx.Fullname = rdr.IsDBNull(1) ? null : rdr.GetString(1);
+            ctx.EmployeeId = rdr.IsDBNull(2) ? null : rdr.GetString(2);
+            ctx.RoleId = rdr.IsDBNull(3) ? null : Convert.ToInt32(rdr.GetValue(3));
+            ctx.RoleName = rdr.IsDBNull(4) ? null : rdr.GetString(4);
+            ctx.Department = rdr.IsDBNull(5) ? null : rdr.GetString(5);
+            ctx.CompanyName = rdr.IsDBNull(6) ? null : rdr.GetString(6);
+            ctx.CompanyId = rdr.IsDBNull(7) ? null : Convert.ToInt32(rdr.GetValue(7));
+            ctx.DepartmentId = rdr.IsDBNull(8) ? null : Convert.ToInt32(rdr.GetValue(8));
+
+            long? activeCompId = rdr.IsDBNull(9) ? null : Convert.ToInt64(rdr.GetValue(9));
+            long? activeDeptId = rdr.IsDBNull(10) ? null : Convert.ToInt64(rdr.GetValue(10));
+
+            if (ctx.RoleId.HasValue)
+            {
+                ctx.RoleIds.Add(ctx.RoleId.Value);
+                if (!string.IsNullOrEmpty(ctx.RoleName))
+                {
+                    ctx.Roles.Add(new UserRoleInfoDto { RoleId = ctx.RoleId.Value, RoleName = ctx.RoleName });
+                }
+            }
+
+            if (ctx.CompanyId.HasValue) ctx.CompanyIds.Add(ctx.CompanyId.Value);
+            if (activeCompId.HasValue && !ctx.CompanyIds.Contains(activeCompId.Value)) ctx.CompanyIds.Add(activeCompId.Value);
+
+            if (ctx.DepartmentId.HasValue) ctx.DepartmentIds.Add(ctx.DepartmentId.Value);
+            if (activeDeptId.HasValue && !ctx.DepartmentIds.Contains(activeDeptId.Value)) ctx.DepartmentIds.Add(activeDeptId.Value);
+
+            await rdr.CloseAsync();
+
+            if (ctx.UserId.HasValue)
+            {
+                // 1. Roles tambahan dari tb_user_role
+                const string sqlUserRoles = @"
+                    SELECT ur.role_id, r.role_name
+                    FROM public.tb_user_role ur
+                    JOIN public.tb_role r ON ur.role_id = r.id
+                    WHERE ur.user_id = @userId;";
+                await using var cmdRoles = new NpgsqlCommand(sqlUserRoles, conn);
+                cmdRoles.Parameters.AddWithValue("@userId", ctx.UserId.Value);
+                await using var rdrRoles = await cmdRoles.ExecuteReaderAsync();
+                while (await rdrRoles.ReadAsync())
+                {
+                    var rid = Convert.ToInt32(rdrRoles.GetValue(0));
+                    var rname = rdrRoles.GetString(1);
+                    if (!ctx.RoleIds.Contains(rid)) ctx.RoleIds.Add(rid);
+                    if (!ctx.Roles.Any(x => x.RoleId == rid))
+                    {
+                        ctx.Roles.Add(new UserRoleInfoDto { RoleId = rid, RoleName = rname });
+                    }
+                }
+                await rdrRoles.CloseAsync();
+
+                // 2. Akses tambahan dari tb_user_access (company & department)
+                const string sqlUserAccess = @"
+                    SELECT ua.company_id, ua.department_id
+                    FROM public.tb_user_access ua
+                    WHERE ua.user_id = @userId AND ua.deleted_at IS NULL;";
+                await using var cmdAccess = new NpgsqlCommand(sqlUserAccess, conn);
+                cmdAccess.Parameters.AddWithValue("@userId", ctx.UserId.Value);
+                await using var rdrAccess = await cmdAccess.ExecuteReaderAsync();
+                while (await rdrAccess.ReadAsync())
+                {
+                    if (!rdrAccess.IsDBNull(0))
+                    {
+                        var cid = Convert.ToInt64(rdrAccess.GetValue(0));
+                        if (!ctx.CompanyIds.Contains(cid)) ctx.CompanyIds.Add(cid);
+                    }
+                    if (!rdrAccess.IsDBNull(1))
+                    {
+                        var did = Convert.ToInt64(rdrAccess.GetValue(1));
+                        if (!ctx.DepartmentIds.Contains(did)) ctx.DepartmentIds.Add(did);
+                    }
+                }
+                await rdrAccess.CloseAsync();
+            }
+
+            // Fallback default jika kosong
+            if (!ctx.CompanyIds.Any()) ctx.CompanyIds.Add(1);
+
+            return ctx;
+        }
+
         public async Task<BimaUserStatusDto> CheckUserStatusAsync(string nik)
         {
             var res = new BimaUserStatusDto { IsRegistered = false };
             if (string.IsNullOrWhiteSpace(nik)) return res;
-
-            var nikClean = nik.Trim();
-            var nikTrimmed = nikClean.TrimStart('0');
 
             await using var conn = await GetBimaConnectionAsync();
             if (conn == null)
@@ -82,99 +211,76 @@ namespace Indexsafe.Api.Services
 
             try
             {
-                // 1. Check tb_user
-                const string sqlUser = @"
-                    SELECT u.id, u.fullname, u.employee_id, u.role_id, r.role_name, 
-                           u.department, u.company_name, u.company_id, u.department_id, u.is_active
-                    FROM public.tb_user u
-                    LEFT JOIN public.tb_role r ON u.role_id = r.id
-                    WHERE (TRIM(u.employee_id) = @nik 
-                           OR LTRIM(TRIM(u.employee_id), '0') = @nikTrimmed 
-                           OR TRIM(u.username) = @nik)
-                      AND u.is_active = true
-                    LIMIT 1;";
-
-                await using var cmdUser = new NpgsqlCommand(sqlUser, conn);
-                cmdUser.Parameters.AddWithValue("@nik", nikClean);
-                cmdUser.Parameters.AddWithValue("@nikTrimmed", nikTrimmed);
-
-                await using var rdr = await cmdUser.ExecuteReaderAsync();
-                if (!await rdr.ReadAsync())
-                {
-                    return res;
-                }
+                var ctx = await GetUserContextAsync(conn, nik);
+                if (!ctx.IsRegistered) return res;
 
                 res.IsRegistered = true;
-                res.UserId = rdr.IsDBNull(0) ? null : rdr.GetInt32(0);
-                res.Fullname = rdr.IsDBNull(1) ? null : rdr.GetString(1);
-                res.EmployeeId = rdr.IsDBNull(2) ? null : rdr.GetString(2);
-                res.RoleId = rdr.IsDBNull(3) ? null : Convert.ToInt32(rdr.GetValue(3));
-                res.RoleName = rdr.IsDBNull(4) ? null : rdr.GetString(4);
-                res.Department = rdr.IsDBNull(5) ? null : rdr.GetString(5);
-                res.CompanyName = rdr.IsDBNull(6) ? null : rdr.GetString(6);
-                res.CompanyId = rdr.IsDBNull(7) ? null : Convert.ToInt32(rdr.GetValue(7));
-                res.DepartmentId = rdr.IsDBNull(8) ? null : Convert.ToInt32(rdr.GetValue(8));
+                res.UserId = ctx.UserId;
+                res.Fullname = ctx.Fullname;
+                res.EmployeeId = ctx.EmployeeId;
+                res.RoleId = ctx.RoleId;
+                res.RoleName = ctx.RoleName;
+                res.Department = ctx.Department;
+                res.CompanyName = ctx.CompanyName;
+                res.CompanyId = ctx.CompanyId;
+                res.DepartmentId = ctx.DepartmentId;
+                res.Roles = ctx.Roles;
 
-                if (res.RoleId.HasValue && !string.IsNullOrEmpty(res.RoleName))
+                // 1. Hitung Dokumen yang benar-benar memerlukan approval dari Role & Dept/Company user
+                if (ctx.RoleIds.Any())
                 {
-                    res.Roles.Add(new UserRoleInfoDto { RoleId = res.RoleId.Value, RoleName = res.RoleName });
-                }
-                await rdr.CloseAsync();
-
-                // 2. Fetch additional roles from tb_user_role
-                if (res.UserId.HasValue)
-                {
-                    const string sqlUserRoles = @"
-                        SELECT ur.role_id, r.role_name
-                        FROM public.tb_user_role ur
-                        JOIN public.tb_role r ON ur.role_id = r.id
-                        WHERE ur.user_id = @userId;";
-                    await using var cmdRoles = new NpgsqlCommand(sqlUserRoles, conn);
-                    cmdRoles.Parameters.AddWithValue("@userId", res.UserId.Value);
-                    await using var rdrRoles = await cmdRoles.ExecuteReaderAsync();
-                    while (await rdrRoles.ReadAsync())
-                    {
-                        var rid = Convert.ToInt32(rdrRoles.GetValue(0));
-                        var rname = rdrRoles.GetString(1);
-                        if (!res.Roles.Any(x => x.RoleId == rid))
-                        {
-                            res.Roles.Add(new UserRoleInfoDto { RoleId = rid, RoleName = rname });
-                        }
-                    }
-                    await rdrRoles.CloseAsync();
-                }
-
-                var roleIds = res.Roles.Select(r => (long)r.RoleId).ToList();
-                bool isAdminOrKtt = roleIds.Any(r => r == 2 || r == 6 || r == 7 || r == 16);
-
-                // 3. Count Pending Approvals
-                if (roleIds.Any() || isAdminOrKtt)
-                {
-                    var sqlPendingCount = @"
+                    const string sqlPendingCount = @"
                         SELECT COUNT(DISTINCT ra.id)
                         FROM public.request_approval ra
+                        LEFT JOIN public.tb_permit p ON ra.req_id = p.req_id AND ra.module = 'PERMIT'
+                        LEFT JOIN public.workflow w ON ra.workflow_id = w.id
                         WHERE ra.is_current_document = true 
                           AND ra.req_status = 'WAITING'
-                          " + (isAdminOrKtt ? "" : "AND ra.req_role_id = ANY(@roleIds)");
+                          AND ra.req_role_id = ANY(@roleIds)
+                          AND (ra.created_company_id = ANY(@companyIds) OR p.company_id = ANY(@companyIds))
+                          AND (
+                            w.is_by_department IS NOT TRUE 
+                            OR ra.created_department_id = ANY(@deptIds) 
+                            OR p.id_departemen = ANY(@deptIds)
+                            OR TRIM(UPPER(p.departemen)) = TRIM(UPPER(@deptName))
+                          );";
 
                     await using var cmdPending = new NpgsqlCommand(sqlPendingCount, conn);
-                    if (!isAdminOrKtt)
-                    {
-                        cmdPending.Parameters.AddWithValue("@roleIds", roleIds.ToArray());
-                    }
+                    cmdPending.Parameters.AddWithValue("@roleIds", ctx.RoleIds.ToArray());
+                    cmdPending.Parameters.AddWithValue("@companyIds", ctx.CompanyIds.ToArray());
+                    cmdPending.Parameters.AddWithValue("@deptIds", ctx.DepartmentIds.ToArray());
+                    cmdPending.Parameters.AddWithValue("@deptName", ctx.Department ?? string.Empty);
+
                     var pCount = await cmdPending.ExecuteScalarAsync();
                     res.PendingCount = Convert.ToInt32(pCount ?? 0);
                 }
 
-                // 4. Count My Submissions
-                var sqlSubCount = @"
+                // 2. Hitung Proses Pengajuan di Departemen & Company Pengguna (atau buatan pengguna)
+                var nikClean = nik.Trim();
+                var nikTrimmed = nikClean.TrimStart('0');
+
+                const string sqlSubCount = @"
                     SELECT COUNT(DISTINCT ra.req_id)
                     FROM public.request_approval ra
-                    WHERE ra.employee_id = @empId 
-                       OR ra.employee_id = @nikTrimmed;";
+                    LEFT JOIN public.tb_permit p ON ra.req_id = p.req_id AND ra.module = 'PERMIT'
+                    LEFT JOIN public.special_permit c ON ra.req_id = c.req_id AND ra.module = 'SPECIAL_PERMIT'
+                    WHERE (ra.employee_id = @nikClean OR ra.employee_id = @nikTrimmed OR p.nik = @nikClean OR c.applicant_nik = @nikClean OR c.created_by = @nikClean)
+                       OR (
+                         (ra.created_company_id = ANY(@companyIds) OR p.company_id = ANY(@companyIds))
+                         AND (
+                           ra.created_department_id = ANY(@deptIds)
+                           OR p.id_departemen = ANY(@deptIds)
+                           OR TRIM(UPPER(p.departemen)) = TRIM(UPPER(@deptName))
+                         )
+                       );";
+
                 await using var cmdSub = new NpgsqlCommand(sqlSubCount, conn);
-                cmdSub.Parameters.AddWithValue("@empId", res.EmployeeId ?? nikClean);
+                cmdSub.Parameters.AddWithValue("@nikClean", nikClean);
                 cmdSub.Parameters.AddWithValue("@nikTrimmed", nikTrimmed);
+                cmdSub.Parameters.AddWithValue("@companyIds", ctx.CompanyIds.ToArray());
+                cmdSub.Parameters.AddWithValue("@deptIds", ctx.DepartmentIds.ToArray());
+                cmdSub.Parameters.AddWithValue("@deptName", ctx.Department ?? string.Empty);
+
                 var sCount = await cmdSub.ExecuteScalarAsync();
                 res.MySubmissionCount = Convert.ToInt32(sCount ?? 0);
             }
@@ -189,17 +295,14 @@ namespace Indexsafe.Api.Services
         public async Task<List<ApprovalItemDto>> GetPendingApprovalsAsync(string nik, string? module = null, int page = 1, int pageSize = 50)
         {
             var list = new List<ApprovalItemDto>();
-            var status = await CheckUserStatusAsync(nik);
-            if (!status.IsRegistered) return list;
-
-            var roleIds = status.Roles.Select(r => (long)r.RoleId).ToList();
-            bool isAdminOrKtt = roleIds.Any(r => r == 2 || r == 6 || r == 7 || r == 16);
-
             await using var conn = await GetBimaConnectionAsync();
             if (conn == null) return list;
 
             try
             {
+                var ctx = await GetUserContextAsync(conn, nik);
+                if (!ctx.IsRegistered || !ctx.RoleIds.Any()) return list;
+
                 var sql = @"
                     SELECT DISTINCT ON (ra.id)
                            ra.id, ra.nomor, ra.req_id, ra.module, ra.level_approval, ra.req_status, ra.req_time,
@@ -212,6 +315,7 @@ namespace Indexsafe.Api.Services
                            ra.notes, ra.action_by, ra.action_by_name, ra.action_time
                     FROM public.request_approval ra
                     LEFT JOIN public.tb_role r ON ra.req_role_id = r.id
+                    LEFT JOIN public.workflow w ON ra.workflow_id = w.id
                     LEFT JOIN public.tb_permit p ON ra.req_id = p.req_id AND ra.module = 'PERMIT'
                     LEFT JOIN public.tb_simper_unit su ON ra.req_id = su.req_id AND ra.module = 'SIMPER'
                     LEFT JOIN public.tb_simper s ON su.simper_id = s.id
@@ -219,16 +323,23 @@ namespace Indexsafe.Api.Services
                     LEFT JOIN public.special_permit c ON ra.req_id = c.req_id AND ra.module = 'SPECIAL_PERMIT'
                     WHERE ra.is_current_document = true 
                       AND ra.req_status = 'WAITING'
-                      " + (isAdminOrKtt ? "" : "AND ra.req_role_id = ANY(@roleIds)") + @"
+                      AND ra.req_role_id = ANY(@roleIds)
+                      AND (ra.created_company_id = ANY(@companyIds) OR p.company_id = ANY(@companyIds))
+                      AND (
+                        w.is_by_department IS NOT TRUE 
+                        OR ra.created_department_id = ANY(@deptIds) 
+                        OR p.id_departemen = ANY(@deptIds)
+                        OR TRIM(UPPER(p.departemen)) = TRIM(UPPER(@deptName))
+                      )
                       " + (!string.IsNullOrWhiteSpace(module) && module != "ALL" ? "AND ra.module = @module" : "") + @"
                     ORDER BY ra.id DESC, ra.req_time DESC
                     OFFSET @offset LIMIT @limit;";
 
                 await using var cmd = new NpgsqlCommand(sql, conn);
-                if (!isAdminOrKtt)
-                {
-                    cmd.Parameters.AddWithValue("@roleIds", roleIds.ToArray());
-                }
+                cmd.Parameters.AddWithValue("@roleIds", ctx.RoleIds.ToArray());
+                cmd.Parameters.AddWithValue("@companyIds", ctx.CompanyIds.ToArray());
+                cmd.Parameters.AddWithValue("@deptIds", ctx.DepartmentIds.ToArray());
+                cmd.Parameters.AddWithValue("@deptName", ctx.Department ?? string.Empty);
                 if (!string.IsNullOrWhiteSpace(module) && module != "ALL")
                 {
                     cmd.Parameters.AddWithValue("@module", module.ToUpper());
@@ -277,14 +388,17 @@ namespace Indexsafe.Api.Services
             var list = new List<ApprovalItemDto>();
             if (string.IsNullOrWhiteSpace(nik)) return list;
 
-            var nikClean = nik.Trim();
-            var nikTrimmed = nikClean.TrimStart('0');
-
             await using var conn = await GetBimaConnectionAsync();
             if (conn == null) return list;
 
             try
             {
+                var ctx = await GetUserContextAsync(conn, nik);
+                if (!ctx.IsRegistered) return list;
+
+                var nikClean = nik.Trim();
+                var nikTrimmed = nikClean.TrimStart('0');
+
                 var sql = @"
                     SELECT DISTINCT ON (ra.req_id)
                            ra.id, ra.nomor, ra.req_id, ra.module, ra.level_approval, ra.req_status, ra.req_time,
@@ -302,19 +416,27 @@ namespace Indexsafe.Api.Services
                     LEFT JOIN public.tb_simper s ON su.simper_id = s.id
                     LEFT JOIN public.tb_permit p2 ON s.permit_id = p2.id
                     LEFT JOIN public.special_permit c ON ra.req_id = c.req_id AND ra.module = 'SPECIAL_PERMIT'
-                    WHERE (ra.employee_id = @nik 
-                           OR ra.employee_id = @nikTrimmed 
-                           OR p.nik = @nik 
-                           OR p.nik = @nikTrimmed 
-                           OR c.applicant_nik = @nik 
-                           OR c.created_by = @nik)
-                      " + (!string.IsNullOrWhiteSpace(module) && module != "ALL" ? "AND ra.module = @module" : "") + @"
+                    WHERE (
+                        (ra.employee_id = @nikClean OR ra.employee_id = @nikTrimmed OR p.nik = @nikClean OR c.applicant_nik = @nikClean OR c.created_by = @nikClean)
+                        OR (
+                          (ra.created_company_id = ANY(@companyIds) OR p.company_id = ANY(@companyIds))
+                          AND (
+                            ra.created_department_id = ANY(@deptIds)
+                            OR p.id_departemen = ANY(@deptIds)
+                            OR TRIM(UPPER(p.departemen)) = TRIM(UPPER(@deptName))
+                          )
+                        )
+                    )
+                    " + (!string.IsNullOrWhiteSpace(module) && module != "ALL" ? "AND ra.module = @module" : "") + @"
                     ORDER BY ra.req_id, ra.id DESC
                     OFFSET @offset LIMIT @limit;";
 
                 await using var cmd = new NpgsqlCommand(sql, conn);
-                cmd.Parameters.AddWithValue("@nik", nikClean);
+                cmd.Parameters.AddWithValue("@nikClean", nikClean);
                 cmd.Parameters.AddWithValue("@nikTrimmed", nikTrimmed);
+                cmd.Parameters.AddWithValue("@companyIds", ctx.CompanyIds.ToArray());
+                cmd.Parameters.AddWithValue("@deptIds", ctx.DepartmentIds.ToArray());
+                cmd.Parameters.AddWithValue("@deptName", ctx.Department ?? string.Empty);
                 if (!string.IsNullOrWhiteSpace(module) && module != "ALL")
                 {
                     cmd.Parameters.AddWithValue("@module", module.ToUpper());
@@ -358,7 +480,7 @@ namespace Indexsafe.Api.Services
             return list;
         }
 
-        public async Task<ApprovalDetailDto?> GetApprovalDetailAsync(long approvalId)
+        public async Task<ApprovalDetailDto?> GetApprovalDetailAsync(long approvalId, string? callerNik = null)
         {
             await using var conn = await GetBimaConnectionAsync();
             if (conn == null) return null;
@@ -376,9 +498,11 @@ namespace Indexsafe.Api.Services
                            COALESCE(p.pengajuan, su.jenis_simper, c.activity_type, '') as submission_type,
                            COALESCE(su.kendaraan, c.work_location, p.tipe_pengajuan, '') as sub_detail,
                            ra.notes, ra.action_by, ra.action_by_name, ra.action_time, ra.is_current_document,
-                           p.id as permit_id, s.id as simper_id, c.id as special_permit_id
+                           p.id as permit_id, s.id as simper_id, c.id as special_permit_id,
+                           w.is_by_department, ra.created_company_id, ra.created_department_id
                     FROM public.request_approval ra
                     LEFT JOIN public.tb_role r ON ra.req_role_id = r.id
+                    LEFT JOIN public.workflow w ON ra.workflow_id = w.id
                     LEFT JOIN public.tb_permit p ON ra.req_id = p.req_id AND ra.module = 'PERMIT'
                     LEFT JOIN public.tb_simper_unit su ON ra.req_id = su.req_id AND ra.module = 'SIMPER'
                     LEFT JOIN public.tb_simper s ON su.simper_id = s.id
@@ -423,7 +547,24 @@ namespace Indexsafe.Api.Services
                 long? permitId = rdr.IsDBNull(20) ? null : Convert.ToInt64(rdr.GetValue(20));
                 long? simperId = rdr.IsDBNull(21) ? null : Convert.ToInt64(rdr.GetValue(21));
                 string? specialPermitId = rdr.IsDBNull(22) ? null : rdr.GetString(22);
+                bool? isByDept = rdr.IsDBNull(23) ? null : rdr.GetBoolean(23);
+                long? createdCompId = rdr.IsDBNull(24) ? null : Convert.ToInt64(rdr.GetValue(24));
+                long? createdDeptId = rdr.IsDBNull(25) ? null : Convert.ToInt64(rdr.GetValue(25));
                 await rdr.CloseAsync();
+
+                // Cek apakah pemanggil memiliki hak approval untuk dokumen ini
+                if (!string.IsNullOrWhiteSpace(callerNik) && detail.Header.IsCurrentDocument && detail.Header.ReqStatus == "WAITING")
+                {
+                    var callerCtx = await GetUserContextAsync(conn, callerNik);
+                    if (callerCtx.IsRegistered && detail.Header.RoleId.HasValue)
+                    {
+                        bool roleMatches = callerCtx.RoleIds.Contains(detail.Header.RoleId.Value);
+                        bool compMatches = createdCompId == null || callerCtx.CompanyIds.Contains(createdCompId.Value);
+                        bool deptMatches = isByDept != true || createdDeptId == null || callerCtx.DepartmentIds.Contains(createdDeptId.Value) || (detail.Header.Department.Equals(callerCtx.Department, StringComparison.OrdinalIgnoreCase));
+
+                        detail.CanApprove = roleMatches && compMatches && deptMatches;
+                    }
+                }
 
                 // 2. Get History Timeline
                 const string sqlHistory = @"
@@ -535,13 +676,24 @@ namespace Indexsafe.Api.Services
                 return res;
             }
 
+            // Validasi hak akses approver
+            if (!string.IsNullOrWhiteSpace(req.UserNik))
+            {
+                var callerCtx = await GetUserContextAsync(conn, req.UserNik);
+                if (!callerCtx.IsRegistered)
+                {
+                    res.Message = "Anda tidak memiliki otorisasi approval di Bima.";
+                    return res;
+                }
+            }
+
             await using var tran = await conn.BeginTransactionAsync();
             try
             {
                 // 1. Fetch current approval record
                 const string sqlCur = @"
                     SELECT id, nomor, req_id, module, level_approval, workflow_id, employee_id,
-                           created_company_id, created_department_id, is_current_document, req_status
+                           created_company_id, created_department_id, is_current_document, req_status, req_role_id
                     FROM public.request_approval
                     WHERE id = @id
                     FOR UPDATE;";
@@ -565,6 +717,7 @@ namespace Indexsafe.Api.Services
                 var deptId = rdrCur.IsDBNull(8) ? (long?)null : Convert.ToInt64(rdrCur.GetValue(8));
                 var isCurrent = !rdrCur.IsDBNull(9) && rdrCur.GetBoolean(9);
                 var currentStatus = rdrCur.IsDBNull(10) ? string.Empty : rdrCur.GetString(10);
+                var reqRoleId = rdrCur.IsDBNull(11) ? (long?)null : Convert.ToInt64(rdrCur.GetValue(11));
                 await rdrCur.CloseAsync();
 
                 if (!isCurrent || currentStatus != "WAITING")

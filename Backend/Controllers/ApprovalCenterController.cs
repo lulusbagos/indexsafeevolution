@@ -111,9 +111,10 @@ namespace Indexsafe.Api.Controllers
 
         [HttpGet("detail/{id:long}")]
         [AllowAnonymous]
-        public async Task<IActionResult> GetDetail(long id)
+        public async Task<IActionResult> GetDetail(long id, [FromQuery] string? nik)
         {
-            var detail = await _approvalService.GetApprovalDetailAsync(id);
+            var activeNik = GetCallerNik(nik);
+            var detail = await _approvalService.GetApprovalDetailAsync(id, activeNik);
             if (detail == null)
             {
                 return NotFound(new { status = 404, message = "Detail approval tidak ditemukan" });
