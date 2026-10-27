@@ -16,6 +16,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Primitives;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace Indexsafe.Api.Controllers
 {
@@ -1599,17 +1600,30 @@ namespace Indexsafe.Api.Controllers
             // Notifikasi ke PIC yang ditunjuk
             if (!string.IsNullOrWhiteSpace(plan.NikPic) && plan.NikPic.Trim() != userNik.Trim())
             {
+                var reassignNoteForm = form["reassign_note"].FirstOrDefault() ?? form["alasan"].FirstOrDefault();
+                bool isReassigned = !string.IsNullOrWhiteSpace(reassignNoteForm);
+
+                if (isReassigned)
+                {
+                    plan.ReassignedFrom = plan.Pic ?? plan.Pja;
+                    plan.ReassignedTo = plan.Pic;
+                    plan.ReassignedAt = DateTime.Now;
+                    plan.ReassignNote = reassignNoteForm?.Trim();
+                }
+
                 _context.Notifications.Add(new Notification
                 {
                     RecipientNik = plan.NikPic.Trim(),
-                    Title = "Penugasan PIC Tindak Lanjut (Action Plan)",
-                    Message = $"Anda ditugaskan sebagai PIC untuk tindakan perbaikan di {plan.Lokasi ?? plan.Area} (AP-#{plan.Id}) oleh {userName}. Segera selesaikan dan laporkan bukti perbaikan.",
-                    Url = $"/ActionPlan/Detail/{plan.Id}",
-                    NotifType = "actionplan_assigned",
+                    Title = isReassigned ? "Pengalihan Action Plan" : "Penugasan PIC Tindak Lanjut (Action Plan)",
+                    Message = isReassigned
+                        ? $"Action Plan untuk {plan.KategoriTemuan ?? "Kondisi Tidak Aman"} di {plan.Lokasi ?? plan.Area ?? "Area Kerja"} telah dialihkan kepada Anda oleh {userName}.{(string.IsNullOrWhiteSpace(reassignNoteForm) ? "" : $" Alasan: {reassignNoteForm}.")}"
+                        : $"Anda ditugaskan sebagai PIC untuk tindakan perbaikan di {plan.Lokasi ?? plan.Area} (AP-#{plan.Id}) oleh {userName}. Segera selesaikan dan laporkan bukti perbaikan.",
+                    Url = "/ActionPlan/Index",
+                    NotifType = isReassigned ? "actionplan_reassign" : "actionplan_assigned",
                     Category = "actionplan",
                     SenderName = userName,
                     Priority = "urgent",
-                    ActionText = "Lapor Perbaikan",
+                    ActionText = "Tindak Lanjut Action Plan",
                     IsRead = false,
                     IsActioned = false,
                     CreatedAt = DateTime.Now
@@ -1651,6 +1665,270 @@ namespace Indexsafe.Api.Controllers
             {
                 Console.WriteLine($"[UpdateActionPlan] Error updating Action Plan: {ex}");
                 return StatusCode(500, new { message = $"Gagal menyimpan Action Plan: {ex.Message}" });
+            }
+        }
+
+        public class ReassignActionPlanDto
+        {
+            [JsonPropertyName("action_id")]
+            public int ActionId { get; set; }
+
+            [JsonPropertyName("id")]
+            public int Id { get; set; }
+
+            [JsonPropertyName("new_nik")]
+            public string NewNik { get; set; } = string.Empty;
+
+            [JsonPropertyName("new_nama")]
+            public string NewNama { get; set; } = string.Empty;
+
+            [JsonPropertyName("new_departemen")]
+            public string? NewDepartemen { get; set; }
+
+            [JsonPropertyName("keterangan")]
+            public string Keterangan { get; set; } = string.Empty;
+
+            [JsonPropertyName("alasan")]
+            public string? Alasan { get; set; }
+
+            [JsonPropertyName("reassign_note")]
+            public string? ReassignNote { get; set; }
+        }
+
+        /// <summary>
+        /// POST /api/action-plan/reassign
+        /// POST /api/action/reassign
+        /// Mengalihkan Action Plan ke PIC lain dan mengirimkan notifikasi seperti di Web MBS SAP
+        /// </summary>
+        [HttpPost("action-plan/reassign")]
+        [HttpPost("action/reassign")]
+        public async Task<IActionResult> ReassignActionPlan()
+        {
+            try
+            {
+                var userNik = GetCurrentNik();
+                var userName = GetCurrentName();
+
+                int actionId = 0;
+                string newNik = "";
+                string newNama = "";
+                string? newDept = null;
+                string keterangan = "";
+
+                if (Request.HasFormContentType)
+                {
+                    var form = await Request.ReadFormAsync();
+                    int.TryParse(form["action_id"].FirstOrDefault() ?? form["id"].FirstOrDefault(), out actionId);
+                    newNik = form["new_nik"].FirstOrDefault() ?? form["nik"].FirstOrDefault() ?? form["nik_pic"].FirstOrDefault() ?? "";
+                    newNama = form["new_nama"].FirstOrDefault() ?? form["nama"].FirstOrDefault() ?? form["pic"].FirstOrDefault() ?? "";
+                    newDept = form["new_departemen"].FirstOrDefault() ?? form["departemen"].FirstOrDefault() ?? form["departemen_pic"].FirstOrDefault();
+                    keterangan = form["keterangan"].FirstOrDefault() ?? form["alasan"].FirstOrDefault() ?? form["reassign_note"].FirstOrDefault() ?? "";
+                }
+                else
+                {
+                    using var reader = new StreamReader(Request.Body);
+                    var json = await reader.ReadToEndAsync();
+                    if (!string.IsNullOrWhiteSpace(json))
+                    {
+                        var req = JsonSerializer.Deserialize<ReassignActionPlanDto>(json, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                        if (req != null)
+                        {
+                            actionId = req.ActionId > 0 ? req.ActionId : req.Id;
+                            newNik = req.NewNik;
+                            newNama = req.NewNama;
+                            newDept = req.NewDepartemen;
+                            keterangan = !string.IsNullOrWhiteSpace(req.Keterangan) ? req.Keterangan : (req.Alasan ?? req.ReassignNote ?? "");
+                        }
+                    }
+                }
+
+                if (actionId <= 0)
+                {
+                    return BadRequest(new { success = false, message = "ID Action Plan tidak valid." });
+                }
+
+                if (string.IsNullOrWhiteSpace(newNik))
+                {
+                    return BadRequest(new { success = false, message = "NIK PIC Baru wajib diisi." });
+                }
+
+                if (string.IsNullOrWhiteSpace(keterangan))
+                {
+                    return BadRequest(new { success = false, message = "Alasan pengalihan Action Plan wajib diisi." });
+                }
+
+                var plan = await _context.ActionPlans.FirstOrDefaultAsync(a => a.Id == actionId && !a.IsDeleted);
+                if (plan == null)
+                {
+                    return NotFound(new { success = false, message = "Action Plan tidak ditemukan." });
+                }
+
+                if (string.Equals(plan.Status, "Closed", StringComparison.OrdinalIgnoreCase))
+                {
+                    return BadRequest(new { success = false, message = "Action Plan yang sudah Closed tidak dapat dialihkan." });
+                }
+
+                // Auto-resolve nama dan departemen jika belum lengkap
+                if (string.IsNullOrWhiteSpace(newNama) || string.IsNullOrWhiteSpace(newDept))
+                {
+                    var emp = await (from k in _context.Karyawans.AsNoTracking()
+                                     join p in _context.Personals.AsNoTracking() on k.IdPersonal equals p.IdPersonal
+                                     join d in _context.Departemens.AsNoTracking() on k.IdDepartemen equals d.DepartemenId into dg
+                                     from d in dg.DefaultIfEmpty()
+                                     where k.NoNik != null && k.NoNik.Trim() == newNik.Trim()
+                                     select new { p.NamaLengkap, NamaDept = d != null ? d.NamaDepartemen : null }).FirstOrDefaultAsync();
+                    if (emp != null)
+                    {
+                        if (string.IsNullOrWhiteSpace(newNama)) newNama = emp.NamaLengkap;
+                        if (string.IsNullOrWhiteSpace(newDept)) newDept = emp.NamaDept;
+                    }
+                }
+
+                if (string.IsNullOrWhiteSpace(newNama))
+                {
+                    newNama = newNik;
+                }
+
+                var previousAssignee = !string.IsNullOrWhiteSpace(plan.Pic)
+                    ? plan.Pic
+                    : (!string.IsNullOrWhiteSpace(plan.Pja) ? plan.Pja : userName);
+
+                // Catat riwayat pengalihan
+                plan.ReassignedFrom = previousAssignee;
+                plan.ReassignedTo = newNama.Trim();
+                plan.ReassignedAt = DateTime.Now;
+                plan.ReassignNote = keterangan.Trim();
+
+                // Update PIC
+                plan.Pic = newNama.Trim();
+                plan.NikPic = newNik.Trim();
+                if (!string.IsNullOrWhiteSpace(newDept))
+                {
+                    plan.DepartemenPic = newDept.Trim();
+                }
+
+                // Update PJA juga jika sebelumnya dipegang oleh orang yang sama atau PJA kosong
+                if (string.IsNullOrWhiteSpace(plan.Pja) || plan.Pja.Trim().Equals(previousAssignee.Trim(), StringComparison.OrdinalIgnoreCase))
+                {
+                    plan.Pja = newNama.Trim();
+                    plan.NikPja = newNik.Trim();
+                    if (!string.IsNullOrWhiteSpace(newDept))
+                    {
+                        plan.DepartemenPja = newDept.Trim();
+                    }
+                }
+
+                // Sinkron ke parent Hazard Report jika terhubung (seperti web SAP)
+                if (!string.IsNullOrEmpty(plan.ItemSap) && plan.ItemSap.StartsWith("hazard:"))
+                {
+                    var hIdStr = plan.ItemSap["hazard:".Length..];
+                    if (int.TryParse(hIdStr, out var hId))
+                    {
+                        var hazard = await _context.HazardReports.FirstOrDefaultAsync(h => h.Id == hId && !h.IsDeleted);
+                        if (hazard != null)
+                        {
+                            hazard.Pja = newNama.Trim();
+                            hazard.NikPja = newNik.Trim();
+                            if (!string.IsNullOrWhiteSpace(newDept))
+                            {
+                                hazard.DepartemenPja = newDept.Trim();
+                            }
+                        }
+                    }
+                }
+
+                // Notifikasi ke PIC Baru persis seperti sistem Web MBS SAP
+                var kategori = !string.IsNullOrWhiteSpace(plan.KategoriTemuan) ? plan.KategoriTemuan : "Kondisi Tidak Aman";
+                var lokasi = !string.IsNullOrWhiteSpace(plan.Lokasi) ? plan.Lokasi : (!string.IsNullOrWhiteSpace(plan.Area) ? plan.Area : "Area Kerja");
+                var noteText = !string.IsNullOrWhiteSpace(keterangan) ? $" Alasan: {keterangan}." : "";
+                var notifMsg = $"Action Plan untuk {kategori} di {lokasi} telah dialihkan kepada Anda oleh {userName}.{noteText}";
+
+                _context.Notifications.Add(new Notification
+                {
+                    RecipientNik = newNik.Trim(),
+                    Title = "Pengalihan Action Plan",
+                    Message = notifMsg,
+                    Url = "/ActionPlan/Index",
+                    NotifType = "actionplan_reassign",
+                    Category = "actionplan",
+                    SenderName = userName,
+                    Priority = "urgent",
+                    ActionText = "Tindak Lanjut Action Plan",
+                    IsRead = false,
+                    IsActioned = false,
+                    CreatedAt = DateTime.Now
+                });
+
+                // Tandai notifikasi action plan sebelumnya untuk user ini sebagai actioned
+                var prevNotifs = await _context.Notifications
+                    .Where(n => n.RecipientNik == userNik && !n.IsActioned &&
+                        (n.Url.Contains($"/ActionPlan/Detail/{plan.Id}") || n.Message.Contains($"#{plan.Id}") || n.Message.Contains(plan.Lokasi ?? "___")))
+                    .ToListAsync();
+                foreach (var pn in prevNotifs)
+                {
+                    pn.IsActioned = true;
+                }
+
+                // Notifikasi ke Pelapor bahwa Action Plan telah dialihkan
+                if (!string.IsNullOrWhiteSpace(plan.Nik) && plan.Nik.Trim() != userNik.Trim() && plan.Nik.Trim() != newNik.Trim())
+                {
+                    _context.Notifications.Add(new Notification
+                    {
+                        RecipientNik = plan.Nik.Trim(),
+                        Title = "Info Pengalihan Action Plan",
+                        Message = $"Action Plan di {lokasi} telah dialihkan oleh {userName} kepada {newNama}.",
+                        Url = "/ActionPlan/Index",
+                        NotifType = "actionplan_info",
+                        Category = "actionplan",
+                        SenderName = userName,
+                        Priority = "normal",
+                        IsRead = false,
+                        IsActioned = false,
+                        CreatedAt = DateTime.Now
+                    });
+                }
+
+                await _context.SaveChangesAsync();
+
+                _monitor.RecordTransaction(new TransactionEvent
+                {
+                    Type = "ActionPlan",
+                    Source = "Mobile Reassignment",
+                    ServerId = plan.Id,
+                    Code = $"AP-{plan.Id}",
+                    Nik = userNik,
+                    Nama = userName,
+                    Perusahaan = User.FindFirst("Company")?.Value ?? "PT INDEXIM COALINDO",
+                    Area = plan.Area ?? "PIT",
+                    Lokasi = plan.Lokasi ?? "FRONT",
+                    DetilLokasi = plan.DetilLokasi ?? "",
+                    HasPhoto = false,
+                    InspectionDate = DateTime.Today,
+                    Status = "Reassigned",
+                    Summary = $"Dialihkan dari {previousAssignee} ke {newNama}. Alasan: {keterangan}"
+                });
+
+                return Ok(new
+                {
+                    success = true,
+                    message = $"Action Plan berhasil dialihkan kepada {newNama}!",
+                    data = new
+                    {
+                        id = plan.Id,
+                        pic = plan.Pic,
+                        nik_pic = plan.NikPic,
+                        departemen_pic = plan.DepartemenPic,
+                        reassigned_from = plan.ReassignedFrom,
+                        reassigned_to = plan.ReassignedTo,
+                        reassigned_at = plan.ReassignedAt?.ToString("yyyy-MM-dd HH:mm:ss"),
+                        reassign_note = plan.ReassignNote
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[ReassignActionPlan] Error: {ex}");
+                return StatusCode(500, new { success = false, message = $"Gagal mengalihkan Action Plan: {ex.Message}" });
             }
         }
 

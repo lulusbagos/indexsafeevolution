@@ -1230,6 +1230,69 @@ class ApiService {
     }
   }
 
+  Future<Either<Map, Map<String, dynamic>>> reassignActionPlan({
+    required int actionId,
+    required String newNik,
+    required String newNama,
+    String? newDepartemen,
+    required String keterangan,
+  }) async {
+    try {
+      _restoreStoredToken();
+      final token = getToken;
+      if (token.isNotEmpty) {
+        dio.options.headers['Authorization'] = 'Bearer $token';
+      }
+
+      final payload = {
+        'action_id': actionId,
+        'id': actionId,
+        'new_nik': newNik,
+        'new_nama': newNama,
+        'new_departemen': newDepartemen ?? '',
+        'keterangan': keterangan,
+        'alasan': keterangan,
+        'reassign_note': keterangan,
+      };
+
+      Response res;
+      try {
+        res = await dio.post('/action-plan/reassign', data: payload);
+      } on DioException catch (dioErr) {
+        if (dioErr.type == DioExceptionType.connectionTimeout ||
+            dioErr.type == DioExceptionType.connectionError ||
+            dioErr.type == DioExceptionType.unknown ||
+            dioErr.response?.statusCode == 404) {
+          final fallbackHost = baseUrl.contains('192.168.')
+              ? 'http://127.0.0.1:7302'
+              : baseUrl;
+          final fallbackDio = Dio(BaseOptions(
+            baseUrl: '$fallbackHost/api',
+            headers: {
+              ...dio.options.headers,
+              if (token.isNotEmpty) 'Authorization': 'Bearer $token',
+            },
+            connectTimeout: const Duration(seconds: 10),
+          ));
+          res = await fallbackDio.post('/action-plan/reassign', data: payload);
+        } else {
+          rethrow;
+        }
+      }
+
+      if (res.data is Map) {
+        return Right(Map<String, dynamic>.from(res.data as Map));
+      }
+      return const Right({});
+    } on DioException catch (err) {
+      debugPrint('[ApiService] reassignActionPlan DioException: ${err.message}, code=${err.response?.statusCode}, data=${err.response?.data}');
+      return Left(errorHandler(err));
+    } catch (e) {
+      debugPrint('[ApiService] reassignActionPlan Exception: $e');
+      return Left({'message': 'Gagal mengalihkan Action Plan: $e'});
+    }
+  }
+
   Future<Either<Map, Map<String, dynamic>>> closeHazardFromSafeMap({
     required int id,
     required String action,
