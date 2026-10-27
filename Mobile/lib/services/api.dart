@@ -4201,6 +4201,189 @@ class ApiService {
       return Left({'message': e.toString()});
     }
   }
+
+  // ==========================================
+  // APPROVAL CENTER (BIMA - OHS)
+  // ==========================================
+
+  Future<Either<Map<String, dynamic>, Map<String, dynamic>>> checkApprovalCenterStatus({String? nik}) async {
+    try {
+      final activeNik = nik ?? PreferenceService.getUser() ?? PreferenceService.getProfile()?.noNik ?? '';
+      final targets = _buildCandidateUrls('/approval-center/status?nik=$activeNik');
+
+      Response? lastResponse;
+      DioException? lastDioError;
+      for (final url in targets) {
+        try {
+          final res = await dio.get(url);
+          if (res.statusCode == 200 && res.data is Map) {
+            _updateActiveBaseUrlFromTarget(url);
+            return Right(Map<String, dynamic>.from(res.data as Map));
+          }
+          lastResponse = res;
+        } on DioException catch (de) {
+          lastDioError = de;
+        } catch (_) {}
+      }
+      if (lastResponse != null && lastResponse.data is Map) {
+        return Right(Map<String, dynamic>.from(lastResponse.data as Map));
+      }
+      if (lastDioError != null) {
+        return Left(errorHandler(lastDioError) as Map<String, dynamic>);
+      }
+      return const Left({'message': 'Gagal memeriksa status approval BIMA'});
+    } catch (e) {
+      return Left({'message': e.toString()});
+    }
+  }
+
+  Future<Either<Map<String, dynamic>, Map<String, dynamic>>> getPendingApprovals({
+    String? nik,
+    String? module,
+    int page = 1,
+    int pageSize = 50,
+  }) async {
+    try {
+      final activeNik = nik ?? PreferenceService.getUser() ?? PreferenceService.getProfile()?.noNik ?? '';
+      final query = 'nik=$activeNik&module=${module ?? 'ALL'}&page=$page&pageSize=$pageSize';
+      final targets = _buildCandidateUrls('/approval-center/pending?$query');
+
+      Response? lastResponse;
+      DioException? lastDioError;
+      for (final url in targets) {
+        try {
+          final res = await dio.get(url);
+          if (res.statusCode == 200 && res.data is Map) {
+            _updateActiveBaseUrlFromTarget(url);
+            return Right(Map<String, dynamic>.from(res.data as Map));
+          }
+          lastResponse = res;
+        } on DioException catch (de) {
+          lastDioError = de;
+        } catch (_) {}
+      }
+      if (lastResponse != null && lastResponse.data is Map) {
+        return Right(Map<String, dynamic>.from(lastResponse.data as Map));
+      }
+      if (lastDioError != null) {
+        return Left(errorHandler(lastDioError) as Map<String, dynamic>);
+      }
+      return const Left({'message': 'Gagal mengambil daftar approval'});
+    } catch (e) {
+      return Left({'message': e.toString()});
+    }
+  }
+
+  Future<Either<Map<String, dynamic>, Map<String, dynamic>>> getMySubmissions({
+    String? nik,
+    String? module,
+    int page = 1,
+    int pageSize = 50,
+  }) async {
+    try {
+      final activeNik = nik ?? PreferenceService.getUser() ?? PreferenceService.getProfile()?.noNik ?? '';
+      final query = 'nik=$activeNik&module=${module ?? 'ALL'}&page=$page&pageSize=$pageSize';
+      final targets = _buildCandidateUrls('/approval-center/submissions?$query');
+
+      Response? lastResponse;
+      DioException? lastDioError;
+      for (final url in targets) {
+        try {
+          final res = await dio.get(url);
+          if (res.statusCode == 200 && res.data is Map) {
+            _updateActiveBaseUrlFromTarget(url);
+            return Right(Map<String, dynamic>.from(res.data as Map));
+          }
+          lastResponse = res;
+        } on DioException catch (de) {
+          lastDioError = de;
+        } catch (_) {}
+      }
+      if (lastResponse != null && lastResponse.data is Map) {
+        return Right(Map<String, dynamic>.from(lastResponse.data as Map));
+      }
+      if (lastDioError != null) {
+        return Left(errorHandler(lastDioError) as Map<String, dynamic>);
+      }
+      return const Left({'message': 'Gagal mengambil riwayat pengajuan'});
+    } catch (e) {
+      return Left({'message': e.toString()});
+    }
+  }
+
+  Future<Either<Map<String, dynamic>, Map<String, dynamic>>> getApprovalDetail(int approvalId) async {
+    try {
+      final targets = _buildCandidateUrls('/approval-center/detail/$approvalId');
+      Response? lastResponse;
+      DioException? lastDioError;
+      for (final url in targets) {
+        try {
+          final res = await dio.get(url);
+          if (res.statusCode == 200 && res.data is Map) {
+            _updateActiveBaseUrlFromTarget(url);
+            return Right(Map<String, dynamic>.from(res.data as Map));
+          }
+          lastResponse = res;
+        } on DioException catch (de) {
+          lastDioError = de;
+        } catch (_) {}
+      }
+      if (lastResponse != null && lastResponse.data is Map) {
+        return Right(Map<String, dynamic>.from(lastResponse.data as Map));
+      }
+      if (lastDioError != null) {
+        return Left(errorHandler(lastDioError) as Map<String, dynamic>);
+      }
+      return const Left({'message': 'Gagal mengambil detail approval'});
+    } catch (e) {
+      return Left({'message': e.toString()});
+    }
+  }
+
+  Future<Either<Map<String, dynamic>, Map<String, dynamic>>> postApprovalAction({
+    required int approvalId,
+    required String action,
+    String? notes,
+    String? userNik,
+    String? userName,
+  }) async {
+    try {
+      final activeNik = userNik ?? PreferenceService.getUser() ?? PreferenceService.getProfile()?.noNik ?? '';
+      final activeName = userName ?? PreferenceService.getProfile()?.namaLengkap ?? PreferenceService.getAuth()?.user?.name ?? '';
+      final payload = {
+        'approvalId': approvalId,
+        'action': action,
+        'notes': notes,
+        'userNik': activeNik,
+        'userName': activeName,
+      };
+
+      final targets = _buildCandidateUrls('/approval-center/action');
+      Response? lastResponse;
+      DioException? lastDioError;
+      for (final url in targets) {
+        try {
+          final res = await dio.post(url, data: payload);
+          if (res.statusCode == 200 && res.data is Map) {
+            _updateActiveBaseUrlFromTarget(url);
+            return Right(Map<String, dynamic>.from(res.data as Map));
+          }
+          lastResponse = res;
+        } on DioException catch (de) {
+          lastDioError = de;
+        } catch (_) {}
+      }
+      if (lastResponse != null && lastResponse.data is Map) {
+        return Right(Map<String, dynamic>.from(lastResponse.data as Map));
+      }
+      if (lastDioError != null) {
+        return Left(errorHandler(lastDioError) as Map<String, dynamic>);
+      }
+      return const Left({'message': 'Gagal mengirim tindakan approval'});
+    } catch (e) {
+      return Left({'message': e.toString()});
+    }
+  }
 }
 
 

@@ -1,25 +1,81 @@
 import 'package:flutter/material.dart';
 
+import '../../models/link_model.dart';
+import '../../services/api.dart';
 import '../../utils/links.dart';
 import '../../utils/routers.dart';
 import '../../widgets/activity_hub_header.dart';
 
 const _ohsInk = Color(0xFF0D2F31);
 
-class OhsPage extends StatelessWidget {
+class OhsPage extends StatefulWidget {
   const OhsPage({super.key});
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-        backgroundColor: const Color(0xFFF5F9F8),
-        body: SafeArea(
-          child: Column(children: [
-            const ActivityHubHeader(
-              title: 'OHS Program',
-              subtitle: 'Kesiapan kerja, inspeksi, dan keselamatan operasional',
-            ),
-            Expanded(
-                child: CustomScrollView(slivers: [
+  State<OhsPage> createState() => _OhsPageState();
+}
+
+class _OhsPageState extends State<OhsPage> {
+  final ApiService _api = ApiService();
+  bool _isApprovalRegistered = false;
+  int _pendingApprovalCount = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkApprovalAccess();
+  }
+
+  Future<void> _checkApprovalAccess() async {
+    try {
+      final res = await _api.checkApprovalCenterStatus();
+      res.fold(
+        (err) {},
+        (data) {
+          if (mounted) {
+            final d = data['data'] as Map<String, dynamic>?;
+            final isReg = d?['isRegistered'] as bool? ?? false;
+            final pCount = d?['pendingCount'] as int? ?? 0;
+            setState(() {
+              _isApprovalRegistered = isReg;
+              _pendingApprovalCount = pCount;
+            });
+          }
+        },
+      );
+    } catch (_) {}
+  }
+
+  List<LinkMenuModel> _getMenuList() {
+    final list = List<LinkMenuModel>.from(listMenuOhs1);
+    if (_isApprovalRegistered) {
+      list.add(
+        LinkMenuModel(
+          title: 'Approval\nCenter',
+          icon: Icons.fact_check_rounded,
+          image: '',
+          route: '/approval_center',
+          opacity: 1,
+        ),
+      );
+    }
+    return list;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final menuItems = _getMenuList();
+
+    return Scaffold(
+      backgroundColor: const Color(0xFFF5F9F8),
+      body: SafeArea(
+        child: Column(children: [
+          const ActivityHubHeader(
+            title: 'OHS Program',
+            subtitle: 'Kesiapan kerja, inspeksi, dan keselamatan operasional',
+          ),
+          Expanded(
+            child: CustomScrollView(slivers: [
               const SliverPadding(
                 padding: EdgeInsets.fromLTRB(16, 18, 16, 10),
                 sliver: SliverToBoxAdapter(
@@ -43,8 +99,15 @@ class OhsPage extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 sliver: SliverGrid(
                   delegate: SliverChildBuilderDelegate(
-                    (context, index) => _OhsModuleCard(index: index),
-                    childCount: listMenuOhs1.length,
+                    (context, index) {
+                      final item = menuItems[index];
+                      final isApprovalCenter = item.route == '/approval_center';
+                      return _OhsModuleCard(
+                        item: item,
+                        badgeCount: isApprovalCenter ? _pendingApprovalCount : 0,
+                      );
+                    },
+                    childCount: menuItems.length,
                   ),
                   gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: 3,
@@ -55,19 +118,21 @@ class OhsPage extends StatelessWidget {
                 ),
               ),
               const SliverToBoxAdapter(child: SizedBox(height: 24)),
-            ])),
-          ]),
-        ),
-      );
+            ]),
+          ),
+        ]),
+      ),
+    );
+  }
 }
 
 class _OhsModuleCard extends StatelessWidget {
-  const _OhsModuleCard({required this.index});
-  final int index;
+  const _OhsModuleCard({required this.item, this.badgeCount = 0});
+  final LinkMenuModel item;
+  final int badgeCount;
 
   @override
   Widget build(BuildContext context) {
-    final item = listMenuOhs1[index];
     final style = _getOhsStyle(item.route);
     return Material(
       color: Colors.white,
@@ -130,6 +195,33 @@ class _OhsModuleCard extends StatelessWidget {
                 ),
               ),
             ]),
+            if (badgeCount > 0)
+              Positioned(
+                right: 0,
+                top: 0,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEF4444),
+                    borderRadius: BorderRadius.circular(10),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFFEF4444).withValues(alpha: 0.4),
+                        blurRadius: 6,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Text(
+                    badgeCount > 99 ? '99+' : '$badgeCount',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+              ),
           ]),
         ),
       ),
@@ -153,6 +245,8 @@ _OhsStyle _getOhsStyle(String route) {
       return const _OhsStyle(Color(0xFFF59E0B), Icons.car_repair_rounded);
     case '/dpa':
       return const _OhsStyle(Color(0xFF159947), Icons.drive_eta_rounded);
+    case '/approval_center':
+      return const _OhsStyle(Color(0xFF0284C7), Icons.fact_check_rounded);
     case '/inspection':
       return const _OhsStyle(Color(0xFF2677E8), Icons.manage_search_rounded);
     case '/daily_inspection':

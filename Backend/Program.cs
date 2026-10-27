@@ -81,6 +81,7 @@ builder.Services.AddScoped<CompanyHierarchyService>();
 builder.Services.AddScoped<JwtService>();
 builder.Services.AddSingleton<ImageUploadService>();
 builder.Services.AddScoped<PermitService>();
+builder.Services.AddScoped<BimaApprovalService>();
 
 // 4. Controllers & JSON settings
 builder.Services.AddControllers()

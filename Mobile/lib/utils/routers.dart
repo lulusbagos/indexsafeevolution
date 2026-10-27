@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../pages/approval/approval_center_page.dart';
 import '../pages/bbs/bbs_page.dart';
 import '../pages/ci_assessment/ci_page.dart';
 import '../pages/ci_assessment/fci_form_page.dart';
@@ -30,7 +31,6 @@ import '../pages/p5m/p5m_page.dart';
 import '../pages/performance/executive_reports_page.dart';
 import '../pages/performance/performance_hub_pages.dart';
 import '../pages/roster_settings_page.dart';
-import '../pages/safety_updates_page.dart';
 import '../pages/safetytalk/safetytalk_form_page.dart';
 import '../pages/safetytalk/safetytalk_page.dart';
 import '../pages/sap_report_page.dart';
@@ -492,6 +492,14 @@ void routePage(BuildContext ctx, String route, {String? title}) {
       ctx,
       MaterialPageRoute(
         builder: (context) => const InductionFormPage(),
+      ),
+    );
+  }
+  if (route == '/approval_center') {
+    Navigator.push(
+      ctx,
+      MaterialPageRoute(
+        builder: (context) => const ApprovalCenterPage(),
       ),
     );
   }
