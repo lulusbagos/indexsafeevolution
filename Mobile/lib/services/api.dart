@@ -4385,6 +4385,53 @@ class ApiService {
       return Left({'message': e.toString()});
     }
   }
+
+  Future<Either<Map<String, dynamic>, Map<String, dynamic>>> processBatchApprovalAction({
+    required List<int> approvalIds,
+    required String action,
+    String? notes,
+  }) async {
+    try {
+      final user = PreferenceService.getUser();
+      final profile = PreferenceService.getProfile();
+      final activeNik = user ?? profile?.noNik ?? '';
+      final activeName = profile?.namaLengkap ?? '';
+
+      final payload = {
+        'approvalIds': approvalIds,
+        'action': action,
+        'notes': notes,
+        'userNik': activeNik,
+        'userName': activeName,
+      };
+
+      final targets = _buildCandidateUrls('/approval-center/batch-action');
+      Response? lastResponse;
+      DioException? lastDioError;
+      for (final url in targets) {
+        try {
+          final res = await dio.post(url, data: payload);
+          if (res.statusCode == 200 && res.data is Map) {
+            _updateActiveBaseUrlFromTarget(url);
+            return Right(Map<String, dynamic>.from(res.data as Map));
+          }
+          lastResponse = res;
+        } on DioException catch (de) {
+          lastDioError = de;
+        } catch (_) {}
+      }
+      if (lastResponse != null && lastResponse.data is Map) {
+        return Right(Map<String, dynamic>.from(lastResponse.data as Map));
+      }
+      if (lastDioError != null) {
+        return Left(errorHandler(lastDioError) as Map<String, dynamic>);
+      }
+      return const Left({'message': 'Gagal memproses batch approval'});
+    } catch (e) {
+      return Left({'message': e.toString()});
+    }
+  }
 }
+
 
 

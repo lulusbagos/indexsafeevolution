@@ -885,5 +885,55 @@ namespace Indexsafe.Api.Services
                 return res;
             }
         }
+
+        public async Task<BatchApprovalActionResultDto> ProcessBatchApprovalActionAsync(BatchApprovalActionRequestDto req)
+        {
+            var res = new BatchApprovalActionResultDto
+            {
+                TotalRequested = req.ApprovalIds?.Count ?? 0
+            };
+
+            if (req.ApprovalIds == null || !req.ApprovalIds.Any())
+            {
+                res.Message = "Tidak ada dokumen approval yang dipilih.";
+                return res;
+            }
+
+            foreach (var approvalId in req.ApprovalIds)
+            {
+                try
+                {
+                    var singleReq = new ApprovalActionRequestDto
+                    {
+                        ApprovalId = approvalId,
+                        Action = req.Action ?? "APPROVED",
+                        Notes = req.Notes ?? "Disetujui secara bersamaan (Batch Approval)",
+                        UserNik = req.UserNik,
+                        UserName = req.UserName
+                    };
+
+                    var singleRes = await ProcessApprovalActionAsync(singleReq);
+                    if (singleRes.Success)
+                    {
+                        res.TotalSuccess++;
+                    }
+                    else
+                    {
+                        res.TotalFailed++;
+                        res.Errors.Add($"Dokumen #{approvalId}: {singleRes.Message}");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    res.TotalFailed++;
+                    res.Errors.Add($"Dokumen #{approvalId}: {ex.Message}");
+                }
+            }
+
+            res.Success = res.TotalSuccess > 0;
+            res.Message = $"Selesai memproses: {res.TotalSuccess} berhasil, {res.TotalFailed} gagal dari {res.TotalRequested} dokumen.";
+            return res;
+        }
     }
 }
+

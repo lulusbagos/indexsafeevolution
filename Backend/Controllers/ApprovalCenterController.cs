@@ -155,5 +155,34 @@ namespace Indexsafe.Api.Controllers
 
             return Ok(new { status = 200, message = result.Message, data = result });
         }
+
+        [HttpPost("batch-action")]
+        [AllowAnonymous]
+        public async Task<IActionResult> ProcessBatchAction([FromBody] BatchApprovalActionRequestDto request)
+        {
+            if (request == null || request.ApprovalIds == null || !request.ApprovalIds.Any())
+            {
+                return BadRequest(new { status = 400, message = "Daftar ID approval tidak boleh kosong" });
+            }
+
+            if (string.IsNullOrWhiteSpace(request.UserNik))
+            {
+                request.UserNik = GetCallerNik();
+            }
+
+            if (string.IsNullOrWhiteSpace(request.UserName))
+            {
+                request.UserName = GetCallerName();
+            }
+
+            var result = await _approvalService.ProcessBatchApprovalActionAsync(request);
+            if (!result.Success && result.TotalSuccess == 0)
+            {
+                return BadRequest(new { status = 400, message = result.Message, data = result });
+            }
+
+            return Ok(new { status = 200, message = result.Message, data = result });
+        }
     }
 }
+

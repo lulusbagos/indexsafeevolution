@@ -97,4 +97,24 @@ namespace Indexsafe.Api.DTOs
         public int? NextLevel { get; set; }
         public string? NextStatus { get; set; }
     }
+
+    public class BatchApprovalActionRequestDto
+    {
+        public List<long> ApprovalIds { get; set; } = new();
+        public string Action { get; set; } = "APPROVED"; // APPROVED or REJECTED
+        public string? Notes { get; set; }
+        public string? UserNik { get; set; }
+        public string? UserName { get; set; }
+    }
+
+    public class BatchApprovalActionResultDto
+    {
+        public bool Success { get; set; }
+        public int TotalRequested { get; set; }
+        public int TotalSuccess { get; set; }
+        public int TotalFailed { get; set; }
+        public List<string> Errors { get; set; } = new();
+        public string Message { get; set; } = string.Empty;
+    }
 }
+

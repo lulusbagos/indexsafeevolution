@@ -26,13 +26,21 @@ class _ApprovalCenterPageState extends State<ApprovalCenterPage>
   String _selectedModule = 'ALL';
   final List<String> _modules = ['ALL', 'PERMIT', 'SIMPER', 'SPECIAL_PERMIT'];
 
+  // State untuk Batch Approval (Approve Beberapa Dokumen Sekaligus)
+  bool _isSelectionMode = false;
+  final Set<int> _selectedIds = {};
+  bool _isBatchSubmitting = false;
+
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
     _tabController.addListener(() {
       if (!_tabController.indexIsChanging) {
-        setState(() {});
+        setState(() {
+          _isSelectionMode = false;
+          _selectedIds.clear();
+        });
       }
     });
     _loadAllData();
@@ -115,7 +123,11 @@ class _ApprovalCenterPageState extends State<ApprovalCenterPage>
 
   void _onModuleSelected(String module) {
     if (_selectedModule == module) return;
-    setState(() => _selectedModule = module);
+    setState(() {
+      _selectedModule = module;
+      _isSelectionMode = false;
+      _selectedIds.clear();
+    });
     _loadPending();
     _loadSubmissions();
   }
@@ -547,18 +559,318 @@ class _ApprovalCenterPageState extends State<ApprovalCenterPage>
       );
     }
 
-    return RefreshIndicator(
-      onRefresh: _loadPending,
-      color: const Color(0xFF0F2628),
-      child: ListView.separated(
-        padding: const EdgeInsets.fromLTRB(16, 10, 16, 24),
-        itemCount: _pendingList.length,
-        separatorBuilder: (_, __) => const SizedBox(height: 12),
-        itemBuilder: (context, index) {
-          final item = _pendingList[index] as Map<String, dynamic>;
-          return _buildApprovalCard(item, isPending: true);
-        },
+    return Column(
+      children: [
+        // Batch Selection Bar
+        Container(
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+          child: Row(
+            children: [
+              if (_isSelectionMode) ...[
+                InkWell(
+                  borderRadius: BorderRadius.circular(8),
+                  onTap: _toggleSelectAll,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          _selectedIds.length == _pendingList.length
+                              ? Icons.check_box_rounded
+                              : Icons.check_box_outline_blank_rounded,
+                          color: const Color(0xFF059669),
+                          size: 22,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          _selectedIds.length == _pendingList.length
+                              ? 'Batal Semua'
+                              : 'Pilih Semua (${_pendingList.length})',
+                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Color(0xFF0F2628)),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const Spacer(),
+                TextButton.icon(
+                  onPressed: _toggleSelectionMode,
+                  icon: const Icon(Icons.close_rounded, size: 16, color: Color(0xFF64748B)),
+                  label: const Text('Batal', style: TextStyle(fontSize: 12, color: Color(0xFF64748B), fontWeight: FontWeight.bold)),
+                ),
+              ] else ...[
+                Text(
+                  '${_pendingList.length} Permohonan Menunggu',
+                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF64748B)),
+                ),
+                const Spacer(),
+                InkWell(
+                  borderRadius: BorderRadius.circular(10),
+                  onTap: _toggleSelectionMode,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF059669).withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: const Color(0xFF059669).withValues(alpha: 0.3)),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.checklist_rounded, size: 16, color: Color(0xFF059669)),
+                        SizedBox(width: 5),
+                        Text(
+                          'Pilih Banyak (Batch)',
+                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Color(0xFF059669)),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+
+        // List
+        Expanded(
+          child: RefreshIndicator(
+            onRefresh: _loadPending,
+            color: const Color(0xFF0F2628),
+            child: ListView.separated(
+              padding: const EdgeInsets.fromLTRB(16, 2, 16, 80),
+              itemCount: _pendingList.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 12),
+              itemBuilder: (context, index) {
+                final item = _pendingList[index] as Map<String, dynamic>;
+                return _buildApprovalCard(item, isPending: true);
+              },
+            ),
+          ),
+        ),
+
+        // Floating Bottom Bar for Batch Approve
+        if (_isSelectionMode && _selectedIds.isNotEmpty)
+          _buildBatchActionBar(),
+      ],
+    );
+  }
+
+  void _toggleSelectionMode() {
+    setState(() {
+      _isSelectionMode = !_isSelectionMode;
+      if (!_isSelectionMode) {
+        _selectedIds.clear();
+      }
+    });
+  }
+
+  void _toggleSelectAll() {
+    setState(() {
+      if (_selectedIds.length == _pendingList.length) {
+        _selectedIds.clear();
+      } else {
+        _selectedIds.clear();
+        for (final item in _pendingList) {
+          final id = item['approvalId'] as int? ?? 0;
+          if (id > 0) _selectedIds.add(id);
+        }
+      }
+    });
+  }
+
+  void _toggleSelectItem(int id) {
+    setState(() {
+      if (_selectedIds.contains(id)) {
+        _selectedIds.remove(id);
+      } else {
+        _selectedIds.add(id);
+      }
+    });
+  }
+
+  Widget _buildBatchActionBar() {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.only(
+          topLeft: Radius.circular(20),
+          topRight: Radius.circular(20),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Color(0x18000000),
+            blurRadius: 12,
+            offset: Offset(0, -4),
+          ),
+        ],
       ),
+      child: SafeArea(
+        top: false,
+        child: Row(
+          children: [
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  '${_selectedIds.length} Dokumen Dipilih',
+                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900, color: Color(0xFF0F2628)),
+                ),
+                const SizedBox(height: 2),
+                const Text(
+                  'Siap untuk persetujuan batch',
+                  style: TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                ),
+              ],
+            ),
+            const Spacer(),
+            ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF059669),
+                foregroundColor: Colors.white,
+                elevation: 0,
+                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              onPressed: _isBatchSubmitting ? null : _showBatchApprovalDialog,
+              icon: _isBatchSubmitting
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                    )
+                  : const Icon(Icons.done_all_rounded, size: 18),
+              label: Text(
+                _isBatchSubmitting ? 'Memproses...' : 'Setujui Sekaligus (${_selectedIds.length})',
+                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showBatchApprovalDialog() async {
+    if (_selectedIds.isEmpty) return;
+    final notesCtrl = TextEditingController();
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: const Color(0xFF059669).withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(Icons.done_all_rounded, color: Color(0xFF059669), size: 24),
+            ),
+            const SizedBox(width: 10),
+            const Expanded(
+              child: Text(
+                'Setujui Sekaligus',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Color(0xFF0F2628)),
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Anda akan menyetujui ${_selectedIds.length} permohonan yang dipilih secara bersamaan.',
+              style: const TextStyle(fontSize: 13, color: Color(0xFF334155)),
+            ),
+            const SizedBox(height: 14),
+            const Text(
+              'Catatan Verifikasi (Opsional):',
+              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF64748B)),
+            ),
+            const SizedBox(height: 6),
+            TextField(
+              controller: notesCtrl,
+              maxLines: 2,
+              decoration: InputDecoration(
+                hintText: 'Contoh: Disetujui lengkap secara batch...',
+                hintStyle: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
+                filled: true,
+                fillColor: const Color(0xFFF8FAFC),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                ),
+                contentPadding: const EdgeInsets.all(10),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Batal', style: TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.bold)),
+          ),
+          ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF059669),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
+            icon: const Icon(Icons.check_rounded, size: 18),
+            label: Text('Setujui (${_selectedIds.length})', style: const TextStyle(fontWeight: FontWeight.w800)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      _executeBatchApproval(notesCtrl.text.trim());
+    }
+  }
+
+  Future<void> _executeBatchApproval(String notes) async {
+    setState(() => _isBatchSubmitting = true);
+    final ids = _selectedIds.toList();
+    final res = await _api.processBatchApprovalAction(
+      approvalIds: ids,
+      action: 'APPROVED',
+      notes: notes.isNotEmpty ? notes : 'Disetujui secara bersamaan (Batch Approval)',
+    );
+
+    if (!mounted) return;
+    setState(() {
+      _isBatchSubmitting = false;
+      _isSelectionMode = false;
+      _selectedIds.clear();
+    });
+
+    res.fold(
+      (err) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(err['message']?.toString() ?? 'Gagal memproses batch approval'),
+            backgroundColor: const Color(0xFFEF4444),
+          ),
+        );
+      },
+      (data) {
+        final msg = data['message']?.toString() ?? 'Batch approval berhasil diproses';
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(msg),
+            backgroundColor: const Color(0xFF059669),
+          ),
+        );
+        _loadAllData();
+      },
     );
   }
 
@@ -616,6 +928,9 @@ class _ApprovalCenterPageState extends State<ApprovalCenterPage>
   }
 
   Widget _buildApprovalCard(Map<String, dynamic> item, {required bool isPending}) {
+    final approvalId = item['approvalId'] as int? ?? 0;
+    final isSelected = isPending && _isSelectionMode && _selectedIds.contains(approvalId);
+
     final module = item['module'] as String? ?? 'PERMIT';
     final modColor = _getModuleColor(module);
     final modLabel = _getModuleLabel(module);
@@ -636,29 +951,38 @@ class _ApprovalCenterPageState extends State<ApprovalCenterPage>
     }
 
     return Material(
-      color: Colors.white,
+      color: isSelected ? const Color(0xFFECFDF5) : Colors.white,
       borderRadius: BorderRadius.circular(18),
       elevation: 0,
       child: InkWell(
         borderRadius: BorderRadius.circular(18),
-        onTap: () => _openDetailModal(item, isPendingTab: isPending),
+        onTap: () {
+          if (isPending && _isSelectionMode) {
+            _toggleSelectItem(approvalId);
+          } else {
+            _openDetailModal(item, isPendingTab: isPending);
+          }
+        },
         child: Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: const Color(0xFFE2E8F0)),
-            boxShadow: const [
+            border: Border.all(
+              color: isSelected ? const Color(0xFF059669) : const Color(0xFFE2E8F0),
+              width: isSelected ? 1.8 : 1.0,
+            ),
+            boxShadow: [
               BoxShadow(
-                color: Color(0x08000000),
+                color: isSelected ? const Color(0xFF059669).withValues(alpha: 0.1) : const Color(0x08000000),
                 blurRadius: 10,
-                offset: Offset(0, 3),
+                offset: const Offset(0, 3),
               ),
             ],
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Baris Tag Modul & Status
+              // Baris Tag Modul & Status / Checkbox
               Row(
                 children: [
                   Container(
@@ -685,7 +1009,25 @@ class _ApprovalCenterPageState extends State<ApprovalCenterPage>
                     ),
                   ),
                   const Spacer(),
-                  _buildStatusBadge(reqStatus),
+                  if (isPending && _isSelectionMode)
+                    Container(
+                      padding: const EdgeInsets.all(2),
+                      decoration: BoxDecoration(
+                        color: isSelected ? const Color(0xFF059669) : Colors.transparent,
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: isSelected ? const Color(0xFF059669) : const Color(0xFF94A3B8),
+                          width: 1.8,
+                        ),
+                      ),
+                      child: Icon(
+                        Icons.check,
+                        size: 16,
+                        color: isSelected ? Colors.white : Colors.transparent,
+                      ),
+                    )
+                  else
+                    _buildStatusBadge(reqStatus),
                 ],
               ),
               const SizedBox(height: 10),
@@ -776,7 +1118,7 @@ class _ApprovalCenterPageState extends State<ApprovalCenterPage>
                 ],
               ),
 
-              if (isPending) ...[
+              if (isPending && !_isSelectionMode) ...[
                 const SizedBox(height: 12),
                 SizedBox(
                   width: double.infinity,

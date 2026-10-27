@@ -22,6 +22,7 @@ import '../services/notification.dart';
 import '../services/preference.dart';
 import '../utils/links.dart';
 import '../widgets/snackbar_msg.dart';
+import 'approval/approval_center_page.dart';
 import 'global_search_page.dart';
 import 'hazard/hazard_hub_page.dart';
 import 'menu/extra_page.dart';
@@ -2124,6 +2125,10 @@ class _DashboardPageState extends State<DashboardPage> with WidgetsBindingObserv
   // Notification State
   int _notifCount = PreferenceService.getNotif();
 
+  // Approval Center State
+  bool _isApprovalRegistered = false;
+  int _pendingApprovalCount = 0;
+
   // Heatmap & Radar Proximity State ('heatmap', 'points', 'off')
   String _hazardMapMode = PreferenceService.getHazardMapMode();
   StreamSubscription<Position>? _positionStreamSub;
@@ -2244,9 +2249,30 @@ class _DashboardPageState extends State<DashboardPage> with WidgetsBindingObserv
       });
       _fetchHomeBanners();
       _fetchNotifCount();
+      _checkApprovalAccess();
       _initLocationAndProximity();
       _fetchHazardPointsFromApi();
     });
+  }
+
+  Future<void> _checkApprovalAccess() async {
+    try {
+      final res = await _api.checkApprovalCenterStatus();
+      res.fold(
+        (err) {},
+        (data) {
+          if (mounted) {
+            final d = data['data'] as Map<String, dynamic>?;
+            final isReg = d?['isRegistered'] as bool? ?? false;
+            final pCount = d?['pendingCount'] as int? ?? 0;
+            setState(() {
+              _isApprovalRegistered = isReg;
+              _pendingApprovalCount = pCount;
+            });
+          }
+        },
+      );
+    } catch (_) {}
   }
 
   @override
@@ -2257,6 +2283,7 @@ class _DashboardPageState extends State<DashboardPage> with WidgetsBindingObserv
       _positionStreamSub?.cancel();
       _positionStreamSub = null;
     } else if (state == AppLifecycleState.resumed) {
+      _checkApprovalAccess();
       if (_positionStreamSub == null) {
         _initLocationAndProximity();
       }
@@ -3974,6 +4001,9 @@ class _DashboardPageState extends State<DashboardPage> with WidgetsBindingObserv
                   ],
                 ),
               ),
+              // Quick Action Card: Approval Center (khusus user terdaftar di Bima)
+              if (_isApprovalRegistered)
+                _buildApprovalQuickCard(),
               Padding(
                 padding:
                     const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
@@ -4245,6 +4275,156 @@ class _DashboardPageState extends State<DashboardPage> with WidgetsBindingObserv
             color: isSelected
                 ? (isOff ? const Color(0xFFDC2626) : const Color(0xFF1D4ED8))
                 : const Color(0xFF64748B),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildApprovalQuickCard() {
+    final hasPending = _pendingApprovalCount > 0;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 2, 20, 10),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(18),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(18),
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (context) => const ApprovalCenterPage(),
+              ),
+            ).then((_) => _checkApprovalAccess());
+          },
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
+            decoration: BoxDecoration(
+              gradient: hasPending
+                  ? const LinearGradient(
+                      colors: [Color(0xFF0F2628), Color(0xFF134E4A)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    )
+                  : const LinearGradient(
+                      colors: [Colors.white, Color(0xFFF8FAFC)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(
+                color: hasPending
+                    ? const Color(0xFF2DD4BF).withValues(alpha: 0.3)
+                    : const Color(0xFFE2E8F0),
+                width: hasPending ? 1.4 : 1.0,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: hasPending
+                      ? const Color(0xFF0F2628).withValues(alpha: 0.25)
+                      : const Color(0x0A000000),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                // Icon Container
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    gradient: hasPending
+                        ? const LinearGradient(
+                            colors: [Color(0xFFEF4444), Color(0xFFDC2626)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          )
+                        : const LinearGradient(
+                            colors: [Color(0xFF0D9488), Color(0xFF0F766E)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                    borderRadius: BorderRadius.circular(13),
+                    boxShadow: [
+                      BoxShadow(
+                        color: (hasPending ? const Color(0xFFEF4444) : const Color(0xFF0D9488))
+                            .withValues(alpha: 0.35),
+                        blurRadius: 8,
+                        offset: const Offset(0, 3),
+                      ),
+                    ],
+                  ),
+                  child: Icon(
+                    hasPending ? Icons.pending_actions_rounded : Icons.fact_check_rounded,
+                    color: Colors.white,
+                    size: 24,
+                  ),
+                ),
+                const SizedBox(width: 13),
+                // Text Column
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Row(
+                        children: [
+                          Text(
+                            'Approval Center',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w800,
+                              color: hasPending ? Colors.white : const Color(0xFF0F2628),
+                            ),
+                          ),
+                          if (hasPending) ...[
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFEF4444),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Text(
+                                '$_pendingApprovalCount Pending',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        hasPending
+                            ? 'Ada $_pendingApprovalCount permohonan menunggu persetujuan Anda'
+                            : 'Pantau alur & status pengajuan izin departemen',
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          color: hasPending
+                              ? Colors.white.withValues(alpha: 0.8)
+                              : const Color(0xFF64748B),
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Icon(
+                  Icons.arrow_forward_ios_rounded,
+                  size: 15,
+                  color: hasPending ? const Color(0xFF2DD4BF) : const Color(0xFF94A3B8),
+                ),
+              ],
+            ),
           ),
         ),
       ),
