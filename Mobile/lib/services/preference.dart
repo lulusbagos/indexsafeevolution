@@ -300,4 +300,12 @@ class PreferenceService {
     await prefs?.setString('safemap_cached_points_json', jsonString);
     await prefs?.setString('safemap_last_fetch_date', dateStr);
   }
+
+  static Future<void> setFcmToken(String token) async {
+    await prefs?.setString('fcm_token', token);
+  }
+
+  static String? getFcmToken() {
+    return prefs?.getString('fcm_token');
+  }
 }

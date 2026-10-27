@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "472904731024",
+    "project_id": "mbsmobile-ca283",
+    "storage_bucket": "mbsmobile-ca283.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:472904731024:android:82c69b5ab7b019c2b9cb15",
+        "android_client_info": {
+          "package_name": "id.indexim.mbs"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCdySPXS-A4RFReDc9FtSL421fz7IX08Rk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
