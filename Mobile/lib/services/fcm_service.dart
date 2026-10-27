@@ -2,6 +2,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 
+import 'api.dart';
 import 'notification.dart';
 import 'preference.dart';
 
@@ -56,6 +57,9 @@ class FCMService {
       _messaging.onTokenRefresh.listen((newToken) {
         debugPrint('[FCM] Token refreshed: $newToken');
         PreferenceService.setFcmToken(newToken);
+        if (PreferenceService.getAuth() != null) {
+          ApiService().updateFcmToken(newToken);
+        }
       });
 
       // Foreground message handler
@@ -105,6 +109,9 @@ class FCMService {
       if (token != null) {
         debugPrint('[FCM] Current Token: $token');
         await PreferenceService.setFcmToken(token);
+        if (PreferenceService.getAuth() != null) {
+          ApiService().updateFcmToken(token);
+        }
       }
       return token;
     } catch (e) {

@@ -13,6 +13,15 @@ namespace Indexsafe.Api.DTOs
 
         [JsonPropertyName("password")]
         public string Password { get; set; } = string.Empty;
+
+        [JsonPropertyName("fcm_token")]
+        public string? FcmToken { get; set; }
+    }
+
+    public class UpdateFcmTokenRequest
+    {
+        [JsonPropertyName("fcm_token")]
+        public string FcmToken { get; set; } = string.Empty;
     }
 
     public class RegisterRequest

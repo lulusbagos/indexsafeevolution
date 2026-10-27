@@ -278,6 +278,36 @@ namespace Indexsafe.Api.Controllers
             }
             await _context.SaveChangesAsync();
 
+            // Update tbl_m_pengguna_sandi: fcm_token & terakhir_login
+            try
+            {
+                if (overridePwd != null)
+                {
+                    overridePwd.TerakhirLogin = DateTime.Now;
+                    if (!string.IsNullOrWhiteSpace(req.FcmToken))
+                    {
+                        overridePwd.FcmToken = req.FcmToken;
+                    }
+                }
+                else
+                {
+                    overridePwd = new PasswordOverride
+                    {
+                        Nrp = nrp,
+                        KataSandi = req.Password,
+                        DiubahPada = DateTime.Now,
+                        TerakhirLogin = DateTime.Now,
+                        FcmToken = req.FcmToken
+                    };
+                    _context.PasswordOverrides.Add(overridePwd);
+                }
+                await _context.SaveChangesAsync();
+            }
+            catch
+            {
+                // Abaikan jika terjadi kendala transient agar flow login utama tetap sukses
+            }
+
             // Auto-provision hak akses scan: Pengguna pertama kali login otomatis mendapatkan izin scan acara (CanScanAcara = true)
             // Terintegrasi langsung dengan Web Admin http://localhost:5111/UserScan/Index
             try
@@ -1138,6 +1168,48 @@ namespace Indexsafe.Api.Controllers
                 nik = rawNik,
                 nama = matchedEmployee.NamaLengkap
             });
+        }
+
+        [HttpPost("fcm-token")]
+        [HttpPost("auth/fcm-token")]
+        [Authorize]
+        public async Task<IActionResult> UpdateFcmToken([FromBody] UpdateFcmTokenRequest req)
+        {
+            var nrp = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(nrp)) return Unauthorized(new { message = "Sesi tidak valid." });
+
+            if (string.IsNullOrWhiteSpace(req.FcmToken))
+            {
+                return BadRequest(new { message = "FCM token tidak boleh kosong." });
+            }
+
+            try
+            {
+                var overridePwd = await _context.PasswordOverrides.FirstOrDefaultAsync(p => p.Nrp == nrp);
+                if (overridePwd != null)
+                {
+                    overridePwd.FcmToken = req.FcmToken;
+                    overridePwd.TerakhirLogin = DateTime.Now;
+                }
+                else
+                {
+                    overridePwd = new PasswordOverride
+                    {
+                        Nrp = nrp,
+                        KataSandi = "123456",
+                        DiubahPada = DateTime.Now,
+                        TerakhirLogin = DateTime.Now,
+                        FcmToken = req.FcmToken
+                    };
+                    _context.PasswordOverrides.Add(overridePwd);
+                }
+                await _context.SaveChangesAsync();
+                return Ok(new { success = true, message = "FCM token berhasil diperbarui di tbl_m_pengguna_sandi." });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { success = false, message = "Gagal menyimpan token ke database: " + ex.Message });
+            }
         }
     }
 }

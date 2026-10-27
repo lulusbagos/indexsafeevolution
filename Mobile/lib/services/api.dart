@@ -288,10 +288,12 @@ class ApiService {
           ? userStr.substring(company.length)
           : userStr;
 
+      final fcmToken = PreferenceService.getFcmToken();
       final loginPayload = <String, dynamic>{
         'email': emailParam,
         'nik': nikParam,
         'password': pswd,
+        if (fcmToken != null && fcmToken.isNotEmpty) 'fcm_token': fcmToken,
       };
 
       late Response res;
@@ -352,6 +354,19 @@ class ApiService {
       return Right(data);
     } on DioException catch (err) {
       return Left(errorHandler(err));
+    }
+  }
+
+  Future<bool> updateFcmToken(String fcmToken) async {
+    try {
+      final res = await dio.post(
+        '/auth/fcm-token',
+        data: {'fcm_token': fcmToken},
+      );
+      return res.statusCode == 200;
+    } catch (e) {
+      debugPrint('[ApiService] updateFcmToken error: $e');
+      return false;
     }
   }
 
