@@ -36,7 +36,7 @@ if %ERRORLEVEL% neq 0 (
     exit /b %ERRORLEVEL%
 )
 
-"%ADB_EXE%" shell am start -n id.icapps.mbs/.MainActivity
+"%ADB_EXE%" shell am start -n id.indexim.mbs/.MainActivity
 
 echo.
 echo ========================================================
