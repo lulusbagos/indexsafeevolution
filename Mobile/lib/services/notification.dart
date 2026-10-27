@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 import '../main.dart';
+import '../pages/approval/approval_center_page.dart';
 import '../pages/hazard/hazard_page.dart';
 import '../pages/inspeksi/inspeksi_page.dart';
 import '../pages/notif_page.dart';
@@ -204,6 +205,8 @@ class NotificationService {
       nav.push(MaterialPageRoute(builder: (_) => const ProfilePage()));
     } else if (lower.contains('action') || lower.contains('actionplan')) {
       nav.push(MaterialPageRoute(builder: (_) => const ActionTrackerPage()));
+    } else if (lower.contains('approval') || lower.contains('approval_center')) {
+      nav.push(MaterialPageRoute(builder: (_) => const ApprovalCenterPage()));
     } else if (lower.contains('special_permit') || lower.contains('specialpermit') || lower.contains('high_risk')) {
       nav.push(MaterialPageRoute(builder: (_) => const SpecialPermitListPage()));
     } else {

@@ -3396,8 +3396,26 @@ class _DashboardPageState extends State<DashboardPage> with WidgetsBindingObserv
         }
       } catch (_) {}
 
-      // GETARAN FISIK: Jika user dijadikan PIC / PJA temuan K3 (Hazard, Inspeksi, Action Plan)
-      if (activeHazardCount > 0 || activeActionPlanCount > 0 || localCnt > 0 || unactionedCount > 0) {
+      // Tambahkan pending approval jika user memiliki permohonan persetujuan
+      if (_pendingApprovalCount > 0) {
+        count += _pendingApprovalCount;
+      }
+
+      int spAlertCount = 0;
+      try {
+        final spRes = await _api.getSpecialPermitAlerts();
+        spRes.fold(
+          (_) {},
+          (spData) {
+            final list = (spData['data'] as List<dynamic>?) ?? [];
+            spAlertCount = list.length;
+            count += spAlertCount;
+          },
+        );
+      } catch (_) {}
+
+      // GETARAN FISIK: Jika user dijadikan PIC / PJA temuan K3, ada Approval Menunggu, atau Special Permit High Risk
+      if (activeHazardCount > 0 || activeActionPlanCount > 0 || localCnt > 0 || unactionedCount > 0 || _pendingApprovalCount > 0 || spAlertCount > 0) {
         NotificationService.vibrateForPicAssignment();
       }
 

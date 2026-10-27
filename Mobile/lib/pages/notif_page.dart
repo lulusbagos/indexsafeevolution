@@ -9,11 +9,13 @@ import '../services/sync.dart';
 import '../utils/enums.dart';
 import '../utils/globals.dart' as globals;
 import '../utils/helpers.dart';
+import 'approval/approval_center_page.dart';
 import 'hazard/hazard_hub_page.dart';
 import 'history/history_detail_page.dart';
 import 'inspeksi/inspection_hub_page.dart';
 import 'performance/action_tracker_page.dart';
 import 'roster_settings_page.dart';
+import 'special_permit/special_permit_list_page.dart';
 
 class NotifPage extends StatefulWidget {
   const NotifPage({super.key});
@@ -287,13 +289,113 @@ class _NotifPageState extends State<NotifPage> {
         combined.add(m);
       }
 
+      // 3. Fetch online pending approvals (Approval Center)
+      try {
+        final approvalRes = await _api.getPendingApprovals();
+        approvalRes.fold(
+          (_) {},
+          (data) {
+            final items = (data['data'] as List<dynamic>?) ?? [];
+            for (var a in items) {
+              final aMap = a as Map<String, dynamic>;
+              final aId = aMap['approvalId'] as int? ?? 0;
+              final mod = aMap['module']?.toString() ?? 'Persetujuan';
+              final nomor = aMap['nomor']?.toString() ?? '-';
+              final applicant = aMap['applicantName']?.toString() ?? 'Pemohon';
+              final comp = aMap['companyName']?.toString() ?? '-';
+              final dept = aMap['department']?.toString() ?? '-';
+              final roleTarget = aMap['roleName']?.toString() ?? 'Approver';
+              final reqTimeStr = aMap['reqTime']?.toString();
+              DateTime? reqDate;
+              if (reqTimeStr != null) {
+                reqDate = DateTime.tryParse(reqTimeStr);
+              }
+
+              combined.add({
+                'id': aId,
+                'is_server_notif': true,
+                'is_approval_item': true,
+                'title': 'Persetujuan $mod: $nomor',
+                'remark': 'Permohonan $mod oleh $applicant ($dept • $comp). Menunggu persetujuan Anda ($roleTarget).',
+                'category': 'approval',
+                'notif_type': 'approval_request',
+                'url': '/approval_center',
+                'sender_name': applicant,
+                'priority': 'urgent',
+                'payload': aId.toString(),
+                'action_text': 'Tinjau Persetujuan',
+                'is_read': false,
+                'is_actioned': false,
+                'is_action_required': true,
+                'date': reqDate != null ? DateFormat('yyyy-MM-dd').format(reqDate) : '',
+                'time': reqDate != null ? DateFormat('HH:mm').format(reqDate) : '',
+                'created_at_dt': reqDate ?? DateTime.now(),
+                'status': 0,
+                'area_name': 'Approval Center',
+                'location_name': mod,
+              });
+            }
+          },
+        );
+      } catch (err) {
+        debugPrint('Error fetching approval notifs: $err');
+      }
+
+      // 4. Fetch Special Permit high risk alerts & pending inspections
+      try {
+        final spRes = await _api.getSpecialPermitAlerts();
+        spRes.fold(
+          (_) {},
+          (spData) {
+            final list = (spData['data'] as List<dynamic>?) ?? [];
+            for (var sp in list) {
+              final spMap = sp as Map<String, dynamic>;
+              final reqId = spMap['reqId']?.toString() ?? '-';
+              final actType = (spMap['activityType']?.toString() ?? 'Pekerjaan Khusus').replaceAll('_', ' ');
+              final loc = spMap['workLocation']?.toString() ?? 'Area Operasional Tambang';
+              final picName = spMap['applicantName']?.toString() ?? spMap['pjoName']?.toString() ?? 'PIC Tim';
+              final issueTime = spMap['issueTime']?.toString() ?? '';
+              final issueDate = spMap['issueDate']?.toString() ?? '';
+
+              combined.add({
+                'id': spMap['id'],
+                'is_server_notif': true,
+                'is_special_permit': true,
+                'title': '⚠️ Inspeksi High Risk: $reqId',
+                'remark': 'Kegiatan risiko tinggi $actType di $loc. Pengawas/PJO: $picName. Segera lakukan verifikasi & inspeksi lapangan!',
+                'category': 'special_permit',
+                'notif_type': 'special_permit_high_risk',
+                'url': '/special_permit',
+                'sender_name': picName,
+                'priority': 'urgent',
+                'payload': spMap['id'],
+                'action_text': 'Inspeksi Sekarang',
+                'is_read': false,
+                'is_actioned': false,
+                'is_action_required': true,
+                'date': issueDate.isNotEmpty ? issueDate.substring(0, 10.clamp(0, issueDate.length)) : '',
+                'time': issueTime,
+                'created_at_dt': DateTime.now(),
+                'status': 0,
+                'area_name': 'Special Permit',
+                'location_name': loc,
+              });
+            }
+          },
+        );
+      } catch (err) {
+        debugPrint('Error fetching special permit notifs: $err');
+      }
+
       // GETARAN FISIK: Pastikan bergetar jika ada notifikasi penugasan PIC/PJA atau prioritas urgent
       final hasPicAssignments = combined.any((item) {
         final isActionReq = item['is_action_required'] == true;
         final isRead = item['is_read'] == true;
         final status = (item['status'] as num?)?.toInt() ?? 0;
         final p = (item['priority'] ?? '').toString().toLowerCase();
-        return (isActionReq && (!isRead || status < 2)) || p == 'urgent';
+        final isApproval = item['is_approval_item'] == true;
+        final isSpecialPermit = item['is_special_permit'] == true;
+        return (isActionReq && (!isRead || status < 2)) || p == 'urgent' || isApproval || isSpecialPermit;
       });
       if (hasPicAssignments) {
         NotificationService.vibrateForPicAssignment();
@@ -316,6 +418,18 @@ class _NotifPageState extends State<NotifPage> {
 
   List<dynamic> get _filteredData {
     if (_selectedFilter == 'all') return _rawData;
+    if (_selectedFilter == 'approval') {
+      return _rawData.where((item) {
+        final cat = (item['category'] ?? '').toString().toLowerCase();
+        return cat.contains('approval') || item['is_approval_item'] == true;
+      }).toList();
+    }
+    if (_selectedFilter == 'special_permit') {
+      return _rawData.where((item) {
+        final cat = (item['category'] ?? '').toString().toLowerCase();
+        return cat.contains('special_permit') || item['is_special_permit'] == true;
+      }).toList();
+    }
     if (_selectedFilter == 'hazard') {
       return _rawData.where((item) {
         final cat = (item['category'] ?? '').toString().toLowerCase();
@@ -341,6 +455,18 @@ class _NotifPageState extends State<NotifPage> {
 
   int _countFor(String type) {
     if (type == 'all') return _rawData.length;
+    if (type == 'approval') {
+      return _rawData.where((item) {
+        final cat = (item['category'] ?? '').toString().toLowerCase();
+        return cat.contains('approval') || item['is_approval_item'] == true;
+      }).length;
+    }
+    if (type == 'special_permit') {
+      return _rawData.where((item) {
+        final cat = (item['category'] ?? '').toString().toLowerCase();
+        return cat.contains('special_permit') || item['is_special_permit'] == true;
+      }).length;
+    }
     if (type == 'hazard') {
       return _rawData.where((item) {
         final cat = (item['category'] ?? '').toString().toLowerCase();
@@ -582,6 +708,22 @@ class _NotifPageState extends State<NotifPage> {
       final url = (item['url'] ?? '').toString().toLowerCase();
       final notifType = (item['notif_type'] ?? '').toString().toLowerCase();
 
+      if (item['is_approval_item'] == true || cat.contains('approval') || url.contains('approval')) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const ApprovalCenterPage()),
+        ).then((_) => _getData());
+        return;
+      }
+
+      if (item['is_special_permit'] == true || cat.contains('special_permit') || url.contains('special_permit')) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const SpecialPermitListPage()),
+        ).then((_) => _getData());
+        return;
+      }
+
       // Jika Notifikasi Roster / Periode Tugas, buka halaman Pengaturan Roster
       if (cat.contains('roster') || url.contains('roster') || notifType.contains('roster')) {
         Navigator.push(
@@ -624,7 +766,7 @@ class _NotifPageState extends State<NotifPage> {
         return;
       }
 
-      if (!cat.contains('hazard') && !cat.contains('inspect') && !cat.contains('simama') && !cat.contains('action') && !url.contains('hazard') && !url.contains('inspect') && !url.contains('action')) {
+      if (!cat.contains('hazard') && !cat.contains('inspect') && !cat.contains('simama') && !cat.contains('action') && !cat.contains('approval') && !cat.contains('special_permit') && !url.contains('hazard') && !url.contains('inspect') && !url.contains('action') && !url.contains('approval') && !url.contains('special_permit')) {
         _showGeneralNotificationDialog(item);
         return;
       }
@@ -746,6 +888,10 @@ class _NotifPageState extends State<NotifPage> {
               child: Row(
                 children: [
                   _buildFilterChip('all', 'Semua', _countFor('all')),
+                  const SizedBox(width: 8),
+                  _buildFilterChip('approval', 'Approval', _countFor('approval')),
+                  const SizedBox(width: 8),
+                  _buildFilterChip('special_permit', 'Special Permit', _countFor('special_permit')),
                   const SizedBox(width: 8),
                   _buildFilterChip('hazard', 'Hazard', _countFor('hazard')),
                   const SizedBox(width: 8),
@@ -1036,6 +1182,9 @@ class _NotifPageState extends State<NotifPage> {
     final isPjaTag = notifType.contains('pja') || itemTitleLower.contains('pja');
     final isPicTag = notifType.contains('pic') || itemTitleLower.contains('pic');
 
+    final isApproval = item['is_approval_item'] == true || category.contains('approval');
+    final isSpecialPermit = item['is_special_permit'] == true || category.contains('special_permit');
+
     final isViolation = category.contains('violation') ||
         notifType.contains('violation') ||
         itemTitleLower.contains('pelanggaran');
@@ -1045,41 +1194,49 @@ class _NotifPageState extends State<NotifPage> {
         itemTitleLower.contains('gerbang') ||
         itemTitleLower.contains('gate');
 
-    final primaryTheme = isViolation
+    final primaryTheme = isSpecialPermit
         ? const Color(0xFFDC2626)
-        : (isGateMovement
-            ? const Color(0xFF0284C7)
-            : (isCoaching
-                ? const Color(0xFF7C3AED)
-                : (isRoster
-                    ? const Color(0xFF7C3AED)
-                    : (isPicTag
-                        ? const Color(0xFF2563EB)
-                        : (isPjaTag
-                            ? (isInspection ? const Color(0xFF0F766E) : const Color(0xFFEA580C))
-                            : (isHazard
-                                ? const Color(0xFFE65100)
-                                : (isInspection
-                                    ? const Color(0xFF0288D1)
-                                    : const Color(0xFF00897B))))))));
+        : (isApproval
+            ? const Color(0xFF0D9488)
+            : (isViolation
+                ? const Color(0xFFDC2626)
+                : (isGateMovement
+                    ? const Color(0xFF0284C7)
+                    : (isCoaching
+                        ? const Color(0xFF7C3AED)
+                        : (isRoster
+                            ? const Color(0xFF7C3AED)
+                            : (isPicTag
+                                ? const Color(0xFF2563EB)
+                                : (isPjaTag
+                                    ? (isInspection ? const Color(0xFF0F766E) : const Color(0xFFEA580C))
+                                    : (isHazard
+                                        ? const Color(0xFFE65100)
+                                        : (isInspection
+                                            ? const Color(0xFF0288D1)
+                                            : const Color(0xFF00897B))))))))));
 
-    final bgTheme = isViolation
+    final bgTheme = isSpecialPermit
         ? const Color(0xFFFEE2E2)
-        : (isGateMovement
-            ? const Color(0xFFE0F2FE)
-            : (isCoaching
-                ? const Color(0xFFF5F3FF)
-                : (isRoster
-                    ? const Color(0xFFF3E8FF)
-                    : (isPicTag
-                        ? const Color(0xFFEFF6FF)
-                        : (isPjaTag
-                            ? (isInspection ? const Color(0xFFF0FDF4) : const Color(0xFFFFF7ED))
-                            : (isHazard
-                                ? const Color(0xFFFFF3E0)
-                                : (isInspection
-                                    ? const Color(0xFFE1F5FE)
-                                    : const Color(0xFFE0F2F1))))))));
+        : (isApproval
+            ? const Color(0xFFCCFBF1)
+            : (isViolation
+                ? const Color(0xFFFEE2E2)
+                : (isGateMovement
+                    ? const Color(0xFFE0F2FE)
+                    : (isCoaching
+                        ? const Color(0xFFF5F3FF)
+                        : (isRoster
+                            ? const Color(0xFFF3E8FF)
+                            : (isPicTag
+                                ? const Color(0xFFEFF6FF)
+                                : (isPjaTag
+                                    ? (isInspection ? const Color(0xFFF0FDF4) : const Color(0xFFFFF7ED))
+                                    : (isHazard
+                                        ? const Color(0xFFFFF3E0)
+                                        : (isInspection
+                                            ? const Color(0xFFE1F5FE)
+                                            : const Color(0xFFE0F2F1))))))))));
 
     final statusInt = (item['status'] as int?) ?? (isCoaching ? -1 : 0);
     final String statusText = (statusInt >= 0 && statusInt < globals.status.length)
@@ -1096,7 +1253,11 @@ class _NotifPageState extends State<NotifPage> {
     final locName = titleCase(item['location_name']?.toString() ?? '-');
 
     String moduleBadge;
-    if (isViolation) {
+    if (isSpecialPermit) {
+      moduleBadge = 'SPECIAL PERMIT';
+    } else if (isApproval) {
+      moduleBadge = 'APPROVAL CENTER';
+    } else if (isViolation) {
       moduleBadge = 'PELANGGARAN K3';
     } else if (isGateMovement) {
       moduleBadge = 'AKSES GERBANG';
@@ -1159,23 +1320,27 @@ class _NotifPageState extends State<NotifPage> {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Icon(
-                            isViolation
-                                ? Icons.gavel_rounded
-                                : (isGateMovement
-                                    ? Icons.meeting_room_rounded
-                                    : (isCoaching
-                                        ? Icons.psychology_outlined
-                                        : (isRoster
-                                            ? (item['notif_type']?.toString().contains('tugas') == true
-                                                ? Icons.flight_takeoff_rounded
-                                                : Icons.calendar_month_rounded)
-                                            : (isPicTag
-                                                ? Icons.assignment_ind_rounded
-                                                : (isPjaTag
-                                                    ? Icons.shield_rounded
-                                                    : (isHazard
-                                                        ? Icons.warning_amber_rounded
-                                                        : Icons.fact_check_outlined)))))),
+                            isSpecialPermit
+                                ? Icons.warning_amber_rounded
+                                : (isApproval
+                                    ? Icons.approval_rounded
+                                    : (isViolation
+                                        ? Icons.gavel_rounded
+                                        : (isGateMovement
+                                            ? Icons.meeting_room_rounded
+                                            : (isCoaching
+                                                ? Icons.psychology_outlined
+                                                : (isRoster
+                                                    ? (item['notif_type']?.toString().contains('tugas') == true
+                                                        ? Icons.flight_takeoff_rounded
+                                                        : Icons.calendar_month_rounded)
+                                                    : (isPicTag
+                                                        ? Icons.assignment_ind_rounded
+                                                        : (isPjaTag
+                                                            ? Icons.shield_rounded
+                                                            : (isHazard
+                                                                ? Icons.warning_amber_rounded
+                                                                : Icons.fact_check_outlined)))))))),
                             size: 13,
                             color: primaryTheme,
                           ),
@@ -1424,7 +1589,45 @@ class _NotifPageState extends State<NotifPage> {
                         ),
                       ),
                       const Spacer(),
-                      if (item['is_server_notif'] == true &&
+                      if (isApproval) ...[
+                        ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF0D9488),
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            minimumSize: const Size(64, 28),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          ),
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (_) => const ApprovalCenterPage()),
+                            ).then((_) => _getData());
+                          },
+                          icon: const Icon(Icons.check_circle_outline_rounded, size: 13),
+                          label: const Text('Tinjau Persetujuan', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                        ),
+                      ] else if (isSpecialPermit) ...[
+                        ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFFDC2626),
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            minimumSize: const Size(64, 28),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          ),
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (_) => const SpecialPermitListPage()),
+                            ).then((_) => _getData());
+                          },
+                          icon: const Icon(Icons.assignment_turned_in_rounded, size: 13),
+                          label: const Text('Inspeksi Lapangan', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                        ),
+                      ] else if (item['is_server_notif'] == true &&
                           (item['notif_type'] == 'hazard_assigned' || item['notif_type'] == 'hazard_new' || item['notif_type'] == 'hazard_reassigned') &&
                           item['is_actioned'] != true) ...[
                         ElevatedButton.icon(

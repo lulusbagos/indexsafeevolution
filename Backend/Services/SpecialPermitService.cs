@@ -484,13 +484,15 @@ namespace Indexsafe.Api.Services
                     FROM public.special_permit sp
                     WHERE (
                         TRIM(sp.pjo_nik) = @nikClean OR TRIM(sp.pjo_nik) = @nikTrimmed OR
-                        TRIM(sp.inspector_nik) = @nikClean OR TRIM(sp.inspector_nik) = @nikTrimmed
+                        TRIM(sp.inspector_nik) = @nikClean OR TRIM(sp.inspector_nik) = @nikTrimmed OR
+                        EXISTS (
+                            SELECT 1 FROM public.tb_user u
+                            LEFT JOIN public.tb_role r ON u.role_id = r.id
+                            WHERE (TRIM(u.employee_id) = @nikClean OR TRIM(u.username) = @nikClean)
+                              AND (UPPER(r.name) LIKE '%HSE%' OR UPPER(r.name) LIKE '%VERIFICATOR%' OR UPPER(r.name) LIKE '%GM%' OR UPPER(r.name) LIKE '%MANAGER%' OR UPPER(r.name) LIKE '%ADMIN%')
+                        )
                     )
-                    AND sp.status IN ('WAITING', 'APPROVED')
-                    AND (
-                        sp.start_date::date <= CURRENT_DATE AND (sp.end_date IS NULL OR sp.end_date::date >= CURRENT_DATE)
-                        OR sp.created_at::date >= CURRENT_DATE - INTERVAL '3 days'
-                    )
+                    AND UPPER(sp.status) IN ('WAITING', 'APPROVED')
                     AND NOT EXISTS (
                         SELECT 1 FROM public.tbl_m_folloup_special_permit f
                         WHERE (f.special_permit_id = sp.id OR f.req_id = sp.req_id)
