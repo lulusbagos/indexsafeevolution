@@ -21,14 +21,14 @@ var builder = WebApplication.CreateBuilder(new WebApplicationOptions
 
 // Configure Kestrel to listen on 0.0.0.0 and port 7071 (or from config)
 var configuredUrl = builder.Configuration["Urls"];
-int port = 7071;
+int port = 7302;
 if (!string.IsNullOrEmpty(configuredUrl) && Uri.TryCreate(configuredUrl.Split(';')[0], UriKind.Absolute, out var parsedUri))
 {
     port = parsedUri.Port;
 }
 else if (builder.Environment.IsDevelopment())
 {
-    port = 5200;
+    port = 7302;
 }
 
 builder.WebHost.ConfigureKestrel(serverOptions =>

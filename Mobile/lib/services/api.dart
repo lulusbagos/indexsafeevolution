@@ -15,18 +15,18 @@ import 'database.dart';
 import 'preference.dart';
 
 class ApiService {
-  // Hotspot Tethering Laptop = http://192.168.137.1:5200
-  // Wi-Fi Kantor / LAN = http://192.168.130.236:5200
-  // USB ADB Reverse = http://127.0.0.1:5200
+  // Hotspot Tethering Laptop = http://192.168.137.1:7302
+  // Wi-Fi Kantor / LAN = http://192.168.130.236:7302
+  // USB ADB Reverse = http://127.0.0.1:7302
   // PROD = https://indexsafeevolution.indexim.id
   static const List<String> _candidateUrls = [
-    'http://127.0.0.1:5200',
-    'http://192.168.137.1:5200',
-    'http://192.168.130.236:5200',
+    'http://127.0.0.1:7302',
+    'http://192.168.137.1:7302',
+    'http://192.168.130.236:7302',
   ];
   static String _activeBaseUrl = const String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'http://127.0.0.1:5200',
+    defaultValue: 'http://127.0.0.1:7302',
   );
   String get baseUrl => _activeBaseUrl;
 
@@ -256,7 +256,7 @@ class ApiService {
             dioErr.type == DioExceptionType.receiveTimeout ||
             dioErr.type == DioExceptionType.unknown) {
           final fallbackHost =
-              baseUrl.contains('192.168.') ? 'http://127.0.0.1:5200' : baseUrl;
+              baseUrl.contains('192.168.') ? 'http://127.0.0.1:7302' : baseUrl;
           final fallbackDio = Dio(BaseOptions(
             baseUrl: '$fallbackHost/api',
             headers: dio.options.headers,
@@ -305,7 +305,7 @@ class ApiService {
             dioErr.type == DioExceptionType.connectionError ||
             dioErr.type == DioExceptionType.unknown) {
           final fallbackHost =
-              baseUrl.contains('192.168.') ? 'http://127.0.0.1:5200' : baseUrl;
+              baseUrl.contains('192.168.') ? 'http://127.0.0.1:7302' : baseUrl;
           final fallbackDio = Dio(BaseOptions(
             baseUrl: '$fallbackHost/api',
             headers: dio.options.headers,
@@ -636,7 +636,7 @@ class ApiService {
             dioErr.type == DioExceptionType.connectionError ||
             dioErr.response?.statusCode == 404) {
           final fallbackHost =
-              baseUrl.contains('192.168.') ? 'http://127.0.0.1:5200' : baseUrl;
+              baseUrl.contains('192.168.') ? 'http://127.0.0.1:7302' : baseUrl;
           final fallbackDio = Dio(BaseOptions(
             baseUrl: '$fallbackHost/api',
             headers: dio.options.headers,
@@ -676,7 +676,7 @@ class ApiService {
             dioErr.type == DioExceptionType.connectionError ||
             dioErr.response?.statusCode == 404) {
           final fallbackHost =
-              baseUrl.contains('192.168.') ? 'http://127.0.0.1:5200' : baseUrl;
+              baseUrl.contains('192.168.') ? 'http://127.0.0.1:7302' : baseUrl;
           final fallbackDio = Dio(BaseOptions(
             baseUrl: '$fallbackHost/api',
             headers: dio.options.headers,
@@ -713,7 +713,7 @@ class ApiService {
             dioErr.type == DioExceptionType.connectionError ||
             dioErr.response?.statusCode == 404) {
           final fallbackHost =
-              baseUrl.contains('192.168.') ? 'http://127.0.0.1:5200' : baseUrl;
+              baseUrl.contains('192.168.') ? 'http://127.0.0.1:7302' : baseUrl;
           final fallbackDio = Dio(BaseOptions(
             baseUrl: '$fallbackHost/api',
             headers: dio.options.headers,
@@ -752,7 +752,7 @@ class ApiService {
             dioErr.type == DioExceptionType.connectionError ||
             dioErr.response?.statusCode == 404) {
           final fallbackHost =
-              baseUrl.contains('192.168.') ? 'http://127.0.0.1:5200' : baseUrl;
+              baseUrl.contains('192.168.') ? 'http://127.0.0.1:7302' : baseUrl;
           final fallbackDio = Dio(BaseOptions(
             baseUrl: '$fallbackHost/api',
             headers: dio.options.headers,
@@ -851,7 +851,7 @@ class ApiService {
             dioErr.type == DioExceptionType.unknown ||
             dioErr.response?.statusCode == 404) {
           final fallbackHost =
-              baseUrl.contains('192.168.') ? 'http://127.0.0.1:5200' : baseUrl;
+              baseUrl.contains('192.168.') ? 'http://127.0.0.1:7302' : baseUrl;
           final fallbackDio = Dio(BaseOptions(
             baseUrl: fallbackHost,
             headers: dio.options.headers,
@@ -894,7 +894,7 @@ class ApiService {
             dioErr.type == DioExceptionType.unknown ||
             dioErr.response?.statusCode == 404) {
           final fallbackHost = baseUrl.contains('192.168.')
-              ? 'http://127.0.0.1:5200'
+              ? 'http://127.0.0.1:7302'
               : baseUrl;
           final fallbackDio = Dio(BaseOptions(
             baseUrl: '$fallbackHost/api',
@@ -943,7 +943,7 @@ class ApiService {
             dioErr.type == DioExceptionType.unknown ||
             dioErr.response?.statusCode == 404) {
           final fallbackHost = baseUrl.contains('192.168.')
-              ? 'http://127.0.0.1:5200'
+              ? 'http://127.0.0.1:7302'
               : baseUrl;
           final fallbackDio = Dio(BaseOptions(
             baseUrl: '$fallbackHost/api',
@@ -994,7 +994,7 @@ class ApiService {
             dioErr.type == DioExceptionType.unknown ||
             dioErr.response?.statusCode == 404) {
           final fallbackHost = baseUrl.contains('192.168.')
-              ? 'http://127.0.0.1:5200'
+              ? 'http://127.0.0.1:7302'
               : baseUrl;
           final fallbackDio = Dio(BaseOptions(
             baseUrl: '$fallbackHost/api',
@@ -1066,7 +1066,7 @@ class ApiService {
             dioErr.type == DioExceptionType.unknown ||
             dioErr.response?.statusCode == 404) {
           final fallbackHost = baseUrl.contains('192.168.')
-              ? 'http://127.0.0.1:5200'
+              ? 'http://127.0.0.1:7302'
               : baseUrl;
           final fallbackDio = Dio(BaseOptions(
             baseUrl: '$fallbackHost/api',
@@ -1132,7 +1132,7 @@ class ApiService {
             dioErr.type == DioExceptionType.unknown ||
             dioErr.response?.statusCode == 404) {
           final fallbackHost =
-              baseUrl.contains('192.168.') ? 'http://127.0.0.1:5200' : baseUrl;
+              baseUrl.contains('192.168.') ? 'http://127.0.0.1:7302' : baseUrl;
           final fallbackDio = Dio(BaseOptions(
             baseUrl: fallbackHost,
             headers: dio.options.headers,
@@ -1174,7 +1174,7 @@ class ApiService {
             dioErr.type == DioExceptionType.unknown ||
             dioErr.response?.statusCode == 404) {
           final fallbackHost = baseUrl.contains('192.168.')
-              ? 'http://127.0.0.1:5200/api'
+              ? 'http://127.0.0.1:7302/api'
               : '$baseUrl/api';
           final fallbackDio = Dio(BaseOptions(
             baseUrl: fallbackHost,
@@ -1229,7 +1229,7 @@ class ApiService {
             dioErr.type == DioExceptionType.unknown ||
             dioErr.response?.statusCode == 404) {
           final fallbackHost = baseUrl.contains('192.168.')
-              ? 'http://127.0.0.1:5200/api'
+              ? 'http://127.0.0.1:7302/api'
               : '$baseUrl/api';
           final fallbackDio = Dio(BaseOptions(
             baseUrl: fallbackHost,
@@ -1288,7 +1288,7 @@ class ApiService {
             dioErr.type == DioExceptionType.unknown ||
             dioErr.response?.statusCode == 404) {
           final fallbackHost = baseUrl.contains('192.168.')
-              ? 'http://127.0.0.1:5200/api'
+              ? 'http://127.0.0.1:7302/api'
               : '$baseUrl/api';
           final fallbackDio = Dio(BaseOptions(
             baseUrl: fallbackHost,
@@ -1338,7 +1338,7 @@ class ApiService {
             dioErr.type == DioExceptionType.unknown ||
             dioErr.response?.statusCode == 404) {
           final fallbackHost = baseUrl.contains('192.168.')
-              ? 'http://127.0.0.1:5200/api'
+              ? 'http://127.0.0.1:7302/api'
               : '$baseUrl/api';
           final fallbackDio = Dio(BaseOptions(
             baseUrl: fallbackHost,
@@ -1376,7 +1376,7 @@ class ApiService {
             dioErr.type == DioExceptionType.unknown ||
             dioErr.response?.statusCode == 404) {
           final fallbackHost = baseUrl.contains('192.168.')
-              ? 'http://127.0.0.1:5200/api'
+              ? 'http://127.0.0.1:7302/api'
               : '$baseUrl/api';
           final fallbackDio = Dio(BaseOptions(
             baseUrl: fallbackHost,
@@ -1418,7 +1418,7 @@ class ApiService {
             dioErr.type == DioExceptionType.unknown ||
             dioErr.response?.statusCode == 404) {
           final fallbackHost = baseUrl.contains('192.168.')
-              ? 'http://127.0.0.1:5200/api'
+              ? 'http://127.0.0.1:7302/api'
               : '$baseUrl/api';
           final fallbackDio = Dio(BaseOptions(
             baseUrl: fallbackHost,
@@ -1496,7 +1496,7 @@ class ApiService {
             dioErr.type == DioExceptionType.unknown ||
             dioErr.response?.statusCode == 404) {
           final fallbackHost = baseUrl.contains('192.168.')
-              ? 'http://127.0.0.1:5200/api'
+              ? 'http://127.0.0.1:7302/api'
               : '$baseUrl/api';
           final fallbackDio = Dio(BaseOptions(
             baseUrl: fallbackHost,
@@ -1540,7 +1540,7 @@ class ApiService {
             dioErr.type == DioExceptionType.unknown ||
             dioErr.response?.statusCode == 404) {
           final fallbackHost = baseUrl.contains('192.168.')
-              ? 'http://127.0.0.1:5200/api'
+              ? 'http://127.0.0.1:7302/api'
               : '$baseUrl/api';
           final fallbackDio = Dio(BaseOptions(
             baseUrl: fallbackHost,
@@ -3102,9 +3102,9 @@ class ApiService {
   }) async {
     final cleanPath = path.startsWith('/') ? path : '/$path';
     final List<String> targets = [
-      'http://127.0.0.1:5200/api$cleanPath',
-      'http://192.168.130.236:5200/api$cleanPath',
-      'http://192.168.137.1:5200/api$cleanPath',
+      'http://127.0.0.1:7302/api$cleanPath',
+      'http://192.168.130.236:7302/api$cleanPath',
+      'http://192.168.137.1:7302/api$cleanPath',
       '$baseUrl/api$cleanPath',
       '$baseUrl$cleanPath',
     ];
@@ -3263,9 +3263,9 @@ class ApiService {
   }) async {
     final cleanPath = path.startsWith('/') ? path : '/$path';
     final List<String> targets = [
-      'http://127.0.0.1:5200/api$cleanPath',
-      'http://192.168.130.236:5200/api$cleanPath',
-      'http://192.168.137.1:5200/api$cleanPath',
+      'http://127.0.0.1:7302/api$cleanPath',
+      'http://192.168.130.236:7302/api$cleanPath',
+      'http://192.168.137.1:7302/api$cleanPath',
       '$baseUrl/api$cleanPath',
       '$baseUrl$cleanPath',
     ];
@@ -3409,9 +3409,9 @@ class ApiService {
   }) async {
     final cleanPath = path.startsWith('/') ? path : '/$path';
     final List<String> targets = [
-      'http://127.0.0.1:5200/api$cleanPath',
-      'http://192.168.130.236:5200/api$cleanPath',
-      'http://192.168.137.1:5200/api$cleanPath',
+      'http://127.0.0.1:7302/api$cleanPath',
+      'http://192.168.130.236:7302/api$cleanPath',
+      'http://192.168.137.1:7302/api$cleanPath',
       '$baseUrl/api$cleanPath',
       '$baseUrl$cleanPath',
     ];
@@ -3639,12 +3639,12 @@ class ApiService {
   }) async {
     final cleanPath = path.startsWith('/') ? path : '/$path';
     final List<String> targets = [
-      'http://127.0.0.1:5200/api$cleanPath',
-      'http://127.0.0.1:5200$cleanPath',
-      'http://192.168.130.236:5200/api$cleanPath',
-      'http://192.168.130.236:5200$cleanPath',
-      'http://192.168.137.1:5200/api$cleanPath',
-      'http://192.168.137.1:5200$cleanPath',
+      'http://127.0.0.1:7302/api$cleanPath',
+      'http://127.0.0.1:7302$cleanPath',
+      'http://192.168.130.236:7302/api$cleanPath',
+      'http://192.168.130.236:7302$cleanPath',
+      'http://192.168.137.1:7302/api$cleanPath',
+      'http://192.168.137.1:7302$cleanPath',
       '$baseUrl/api$cleanPath',
       '$baseUrl$cleanPath',
     ];

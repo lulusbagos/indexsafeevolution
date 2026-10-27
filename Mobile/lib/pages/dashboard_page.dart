@@ -4269,7 +4269,7 @@ String buildHazardMapHtml({
   String mapMode = 'heatmap',
   Position? userPosition,
   List<MapHazardItem> hazards = const [],
-  String baseUrl = 'http://127.0.0.1:5200',
+  String baseUrl = 'http://127.0.0.1:7302',
 }) {
   final hasUserPos = userPosition != null;
   final userLat = userPosition?.latitude ?? 1.2057;
