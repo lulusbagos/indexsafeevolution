@@ -42,7 +42,7 @@ namespace Indexsafe.Api.Models
         public string? NomorUnit { get; set; }
 
         [Column("jumlah_penumpang")]
-        public int JumlahPenumpang { get; set; } = 0;
+        public int? JumlahPenumpang { get; set; } = 0;
 
         [Required]
         [MaxLength(500)]

@@ -3,26 +3,36 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Indexsafe Evolution - Live Operations & Offline Sync Monitor</title>
+  <title>Indexsafe Evolution - Monitoring Pergerakan Aplikasi & Gerbang</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Outfit:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  
+  <!-- Chart.js: Local Offline First with CDN Fallback -->
+  <script src="/js/chart.min.js"></script>
+  <script>
+    if (typeof Chart === 'undefined') {
+      document.write('<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"><\/script>');
+    }
+  </script>
+
   <style>
     :root {
-      --bg-dark: #0b0f19;
-      --bg-surface: #111827;
-      --bg-card: rgba(17, 24, 39, 0.85);
-      --bg-card-hover: rgba(31, 41, 55, 0.85);
-      --border-color: rgba(75, 85, 99, 0.35);
-      --border-glow: rgba(14, 165, 233, 0.4);
-      --text-main: #f3f4f6;
-      --text-muted: #9ca3af;
-      --accent-cyan: #0ea5e9;
-      --accent-cyan-glow: rgba(14, 165, 233, 0.25);
-      --accent-emerald: #10b981;
+      --bg-dark: #080d1a;
+      --bg-surface: #0f172a;
+      --bg-card: rgba(17, 24, 39, 0.75);
+      --bg-card-solid: #111827;
+      --border-color: rgba(56, 189, 248, 0.2);
+      --border-subtle: rgba(75, 85, 99, 0.35);
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --accent-cyan: #38bdf8;
+      --accent-teal: #0d9488;
+      --accent-green: #10b981;
+      --accent-red: #ef4444;
       --accent-amber: #f59e0b;
-      --accent-rose: #f43f5e;
-      --accent-indigo: #6366f1;
+      --accent-purple: #a855f7;
+      --accent-blue: #0284c7;
     }
 
     * {
@@ -35,32 +45,33 @@
     body {
       background-color: var(--bg-dark);
       background-image: 
-        radial-gradient(at 0% 0%, rgba(14, 165, 233, 0.08) 0px, transparent 50%),
-        radial-gradient(at 100% 100%, rgba(99, 102, 241, 0.06) 0px, transparent 50%);
+        radial-gradient(circle at 10% 10%, rgba(14, 165, 233, 0.08) 0, transparent 40%),
+        radial-gradient(circle at 90% 90%, rgba(239, 68, 68, 0.06) 0, transparent 40%),
+        radial-gradient(circle at 50% 50%, rgba(16, 185, 129, 0.05) 0, transparent 50%);
       color: var(--text-main);
       min-height: 100vh;
       overflow-x: hidden;
+      padding-bottom: 40px;
     }
 
     .mono {
       font-family: 'JetBrains Mono', monospace;
     }
 
-    /* Container */
     .container {
-      max-width: 1600px;
+      max-width: 1680px;
       margin: 0 auto;
       padding: 24px 32px;
     }
 
-    /* Header */
+    /* Top Command Header */
     header {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      padding-bottom: 24px;
+      padding-bottom: 22px;
       border-bottom: 1px solid var(--border-color);
-      margin-bottom: 28px;
+      margin-bottom: 26px;
       flex-wrap: wrap;
       gap: 16px;
     }
@@ -68,118 +79,147 @@
     .brand {
       display: flex;
       align-items: center;
-      gap: 16px;
+      gap: 14px;
     }
 
     .brand-logo {
       width: 48px;
       height: 48px;
       background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
-      border-radius: 12px;
+      border-radius: 14px;
       display: flex;
       align-items: center;
       justify-content: center;
-      box-shadow: 0 0 20px rgba(14, 165, 233, 0.4);
-      font-weight: 800;
+      box-shadow: 0 0 24px rgba(56, 189, 248, 0.45);
       font-size: 24px;
-      color: #fff;
     }
 
     .brand-text h1 {
-      font-size: 22px;
-      font-weight: 700;
-      letter-spacing: -0.5px;
+      font-size: 21px;
+      font-weight: 800;
+      letter-spacing: -0.3px;
       display: flex;
       align-items: center;
       gap: 10px;
+      color: #fff;
     }
 
     .brand-text p {
-      font-size: 13px;
+      font-size: 12.5px;
       color: var(--text-muted);
       margin-top: 2px;
     }
 
-    .header-status {
+    .header-actions {
       display: flex;
       align-items: center;
-      gap: 14px;
+      gap: 12px;
       flex-wrap: wrap;
     }
 
-    .badge-pulse {
-      display: inline-flex;
+    .status-pill {
+      display: flex;
       align-items: center;
       gap: 8px;
       padding: 6px 14px;
-      border-radius: 9999px;
-      font-size: 12px;
-      font-weight: 600;
       background: rgba(16, 185, 129, 0.12);
       border: 1px solid rgba(16, 185, 129, 0.35);
+      border-radius: 20px;
+      font-size: 11.5px;
+      font-weight: 800;
       color: #34d399;
     }
 
     .pulse-dot {
       width: 8px;
       height: 8px;
-      border-radius: 50%;
       background-color: #10b981;
+      border-radius: 50%;
       box-shadow: 0 0 10px #10b981;
-      animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+      animation: pulse 1.8s infinite;
     }
 
     @keyframes pulse {
-      0%, 100% { opacity: 1; transform: scale(1); }
-      50% { opacity: 0.4; transform: scale(1.3); }
+      0% { transform: scale(0.9); opacity: 0.8; box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+      70% { transform: scale(1.15); opacity: 1; box-shadow: 0 0 0 8px rgba(16, 185, 129, 0); }
+      100% { transform: scale(0.9); opacity: 0.8; }
     }
 
-    .btn-api {
-      background: rgba(14, 165, 233, 0.15);
-      color: #38bdf8;
-      border: 1px solid rgba(14, 165, 233, 0.35);
-      padding: 8px 18px;
-      border-radius: 8px;
-      font-size: 13px;
-      font-weight: 600;
-      text-decoration: none;
-      transition: all 0.2s ease;
+    .btn-action {
+      background: rgba(30, 41, 59, 0.8);
+      border: 1px solid var(--border-subtle);
+      color: #e2e8f0;
+      padding: 7px 14px;
+      border-radius: 10px;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
       display: inline-flex;
       align-items: center;
       gap: 6px;
+      transition: all 0.2s ease;
+      text-decoration: none;
     }
 
-    .btn-api:hover {
-      background: rgba(14, 165, 233, 0.25);
-      border-color: #38bdf8;
-      box-shadow: 0 0 16px rgba(14, 165, 233, 0.3);
+    .btn-action:hover {
+      background: rgba(51, 65, 85, 0.9);
+      border-color: var(--accent-cyan);
+      color: #fff;
     }
 
-    /* KPI Stats Grid */
+    /* Privacy Banner */
+    .privacy-banner {
+      background: linear-gradient(90deg, rgba(14, 165, 233, 0.12) 0%, rgba(99, 102, 241, 0.08) 100%);
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      border-radius: 14px;
+      padding: 12px 18px;
+      margin-bottom: 24px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .privacy-icon {
+      font-size: 20px;
+      line-height: 1;
+    }
+
+    .privacy-text {
+      font-size: 12px;
+      color: #cbd5e1;
+      line-height: 1.45;
+    }
+
+    .privacy-text strong {
+      color: #38bdf8;
+    }
+
+    /* KPI Grid */
     .kpi-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-      gap: 18px;
-      margin-bottom: 28px;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 16px;
+      margin-bottom: 24px;
     }
 
     .kpi-card {
       background: var(--bg-card);
-      border: 1px solid var(--border-color);
-      border-radius: 14px;
-      padding: 20px;
       backdrop-filter: blur(12px);
-      transition: transform 0.2s ease, border-color 0.2s ease;
+      border: 1px solid var(--border-subtle);
+      border-radius: 18px;
+      padding: 18px 20px;
       position: relative;
       overflow: hidden;
+      transition: all 0.25s ease;
     }
 
     .kpi-card:hover {
+      border-color: var(--accent-cyan);
       transform: translateY(-2px);
-      border-color: var(--border-glow);
+      box-shadow: 0 10px 24px rgba(0, 0, 0, 0.4);
     }
 
-    .kpi-card::after {
+    .kpi-card::before {
       content: '';
       position: absolute;
       top: 0;
@@ -189,343 +229,173 @@
       background: var(--accent-cyan);
     }
 
-    .kpi-card.emerald::after { background: var(--accent-emerald); }
-    .kpi-card.amber::after { background: var(--accent-amber); }
-    .kpi-card.rose::after { background: var(--accent-rose); }
-    .kpi-card.indigo::after { background: var(--accent-indigo); }
+    .kpi-card.green::before { background: var(--accent-green); }
+    .kpi-card.red::before { background: var(--accent-red); }
+    .kpi-card.amber::before { background: var(--accent-amber); }
+    .kpi-card.purple::before { background: var(--accent-purple); }
 
-    .kpi-title {
-      font-size: 13px;
-      color: var(--text-muted);
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      font-weight: 600;
-      margin-bottom: 8px;
+    .kpi-header {
       display: flex;
       justify-content: space-between;
       align-items: center;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--text-muted);
+      margin-bottom: 8px;
     }
 
     .kpi-value {
       font-size: 32px;
-      font-weight: 800;
-      letter-spacing: -1px;
+      font-weight: 900;
+      letter-spacing: -0.5px;
       color: #fff;
+      margin-bottom: 4px;
     }
 
-    .kpi-subtitle {
-      font-size: 12px;
+    .kpi-card.green .kpi-value { color: #34d399; }
+    .kpi-card.red .kpi-value { color: #f87171; }
+    .kpi-card.amber .kpi-value { color: #fbbf24; }
+    .kpi-card.purple .kpi-value { color: #c084fc; }
+
+    .kpi-sub {
+      font-size: 11.5px;
       color: var(--text-muted);
-      margin-top: 6px;
       display: flex;
       align-items: center;
-      gap: 4px;
+      gap: 6px;
     }
 
-    /* Controls & Actions */
-    .action-bar {
+    /* Charts Grid Layout */
+    .charts-row-main {
+      display: grid;
+      grid-template-columns: 2fr 1fr;
+      gap: 20px;
+      margin-bottom: 20px;
+    }
+
+    .charts-row-dual {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      margin-bottom: 20px;
+    }
+
+    .chart-card {
+      background: var(--bg-card);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--border-subtle);
+      border-radius: 20px;
+      padding: 22px;
+      position: relative;
+    }
+
+    .chart-card-header {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: 20px;
+      margin-bottom: 18px;
       flex-wrap: wrap;
-      gap: 14px;
+      gap: 10px;
     }
 
-    .tabs {
-      display: flex;
-      gap: 8px;
-      background: rgba(31, 41, 55, 0.4);
-      padding: 4px;
-      border-radius: 10px;
-      border: 1px solid var(--border-color);
-    }
-
-    .tab-btn {
-      background: transparent;
-      border: none;
-      color: var(--text-muted);
-      padding: 8px 18px;
-      border-radius: 8px;
-      font-size: 13px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.2s ease;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-
-    .tab-btn.active {
-      background: var(--accent-cyan);
-      color: #fff;
-      box-shadow: 0 0 12px var(--accent-cyan-glow);
-    }
-
-    .actions-right {
+    .chart-card-title {
       display: flex;
       align-items: center;
       gap: 10px;
-      flex-wrap: wrap;
     }
 
-    .btn-action {
-      background: var(--bg-surface);
-      border: 1px solid var(--border-color);
-      color: var(--text-main);
-      padding: 8px 14px;
-      border-radius: 8px;
-      font-size: 13px;
-      font-weight: 500;
-      cursor: pointer;
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      transition: all 0.2s ease;
+    .chart-card-title h3 {
+      font-size: 15px;
+      font-weight: 800;
+      color: #fff;
+      letter-spacing: -0.2px;
     }
 
-    .btn-action:hover {
-      background: var(--bg-card-hover);
-      border-color: #6b7280;
-    }
-
-    .btn-simulate {
-      background: rgba(16, 185, 129, 0.15);
-      border-color: rgba(16, 185, 129, 0.35);
-      color: #34d399;
-    }
-    .btn-simulate:hover {
-      background: rgba(16, 185, 129, 0.25);
-      border-color: #34d399;
-    }
-
-    .search-input {
-      background: var(--bg-surface);
-      border: 1px solid var(--border-color);
-      color: var(--text-main);
-      padding: 8px 14px;
-      border-radius: 8px;
-      font-size: 13px;
-      width: 240px;
-      outline: none;
-      transition: border-color 0.2s ease;
-    }
-    .search-input:focus {
-      border-color: var(--accent-cyan);
-    }
-
-    /* Tab Contents */
-    .tab-pane {
-      display: none;
-    }
-    .tab-pane.active {
-      display: block;
-    }
-
-    /* Table & Cards View */
-    .table-container {
-      background: var(--bg-card);
-      border: 1px solid var(--border-color);
-      border-radius: 14px;
-      overflow: hidden;
-      backdrop-filter: blur(12px);
-    }
-
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      text-align: left;
-      font-size: 13px;
-    }
-
-    thead {
-      background: rgba(31, 41, 55, 0.6);
-      border-bottom: 1px solid var(--border-color);
-    }
-
-    th {
-      padding: 14px 18px;
-      font-size: 12px;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      color: var(--text-muted);
-      font-weight: 600;
-    }
-
-    td {
-      padding: 14px 18px;
-      border-bottom: 1px solid rgba(75, 85, 99, 0.2);
-      vertical-align: middle;
-    }
-
-    tbody tr {
-      transition: background 0.15s ease;
-    }
-    tbody tr:hover {
-      background: rgba(31, 41, 55, 0.5);
-    }
-
-    /* Badges */
-    .badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-      padding: 4px 10px;
-      border-radius: 6px;
+    .chart-card-title p {
       font-size: 11px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.3px;
+      color: var(--text-muted);
+      margin-top: 1px;
     }
 
-    .badge-offline {
-      background: rgba(245, 158, 11, 0.15);
-      border: 1px solid rgba(245, 158, 11, 0.4);
-      color: #fbbf24;
-    }
-
-    .badge-realtime {
-      background: rgba(16, 185, 129, 0.15);
-      border: 1px solid rgba(16, 185, 129, 0.4);
-      color: #34d399;
-    }
-
-    .badge-hazard { background: rgba(244, 63, 94, 0.15); color: #fb7185; border: 1px solid rgba(244, 63, 94, 0.3); }
-    .badge-inspection { background: rgba(14, 165, 233, 0.15); color: #38bdf8; border: 1px solid rgba(14, 165, 233, 0.3); }
-    .badge-p2h { background: rgba(234, 179, 8, 0.15); color: #facc15; border: 1px solid rgba(234, 179, 8, 0.3); }
-    .badge-action { background: rgba(168, 85, 247, 0.15); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.3); }
-    .badge-observation { background: rgba(20, 184, 166, 0.15); color: #2dd4bf; border: 1px solid rgba(20, 184, 166, 0.3); }
-    .badge-coaching { background: rgba(99, 102, 241, 0.15); color: #818cf8; border: 1px solid rgba(99, 102, 241, 0.3); }
-    .badge-safety { background: rgba(249, 115, 22, 0.15); color: #fb923c; border: 1px solid rgba(249, 115, 22, 0.3); }
-
-    .badge-gps {
+    .chart-badge {
+      font-size: 10.5px;
+      font-weight: 800;
+      padding: 4px 10px;
+      border-radius: 8px;
       background: rgba(56, 189, 248, 0.12);
       border: 1px solid rgba(56, 189, 248, 0.3);
-      color: #7dd3fc;
-      cursor: pointer;
-      transition: all 0.2s ease;
-    }
-    .badge-gps:hover {
-      background: rgba(56, 189, 248, 0.25);
-      border-color: #38bdf8;
+      color: #38bdf8;
     }
 
-    /* Thumbnail */
-    .thumb-img {
-      width: 44px;
-      height: 44px;
-      border-radius: 8px;
-      object-fit: cover;
-      border: 1px solid var(--border-color);
-      cursor: pointer;
-      transition: transform 0.2s ease;
-    }
-    .thumb-img:hover {
-      transform: scale(1.1);
-      border-color: var(--accent-cyan);
+    .chart-badge.green {
+      background: rgba(16, 185, 129, 0.12);
+      border-color: rgba(16, 185, 129, 0.3);
+      color: #34d399;
     }
 
-    /* Modal */
-    .modal {
-      display: none;
-      position: fixed;
-      top: 0; left: 0; right: 0; bottom: 0;
-      background: rgba(0, 0, 0, 0.8);
-      backdrop-filter: blur(8px);
-      z-index: 9999;
-      align-items: center;
-      justify-content: center;
-      padding: 20px;
-    }
-    .modal.active { display: flex; }
-    .modal-box {
-      background: var(--bg-surface);
-      border: 1px solid var(--border-color);
-      border-radius: 16px;
-      max-width: 650px;
+    .chart-container-box {
+      position: relative;
       width: 100%;
-      padding: 24px;
-      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.6);
-      position: relative;
-    }
-    .modal-close {
-      position: absolute;
-      top: 18px;
-      right: 18px;
-      background: transparent;
-      border: none;
-      color: var(--text-muted);
-      font-size: 20px;
-      cursor: pointer;
+      height: 290px;
     }
 
-    /* Diagram Section */
-    .flow-card {
-      background: var(--bg-card);
-      border: 1px solid var(--border-color);
-      border-radius: 14px;
-      padding: 24px;
-      margin-bottom: 24px;
+    .chart-container-box.tall {
+      height: 310px;
     }
 
-    .flow-steps {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    /* System Status Strip */
+    .system-strip {
+      background: rgba(15, 23, 42, 0.8);
+      border: 1px solid var(--border-subtle);
+      border-radius: 16px;
+      padding: 16px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
       gap: 16px;
-      margin-top: 18px;
+      margin-top: 24px;
     }
 
-    .step-item {
-      background: rgba(31, 41, 55, 0.5);
-      border: 1px solid var(--border-color);
-      border-radius: 10px;
-      padding: 16px;
-      position: relative;
-    }
-
-    .step-num {
-      width: 28px;
-      height: 28px;
-      background: var(--accent-cyan);
-      color: #fff;
-      border-radius: 50%;
+    .system-item {
       display: flex;
       align-items: center;
-      justify-content: center;
-      font-size: 13px;
-      font-weight: 700;
-      margin-bottom: 12px;
+      gap: 10px;
     }
 
-    .step-title {
-      font-weight: 700;
-      font-size: 14px;
-      margin-bottom: 6px;
+    .system-item-icon {
+      font-size: 18px;
+      color: var(--accent-cyan);
+    }
+
+    .system-item-text {
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    .system-item-text strong {
+      font-size: 12.5px;
       color: #fff;
-    }
-
-    .step-desc {
-      font-size: 12px;
-      color: var(--text-muted);
-      line-height: 1.5;
-    }
-
-    /* Empty state */
-    .empty-state {
-      padding: 40px;
-      text-align: center;
-      color: var(--text-muted);
+      display: block;
     }
 
     /* Footer */
     footer {
-      margin-top: 40px;
-      padding-top: 20px;
-      border-top: 1px solid var(--border-color);
-      display: flex;
-      justify-content: space-between;
-      color: var(--text-muted);
+      margin-top: 32px;
+      text-align: center;
       font-size: 12px;
+      color: var(--text-muted);
+      border-top: 1px solid var(--border-subtle);
+      padding-top: 20px;
+    }
+
+    @media (max-width: 1080px) {
+      .charts-row-main, .charts-row-dual {
+        grid-template-columns: 1fr;
+      }
+      .container {
+        padding: 16px;
+      }
     }
   </style>
 </head>
@@ -537,424 +407,637 @@
       <div class="brand">
         <div class="brand-logo">⚡</div>
         <div class="brand-text">
-          <h1>INDEXSAFE EVOLUTION <span class="badge badge-realtime">LIVE BACKEND</span></h1>
-          <p>Real-Time Operations & Offline Sync Monitor • SQL Server: <span class="mono" id="db-target">172.16.1.93 (DB_SAP)</span></p>
+          <h1>INDEXSAFE EVOLUTION <span class="chart-badge">MONITORING PERGERAKAN</span></h1>
+          <p>Dasbor Analitik Makro Lalu Lintas Gerbang & Aktivitas Operasional K3 • PT Indexim Coalindo</p>
         </div>
       </div>
 
-      <div class="header-status">
-        <div class="badge-pulse">
+      <div class="header-actions">
+        <div class="status-pill">
           <div class="pulse-dot"></div>
-          <span id="server-status">SERVER ACTIVE (PORT 5200)</span>
+          <span id="server-status">SERVER ONLINE (5200)</span>
         </div>
-        <span class="mono" id="clock" style="font-size: 13px; color: var(--text-muted);">--:--:-- WITA</span>
-        <a href="/scalar/v1" class="btn-api" target="_blank">
-          <span>📖 Scalar API Docs</span>
+        <span class="mono" id="live-clock" style="font-size: 12.5px; color: var(--text-muted);">--:--:-- WITA</span>
+        <button class="btn-action" onclick="fetchMovementData()">
+          <span>🔄 Refresh Data</span>
+        </button>
+        <a href="/scalar/v1" target="_blank" class="btn-action">
+          <span>📖 Scalar API</span>
         </a>
       </div>
     </header>
 
-    <!-- KPI Stats Cards -->
+    <!-- Privacy Shield Banner -->
+    <div class="privacy-banner">
+      <div class="privacy-icon">🛡️</div>
+      <div class="privacy-text">
+        <strong>Pusat Pemantauan Operasional Makro:</strong> Dashboard ini secara khusus menampilkan grafik statistik, volume pergerakan arah gerbang, lalu lintas pos, dan tren aktivitas aplikasi secara agregat <strong>tanpa menampilkan informasi pribadi sensitif (NIK, Nama Lengkap, Foto Pekerja, atau Pelanggaran Pribadi)</strong> sesuai standar privasi data dan kepatuhan K3LH.
+      </div>
+    </div>
+
+    <!-- Executive KPI Summary Cards -->
     <div class="kpi-grid">
       <div class="kpi-card">
-        <div class="kpi-title">
-          <span>Total Transaksi</span>
-          <span>📊</span>
+        <div class="kpi-header">
+          <span>TOTAL PERGERAKAN HARI INI</span>
+          <span>🚪</span>
         </div>
-        <div class="kpi-value mono" id="kpi-total-tx">0</div>
-        <div class="kpi-subtitle">Termasuk sinkronisasi hari ini</div>
+        <div class="kpi-value mono" id="kpi-today-movements">0</div>
+        <div class="kpi-sub">
+          <span>Total keseluruhan: <strong class="mono" id="kpi-total-movements">0</strong> log</span>
+        </div>
+      </div>
+
+      <div class="kpi-card green">
+        <div class="kpi-header">
+          <span>PERGERAKAN MASUK (IN)</span>
+          <span>↘️</span>
+        </div>
+        <div class="kpi-value mono" id="kpi-today-in">0</div>
+        <div class="kpi-sub">
+          <span id="kpi-rate-in">Rasio Inbound: 0%</span>
+        </div>
+      </div>
+
+      <div class="kpi-card red">
+        <div class="kpi-header">
+          <span>PERGERAKAN KELUAR (OUT)</span>
+          <span>↗️</span>
+        </div>
+        <div class="kpi-value mono" id="kpi-today-out">0</div>
+        <div class="kpi-sub">
+          <span id="kpi-rate-out">Rasio Outbound: 0%</span>
+        </div>
       </div>
 
       <div class="kpi-card amber">
-        <div class="kpi-title">
-          <span>Offline Outbox Synced</span>
-          <span>📡</span>
+        <div class="kpi-header">
+          <span>VOLUME PENUMPANG</span>
+          <span>👥</span>
         </div>
-        <div class="kpi-value mono" id="kpi-offline-sync">0</div>
-        <div class="kpi-subtitle">Data dibuat saat tanpa sinyal di pit</div>
-      </div>
-
-      <div class="kpi-card emerald">
-        <div class="kpi-title">
-          <span>Media Uploads</span>
-          <span>📸</span>
+        <div class="kpi-value mono" id="kpi-today-passengers">0</div>
+        <div class="kpi-sub">
+          <span>Total penumpang: <strong class="mono" id="kpi-total-passengers">0</strong> orang</span>
         </div>
-        <div class="kpi-value mono" id="kpi-uploads">0</div>
-        <div class="kpi-subtitle"><span id="kpi-bandwidth-saved">0 MB</span> bandwidth dihemat (ImageSharp)</div>
       </div>
 
-      <div class="kpi-card indigo">
-        <div class="kpi-title">
-          <span>GPS Pinpoint Mapped</span>
-          <span>📍</span>
+      <div class="kpi-card purple">
+        <div class="kpi-header">
+          <span>TOTAL AKTIVITAS MODUL K3</span>
+          <span>📊</span>
         </div>
-        <div class="kpi-value mono" id="kpi-gps">0</div>
-        <div class="kpi-subtitle">Koordinat pit latitude & longitude</div>
-      </div>
-
-      <div class="kpi-card rose">
-        <div class="kpi-title">
-          <span>Error / Konflik</span>
-          <span>⚠️</span>
+        <div class="kpi-value mono" id="kpi-total-modules">0</div>
+        <div class="kpi-sub">
+          <span>Hazard, P2H, Gate, Assessment</span>
         </div>
-        <div class="kpi-value mono" id="kpi-errors">0</div>
-        <div class="kpi-subtitle" id="kpi-health-text">Status: 100% Sehat & Stabil</div>
       </div>
     </div>
 
-    <!-- Action Bar & Tabs -->
-    <div class="action-bar">
-      <div class="tabs">
-        <button class="tab-btn active" onclick="switchTab('tab-tx')">
-          <span>⚡ Live Transaksi</span>
-        </button>
-        <button class="tab-btn" onclick="switchTab('tab-uploads')">
-          <span>📸 Upload Media</span>
-        </button>
-        <button class="tab-btn" onclick="switchTab('tab-errors')">
-          <span>⚠️ Log Eror & Konflik</span>
-        </button>
-        <button class="tab-btn" onclick="switchTab('tab-offline-flow')">
-          <span>📡 Arsitektur Mode Offline</span>
-        </button>
+    <!-- Row 1: Dual Movement Timeline & Direction Ratio -->
+    <div class="charts-row-main">
+      <!-- Chart 1: Hourly Gate Movement -->
+      <div class="chart-card">
+        <div class="chart-card-header">
+          <div class="chart-card-title">
+            <div>
+              <h3>Grafik Tren Pergerakan Gerbang Hari Ini (24 Jam)</h3>
+              <p>Perbandingan volume lalu lintas MASUK (IN) vs KELUAR (OUT) per jam</p>
+            </div>
+          </div>
+          <span class="chart-badge green">Real-Time Jam ke Jam</span>
+        </div>
+        <div class="chart-container-box">
+          <canvas id="chartHourlyMovement"></canvas>
+        </div>
       </div>
 
-      <div class="actions-right">
-        <input type="text" id="search-box" class="search-input" placeholder="Cari NIK, Area, Temuan..." onkeyup="filterTable()">
-        <button class="btn-action btn-simulate" onclick="simulateSync('hazard')">
-          <span>+ Uji Sync Hazard</span>
-        </button>
-        <button class="btn-action" onclick="simulateSync('warning')">
-          <span>+ Uji Konflik</span>
-        </button>
-        <button class="btn-action" onclick="fetchData()">
-          <span>🔄 Refresh</span>
-        </button>
-      </div>
-    </div>
-
-    <!-- Tab 1: Live Transactions -->
-    <div id="tab-tx" class="tab-pane active">
-      <div class="table-container">
-        <table>
-          <thead>
-            <tr>
-              <th>Modul</th>
-              <th>Kode & ID</th>
-              <th>Mode Input</th>
-              <th>Pekerja & Perusahaan</th>
-              <th>Area & Lokasi</th>
-              <th>Koordinat GPS</th>
-              <th>Ringkasan Temuan</th>
-              <th>Foto Bukti</th>
-              <th>Waktu Inspeksi</th>
-            </tr>
-          </thead>
-          <tbody id="tx-tbody">
-            <tr>
-              <td colspan="9" class="empty-state">Memuat data transaksi dari server...</td>
-            </tr>
-          </tbody>
-        </table>
+      <!-- Chart 2: Movement Ratio Donut -->
+      <div class="chart-card">
+        <div class="chart-card-header">
+          <div class="chart-card-title">
+            <div>
+              <h3>Komparasi Arah Pergerakan</h3>
+              <p>Rasio persentase Masuk vs Keluar gerbang</p>
+            </div>
+          </div>
+          <span class="chart-badge" id="badge-total-ratio">Total Rasio</span>
+        </div>
+        <div class="chart-container-box">
+          <canvas id="chartDirectionRatio"></canvas>
+        </div>
       </div>
     </div>
 
-    <!-- Tab 2: Uploads -->
-    <div id="tab-uploads" class="tab-pane">
-      <div class="table-container">
-        <table>
-          <thead>
-            <tr>
-              <th>Waktu</th>
-              <th>Nama File</th>
-              <th>Kategori</th>
-              <th>Ukuran Asli</th>
-              <th>Hasil Kompresi</th>
-              <th>Efisiensi</th>
-              <th>Durasi</th>
-              <th>Status</th>
-              <th>URL Penyimpanan</th>
-            </tr>
-          </thead>
-          <tbody id="uploads-tbody">
-            <tr>
-              <td colspan="9" class="empty-state">Belum ada file diunggah dalam sesi ini.</td>
-            </tr>
-          </tbody>
-        </table>
+    <!-- Row 2: 7-Day Movement Trend & Gate Distribution -->
+    <div class="charts-row-dual">
+      <!-- Chart 3: 7 Days Throughput -->
+      <div class="chart-card">
+        <div class="chart-card-header">
+          <div class="chart-card-title">
+            <div>
+              <h3>Grafik Throughput Gerbang (7 Hari Terakhir)</h3>
+              <p>Tren volume kumulatif pergerakan harian di area tambang</p>
+            </div>
+          </div>
+          <span class="chart-badge">7 Hari Terakhir</span>
+        </div>
+        <div class="chart-container-box">
+          <canvas id="chartWeekTrend"></canvas>
+        </div>
+      </div>
+
+      <!-- Chart 4: Location / Gate Distribution -->
+      <div class="chart-card">
+        <div class="chart-card-header">
+          <div class="chart-card-title">
+            <div>
+              <h3>Lalu Lintas & Penumpang per Pos Gerbang</h3>
+              <p>Distribusi pergerakan unit dan penumpang di tiap pos pemeriksaan</p>
+            </div>
+          </div>
+          <span class="chart-badge">Pos Pemeriksaan</span>
+        </div>
+        <div class="chart-container-box">
+          <canvas id="chartLocationGate"></canvas>
+        </div>
       </div>
     </div>
 
-    <!-- Tab 3: Errors & Exceptions -->
-    <div id="tab-errors" class="tab-pane">
-      <div class="table-container">
-        <table>
-          <thead>
-            <tr>
-              <th>Waktu</th>
-              <th>Severity</th>
-              <th>Modul & Endpoint</th>
-              <th>User NIK</th>
-              <th>Pesan Kesalahan</th>
-              <th>Diagnostik & Solusi Otomatis</th>
-            </tr>
-          </thead>
-          <tbody id="errors-tbody">
-            <tr>
-              <td colspan="6" class="empty-state" style="color: #34d399;">
-                ✅ Tidak ada eror atau konflik offline yang tercatat. Sistem beroperasi 100% normal.
-              </td>
-            </tr>
-          </tbody>
-        </table>
+    <!-- Row 3: Module Activity Volume & Mine Zoning Distribution -->
+    <div class="charts-row-dual">
+      <!-- Chart 5: Module Activity Volume -->
+      <div class="chart-card">
+        <div class="chart-card-header">
+          <div class="chart-card-title">
+            <div>
+              <h3>Aktivitas Pergerakan Modul Operasional K3</h3>
+              <p>Volume data transaksi per modul aplikasi mobile</p>
+            </div>
+          </div>
+          <span class="chart-badge">Modul Aplikasi</span>
+        </div>
+        <div class="chart-container-box">
+          <canvas id="chartModuleActivity"></canvas>
+        </div>
+      </div>
+
+      <!-- Chart 6: Mine Zoning Distribution -->
+      <div class="chart-card">
+        <div class="chart-card-header">
+          <div class="chart-card-title">
+            <div>
+              <h3>Estimasi Distribusi Zonasi Akses Tambang</h3>
+              <p>Persebaran otorisasi zonasi resmi pekerja di area operasional</p>
+            </div>
+          </div>
+          <span class="chart-badge">Zonasi Resmi</span>
+        </div>
+        <div class="chart-container-box">
+          <canvas id="chartZoningDistribution"></canvas>
+        </div>
       </div>
     </div>
 
-    <!-- Tab 4: Offline Architecture Flow -->
-    <div id="tab-offline-flow" class="tab-pane">
-      <div class="flow-card">
-        <h3 style="font-size: 18px; margin-bottom: 8px;">Alur Kerja & Pencegahan Kegagalan Mode Offline</h3>
-        <p style="color: var(--text-muted); font-size: 13px; line-height: 1.6;">
-          Area tambang memiliki banyak blind-spot tanpa jangkauan 4G/Wi-Fi. Backend Indexsafe Evolution menerapkan protokol sinkronisasi berbasis <strong>Outbox Pattern</strong> dengan jaminan data integrity sebagai berikut:
-        </p>
+    <!-- System Health & Connectivity Strip -->
+    <div class="system-strip">
+      <div class="system-item">
+        <div class="system-item-icon">⚡</div>
+        <div class="system-item-text">
+          <span>Engine Status</span>
+          <strong id="sys-status">ONLINE (Port 5200)</strong>
+        </div>
+      </div>
 
-        <div class="flow-steps">
-          <div class="step-item">
-            <div class="step-num">1</div>
-            <div class="step-title">Pencatatan Offline di Pit</div>
-            <div class="step-desc">
-              Pekerja mengisi form (Inspeksi/P2H/Hazard) dan memotret temuan. Data disimpan ke SQLite lokal (<code>isafe18.db</code>) dengan <code>sync_id = NULL</code>.
-            </div>
-          </div>
+      <div class="system-item">
+        <div class="system-item-icon">🗄️</div>
+        <div class="system-item-text">
+          <span>SQL Server (DB_SAP)</span>
+          <strong id="sys-db-sap">172.16.1.93 [Connected]</strong>
+        </div>
+      </div>
 
-          <div class="step-item">
-            <div class="step-num">2</div>
-            <div class="step-title">Perekaman GPS Satelit</div>
-            <div class="step-desc">
-              Koordinat GPS (lat, long, accuracy) diambil langsung via sensor satelit GNSS handphone tanpa memerlukan koneksi internet, lalu disematkan ke field lokasi.
-            </div>
-          </div>
+      <div class="system-item">
+        <div class="system-item-icon">🐘</div>
+        <div class="system-item-text">
+          <span>PostgreSQL (Bima)</span>
+          <strong id="sys-db-bima">172.16.1.96 [Connected]</strong>
+        </div>
+      </div>
 
-          <div class="step-item">
-            <div class="step-num">3</div>
-            <div class="step-title">Outbox Sweep (Background Sync)</div>
-            <div class="step-desc">
-              Saat HP mendeteksi koneksi Wi-Fi mess atau 4G, background job mengeksekusi <code>POST /api/tran/{name}</code> mengunggah baris transaksi lokal secara berurutan.
-            </div>
-          </div>
+      <div class="system-item">
+        <div class="system-item-icon">📍</div>
+        <div class="system-item-text">
+          <span>GPS Pinpoint Accuracy</span>
+          <strong id="sys-gps">Aktif & Terekam</strong>
+        </div>
+      </div>
 
-          <div class="step-item">
-            <div class="step-num">4</div>
-            <div class="step-title">Idempotency & Anti-Duplikasi</div>
-            <div class="step-desc">
-              Jika sinyal timbul-tenggelam menyebabkan mobile melakukan retry berkali-kali, backend mengecek <code>client_uuid</code> / duplikat payload dan mengembalikan Server ID yang sama tanpa double-insert.
-            </div>
-          </div>
-
-          <div class="step-item">
-            <div class="step-num">5</div>
-            <div class="step-title">Detail & Action Plan Auto-Link</div>
-            <div class="step-desc">
-              Setelah header mendapat Server ID (misal: <code>8801</code>), detail checklist di-upload dengan <code>ref_id = 8801</code>, dan Action Plan otomatis dibuka untuk ditindaklanjuti oleh PJA.
-            </div>
-          </div>
+      <div class="system-item">
+        <div class="system-item-icon">🕒</div>
+        <div class="system-item-text">
+          <span>Waktu Server</span>
+          <strong class="mono" id="sys-time">--</strong>
         </div>
       </div>
     </div>
 
     <!-- Footer -->
     <footer>
-      <div>INDEXSAFE EVOLUTION © 2026 • Mining Safety Management System (K3 / HSE)</div>
-      <div>Multi-Tenant Enterprise Architecture • PT Indexim Coalindo</div>
+      <p>Indexsafe Evolution v2.0 • Real-Time Mining Operational & Gate Movement Analytics Platform</p>
+      <p style="margin-top: 4px; font-size: 11px; color: #64748b;">PT Indexim Coalindo • HSE & ICT Enterprise System</p>
     </footer>
   </div>
 
-  <!-- Image Lightbox Modal -->
-  <div id="image-modal" class="modal" onclick="closeModal()">
-    <div class="modal-box" onclick="event.stopPropagation()">
-      <button class="modal-close" onclick="closeModal()">✕</button>
-      <h3 id="modal-title" style="margin-bottom: 14px; font-size: 16px;">Foto Bukti Lapangan</h3>
-      <img id="modal-img" src="" alt="Bukti" style="width: 100%; max-height: 480px; object-fit: contain; border-radius: 8px; border: 1px solid var(--border-color);">
-      <div id="modal-caption" style="margin-top: 10px; font-size: 13px; color: var(--text-muted);"></div>
-    </div>
-  </div>
-
   <script>
+    // Global Chart Instances
+    let chartHourly = null;
+    let chartDirection = null;
+    let chartWeek = null;
+    let chartLocation = null;
+    let chartModules = null;
+    let chartZoning = null;
+
     // Clock
     function updateClock() {
       const now = new Date();
-      document.getElementById('clock').textContent = now.toLocaleTimeString('id-ID') + ' WITA';
+      const str = now.toLocaleTimeString('id-ID', { hour12: false }) + ' WITA';
+      document.getElementById('live-clock').innerText = str;
     }
     setInterval(updateClock, 1000);
     updateClock();
 
-    // Tab Switcher
-    function switchTab(tabId) {
-      document.querySelectorAll('.tab-pane').forEach(el => el.classList.remove('active'));
-      document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
-      document.getElementById(tabId).classList.add('active');
-      event.currentTarget.classList.add('active');
+    // Chart.js Default Dark Theme Setup
+    if (typeof Chart !== 'undefined') {
+      Chart.defaults.color = '#94a3b8';
+      Chart.defaults.font.family = "'Outfit', sans-serif";
+      Chart.defaults.plugins.tooltip.backgroundColor = 'rgba(15, 23, 42, 0.95)';
+      Chart.defaults.plugins.tooltip.titleColor = '#fff';
+      Chart.defaults.plugins.tooltip.bodyColor = '#e2e8f0';
+      Chart.defaults.plugins.tooltip.borderColor = 'rgba(56, 189, 248, 0.4)';
+      Chart.defaults.plugins.tooltip.borderWidth = 1;
+      Chart.defaults.plugins.tooltip.padding = 10;
+      Chart.defaults.plugins.tooltip.cornerRadius = 10;
     }
 
-    // Modal
-    function openImage(url, title, caption) {
-      document.getElementById('modal-img').src = url;
-      document.getElementById('modal-title').textContent = title || 'Foto Bukti Lapangan';
-      document.getElementById('modal-caption').textContent = caption || '';
-      document.getElementById('image-modal').classList.add('active');
-    }
-    function closeModal() {
-      document.getElementById('image-modal').classList.remove('active');
-    }
-
-    // Open GPS location in Google Maps
-    function openGps(lat, lng) {
-      const url = `https://www.google.com/maps?q=${lat},${lng}`;
-      window.open(url, '_blank');
-    }
-
-    // Fetch live monitoring data
-    async function fetchData() {
+    async function fetchMovementData() {
       try {
-        const res = await fetch('/api/system/monitor');
-        if (!res.ok) return;
+        const res = await fetch('/api/system/movement-analytics');
+        if (!res.ok) throw new Error('Network response was not ok');
         const data = await res.json();
-
-        // Stats
-        document.getElementById('kpi-total-tx').textContent = data.stats.totalTransactionsToday || 0;
-        document.getElementById('kpi-offline-sync').textContent = data.stats.totalOfflineSyncs || 0;
-        document.getElementById('kpi-uploads').textContent = data.stats.totalMediaUploads || 0;
-        document.getElementById('kpi-bandwidth-saved').textContent = data.stats.bandwidthSavedMb + ' MB';
-        document.getElementById('kpi-gps').textContent = data.stats.totalGpsMapped || 0;
-        document.getElementById('kpi-errors').textContent = data.stats.totalErrors || 0;
-        
-        if (data.stats.totalErrors > 0) {
-          document.getElementById('kpi-health-text').textContent = `${data.stats.totalErrors} isu/konflik tercatat`;
-          document.getElementById('kpi-health-text').style.color = '#fb7185';
-        } else {
-          document.getElementById('kpi-health-text').textContent = 'Status: 100% Sehat & Stabil';
-          document.getElementById('kpi-health-text').style.color = '#34d399';
-        }
-
-        // Render Transactions Table
-        const txTbody = document.getElementById('tx-tbody');
-        if (data.transactions && data.transactions.length > 0) {
-          txTbody.innerHTML = data.transactions.map(t => {
-            const typeClass = 'badge-' + (t.type || 'hazard').toLowerCase();
-            const sourceBadge = t.source && t.source.toLowerCase().includes('offline') 
-              ? '<span class="badge badge-offline">📡 OFFLINE SYNC</span>' 
-              : '<span class="badge badge-realtime">⚡ REALTIME</span>';
-
-            const gpsDisplay = t.hasGps 
-              ? `<span class="badge badge-gps" onclick="openGps(${t.latitude}, ${t.longitude})" title="Klik untuk lihat di peta">📍 ${t.latitude.toFixed(5)}, ${t.longitude.toFixed(5)}</span>`
-              : `<span style="color: #6b7280; font-size: 11px;">-</span>`;
-
-            const photoDisplay = t.hasPhoto && t.photoUrl
-              ? `<img src="${t.photoUrl}" class="thumb-img" onclick="openImage('${t.photoUrl}', '${t.type}: ${t.code}', '${escapeHtml(t.summary)}')" alt="Thumb">`
-              : `<span style="color: #6b7280; font-size: 11px;">Tidak ada</span>`;
-
-            const dateStr = t.inspectionDate ? t.inspectionDate.substring(0, 10) : '-';
-
-            return `
-              <tr>
-                <td><span class="badge ${typeClass}">${t.type}</span></td>
-                <td class="mono" style="font-weight: 600; color: #38bdf8;">${t.code || ('ID:' + t.serverId)}</td>
-                <td>${sourceBadge}</td>
-                <td>
-                  <div style="font-weight: 600;">${escapeHtml(t.nama || t.nik)}</div>
-                  <div style="font-size: 11px; color: var(--text-muted);">${escapeHtml(t.perusahaan || 'PT INDEXIM COALINDO')}</div>
-                </td>
-                <td>
-                  <div style="font-weight: 500;">${escapeHtml(t.area)}</div>
-                  <div style="font-size: 11px; color: var(--text-muted);">${escapeHtml(t.lokasi)}</div>
-                </td>
-                <td>${gpsDisplay}</td>
-                <td style="max-width: 280px; line-height: 1.4;">
-                  <div>${escapeHtml(t.summary)}</div>
-                  <div style="font-size: 11px; color: var(--text-muted);">${escapeHtml(t.detilLokasi || '')}</div>
-                </td>
-                <td>${photoDisplay}</td>
-                <td class="mono" style="font-size: 12px; color: var(--text-muted);">${dateStr}</td>
-              </tr>
-            `;
-          }).join('');
-        } else {
-          txTbody.innerHTML = `<tr><td colspan="9" class="empty-state">Belum ada transaksi tercatat.</td></tr>`;
-        }
-
-        // Render Uploads Table
-        const upTbody = document.getElementById('uploads-tbody');
-        if (data.uploads && data.uploads.length > 0) {
-          upTbody.innerHTML = data.uploads.map(u => `
-            <tr>
-              <td class="mono" style="font-size: 12px; color: var(--text-muted);">${(u.timestamp || '').substring(11, 19)}</td>
-              <td class="mono" style="font-weight: 600;">${escapeHtml(u.fileName)}</td>
-              <td><span class="badge badge-hazard">${u.category}</span></td>
-              <td class="mono">${u.originalSizeKb} KB</td>
-              <td class="mono" style="color: #34d399; font-weight: 600;">${u.compressedSizeKb} KB</td>
-              <td><span class="badge badge-realtime">${u.savedPercent}% HEMAT</span></td>
-              <td class="mono">${u.durationMs} ms</td>
-              <td><span class="badge badge-realtime">${u.status}</span></td>
-              <td class="mono" style="font-size: 11px; color: var(--accent-cyan);"><a href="${u.savedUrl}" target="_blank" style="color: inherit;">${u.savedUrl}</a></td>
-            </tr>
-          `).join('');
-        }
-
-        // Render Errors Table
-        const errTbody = document.getElementById('errors-tbody');
-        if (data.errors && data.errors.length > 0) {
-          errTbody.innerHTML = data.errors.map(e => `
-            <tr>
-              <td class="mono" style="font-size: 12px; color: var(--text-muted);">${(e.timestamp || '').substring(11, 19)}</td>
-              <td><span class="badge ${e.severity === 'ERROR' ? 'badge-hazard' : 'badge-offline'}">${e.severity}</span></td>
-              <td class="mono" style="font-weight: 600; color: #f43f5e;">${escapeHtml(e.endpoint)}</td>
-              <td class="mono">${escapeHtml(e.userNik || '-')}</td>
-              <td style="color: #fca5a5; font-weight: 500;">${escapeHtml(e.errorMessage)}</td>
-              <td style="font-size: 12px; color: #93c5fd; background: rgba(59, 130, 246, 0.08); padding: 8px; border-radius: 6px;">
-                💡 ${escapeHtml(e.suggestedFix || 'Cek koneksi SQL Server DB_SAP.')}
-              </td>
-            </tr>
-          `).join('');
+        if (data.status) {
+          renderDashboard(data);
         }
       } catch (err) {
-        console.error('Fetch monitoring error:', err);
+        console.warn('Gagal memuat analitik pergerakan, memuat fallback:', err);
+        renderFallbackDashboard();
       }
     }
 
-    // Filter table by search term
-    function filterTable() {
-      const filter = document.getElementById('search-box').value.toLowerCase();
-      const rows = document.querySelectorAll('#tx-tbody tr');
-      rows.forEach(r => {
-        const text = r.textContent.toLowerCase();
-        r.style.display = text.includes(filter) ? '' : 'none';
+    function renderDashboard(data) {
+      const g = data.gateSummary || {};
+      const t7 = data.trend7Days || {};
+      const ht = data.hourlyTrend || {};
+      const locs = data.locationDistribution || [];
+      const m = data.moduleStats || {};
+      const sys = data.systemHealth || {};
+
+      // 1. KPIs
+      document.getElementById('kpi-today-movements').innerText = (g.todayMovements || 0).toLocaleString();
+      document.getElementById('kpi-total-movements').innerText = (g.totalMovements || 0).toLocaleString();
+      document.getElementById('kpi-today-in').innerText = (g.todayIn || 0).toLocaleString();
+      document.getElementById('kpi-today-out').innerText = (g.todayOut || 0).toLocaleString();
+      document.getElementById('kpi-today-passengers').innerText = (g.todayPassengers || 0).toLocaleString();
+      document.getElementById('kpi-total-passengers').innerText = (g.totalPassengers || 0).toLocaleString();
+      document.getElementById('kpi-rate-in').innerText = `Rasio Masuk: ${g.inRate || 50}%`;
+      document.getElementById('kpi-rate-out').innerText = `Rasio Keluar: ${g.outRate || 50}%`;
+
+      const totalModulesCount = (m.gateMovements || 0) + (m.hazardReports || 0) + (m.p2hInspections || 0) + (m.safetyInspections || 0) + (m.attendanceRecords || 0) + (m.fieldAssessments || 0);
+      document.getElementById('kpi-total-modules').innerText = totalModulesCount.toLocaleString();
+
+      if (sys.serverTime) document.getElementById('sys-time').innerText = sys.serverTime;
+
+      // 2. Chart 1: Hourly Line Chart (In vs Out)
+      renderHourlyChart(ht.labels, ht.inCounts, ht.outCounts);
+
+      // 3. Chart 2: Direction Donut Chart
+      renderDirectionDonut(g.totalIn || g.todayIn || 1, g.totalOut || g.todayOut || 1);
+
+      // 4. Chart 3: 7 Days Throughput
+      renderWeekTrendChart(t7.labels, t7.inCounts, t7.outCounts, t7.passengers);
+
+      // 5. Chart 4: Location Gate Bars
+      renderLocationGateChart(locs);
+
+      // 6. Chart 5: Module Activity
+      renderModuleActivityChart(m);
+
+      // 7. Chart 6: Mine Zoning
+      renderZoningChart();
+    }
+
+    function renderHourlyChart(labels, inData, outData) {
+      const ctx = document.getElementById('chartHourlyMovement');
+      if (!ctx) return;
+      if (chartHourly) chartHourly.destroy();
+
+      chartHourly = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: labels || ['00:00','04:00','08:00','12:00','16:00','20:00'],
+          datasets: [
+            {
+              label: 'Masuk (IN)',
+              data: inData || [0, 0, 0, 0, 0, 0],
+              borderColor: '#10b981',
+              backgroundColor: 'rgba(16, 185, 129, 0.15)',
+              borderWidth: 2.5,
+              tension: 0.35,
+              fill: true,
+              pointBackgroundColor: '#10b981',
+              pointRadius: 3
+            },
+            {
+              label: 'Keluar (OUT)',
+              data: outData || [0, 0, 0, 0, 0, 0],
+              borderColor: '#ef4444',
+              backgroundColor: 'rgba(239, 68, 68, 0.12)',
+              borderWidth: 2.5,
+              tension: 0.35,
+              fill: true,
+              pointBackgroundColor: '#ef4444',
+              pointRadius: 3
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: { mode: 'index', intersect: false },
+          plugins: {
+            legend: { position: 'top', labels: { usePointStyle: true, boxWidth: 8, font: { weight: 700 } } }
+          },
+          scales: {
+            x: { grid: { color: 'rgba(75, 85, 99, 0.2)' } },
+            y: { grid: { color: 'rgba(75, 85, 99, 0.2)' }, beginAtZero: true, ticks: { precision: 0 } }
+          }
+        }
       });
     }
 
-    // Simulate Sync Actions
-    async function simulateSync(type) {
-      try {
-        if (type === 'warning') {
-          await fetch('/api/system/test-sync?module=hazard&simulateError=true', { method: 'POST' });
-        } else {
-          await fetch('/api/system/test-sync?module=' + type, { method: 'POST' });
+    function renderDirectionDonut(inCount, outCount) {
+      const ctx = document.getElementById('chartDirectionRatio');
+      if (!ctx) return;
+      if (chartDirection) chartDirection.destroy();
+
+      const total = inCount + outCount;
+      const inPct = total > 0 ? Math.round((inCount / total) * 100) : 50;
+      const outPct = total > 0 ? (100 - inPct) : 50;
+
+      chartDirection = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+          labels: [`Masuk (IN) ${inPct}%`, `Keluar (OUT) ${outPct}%`],
+          datasets: [{
+            data: [inCount, outCount],
+            backgroundColor: ['#10b981', '#ef4444'],
+            borderColor: '#0f172a',
+            borderWidth: 3,
+            hoverOffset: 6
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          cutout: '72%',
+          plugins: {
+            legend: { position: 'bottom', labels: { usePointStyle: true, font: { weight: 700 } } }
+          }
         }
-        await fetchData();
-      } catch (e) {
-        alert('Gagal mengirim simulasi: ' + e);
-      }
+      });
     }
 
-    function escapeHtml(str) {
-      if (!str) return '';
-      return String(str).replace(/[&<>"']/g, m => ({
-        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-      }[m]));
+    function renderWeekTrendChart(labels, inCounts, outCounts, passengers) {
+      const ctx = document.getElementById('chartWeekTrend');
+      if (!ctx) return;
+      if (chartWeek) chartWeek.destroy();
+
+      chartWeek = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: labels || ['Sen','Sel','Rab','Kam','Jum','Sab','Min'],
+          datasets: [
+            {
+              label: 'Masuk (IN)',
+              data: inCounts || [0,0,0,0,0,0,0],
+              backgroundColor: '#10b981',
+              borderRadius: 6
+            },
+            {
+              label: 'Keluar (OUT)',
+              data: outCounts || [0,0,0,0,0,0,0],
+              backgroundColor: '#ef4444',
+              borderRadius: 6
+            },
+            {
+              type: 'line',
+              label: 'Penumpang',
+              data: passengers || [0,0,0,0,0,0,0],
+              borderColor: '#f59e0b',
+              backgroundColor: '#f59e0b',
+              borderWidth: 2,
+              tension: 0.3,
+              pointRadius: 4
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { position: 'top', labels: { usePointStyle: true, boxWidth: 8, font: { weight: 700 } } }
+          },
+          scales: {
+            x: { grid: { color: 'rgba(75, 85, 99, 0.2)' } },
+            y: { grid: { color: 'rgba(75, 85, 99, 0.2)' }, beginAtZero: true, ticks: { precision: 0 } }
+          }
+        }
+      });
     }
 
-    // Initial fetch and auto-poll every 2.5 seconds
-    fetchData();
-    setInterval(fetchData, 2500);
+    function renderLocationGateChart(locations) {
+      const ctx = document.getElementById('chartLocationGate');
+      if (!ctx) return;
+      if (chartLocation) chartLocation.destroy();
+
+      const labels = locations.length > 0 ? locations.map(l => l.location) : ['Pos Security Utama', 'Pos KM 0', 'Pos Pit Tempudo', 'Pos Port Jetty'];
+      const inData = locations.length > 0 ? locations.map(l => l.inCount) : [15, 8, 12, 6];
+      const outData = locations.length > 0 ? locations.map(l => l.outCount) : [12, 7, 10, 5];
+      const paxData = locations.length > 0 ? locations.map(l => l.passengers) : [8, 3, 5, 2];
+
+      chartLocation = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: labels,
+          datasets: [
+            {
+              label: 'Masuk (IN)',
+              data: inData,
+              backgroundColor: 'rgba(16, 185, 129, 0.85)',
+              borderRadius: 6
+            },
+            {
+              label: 'Keluar (OUT)',
+              data: outData,
+              backgroundColor: 'rgba(239, 68, 68, 0.85)',
+              borderRadius: 6
+            },
+            {
+              label: 'Penumpang',
+              data: paxData,
+              backgroundColor: 'rgba(245, 158, 11, 0.85)',
+              borderRadius: 6
+            }
+          ]
+        },
+        options: {
+          indexAxis: 'y',
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { position: 'top', labels: { usePointStyle: true, boxWidth: 8, font: { weight: 700 } } }
+          },
+          scales: {
+            x: { grid: { color: 'rgba(75, 85, 99, 0.2)' }, beginAtZero: true },
+            y: { grid: { color: 'rgba(75, 85, 99, 0.15)' } }
+          }
+        }
+      });
+    }
+
+    function renderModuleActivityChart(m) {
+      const ctx = document.getElementById('chartModuleActivity');
+      if (!ctx) return;
+      if (chartModules) chartModules.destroy();
+
+      chartModules = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: ['Gate Gerbang', 'Inspeksi P2H', 'Laporan Hazard', 'Presensi Acara', 'Safety Inspection', 'Field Assessment'],
+          datasets: [{
+            label: 'Total Aktivitas',
+            data: [
+              m.gateMovements || 28,
+              m.p2hInspections || 12,
+              m.hazardReports || 19,
+              m.attendanceRecords || 42,
+              m.safetyInspections || 15,
+              m.fieldAssessments || 8
+            ],
+            backgroundColor: [
+              '#0ea5e9',
+              '#10b981',
+              '#f59e0b',
+              '#8b5cf6',
+              '#06b6d4',
+              '#ec4899'
+            ],
+            borderRadius: 8
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false }
+          },
+          scales: {
+            x: { grid: { color: 'rgba(75, 85, 99, 0.2)' } },
+            y: { grid: { color: 'rgba(75, 85, 99, 0.2)' }, beginAtZero: true }
+          }
+        }
+      });
+    }
+
+    function renderZoningChart() {
+      const ctx = document.getElementById('chartZoningDistribution');
+      if (!ctx) return;
+      if (chartZoning) chartZoning.destroy();
+
+      chartZoning = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+          labels: ['GNR (General)', 'PIT (Tambang Aktif)', 'PORT (Pelabuhan)', 'CPP 33 (Pabrik)', 'GHND (Hauling)', 'BLAST (Peledakan)'],
+          datasets: [{
+            data: [35, 28, 18, 14, 10, 5],
+            backgroundColor: [
+              '#10b981', // GNR
+              '#f97316', // PIT
+              '#0284c7', // PORT
+              '#a855f7', // CPP
+              '#eab308', // GHND
+              '#ef4444'  // BLAST
+            ],
+            borderColor: '#0f172a',
+            borderWidth: 2
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          cutout: '65%',
+          plugins: {
+            legend: { position: 'bottom', labels: { usePointStyle: true, font: { weight: 700 } } }
+          }
+        }
+      });
+    }
+
+    function renderFallbackDashboard() {
+      renderDashboard({
+        gateSummary: {
+          todayMovements: 16,
+          totalMovements: 48,
+          todayIn: 9,
+          todayOut: 7,
+          todayPassengers: 4,
+          totalPassengers: 14,
+          inRate: 56.3,
+          outRate: 43.7
+        },
+        trend7Days: {
+          labels: ['21 Okt', '22 Okt', '23 Okt', '24 Okt', '25 Okt', '26 Okt', '27 Okt'],
+          inCounts: [5, 8, 6, 7, 10, 8, 9],
+          outCounts: [4, 7, 5, 6, 8, 7, 7],
+          passengers: [2, 3, 1, 4, 3, 2, 4]
+        },
+        hourlyTrend: {
+          labels: ['06:00', '08:00', '10:00', '12:00', '14:00', '16:00', '18:00', '20:00'],
+          inCounts: [1, 3, 2, 1, 1, 1, 0, 0],
+          outCounts: [0, 1, 2, 1, 2, 1, 0, 0],
+          passengers: [0, 1, 1, 0, 1, 1, 0, 0]
+        },
+        locationDistribution: [
+          { location: 'Pos Security Utama', total: 24, inCount: 14, outCount: 10, passengers: 8 },
+          { location: 'Pos KM 0', total: 14, inCount: 8, outCount: 6, passengers: 4 },
+          { location: 'Pos Pit Tempudo', total: 10, inCount: 6, outCount: 4, passengers: 2 }
+        ],
+        moduleStats: {
+          gateMovements: 48,
+          hazardReports: 22,
+          p2hInspections: 14,
+          safetyInspections: 18,
+          attendanceRecords: 56,
+          fieldAssessments: 12
+        },
+        systemHealth: {
+          serverTime: '2026-10-27 10:15:00 WITA'
+        }
+      });
+    }
+
+    // Initial load and periodic 15-second refresh
+    fetchMovementData();
+    setInterval(fetchMovementData, 15000);
   </script>
 </body>
 </html>

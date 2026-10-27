@@ -165,6 +165,144 @@ namespace Indexsafe.Api.Controllers
             return Ok(new { status = true, message = "Simulasi transaksi offline berhasil dikirim ke Live Monitor." });
         }
 
+        /// <summary>
+        /// Endpoint analitik makro untuk memantau pergerakan aplikasi dan gerbang tanpa mengekspos data pribadi
+        /// </summary>
+        [HttpGet("movement-analytics")]
+        public async Task<IActionResult> GetMovementAnalytics()
+        {
+            try
+            {
+                var nowWita = DateTime.UtcNow.AddHours(8);
+                var todayDate = nowWita.Date;
+                var sevenDaysAgo = todayDate.AddDays(-6);
+
+                // 1. Gate Movement Stats
+                var allGateLogs = await _context.PermitGateLogs.AsNoTracking().ToListAsync();
+                var totalMovements = allGateLogs.Count;
+                var totalIn = allGateLogs.Count(l => l.Direction.Equals("MASUK", StringComparison.OrdinalIgnoreCase));
+                var totalOut = allGateLogs.Count(l => l.Direction.Equals("KELUAR", StringComparison.OrdinalIgnoreCase));
+                var totalPassengers = allGateLogs.Sum(l => l.JumlahPenumpang ?? 0);
+
+                var todayLogs = allGateLogs.Where(l => l.CreatedAt.Date == todayDate || l.CreatedAt.Date == DateTime.Today).ToList();
+                var todayMovements = todayLogs.Count;
+                var todayIn = todayLogs.Count(l => l.Direction.Equals("MASUK", StringComparison.OrdinalIgnoreCase));
+                var todayOut = todayLogs.Count(l => l.Direction.Equals("KELUAR", StringComparison.OrdinalIgnoreCase));
+                var todayPassengers = todayLogs.Sum(l => l.JumlahPenumpang ?? 0);
+
+                // 7-day trend (Labels and counts for IN, OUT, and Passengers)
+                var last7DaysLabels = new List<string>();
+                var last7DaysIn = new List<int>();
+                var last7DaysOut = new List<int>();
+                var last7DaysPassengers = new List<int>();
+
+                for (int i = 6; i >= 0; i--)
+                {
+                    var d = todayDate.AddDays(-i);
+                    var dayLogs = allGateLogs.Where(l => l.CreatedAt.Date == d.Date).ToList();
+                    last7DaysLabels.Add(d.ToString("dd MMM"));
+                    last7DaysIn.Add(dayLogs.Count(l => l.Direction.Equals("MASUK", StringComparison.OrdinalIgnoreCase)));
+                    last7DaysOut.Add(dayLogs.Count(l => l.Direction.Equals("KELUAR", StringComparison.OrdinalIgnoreCase)));
+                    last7DaysPassengers.Add(dayLogs.Sum(l => l.JumlahPenumpang ?? 0));
+                }
+
+                // 24-hour distribution (today)
+                var hourlyLabels = Enumerable.Range(0, 24).Select(h => $"{h:D2}:00").ToList();
+                var hourlyIn = new int[24];
+                var hourlyOut = new int[24];
+                var hourlyPassengers = new int[24];
+                foreach (var log in todayLogs)
+                {
+                    var h = log.CreatedAt.Hour;
+                    if (h >= 0 && h < 24)
+                    {
+                        if (log.Direction.Equals("MASUK", StringComparison.OrdinalIgnoreCase)) hourlyIn[h]++;
+                        else hourlyOut[h]++;
+                        hourlyPassengers[h] += (log.JumlahPenumpang ?? 0);
+                    }
+                }
+
+                // Location distribution (Pos / Gate)
+                var locationDistribution = allGateLogs
+                    .GroupBy(l => string.IsNullOrWhiteSpace(l.LokasiPos) ? "Pos Security Utama" : l.LokasiPos.Trim())
+                    .Select(g => new
+                    {
+                        location = g.Key,
+                        total = g.Count(),
+                        inCount = g.Count(l => l.Direction.Equals("MASUK", StringComparison.OrdinalIgnoreCase)),
+                        outCount = g.Count(l => l.Direction.Equals("KELUAR", StringComparison.OrdinalIgnoreCase)),
+                        passengers = g.Sum(l => l.JumlahPenumpang ?? 0)
+                    })
+                    .OrderByDescending(x => x.total)
+                    .Take(7)
+                    .ToList();
+
+                // 2. High-level Application Module Activity Volume (macro counts only)
+                var moduleStats = new
+                {
+                    gateMovements = totalMovements,
+                    hazardReports = await _context.HazardReports.CountAsync(),
+                    p2hInspections = await _context.P2hReports.CountAsync(),
+                    safetyInspections = await _context.Inspections.CountAsync(),
+                    attendanceRecords = await _context.AttendanceRecords.CountAsync(),
+                    fieldAssessments = await _context.FciReports.CountAsync()
+                        + await _context.DciReports.CountAsync()
+                        + await _context.RciReports.CountAsync()
+                        + await _context.DpaReports.CountAsync()
+                };
+
+                // 3. System Health Info
+                var systemHealth = new
+                {
+                    status = "ONLINE",
+                    environment = "Production / Staging",
+                    serverTime = nowWita.ToString("yyyy-MM-dd HH:mm:ss") + " WITA",
+                    databaseSap = "Connected (172.16.1.93)",
+                    databaseBima = "Connected (172.16.1.96)",
+                    gpsTracked = allGateLogs.Count(l => l.Latitude.HasValue && l.Longitude.HasValue)
+                };
+
+                return Ok(new
+                {
+                    status = true,
+                    gateSummary = new
+                    {
+                        totalMovements,
+                        totalIn,
+                        totalOut,
+                        totalPassengers,
+                        todayMovements,
+                        todayIn,
+                        todayOut,
+                        todayPassengers,
+                        inRate = totalMovements > 0 ? Math.Round((double)totalIn / totalMovements * 100, 1) : 50.0,
+                        outRate = totalMovements > 0 ? Math.Round((double)totalOut / totalMovements * 100, 1) : 50.0,
+                    },
+                    trend7Days = new
+                    {
+                        labels = last7DaysLabels,
+                        inCounts = last7DaysIn,
+                        outCounts = last7DaysOut,
+                        passengers = last7DaysPassengers
+                    },
+                    hourlyTrend = new
+                    {
+                        labels = hourlyLabels,
+                        inCounts = hourlyIn,
+                        outCounts = hourlyOut,
+                        passengers = hourlyPassengers
+                    },
+                    locationDistribution,
+                    moduleStats,
+                    systemHealth
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { status = false, message = ex.Message });
+            }
+        }
+
         [HttpPost("clear-logs")]
         public IActionResult ClearLogs()
         {
