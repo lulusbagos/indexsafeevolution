@@ -10,6 +10,8 @@ import 'package:qr_flutter/qr_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../services/api.dart';
+import '../services/preference.dart';
+import 'login_page.dart';
 
 class ScanPage extends StatefulWidget {
   const ScanPage({super.key});
@@ -327,11 +329,13 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
 
     await res.fold(
       (err) async {
+        final errMsg = err['message']?.toString() ?? 'QR tidak valid atau server bermasalah.';
+        final isAuth = err['isAuthError'] == true || errMsg.toLowerCase().contains('sesi login') || errMsg.toLowerCase().contains('401');
         await _showResultDialog(
           isSuccess: false,
           title: 'Pemindaian Belum Berhasil',
-          message: err['message']?.toString() ?? 'QR tidak valid atau server bermasalah.',
-          actionType: 'Error',
+          message: errMsg,
+          actionType: isAuth ? 'AuthError' : 'Error',
         );
       },
       (data) async {
@@ -1033,6 +1037,47 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
                           ),
                           onPressed: () => Navigator.pop(ctx),
                           child: const Text('Selesai', style: TextStyle(fontWeight: FontWeight.w800)),
+                        ),
+                      ),
+                    ],
+                  ),
+                ] else if (actionType == 'AuthError') ...[
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                            side: const BorderSide(color: Color(0xFFCBD5E1)),
+                          ),
+                          onPressed: () => Navigator.pop(ctx),
+                          child: const Text('Tutup', style: TextStyle(fontWeight: FontWeight.w700, color: Color(0xFF475569))),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF2563EB),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                          ),
+                          onPressed: () async {
+                            Navigator.pop(ctx);
+                            await PreferenceService.removeAuth();
+                            if (mounted) {
+                              Navigator.pushAndRemoveUntil(
+                                context,
+                                MaterialPageRoute(builder: (_) => const LoginPage()),
+                                (route) => false,
+                              );
+                            }
+                          },
+                          icon: const Icon(Icons.login_rounded, size: 18),
+                          label: const Text('Login Ulang', style: TextStyle(fontWeight: FontWeight.w800)),
                         ),
                       ),
                     ],
