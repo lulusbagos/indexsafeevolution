@@ -62,7 +62,7 @@ class ApiService {
     'http://127.0.0.1:7302',
   ];
 
-  /// Khusus Special Permit: prioritaskan backend lokal terlebih dahulu agar respon instan (< 200ms)
+  /// Khusus Special Permit: prioritaskan public endpoint terlebih dahulu
   static List<String> _buildSpecialPermitCandidateUrls(String cleanPath) {
     final List<String> list = [];
     void addTarget(String base) {
