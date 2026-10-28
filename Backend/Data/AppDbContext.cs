@@ -69,19 +69,19 @@ namespace Indexsafe.Api.Data
                 .HasKey(p => p.Nrp);
 
             modelBuilder.Entity<HazardReport>()
-                .ToTable("tbl_t_hazard_report");
+                .ToTable("tbl_t_hazard_report", tb => tb.UseSqlOutputClause(false));
 
             modelBuilder.Entity<Inspection>()
-                .ToTable("tbl_t_inspection");
+                .ToTable("tbl_t_inspection", tb => tb.UseSqlOutputClause(false));
 
             modelBuilder.Entity<ActionPlan>()
-                .ToTable("tbl_t_action_plan");
+                .ToTable("tbl_t_action_plan", tb => tb.UseSqlOutputClause(false));
 
             modelBuilder.Entity<SafetyTalk>()
-                .ToTable("tbl_t_safety_talk");
+                .ToTable("tbl_t_safety_talk", tb => tb.UseSqlOutputClause(false));
 
             modelBuilder.Entity<P5m>()
-                .ToTable("tbl_t_p5m");
+                .ToTable("tbl_t_p5m", tb => tb.UseSqlOutputClause(false));
 
             modelBuilder.Entity<Quiz>()
                 .ToTable("table_m_quis");
@@ -90,32 +90,32 @@ namespace Indexsafe.Api.Data
                 .ToTable("table_m_quis_detail");
 
             modelBuilder.Entity<Observation>()
-                .ToTable("tbl_t_observation");
+                .ToTable("tbl_t_observation", tb => tb.UseSqlOutputClause(false));
 
             modelBuilder.Entity<P2hVehicle>()
                 .ToTable("tbl_m_p2h_vehicle");
 
             modelBuilder.Entity<P2hReport>()
-                .ToTable("tbl_t_p2h_report");
+                .ToTable("tbl_t_p2h_report", tb => tb.UseSqlOutputClause(false));
 
             modelBuilder.Entity<DpaReport>()
-                .ToTable("tbl_t_dpa_report");
+                .ToTable("tbl_t_dpa_report", tb => tb.UseSqlOutputClause(false));
 
             modelBuilder.Entity<FciReport>()
-                .ToTable("tbl_t_fci_report");
+                .ToTable("tbl_t_fci_report", tb => tb.UseSqlOutputClause(false));
 
             modelBuilder.Entity<DciReport>()
-                .ToTable("tbl_t_dci_report");
+                .ToTable("tbl_t_dci_report", tb => tb.UseSqlOutputClause(false));
 
             modelBuilder.Entity<RciReport>()
-                .ToTable("tbl_t_rci_report")
+                .ToTable("tbl_t_rci_report", tb => tb.UseSqlOutputClause(false))
                 .HasMany(r => r.Members)
                 .WithOne(m => m.RciReport)
                 .HasForeignKey(m => m.RciReportId)
                 .OnDelete(DeleteBehavior.Cascade);
 
             modelBuilder.Entity<RciMember>()
-                .ToTable("tbl_t_rci_member");
+                .ToTable("tbl_t_rci_member", tb => tb.UseSqlOutputClause(false));
 
             modelBuilder.Entity<DpaDriver>()
                 .ToTable("tbl_m_dpa_driver");
@@ -180,10 +180,10 @@ namespace Indexsafe.Api.Data
                 .OnDelete(DeleteBehavior.Cascade);
 
             modelBuilder.Entity<Coaching>()
-                .ToTable("tbl_t_coaching");
+                .ToTable("tbl_t_coaching", tb => tb.UseSqlOutputClause(false));
 
             modelBuilder.Entity<CoachingParticipant>()
-                .ToTable("tbl_t_coaching_participant");
+                .ToTable("tbl_t_coaching_participant", tb => tb.UseSqlOutputClause(false));
 
             modelBuilder.Entity<Roster>()
                 .ToTable("tbl_m_roster")
