@@ -20,4 +20,8 @@
     <PackageReference Include="SixLabors.ImageSharp" Version="2.1.9" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Content Update="wwwroot\**" CopyToOutputDirectory="Always" />
+  </ItemGroup>
+
 </Project>

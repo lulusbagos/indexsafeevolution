@@ -110,13 +110,16 @@ builder.Services.AddOpenApi();
 
 var app = builder.Build();
 
-// Enable interactive API Documentation (Scalar UI) at /scalar/v1
-app.MapOpenApi();
-app.MapScalarApiReference(options =>
+// Enable interactive API Documentation (Scalar UI) at /scalar/v1 only in Development
+if (app.Environment.IsDevelopment())
 {
-    options.WithTitle("Indexsafe Evolution API");
-    options.WithTheme(ScalarTheme.Moon);
-});
+    app.MapOpenApi();
+    app.MapScalarApiReference(options =>
+    {
+        options.WithTitle("Indexsafe Evolution API");
+        options.WithTheme(ScalarTheme.Moon);
+    });
+}
 
 app.UseCors("AllowAll");
 
