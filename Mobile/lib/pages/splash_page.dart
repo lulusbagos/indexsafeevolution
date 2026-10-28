@@ -258,7 +258,6 @@ class _SplashPageState extends State<SplashPage>
         (route) => false,
       );
     }
-    NotificationService.consumePendingPayload();
   }
 
   bool _isVersionLower(String current, String target) {

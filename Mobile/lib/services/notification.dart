@@ -17,6 +17,7 @@ import '../pages/special_permit/special_permit_followup_page.dart';
 import '../pages/special_permit/special_permit_list_page.dart';
 import '../utils/enums.dart';
 import 'api.dart';
+import 'preference.dart';
 
 @pragma('vm:entry-point')
 void notificationTapBackground(NotificationResponse notificationResponse) {
@@ -275,24 +276,21 @@ class NotificationService {
     }
   }
 
-  static Future<void> _openSpecialPermitObservation(String payload, NavigatorState nav) async {
-    // 1. Jika payload berisi JSON lengkap permit ("special_permit_obs:{...}")
-    if (payload.startsWith('special_permit_obs:')) {
-      try {
-        final rawJson = payload.substring('special_permit_obs:'.length);
-        final map = jsonDecode(rawJson);
-        if (map is Map<String, dynamic>) {
-          nav.push(MaterialPageRoute(
-            builder: (_) => SpecialPermitFollowupPage(permit: map),
-          ));
-          return;
-        }
-      } catch (e) {
-        debugPrint('[NotificationService] Gagal parse JSON permit dari payload: $e');
-      }
-    }
+  static bool _isPermitAssignedToUser(Map<String, dynamic> permit) {
+    final profile = PreferenceService.getProfile();
+    final rawUserNik = (profile?.noNik ?? PreferenceService.getUser() ?? PreferenceService.getOfflineNik() ?? '').trim();
+    final cleanUserNik = rawUserNik.replaceAll(RegExp(r'[^0-9]'), '');
+    if (cleanUserNik.isEmpty) return false;
 
-    // 2. Jika payload berisi ID permit: "special_permit_id:<guid>"
+    final pjoNik = (permit['pjoNik'] ?? permit['pjo_nik'] ?? '').toString().trim().replaceAll(RegExp(r'[^0-9]'), '');
+    final inspectorNik = (permit['inspectorNik'] ?? permit['inspector_nik'] ?? '').toString().trim().replaceAll(RegExp(r'[^0-9]'), '');
+
+    return (pjoNik.isNotEmpty && (cleanUserNik == pjoNik || cleanUserNik.endsWith(pjoNik) || pjoNik.endsWith(cleanUserNik))) ||
+           (inspectorNik.isNotEmpty && (cleanUserNik == inspectorNik || cleanUserNik.endsWith(inspectorNik) || inspectorNik.endsWith(cleanUserNik)));
+  }
+
+  static Future<void> _openSpecialPermitObservation(String payload, NavigatorState nav) async {
+    // 1. Jika payload berisi ID permit: "special_permit_id:<guid>"
     if (payload.contains('special_permit_id:')) {
       final id = payload.split('special_permit_id:').last.trim();
       if (id.isNotEmpty) {
@@ -302,9 +300,14 @@ class NotificationService {
           res.fold((_) {}, (data) {
             final p = data['data'];
             if (p is Map<String, dynamic>) {
-              nav.push(MaterialPageRoute(
-                builder: (_) => SpecialPermitFollowupPage(permit: p),
-              ));
+              // HANYA buka form observasi langsung jika NIK user adalah PJO atau Inspector permit ini
+              if (_isPermitAssignedToUser(p)) {
+                nav.push(MaterialPageRoute(
+                  builder: (_) => SpecialPermitFollowupPage(permit: p),
+                ));
+              } else {
+                nav.push(MaterialPageRoute(builder: (_) => const SpecialPermitListPage()));
+              }
               handled = true;
             }
           });
@@ -313,24 +316,27 @@ class NotificationService {
       }
     }
 
-    // 3. Fallback cerdas: Ambil permit high risk aktif milik NIK login dari endpoint alerts
-    try {
-      final res = await ApiService().getSpecialPermitAlerts();
-      bool handled = false;
-      res.fold((_) {}, (data) {
-        final list = (data['data'] as List<dynamic>?) ?? [];
-        if (list.isNotEmpty) {
-          final first = list.first as Map<String, dynamic>;
-          nav.push(MaterialPageRoute(
-            builder: (_) => SpecialPermitFollowupPage(permit: first),
-          ));
-          handled = true;
+    // 2. Jika payload berisi JSON lengkap permit ("special_permit_obs:{...}")
+    if (payload.startsWith('special_permit_obs:')) {
+      try {
+        final rawJson = payload.substring('special_permit_obs:'.length);
+        final map = jsonDecode(rawJson);
+        if (map is Map<String, dynamic>) {
+          if (_isPermitAssignedToUser(map)) {
+            nav.push(MaterialPageRoute(
+              builder: (_) => SpecialPermitFollowupPage(permit: map),
+            ));
+          } else {
+            nav.push(MaterialPageRoute(builder: (_) => const SpecialPermitListPage()));
+          }
+          return;
         }
-      });
-      if (handled) return;
-    } catch (_) {}
+      } catch (e) {
+        debugPrint('[NotificationService] Gagal parse JSON permit dari payload: $e');
+      }
+    }
 
-    // 4. Jika tidak ada alert high risk aktif, buka list page
+    // Default aman: Buka daftar Special Permit
     nav.push(MaterialPageRoute(builder: (_) => const SpecialPermitListPage()));
   }
 

@@ -110,8 +110,8 @@ namespace Indexsafe.Api.Services
                         GROUP BY special_permit_id
                     ) f ON sp.id = f.special_permit_id
                     WHERE (
-                        TRIM(sp.pjo_nik) = @nikClean OR TRIM(sp.pjo_nik) = @nikTrimmed OR
-                        TRIM(sp.inspector_nik) = @nikClean OR TRIM(sp.inspector_nik) = @nikTrimmed
+                        (NULLIF(TRIM(sp.pjo_nik), '') = @nikClean OR NULLIF(TRIM(sp.pjo_nik), '') = @nikTrimmed) OR
+                        (NULLIF(TRIM(sp.inspector_nik), '') = @nikClean OR NULLIF(TRIM(sp.inspector_nik), '') = @nikTrimmed)
                     ) ";
 
                 var parameters = new List<NpgsqlParameter>
@@ -639,8 +639,8 @@ namespace Indexsafe.Api.Services
                            sp.phone, sp.responsible_person_nik, sp.responsible_person_name, sp.work_related_hazard
                     FROM public.special_permit sp
                     WHERE (
-                        TRIM(sp.pjo_nik) = @nikClean OR TRIM(sp.pjo_nik) = @nikTrimmed OR
-                        TRIM(sp.inspector_nik) = @nikClean OR TRIM(sp.inspector_nik) = @nikTrimmed
+                        (NULLIF(TRIM(sp.pjo_nik), '') = @nikClean OR NULLIF(TRIM(sp.pjo_nik), '') = @nikTrimmed) OR
+                        (NULLIF(TRIM(sp.inspector_nik), '') = @nikClean OR NULLIF(TRIM(sp.inspector_nik), '') = @nikTrimmed)
                     )
                     AND UPPER(sp.status) IN ('WAITING', 'APPROVED')
                     -- Tampilkan sesuai jam pekerjaan / schedule

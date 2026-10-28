@@ -2261,7 +2261,6 @@ class _DashboardPageState extends State<DashboardPage> with WidgetsBindingObserv
       _checkSpecialPermitHighRiskAlerts();
       _initLocationAndProximity();
       _fetchHazardPointsFromApi();
-      NotificationService.consumePendingPayload();
     });
   }
 
@@ -2294,53 +2293,58 @@ class _DashboardPageState extends State<DashboardPage> with WidgetsBindingObserv
           final alerts = (data['data'] as List<dynamic>?) ?? [];
           if (alerts.isNotEmpty && mounted) {
             final first = alerts.first as Map<String, dynamic>;
+
+            // VALIDASI KETAT NIK: Pastikan permit ini benar-benar ditugaskan ke NIK login!
+            final profile = PreferenceService.getProfile();
+            final rawUserNik = (profile?.noNik ?? PreferenceService.getUser() ?? PreferenceService.getOfflineNik() ?? '').trim();
+            final cleanUserNik = rawUserNik.replaceAll(RegExp(r'[^0-9]'), '');
+
+            final pjoNik = (first['pjoNik'] ?? first['pjo_nik'] ?? '').toString().trim().replaceAll(RegExp(r'[^0-9]'), '');
+            final inspectorNik = (first['inspectorNik'] ?? first['inspector_nik'] ?? '').toString().trim().replaceAll(RegExp(r'[^0-9]'), '');
+
+            final isAssigned = cleanUserNik.isNotEmpty && (
+              (pjoNik.isNotEmpty && (cleanUserNik == pjoNik || cleanUserNik.endsWith(pjoNik) || pjoNik.endsWith(cleanUserNik))) ||
+              (inspectorNik.isNotEmpty && (cleanUserNik == inspectorNik || cleanUserNik.endsWith(inspectorNik) || inspectorNik.endsWith(cleanUserNik)))
+            );
+
+            // Jika NIK login bukan PJO atau Inspector yang ditugaskan, lewati dan jangan tampilkan apa pun
+            if (!isAssigned) return;
+
             final actType = (first['activityType'] ?? 'Pekerjaan Khusus').toString().replaceAll('_', ' ');
             final loc = first['workLocation'] ?? 'Area Operasional';
             final permitId = first['id']?.toString() ?? '';
             final hasFollowup = first['hasFollowup'] == true || first['has_followup'] == true;
 
-            // Jika sudah ada follow-up/inspeksi, jangan tampilkan pop up lagi
+            // Jika sudah ada follow-up/inspeksi, jangan tampilkan notifikasi lagi
             if (hasFollowup) return;
 
-            // Cek interval 1 jam menggunakan SharedPreferences agar tidak muncul terus-menerus
+            // Cek interval 1 jam menggunakan SharedPreferences agar tidak spamming
             final prefs = await SharedPreferences.getInstance();
             final lastAlertKey = 'last_sp_alert_$permitId';
             final lastAlertMillis = prefs.getInt(lastAlertKey) ?? 0;
             final nowMillis = DateTime.now().millisecondsSinceEpoch;
 
-            // 1 Jam = 60 * 60 * 1000 milidetik
             const oneHourMillis = 60 * 60 * 1000;
             if (lastAlertMillis > 0 && (nowMillis - lastAlertMillis) < oneHourMillis) {
-              // Belum lewat 1 jam sejak peringatan terakhir, lewati pop up & getaran
               return;
             }
 
-            // Simpan timestamp peringatan saat ini
             await prefs.setInt(lastAlertKey, nowMillis);
 
-            // 1. Getaran fisik darurat / High Risk pada handphone
+            // Getaran fisik singkat
             try {
-              for (int i = 0; i < 4; i++) {
-                await HapticFeedback.heavyImpact();
-                await Future.delayed(const Duration(milliseconds: 180));
-                await HapticFeedback.vibrate();
-                await Future.delayed(const Duration(milliseconds: 220));
-              }
+              await HapticFeedback.vibrate();
             } catch (_) {}
 
-            // 2. Tampilkan notifikasi push / local notification dengan payload langsung ke observasi
+            // Tampilkan CUKUP di notifikasi dan pop up android (sesuai permintaan user)
+            // Tanpa modal dialog Flutter yang mengganggu tampilan dashboard/login
             await NotificationService.display(
               title: '⚠️ Peringatan Kegiatan High Risk!',
-              body: 'Sedang ada kegiatan $actType di $loc aktif untuk NIK Anda. Segera lakukan observasi keselamatan!',
-              payload: 'special_permit_obs:${jsonEncode(first)}',
+              body: 'Kegiatan $actType di $loc aktif untuk NIK Anda. Lakukan inspeksi lapangan.',
+              payload: 'special_permit_id:$permitId',
               priority: 'urgent',
               notifType: 'special_permit',
             );
-
-            // 3. Tampilkan modal dialog interaktif langsung mengarahkan observasi
-            if (!_isShowingSpecialPermitModal) {
-              _showSpecialPermitHighRiskObservationDialog(first, alerts.length);
-            }
           }
         },
       );
