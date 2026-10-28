@@ -83,6 +83,8 @@ builder.Services.AddSingleton<ImageUploadService>();
 builder.Services.AddScoped<PermitService>();
 builder.Services.AddScoped<BimaApprovalService>();
 builder.Services.AddScoped<SpecialPermitService>();
+builder.Services.AddHttpClient();
+builder.Services.AddMemoryCache();
 
 // 4. Controllers & JSON settings
 builder.Services.AddControllers()

@@ -10,6 +10,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:webview_flutter_android/webview_flutter_android.dart';
 import 'package:webview_flutter_platform_interface/webview_flutter_platform_interface.dart';
@@ -30,6 +31,9 @@ import 'menu/ohs_page.dart';
 import 'menu/sap_page.dart';
 import 'notif_page.dart';
 import 'safety_updates_page.dart';
+import 'special_permit/special_permit_followup_page.dart';
+import 'special_permit/special_permit_list_page.dart';
+import '../widgets/home_weather_widget.dart';
 
 class _HomeModuleCard extends StatelessWidget {
   const _HomeModuleCard({
@@ -2129,6 +2133,10 @@ class _DashboardPageState extends State<DashboardPage> with WidgetsBindingObserv
   bool _isApprovalRegistered = false;
   int _pendingApprovalCount = 0;
 
+  // Special Permit & High Risk Alert State
+  String? _lastAlertedSpecialPermitId;
+  bool _isShowingSpecialPermitModal = false;
+
   // Heatmap & Radar Proximity State ('heatmap', 'points', 'off')
   String _hazardMapMode = PreferenceService.getHazardMapMode();
   StreamSubscription<Position>? _positionStreamSub;
@@ -2253,6 +2261,7 @@ class _DashboardPageState extends State<DashboardPage> with WidgetsBindingObserv
       _checkSpecialPermitHighRiskAlerts();
       _initLocationAndProximity();
       _fetchHazardPointsFromApi();
+      NotificationService.consumePendingPayload();
     });
   }
 
@@ -2287,18 +2296,370 @@ class _DashboardPageState extends State<DashboardPage> with WidgetsBindingObserv
             final first = alerts.first as Map<String, dynamic>;
             final actType = (first['activityType'] ?? 'Pekerjaan Khusus').toString().replaceAll('_', ' ');
             final loc = first['workLocation'] ?? 'Area Operasional';
+            final permitId = first['id']?.toString() ?? '';
+            final hasFollowup = first['hasFollowup'] == true || first['has_followup'] == true;
 
+            // Jika sudah ada follow-up/inspeksi, jangan tampilkan pop up lagi
+            if (hasFollowup) return;
+
+            // Cek interval 1 jam menggunakan SharedPreferences agar tidak muncul terus-menerus
+            final prefs = await SharedPreferences.getInstance();
+            final lastAlertKey = 'last_sp_alert_$permitId';
+            final lastAlertMillis = prefs.getInt(lastAlertKey) ?? 0;
+            final nowMillis = DateTime.now().millisecondsSinceEpoch;
+
+            // 1 Jam = 60 * 60 * 1000 milidetik
+            const oneHourMillis = 60 * 60 * 1000;
+            if (lastAlertMillis > 0 && (nowMillis - lastAlertMillis) < oneHourMillis) {
+              // Belum lewat 1 jam sejak peringatan terakhir, lewati pop up & getaran
+              return;
+            }
+
+            // Simpan timestamp peringatan saat ini
+            await prefs.setInt(lastAlertKey, nowMillis);
+
+            // 1. Getaran fisik darurat / High Risk pada handphone
+            try {
+              for (int i = 0; i < 4; i++) {
+                await HapticFeedback.heavyImpact();
+                await Future.delayed(const Duration(milliseconds: 180));
+                await HapticFeedback.vibrate();
+                await Future.delayed(const Duration(milliseconds: 220));
+              }
+            } catch (_) {}
+
+            // 2. Tampilkan notifikasi push / local notification dengan payload langsung ke observasi
             await NotificationService.display(
               title: '⚠️ Peringatan Kegiatan High Risk!',
-              body: 'Sedang ada kegiatan $actType di $loc. PJO & Inspector segera lakukan inspeksi di area kerja!',
-              payload: '/special_permit',
+              body: 'Sedang ada kegiatan $actType di $loc aktif untuk NIK Anda. Segera lakukan observasi keselamatan!',
+              payload: 'special_permit_obs:${jsonEncode(first)}',
               priority: 'urgent',
               notifType: 'special_permit',
             );
+
+            // 3. Tampilkan modal dialog interaktif langsung mengarahkan observasi
+            if (!_isShowingSpecialPermitModal) {
+              _showSpecialPermitHighRiskObservationDialog(first, alerts.length);
+            }
           }
         },
       );
     } catch (_) {}
+  }
+
+  void _showSpecialPermitHighRiskObservationDialog(Map<String, dynamic> permit, int totalAlerts) {
+    if (!mounted) return;
+    _isShowingSpecialPermitModal = true;
+    _lastAlertedSpecialPermitId = permit['id']?.toString() ?? '';
+
+    final actType = (permit['activityType'] ?? 'Pekerjaan Khusus').toString().replaceAll('_', ' ').toUpperCase();
+    final reqId = permit['reqId']?.toString() ?? '-';
+    final loc = permit['workLocation']?.toString() ?? 'Area Operasional';
+    final company = permit['companyName']?.toString() ?? permit['implementingContractor']?.toString() ?? '-';
+    final pjoName = permit['pjoName']?.toString() ?? '-';
+    final inspectorName = permit['inspectorName']?.toString() ?? '-';
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      isDismissible: true,
+      enableDrag: true,
+      builder: (ctx) => Container(
+        padding: EdgeInsets.only(
+          left: 20,
+          right: 20,
+          top: 14,
+          bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
+        ),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black26,
+              blurRadius: 20,
+              offset: Offset(0, -4),
+            )
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Handle bar
+            Center(
+              child: Container(
+                width: 44,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Header Icon & Title
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFEF2F2),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: const Color(0xFFFCA5A5)),
+                  ),
+                  child: const Icon(
+                    Icons.warning_amber_rounded,
+                    color: Color(0xFFDC2626),
+                    size: 28,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFDC2626),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: const Text(
+                              'HIGH RISK ACTIVITY',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 9.5,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                          ),
+                          if (totalAlerts > 1) ...[
+                            const SizedBox(width: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFFEF3C7),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                '+$totalAlerts Pengajuan',
+                                style: const TextStyle(
+                                  color: Color(0xFFB45309),
+                                  fontSize: 9.5,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      const Text(
+                        'Peringatan Special Permit!',
+                        style: TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF0F172A),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+
+            // Card Detail Kegiatan
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        reqId,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF0284C7),
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFEFF6FF),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          permit['status']?.toString().toUpperCase() ?? 'APPROVED',
+                          style: const TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w800,
+                            color: Color(0xFF2563EB),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    actType,
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF1E293B),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  const Divider(height: 1, color: Color(0xFFE2E8F0)),
+                  const SizedBox(height: 10),
+                  _buildPermitInfoRow(Icons.place_rounded, 'Lokasi', loc),
+                  const SizedBox(height: 6),
+                  _buildPermitInfoRow(Icons.business_rounded, 'Perusahaan', company),
+                  if (pjoName != '-' || inspectorName != '-') ...[
+                    const SizedBox(height: 6),
+                    _buildPermitInfoRow(
+                      Icons.people_alt_outlined,
+                      'PJO / Pengawas',
+                      pjoName != '-' ? pjoName : inspectorName,
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
+
+            // Arahan Observasi
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFFBEB),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFFDE68A)),
+              ),
+              child: const Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.info_outline_rounded, color: Color(0xFFD97706), size: 18),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'NIK Anda terdaftar pada pengajuan Special Permit ini. Harap segera lakukan observasi dan inspeksi keselamatan lapangan (Follow-up Special Permit) untuk memastikan seluruh kendali bahaya telah diterapkan.',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Color(0xFF92400E),
+                        fontWeight: FontWeight.w600,
+                        height: 1.4,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 18),
+
+            // Tombol Observasi Sekarang (Primary)
+            SizedBox(
+              height: 48,
+              child: ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFDC2626),
+                  foregroundColor: Colors.white,
+                  elevation: 2,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => SpecialPermitFollowupPage(permit: permit),
+                    ),
+                  ).then((_) {
+                    _checkSpecialPermitHighRiskAlerts();
+                  });
+                },
+                icon: const Icon(Icons.assignment_turned_in_rounded, size: 20),
+                label: const Text(
+                  'Lakukan Observasi Sekarang',
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+
+            // Tombol Lihat Daftar Special Permit
+            SizedBox(
+              height: 42,
+              child: OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: const Color(0xFF475569),
+                  side: const BorderSide(color: Color(0xFFCBD5E1)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const SpecialPermitListPage(),
+                    ),
+                  ).then((_) {
+                    _checkSpecialPermitHighRiskAlerts();
+                  });
+                },
+                icon: const Icon(Icons.list_alt_rounded, size: 18),
+                label: const Text(
+                  'Lihat Semua Special Permit',
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    ).whenComplete(() {
+      _isShowingSpecialPermitModal = false;
+    });
+  }
+
+  Widget _buildPermitInfoRow(IconData icon, String label, String value) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 14, color: const Color(0xFF64748B)),
+        const SizedBox(width: 6),
+        Text(
+          '$label: ',
+          style: const TextStyle(fontSize: 12, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
+        ),
+        Expanded(
+          child: Text(
+            value,
+            style: const TextStyle(fontSize: 12, color: Color(0xFF1E293B), fontWeight: FontWeight.w700),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
+    );
   }
 
   @override
@@ -3972,18 +4333,27 @@ class _DashboardPageState extends State<DashboardPage> with WidgetsBindingObserv
                       ),
                     ),
                     const SizedBox(height: 2),
-                    Text(
-                      _formatCompany(_profile?.company),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        height: 1.35,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFF64748B),
-                      ),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            _formatCompany(_profile?.company),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              height: 1.35,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF64748B),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        const HomeWeatherWidget(),
+                      ],
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 14),
                     _buildProfessionalSearchBar(),
                   ],
                 ),

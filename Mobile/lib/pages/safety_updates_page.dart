@@ -120,17 +120,13 @@ class _SafetyUpdatesPageState extends State<SafetyUpdatesPage> {
       return matchesCat && matchesSearch;
     }).toList();
 
-    // Prioritaskan 'Banner Informasi' / isBanner agar selalu berada di posisi paling depan
+    // Urutkan murni dari yang paling terbaru (berdasarkan tanggal kejadian atau waktu dibuat terbaru)
     list.sort((a, b) {
-      final aIsBanner = a.kategori.toLowerCase().contains('banner') || a.isBanner;
-      final bIsBanner = b.kategori.toLowerCase().contains('banner') || b.isBanner;
-      if (aIsBanner && !bIsBanner) return -1;
-      if (!aIsBanner && bIsBanner) return 1;
-
-      // Jika status banner sama, urutkan tanggal kejadian / createdAt terbaru
       final aDate = a.tanggalKejadian ?? a.createdAt ?? DateTime(2000);
       final bDate = b.tanggalKejadian ?? b.createdAt ?? DateTime(2000);
-      return bDate.compareTo(aDate);
+      final cmp = bDate.compareTo(aDate);
+      if (cmp != 0) return cmp;
+      return b.id.compareTo(a.id);
     });
 
     return list;

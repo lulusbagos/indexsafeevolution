@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import '../../services/api.dart';
+import '../../services/preference.dart';
 import 'special_permit_followup_page.dart';
 
 class SpecialPermitListPage extends StatefulWidget {
@@ -35,6 +36,10 @@ class _SpecialPermitListPageState extends State<SpecialPermitListPage> {
     if (!mounted) return;
     setState(() => _isLoading = false);
 
+    final profile = PreferenceService.getProfile();
+    final user = PreferenceService.getUser();
+    final myNik = (user ?? profile?.noNik ?? PreferenceService.getOfflineNik() ?? '').trim();
+
     res.fold(
       (err) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -45,8 +50,19 @@ class _SpecialPermitListPageState extends State<SpecialPermitListPage> {
         );
       },
       (data) {
+        final list = (data['data'] as List<dynamic>?) ?? [];
         setState(() {
-          _permits = (data['data'] as List<dynamic>?) ?? [];
+          // Hanya tampilkan permit yang NIK kita terdaftar jadi inspector_nik atau pjo_nik
+          if (myNik.isNotEmpty) {
+            _permits = list.where((p) {
+              final pjo = (p['pjoNik'] ?? '').toString().trim();
+              final insp = (p['inspectorNik'] ?? '').toString().trim();
+              return pjo == myNik || pjo.endsWith(myNik) || myNik.endsWith(pjo) ||
+                     insp == myNik || insp.endsWith(myNik) || myNik.endsWith(insp);
+            }).toList();
+          } else {
+            _permits = [];
+          }
         });
       },
     );
@@ -73,25 +89,25 @@ class _SpecialPermitListPageState extends State<SpecialPermitListPage> {
 
   @override
   Widget build(BuildContext context) {
-    const bgDark = Color(0xFF0F2628);
     final displayedList = _filteredPermits;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF3F7F7),
+      backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
-        backgroundColor: bgDark,
+        backgroundColor: Colors.white,
         elevation: 0,
+        centerTitle: false,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 20),
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Color(0xFF0F172A), size: 20),
           onPressed: () => Navigator.pop(context),
         ),
         title: const Text(
           'Special Permit & High Risk',
-          style: TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w800),
+          style: TextStyle(color: Color(0xFF0F172A), fontSize: 17, fontWeight: FontWeight.w800),
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.refresh_rounded, color: Colors.white),
+            icon: const Icon(Icons.refresh_rounded, color: Color(0xFF0F172A)),
             tooltip: 'Segarkan',
             onPressed: _loadPermits,
           ),
@@ -108,12 +124,12 @@ class _SpecialPermitListPageState extends State<SpecialPermitListPage> {
           // List Special Permit
           Expanded(
             child: _isLoading
-                ? const Center(child: CircularProgressIndicator(color: Color(0xFF0F2628)))
+                ? const Center(child: CircularProgressIndicator(color: Color(0xFF1D4ED8)))
                 : displayedList.isEmpty
                     ? _buildEmptyState()
                     : RefreshIndicator(
                         onRefresh: _loadPermits,
-                        color: const Color(0xFF0F2628),
+                        color: const Color(0xFF1D4ED8),
                         child: ListView.separated(
                           padding: const EdgeInsets.fromLTRB(16, 10, 16, 30),
                           itemCount: displayedList.length,
@@ -131,43 +147,25 @@ class _SpecialPermitListPageState extends State<SpecialPermitListPage> {
   }
 
   Widget _buildHighRiskBanner() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(16, 6, 16, 16),
-      decoration: const BoxDecoration(
-        color: Color(0xFF0F2628),
-        borderRadius: BorderRadius.only(
-          bottomLeft: Radius.circular(22),
-          bottomRight: Radius.circular(22),
-        ),
-      ),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 2),
       child: Container(
+        width: double.infinity,
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.08),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+          color: const Color(0xFFFEF2F2),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: const Color(0xFFFECACA)),
         ),
         child: Row(
           children: [
             Container(
-              padding: const EdgeInsets.all(10),
+              padding: const EdgeInsets.all(9),
               decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFFEF4444), Color(0xFFDC2626)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
+                color: const Color(0xFFEF4444),
                 borderRadius: BorderRadius.circular(12),
-                boxShadow: [
-                  BoxShadow(
-                    color: const Color(0xFFEF4444).withValues(alpha: 0.35),
-                    blurRadius: 8,
-                    offset: const Offset(0, 3),
-                  ),
-                ],
               ),
-              child: const Icon(Icons.warning_amber_rounded, color: Colors.white, size: 24),
+              child: const Icon(Icons.warning_amber_rounded, color: Colors.white, size: 20),
             ),
             const SizedBox(width: 12),
             const Expanded(
@@ -176,12 +174,12 @@ class _SpecialPermitListPageState extends State<SpecialPermitListPage> {
                 children: [
                   Text(
                     'Peringatan Pekerjaan Risiko Tinggi',
-                    style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w800),
+                    style: TextStyle(color: Color(0xFF991B1B), fontSize: 12.5, fontWeight: FontWeight.w800),
                   ),
-                  SizedBox(height: 3),
+                  SizedBox(height: 2),
                   Text(
                     'PJO & Inspector wajib melakukan inspeksi lapangan sebelum & selama pekerjaan berlangsung.',
-                    style: TextStyle(color: Color(0xFFBAE6FD), fontSize: 11, height: 1.3),
+                    style: TextStyle(color: Color(0xFFB91C1C), fontSize: 11, height: 1.3),
                   ),
                 ],
               ),
@@ -194,7 +192,7 @@ class _SpecialPermitListPageState extends State<SpecialPermitListPage> {
 
   Widget _buildSearchAndFilters() {
     return Container(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 4),
       child: Column(
         children: [
           // Search Input
@@ -259,7 +257,7 @@ class _SpecialPermitListPageState extends State<SpecialPermitListPage> {
 
   Widget _buildFilterChip(String key, String label, {bool isUrgent = false}) {
     final isSelected = _selectedFilter == key;
-    Color activeBg = isUrgent ? const Color(0xFFEF4444) : const Color(0xFF0F2628);
+    Color activeBg = isUrgent ? const Color(0xFFEF4444) : const Color(0xFF1D4ED8);
 
     return InkWell(
       borderRadius: BorderRadius.circular(20),
@@ -304,6 +302,10 @@ class _SpecialPermitListPageState extends State<SpecialPermitListPage> {
     final inspectorName = item['inspectorName']?.toString() ?? '-';
     final hasFollowup = item['hasFollowup'] == true;
     final latestStatus = item['latestInspectionStatus']?.toString();
+    final latestInspector = (item['latestInspectorName']?.toString().isNotEmpty == true)
+        ? item['latestInspectorName'].toString()
+        : (item['inspectorName']?.toString() ?? '-');
+    final latestRole = item['latestInspectorRole']?.toString() ?? 'INSPECTOR';
 
     DateTime? startDate;
     if (item['startDate'] != null) {
@@ -322,8 +324,8 @@ class _SpecialPermitListPageState extends State<SpecialPermitListPage> {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(18),
             border: Border.all(
-              color: hasFollowup ? const Color(0xFFE2E8F0) : const Color(0xFFFCA5A5),
-              width: hasFollowup ? 1.0 : 1.4,
+              color: hasFollowup ? const Color(0xFFA7F3D0) : const Color(0xFFFCA5A5),
+              width: hasFollowup ? 1.2 : 1.4,
             ),
             boxShadow: const [
               BoxShadow(
@@ -336,40 +338,50 @@ class _SpecialPermitListPageState extends State<SpecialPermitListPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Baris Tag Aktivitas & Req ID
+              // Baris Tag Aktivitas & Status Inspeksi
               Row(
                 children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: actColor.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: actColor.withValues(alpha: 0.3)),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.warning_amber_rounded, size: 14, color: actColor),
-                        const SizedBox(width: 5),
-                        Text(
-                          activityType,
-                          style: TextStyle(color: actColor, fontSize: 11, fontWeight: FontWeight.w900),
-                        ),
-                      ],
+                  Flexible(
+                    flex: 4,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: actColor.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: actColor.withValues(alpha: 0.3)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.warning_amber_rounded, size: 13, color: actColor),
+                          const SizedBox(width: 4),
+                          Flexible(
+                            child: Text(
+                              activityType,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(color: actColor, fontSize: 10.5, fontWeight: FontWeight.w900),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                  const Spacer(),
-                  _buildInspectionStatusBadge(hasFollowup, latestStatus),
+                  const SizedBox(width: 6),
+                  Flexible(
+                    flex: 6,
+                    child: _buildInspectionStatusBadge(hasFollowup, latestStatus, latestInspector),
+                  ),
                 ],
               ),
               const SizedBox(height: 10),
 
-              // Req ID & Lokasi Kerja
+              // Req ID & Waktu
               Row(
                 children: [
                   Text(
                     reqId,
-                    style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: Color(0xFF0F2628)),
+                    style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: Color(0xFF0F172A)),
                   ),
                   const SizedBox(width: 8),
                   if (startDate != null)
@@ -419,31 +431,87 @@ class _SpecialPermitListPageState extends State<SpecialPermitListPage> {
 
               // Info PJO & Inspector
               Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Expanded(
                     child: Text(
                       'PJO: $pjoName\nInspector: $inspectorName',
-                      style: const TextStyle(fontSize: 10.5, color: Color(0xFF475569), height: 1.3),
+                      style: const TextStyle(fontSize: 11, color: Color(0xFF475569), height: 1.3),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                  ElevatedButton.icon(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: hasFollowup ? const Color(0xFF0F2628) : const Color(0xFFEF4444),
-                      foregroundColor: Colors.white,
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                ],
+              ),
+
+              if (hasFollowup) ...[
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFECFDF5),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: const Color(0xFFA7F3D0)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.verified_rounded, size: 16, color: Color(0xFF059669)),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Observasi Selesai • Diperiksa oleh $latestInspector ($latestRole)',
+                          style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w800,
+                            color: Color(0xFF065F46),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+
+              const SizedBox(height: 12),
+
+              // Action Buttons: Alihkan ke Orang Lain & Observasi Sekarang
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFF0F172A),
+                        side: const BorderSide(color: Color(0xFFCBD5E1)),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                      ),
+                      onPressed: () => _showReassignDialog(item),
+                      icon: const Icon(Icons.person_add_alt_1_rounded, size: 14),
+                      label: const Text(
+                        'Alihkan',
+                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                      ),
                     ),
-                    onPressed: () => _openFollowupForm(item),
-                    icon: Icon(
-                      hasFollowup ? Icons.fact_check_rounded : Icons.add_task_rounded,
-                      size: 14,
-                    ),
-                    label: Text(
-                      hasFollowup ? 'Cek / Follow-Up' : 'Inspeksi Sekarang',
-                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: hasFollowup ? const Color(0xFF059669) : const Color(0xFFDC2626),
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                      ),
+                      onPressed: () => _openFollowupForm(item),
+                      icon: Icon(
+                        hasFollowup ? Icons.fact_check_rounded : Icons.assignment_turned_in_rounded,
+                        size: 14,
+                      ),
+                      label: Text(
+                        hasFollowup ? 'Cek Observasi' : 'Observasi Sekarang',
+                        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800),
+                      ),
                     ),
                   ),
                 ],
@@ -455,7 +523,7 @@ class _SpecialPermitListPageState extends State<SpecialPermitListPage> {
     );
   }
 
-  Widget _buildInspectionStatusBadge(bool hasFollowup, String? latestStatus) {
+  Widget _buildInspectionStatusBadge(bool hasFollowup, String? latestStatus, String? inspectorName) {
     if (!hasFollowup) {
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
@@ -478,28 +546,26 @@ class _SpecialPermitListPageState extends State<SpecialPermitListPage> {
       );
     }
 
-    final isSafe = latestStatus == 'AMAN';
-    final isStopped = latestStatus == 'DIHENTIKAN';
-
-    Color bg = isSafe ? const Color(0xFFECFDF5) : (isStopped ? const Color(0xFFFEF2F2) : const Color(0xFFFFFBEB));
-    Color fg = isSafe ? const Color(0xFF059669) : (isStopped ? const Color(0xFFDC2626) : const Color(0xFFD97706));
-    IconData icon = isSafe ? Icons.check_circle_rounded : (isStopped ? Icons.cancel_rounded : Icons.warning_rounded);
+    final byName = (inspectorName != null && inspectorName.trim().isNotEmpty) ? inspectorName.trim() : 'Inspector';
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color: bg,
+        color: const Color(0xFFECFDF5),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: fg.withValues(alpha: 0.3)),
+        border: Border.all(color: const Color(0xFFA7F3D0)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 12, color: fg),
+          const Icon(Icons.check_circle_rounded, size: 13, color: Color(0xFF059669)),
           const SizedBox(width: 4),
-          Text(
-            isSafe ? 'Sudah Diinspeksi (Aman)' : (isStopped ? 'Dihentikan' : 'Ada Temuan'),
-            style: TextStyle(color: fg, fontSize: 10, fontWeight: FontWeight.w900),
+          Flexible(
+            child: Text(
+              'Sudah Diinspeksi oleh $byName',
+              style: const TextStyle(color: Color(0xFF059669), fontSize: 10, fontWeight: FontWeight.w900),
+              overflow: TextOverflow.ellipsis,
+            ),
           ),
         ],
       ),
@@ -523,13 +589,13 @@ class _SpecialPermitListPageState extends State<SpecialPermitListPage> {
           const SizedBox(height: 16),
           const Text(
             'Tidak Ada Special Permit',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Color(0xFF0F2628)),
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
           ),
           const SizedBox(height: 6),
           const Padding(
             padding: EdgeInsets.symmetric(horizontal: 32),
             child: Text(
-              'Tidak ditemukan kegiatan pekerjaan khusus risiko tinggi yang terdaftar atau memerlukan inspeksi saat ini.',
+              'Hanya pekerjaan khusus risiko tinggi di mana NIK Anda terdaftar sebagai Inspector atau PJO yang ditampilkan.',
               textAlign: TextAlign.center,
               style: TextStyle(fontSize: 12, color: Color(0xFF64748B), height: 1.4),
             ),
@@ -549,5 +615,318 @@ class _SpecialPermitListPageState extends State<SpecialPermitListPage> {
     if (result == true) {
       _loadPermits();
     }
+  }
+
+  void _showReassignDialog(Map<String, dynamic> permit) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => _ReassignInspectorModal(
+        permit: permit,
+        onReassigned: () {
+          Navigator.pop(ctx);
+          _loadPermits();
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('✅ Penugasan inspeksi berhasil dialihkan!'),
+              backgroundColor: Color(0xFF059669),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _ReassignInspectorModal extends StatefulWidget {
+  final Map<String, dynamic> permit;
+  final VoidCallback onReassigned;
+
+  const _ReassignInspectorModal({
+    required this.permit,
+    required this.onReassigned,
+  });
+
+  @override
+  State<_ReassignInspectorModal> createState() => _ReassignInspectorModalState();
+}
+
+class _ReassignInspectorModalState extends State<_ReassignInspectorModal> {
+  final ApiService _api = ApiService();
+  final TextEditingController _searchCtrl = TextEditingController();
+  final TextEditingController _reasonCtrl = TextEditingController();
+
+  List<Map<String, dynamic>> _candidates = [];
+  bool _isSearching = false;
+  Map<String, dynamic>? _selectedInspector;
+  bool _isSubmitting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _performSearch('');
+  }
+
+  Future<void> _performSearch(String query) async {
+    setState(() => _isSearching = true);
+    final results = await _api.searchInspectors(query);
+    if (!mounted) return;
+    setState(() {
+      _candidates = results;
+      _isSearching = false;
+    });
+  }
+
+  Future<void> _submitReassign() async {
+    if (_selectedInspector == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Pilih Inspector baru terlebih dahulu.'),
+          backgroundColor: Color(0xFFEF4444),
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isSubmitting = true);
+    final permitId = widget.permit['id']?.toString() ?? '';
+    final newNik = _selectedInspector!['nik']?.toString() ?? '';
+    final newName = _selectedInspector!['nama']?.toString() ?? '';
+
+    final res = await _api.reassignSpecialPermitInspector(
+      permitId: permitId,
+      newInspectorNik: newNik,
+      newInspectorName: newName,
+      reason: _reasonCtrl.text.trim().isNotEmpty ? _reasonCtrl.text.trim() : 'Dialihkan oleh PJO/Pengawas',
+    );
+
+    if (!mounted) return;
+    setState(() => _isSubmitting = false);
+
+    res.fold(
+      (err) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(err['message']?.toString() ?? 'Gagal mengalihkan inspektur'),
+            backgroundColor: const Color(0xFFEF4444),
+          ),
+        );
+      },
+      (_) {
+        widget.onReassigned();
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final reqId = widget.permit['reqId']?.toString() ?? '-';
+    final actType = (widget.permit['activityType'] ?? 'Special Permit').toString().replaceAll('_', ' ');
+    final currentInspector = widget.permit['inspectorName']?.toString() ?? '-';
+
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      padding: EdgeInsets.only(
+        top: 16,
+        left: 20,
+        right: 20,
+        bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+      ),
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.of(context).size.height * 0.85,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Drag handle
+          Center(
+            child: Container(
+              width: 44,
+              height: 4,
+              decoration: BoxDecoration(
+                color: const Color(0xFFCBD5E1),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+          const SizedBox(height: 14),
+
+          // Header
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEFF6FF),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.person_add_alt_1_rounded, color: Color(0xFF2563EB), size: 20),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Alihkan Penugasan Inspeksi',
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
+                    ),
+                    Text(
+                      '$reqId • $actType',
+                      style: const TextStyle(fontSize: 11, color: Color(0xFF64748B), fontWeight: FontWeight.w600),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+
+          // Info Inspector Saat Ini
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.person_pin_rounded, size: 16, color: Color(0xFF64748B)),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Inspector Saat Ini: $currentInspector',
+                    style: const TextStyle(fontSize: 11.5, color: Color(0xFF334155), fontWeight: FontWeight.w700),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
+
+          // Search Box
+          TextField(
+            controller: _searchCtrl,
+            onChanged: (val) => _performSearch(val.trim()),
+            decoration: InputDecoration(
+              hintText: 'Cari Nama / NIK Pengawas...',
+              hintStyle: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
+              prefixIcon: const Icon(Icons.search_rounded, size: 18, color: Color(0xFF64748B)),
+              filled: true,
+              fillColor: const Color(0xFFF1F5F9),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
+              ),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            ),
+          ),
+          const SizedBox(height: 10),
+
+          // Candidate List
+          Flexible(
+            child: _isSearching
+                ? const Center(child: Padding(padding: EdgeInsets.all(20), child: CircularProgressIndicator()))
+                : _candidates.isEmpty
+                    ? const Center(
+                        child: Padding(
+                          padding: EdgeInsets.all(20),
+                          child: Text(
+                            'Tidak ditemukan pengawas / inspector.',
+                            style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
+                          ),
+                        ),
+                      )
+                    : ListView.separated(
+                        shrinkWrap: true,
+                        itemCount: _candidates.length,
+                        separatorBuilder: (_, __) => const Divider(height: 1, color: Color(0xFFF1F5F9)),
+                        itemBuilder: (ctx, idx) {
+                          final cand = _candidates[idx];
+                          final nik = cand['nik']?.toString() ?? '';
+                          final name = cand['nama']?.toString() ?? '-';
+                          final dept = cand['departemen']?.toString() ?? '-';
+                          final isSelected = _selectedInspector != null && _selectedInspector!['nik'] == nik;
+
+                          return ListTile(
+                            dense: true,
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            tileColor: isSelected ? const Color(0xFFECFDF5) : Colors.transparent,
+                            leading: CircleAvatar(
+                              radius: 18,
+                              backgroundColor: isSelected ? const Color(0xFF059669) : const Color(0xFFE2E8F0),
+                              child: Text(
+                                name.isNotEmpty ? name[0].toUpperCase() : '?',
+                                style: TextStyle(
+                                  color: isSelected ? Colors.white : const Color(0xFF475569),
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ),
+                            title: Text(
+                              name,
+                              style: TextStyle(
+                                fontSize: 12.5,
+                                fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                                color: isSelected ? const Color(0xFF065F46) : const Color(0xFF0F172A),
+                              ),
+                            ),
+                            subtitle: Text(
+                              'NIK: $nik • $dept',
+                              style: const TextStyle(fontSize: 10.5, color: Color(0xFF64748B)),
+                            ),
+                            trailing: isSelected
+                                ? const Icon(Icons.check_circle_rounded, color: Color(0xFF059669), size: 20)
+                                : null,
+                            onTap: () {
+                              setState(() {
+                                _selectedInspector = cand;
+                              });
+                            },
+                          );
+                        },
+                      ),
+          ),
+          const SizedBox(height: 12),
+
+          // Konfirmasi Alihkan Tombol
+          SizedBox(
+            width: double.infinity,
+            height: 46,
+            child: ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF059669),
+                foregroundColor: Colors.white,
+                elevation: 0,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              onPressed: _isSubmitting ? null : _submitReassign,
+              icon: _isSubmitting
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                    )
+                  : const Icon(Icons.send_rounded, size: 16),
+              label: Text(
+                _selectedInspector != null
+                    ? 'Tugaskan ${_selectedInspector!['nama']}'
+                    : 'Pilih Inspector di Atas',
+                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

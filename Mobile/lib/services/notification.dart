@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -12,13 +13,31 @@ import '../pages/p2h/p2h_page.dart';
 import '../pages/performance/performance_hub_pages.dart';
 import '../pages/profile_page.dart';
 import '../pages/roster_settings_page.dart';
+import '../pages/special_permit/special_permit_followup_page.dart';
 import '../pages/special_permit/special_permit_list_page.dart';
 import '../utils/enums.dart';
+import 'api.dart';
+
+@pragma('vm:entry-point')
+void notificationTapBackground(NotificationResponse notificationResponse) {
+  // Callback background top-level yang dibutuhkan plugin flutter_local_notifications
+}
 
 class NotificationService {
   NotificationService();
 
   static final _localNotifications = FlutterLocalNotificationsPlugin();
+  static String? _pendingPayload;
+
+  static void consumePendingPayload() {
+    if (_pendingPayload != null && _pendingPayload!.isNotEmpty) {
+      final p = _pendingPayload!;
+      _pendingPayload = null;
+      Future.delayed(const Duration(milliseconds: 300), () {
+        navigateToUrl(p);
+      });
+    }
+  }
 
   static Future<void> init() async {
     const androidSettings = AndroidInitializationSettings('@mipmap/launcher_icon');
@@ -36,13 +55,26 @@ class NotificationService {
     await _localNotifications.initialize(
       initializationSettings,
       onDidReceiveNotificationResponse: (NotificationResponse response) {
-        if (response.payload != null && response.payload!.isNotEmpty) {
-          navigateToUrl(response.payload!);
+        final payload = response.payload;
+        if (payload != null && payload.isNotEmpty) {
+          navigateToUrl(payload);
         } else {
           navigateToNotifPage();
         }
       },
+      onDidReceiveBackgroundNotificationResponse: notificationTapBackground,
     );
+
+    // Deteksi jika aplikasi dibuka dari kondisi mati (terminated) via tap notifikasi
+    try {
+      final details = await _localNotifications.getNotificationAppLaunchDetails();
+      if (details != null && details.didNotificationLaunchApp && details.notificationResponse != null) {
+        final p = details.notificationResponse?.payload;
+        if (p != null && p.isNotEmpty) {
+          _pendingPayload = p;
+        }
+      }
+    } catch (_) {}
 
     // Create Android Notification Channels: Normal & Urgent Long Vibration for Findings
     final androidImplementation = _localNotifications
@@ -159,6 +191,8 @@ class NotificationService {
         enableVibration: true,
         vibrationPattern: vibrationPattern,
         playSound: true,
+        autoCancel: true,
+        channelAction: AndroidNotificationChannelAction.createIfNotExists,
         styleInformation: BigTextStyleInformation(
           body,
           contentTitle: title,
@@ -184,9 +218,38 @@ class NotificationService {
 
   // Direct navigation from notification payload / url ("langsung mengarah ke menunya")
   static void navigateToUrl(String url) {
+    if (url.trim().isEmpty) return;
     final nav = rootNavigatorKey.currentState;
-    if (nav == null) return;
+    if (nav == null) {
+      debugPrint('[NotificationService] Navigator belum siap untuk url: $url. Mengantrekan retry...');
+      _pendingPayload = url;
+      for (final delay in [200, 500, 1000, 1800]) {
+        Future.delayed(Duration(milliseconds: delay), () {
+          if (_pendingPayload != null && rootNavigatorKey.currentState != null) {
+            final p = _pendingPayload!;
+            _pendingPayload = null;
+            navigateToUrl(p);
+          }
+        });
+      }
+      return;
+    }
+    _pendingPayload = null;
+
     final lower = url.toLowerCase();
+
+    // PRIORITAS UTAMA: Special Permit / Observasi High Risk
+    // HARUS dicek paling pertama sebelum 'hazard', karena payload special_permit_obs sering memuat kata 'hazard' di dalam atribut permit!
+    if (lower.startsWith('special_permit_obs:') ||
+        lower.contains('special_permit_id:') ||
+        lower.contains('special_permit') ||
+        lower.contains('specialpermit') ||
+        lower.contains('high_risk') ||
+        lower.contains('observasi')) {
+      _openSpecialPermitObservation(url, nav);
+      return;
+    }
+
     if (lower.contains('roster')) {
       nav.push(MaterialPageRoute(builder: (_) => const RosterSettingsPage()));
     } else if (lower.contains('incident') || lower.contains('insiden') || lower.contains('safety')) {
@@ -207,11 +270,68 @@ class NotificationService {
       nav.push(MaterialPageRoute(builder: (_) => const ActionTrackerPage()));
     } else if (lower.contains('approval') || lower.contains('approval_center')) {
       nav.push(MaterialPageRoute(builder: (_) => const ApprovalCenterPage()));
-    } else if (lower.contains('special_permit') || lower.contains('specialpermit') || lower.contains('high_risk')) {
-      nav.push(MaterialPageRoute(builder: (_) => const SpecialPermitListPage()));
     } else {
       nav.push(MaterialPageRoute(builder: (_) => const NotifPage()));
     }
+  }
+
+  static Future<void> _openSpecialPermitObservation(String payload, NavigatorState nav) async {
+    // 1. Jika payload berisi JSON lengkap permit ("special_permit_obs:{...}")
+    if (payload.startsWith('special_permit_obs:')) {
+      try {
+        final rawJson = payload.substring('special_permit_obs:'.length);
+        final map = jsonDecode(rawJson);
+        if (map is Map<String, dynamic>) {
+          nav.push(MaterialPageRoute(
+            builder: (_) => SpecialPermitFollowupPage(permit: map),
+          ));
+          return;
+        }
+      } catch (e) {
+        debugPrint('[NotificationService] Gagal parse JSON permit dari payload: $e');
+      }
+    }
+
+    // 2. Jika payload berisi ID permit: "special_permit_id:<guid>"
+    if (payload.contains('special_permit_id:')) {
+      final id = payload.split('special_permit_id:').last.trim();
+      if (id.isNotEmpty) {
+        try {
+          final res = await ApiService().getSpecialPermitDetail(id);
+          bool handled = false;
+          res.fold((_) {}, (data) {
+            final p = data['data'];
+            if (p is Map<String, dynamic>) {
+              nav.push(MaterialPageRoute(
+                builder: (_) => SpecialPermitFollowupPage(permit: p),
+              ));
+              handled = true;
+            }
+          });
+          if (handled) return;
+        } catch (_) {}
+      }
+    }
+
+    // 3. Fallback cerdas: Ambil permit high risk aktif milik NIK login dari endpoint alerts
+    try {
+      final res = await ApiService().getSpecialPermitAlerts();
+      bool handled = false;
+      res.fold((_) {}, (data) {
+        final list = (data['data'] as List<dynamic>?) ?? [];
+        if (list.isNotEmpty) {
+          final first = list.first as Map<String, dynamic>;
+          nav.push(MaterialPageRoute(
+            builder: (_) => SpecialPermitFollowupPage(permit: first),
+          ));
+          handled = true;
+        }
+      });
+      if (handled) return;
+    } catch (_) {}
+
+    // 4. Jika tidak ada alert high risk aktif, buka list page
+    nav.push(MaterialPageRoute(builder: (_) => const SpecialPermitListPage()));
   }
 
   static void navigateToNotifPage() {

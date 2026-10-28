@@ -34,7 +34,18 @@ namespace Indexsafe.Api.DTOs
         public bool HasFollowup { get; set; }
         public string? LatestInspectionStatus { get; set; }
         public DateTime? LatestInspectionTime { get; set; }
+        public string? LatestInspectorNik { get; set; }
+        public string? LatestInspectorName { get; set; }
+        public string? LatestInspectorRole { get; set; }
         public int TotalFollowups { get; set; }
+    }
+
+    public class ReassignSpecialPermitDto
+    {
+        public string SpecialPermitId { get; set; } = string.Empty;
+        public string NewInspectorNik { get; set; } = string.Empty;
+        public string NewInspectorName { get; set; } = string.Empty;
+        public string? Reason { get; set; }
     }
 
     public class SpecialPermitDetailDto

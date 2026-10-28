@@ -57,3 +57,4 @@ _ReSharper*/
 
 # Temporary / Scratch scripts
 *.py
+scratch/

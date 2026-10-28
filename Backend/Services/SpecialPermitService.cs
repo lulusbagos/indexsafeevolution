@@ -6,6 +6,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Indexsafe.Api.DTOs;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Npgsql;
@@ -73,12 +74,14 @@ namespace Indexsafe.Api.Services
         public async Task<List<SpecialPermitItemDto>> GetSpecialPermitsAsync(string? nik, string? status = null, string? search = null)
         {
             var list = new List<SpecialPermitItemDto>();
+            if (string.IsNullOrWhiteSpace(nik)) return list;
+
             await using var conn = await GetBimaConnectionAsync();
             if (conn == null) return list;
 
             try
             {
-                var nikClean = (nik ?? string.Empty).Trim();
+                var nikClean = nik.Trim();
                 var nikTrimmed = nikClean.TrimStart('0');
 
                 var sql = @"
@@ -90,37 +93,37 @@ namespace Indexsafe.Api.Services
                            sp.start_date, sp.end_date, sp.job_description, sp.special_equipment, sp.work_related_hazard,
                            COALESCE(f.followup_count, 0) AS total_followups,
                            f.latest_status,
-                           f.latest_time
+                           f.latest_time,
+                           f.latest_inspector_nik,
+                           f.latest_inspector_name,
+                           f.latest_inspector_role
                     FROM public.special_permit sp
                     LEFT JOIN (
                         SELECT special_permit_id,
                                COUNT(*) AS followup_count,
                                MAX(inspection_time) AS latest_time,
-                               (ARRAY_AGG(inspection_status ORDER BY id DESC))[1] AS latest_status
+                               (ARRAY_AGG(inspection_status ORDER BY id DESC))[1] AS latest_status,
+                               (ARRAY_AGG(inspector_nik ORDER BY id DESC))[1] AS latest_inspector_nik,
+                               (ARRAY_AGG(inspector_name ORDER BY id DESC))[1] AS latest_inspector_name,
+                               (ARRAY_AGG(inspector_role ORDER BY id DESC))[1] AS latest_inspector_role
                         FROM public.tbl_m_folloup_special_permit
                         GROUP BY special_permit_id
                     ) f ON sp.id = f.special_permit_id
-                    WHERE 1=1 ";
+                    WHERE (
+                        TRIM(sp.pjo_nik) = @nikClean OR TRIM(sp.pjo_nik) = @nikTrimmed OR
+                        TRIM(sp.inspector_nik) = @nikClean OR TRIM(sp.inspector_nik) = @nikTrimmed
+                    ) ";
 
-                var parameters = new List<NpgsqlParameter>();
+                var parameters = new List<NpgsqlParameter>
+                {
+                    new NpgsqlParameter("@nikClean", nikClean),
+                    new NpgsqlParameter("@nikTrimmed", nikTrimmed)
+                };
 
                 if (!string.IsNullOrWhiteSpace(status) && status.ToUpper() != "ALL")
                 {
                     sql += " AND UPPER(sp.status) = @status ";
                     parameters.Add(new NpgsqlParameter("@status", status.ToUpper()));
-                }
-
-                if (!string.IsNullOrWhiteSpace(nikClean))
-                {
-                    sql += @" AND (
-                        TRIM(sp.pjo_nik) = @nikClean OR TRIM(sp.pjo_nik) = @nikTrimmed OR
-                        TRIM(sp.inspector_nik) = @nikClean OR TRIM(sp.inspector_nik) = @nikTrimmed OR
-                        TRIM(sp.applicant_nik) = @nikClean OR TRIM(sp.applicant_nik) = @nikTrimmed OR
-                        TRIM(sp.responsible_person_nik) = @nikClean OR TRIM(sp.responsible_person_nik) = @nikTrimmed OR
-                        TRIM(sp.created_by) = @nikClean
-                    ) ";
-                    parameters.Add(new NpgsqlParameter("@nikClean", nikClean));
-                    parameters.Add(new NpgsqlParameter("@nikTrimmed", nikTrimmed));
                 }
 
                 if (!string.IsNullOrWhiteSpace(search))
@@ -174,6 +177,9 @@ namespace Indexsafe.Api.Services
                         TotalFollowups = rdr.IsDBNull(26) ? 0 : Convert.ToInt32(rdr.GetValue(26)),
                         LatestInspectionStatus = rdr.IsDBNull(27) ? null : rdr.GetString(27),
                         LatestInspectionTime = rdr.IsDBNull(28) ? (DateTime?)null : rdr.GetDateTime(28),
+                        LatestInspectorNik = rdr.IsDBNull(29) ? null : rdr.GetString(29),
+                        LatestInspectorName = rdr.IsDBNull(30) ? null : rdr.GetString(30),
+                        LatestInspectorRole = rdr.IsDBNull(31) ? null : rdr.GetString(31),
                     };
                     item.HasFollowup = item.TotalFollowups > 0;
                     list.Add(item);
@@ -182,6 +188,80 @@ namespace Indexsafe.Api.Services
             catch (Exception ex)
             {
                 _logger.LogError(ex, "[SpecialPermitService] Error getting special permits");
+            }
+
+            return list;
+        }
+
+        public async Task<bool> ReassignInspectorAsync(string permitId, string newInspectorNik, string newInspectorName, string? assignedByNik, string? assignedByName, string? reason)
+        {
+            await using var conn = await GetBimaConnectionAsync();
+            if (conn == null) return false;
+
+            try
+            {
+                const string sql = @"
+                    UPDATE public.special_permit
+                    SET inspector_nik = @newNik,
+                        inspector_name = @newName
+                    WHERE id::text = @id OR req_id = @id;";
+
+                await using var cmd = new NpgsqlCommand(sql, conn);
+                cmd.Parameters.AddWithValue("@newNik", newInspectorNik.Trim());
+                cmd.Parameters.AddWithValue("@newName", newInspectorName.Trim());
+                cmd.Parameters.AddWithValue("@id", permitId.Trim());
+
+                var rows = await cmd.ExecuteNonQueryAsync();
+                return rows > 0;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "[SpecialPermitService] Error reassigning inspector for permit {Id}", permitId);
+                return false;
+            }
+        }
+
+        public async Task<List<object>> SearchInspectorsAsync(string? query)
+        {
+            var list = new List<object>();
+            await using var conn = await GetBimaConnectionAsync();
+            if (conn == null) return list;
+
+            try
+            {
+                var sql = @"
+                    SELECT u.employee_id, u.fullname, COALESCE(u.department, '-'), COALESCE(u.company_name, '-')
+                    FROM public.tb_user u
+                    WHERE u.is_active = true AND u.employee_id IS NOT NULL AND u.employee_id <> '' ";
+
+                if (!string.IsNullOrWhiteSpace(query))
+                {
+                    sql += " AND (u.fullname ILIKE @q OR u.employee_id ILIKE @q OR u.username ILIKE @q) ";
+                }
+
+                sql += " ORDER BY u.fullname ASC LIMIT 40;";
+
+                await using var cmd = new NpgsqlCommand(sql, conn);
+                if (!string.IsNullOrWhiteSpace(query))
+                {
+                    cmd.Parameters.AddWithValue("@q", $"%{query.Trim()}%");
+                }
+
+                await using var rdr = await cmd.ExecuteReaderAsync();
+                while (await rdr.ReadAsync())
+                {
+                    list.Add(new
+                    {
+                        nik = rdr.GetString(0),
+                        nama = rdr.GetString(1),
+                        departemen = rdr.GetString(2),
+                        perusahaan = rdr.GetString(3)
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "[SpecialPermitService] Error searching inspectors");
             }
 
             return list;
@@ -434,6 +514,9 @@ namespace Indexsafe.Api.Services
 
                 await tran.CommitAsync();
 
+                // Simpan juga ke tabel SQL Server DB_SAP
+                await SaveFollowupToSqlServerAsync(req, newId, insTime, photosSaved);
+
                 return new SpecialPermitFollowupItemDto
                 {
                     Id = newId,
@@ -463,6 +546,76 @@ namespace Indexsafe.Api.Services
             }
         }
 
+        private async Task SaveFollowupToSqlServerAsync(
+            CreateSpecialPermitFollowupDto req,
+            long bimaFollowupId,
+            DateTime insTime,
+            List<SpecialPermitPhotoDto> photosSaved)
+        {
+            try
+            {
+                var connStr = _config.GetConnectionString("DefaultConnection");
+                if (string.IsNullOrWhiteSpace(connStr)) return;
+
+                await using var conn = new SqlConnection(connStr);
+                await conn.OpenAsync();
+
+                const string sql = @"
+                    INSERT INTO dbo.tbl_t_special_permit_followup
+                    (special_permit_id, req_id, activity_type, work_location, inspector_nik, inspector_name,
+                     inspector_role, inspection_status, inspection_notes, corrective_action, is_safe,
+                     work_condition_rating, latitude, longitude, bima_followup_id, inspection_time, created_at, updated_at)
+                    OUTPUT INSERTED.id
+                    VALUES
+                    (@spId, @reqId, @actType, @loc, @nik, @name,
+                     @role, @status, @notes, @corrective, @isSafe,
+                     @rating, @lat, @lng, @bimaId, @insTime, GETDATE(), GETDATE());";
+
+                await using var cmd = new SqlCommand(sql, conn);
+                cmd.Parameters.AddWithValue("@spId", req.SpecialPermitId);
+                cmd.Parameters.AddWithValue("@reqId", (object?)req.ReqId ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@actType", (object?)req.ActivityType ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@loc", (object?)req.WorkLocation ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@nik", req.InspectorNik.Trim());
+                cmd.Parameters.AddWithValue("@name", (object?)req.InspectorName ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@role", (object?)req.InspectorRole ?? "INSPECTOR");
+                cmd.Parameters.AddWithValue("@status", req.InspectionStatus.ToUpper());
+                cmd.Parameters.AddWithValue("@notes", (object?)req.InspectionNotes ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@corrective", (object?)req.CorrectiveAction ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@isSafe", req.IsSafe);
+                cmd.Parameters.AddWithValue("@rating", req.WorkConditionRating);
+                cmd.Parameters.AddWithValue("@lat", (object?)req.Latitude ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@lng", (object?)req.Longitude ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@bimaId", bimaFollowupId > 0 ? (object)bimaFollowupId : DBNull.Value);
+                cmd.Parameters.AddWithValue("@insTime", insTime);
+
+                var sqlFollowupId = Convert.ToInt64(await cmd.ExecuteScalarAsync());
+
+                if (photosSaved != null && photosSaved.Any())
+                {
+                    foreach (var photo in photosSaved)
+                    {
+                        const string sqlPhoto = @"
+                            INSERT INTO dbo.tbl_t_special_permit_followup_photo
+                            (followup_id, photo_url, caption, created_at)
+                            VALUES (@fId, @url, @caption, GETDATE());";
+
+                        await using var cmdP = new SqlCommand(sqlPhoto, conn);
+                        cmdP.Parameters.AddWithValue("@fId", sqlFollowupId);
+                        cmdP.Parameters.AddWithValue("@url", photo.PhotoUrl);
+                        cmdP.Parameters.AddWithValue("@caption", (object?)photo.Caption ?? "Dokumentasi Verifikasi Lapangan");
+                        await cmdP.ExecuteNonQueryAsync();
+                    }
+                }
+
+                _logger.LogInformation("[SpecialPermitService] Followup successfully saved to SQL Server DB_SAP (ID: {SqlId})", sqlFollowupId);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "[SpecialPermitService] Error saving followup to SQL Server DB_SAP");
+            }
+        }
+
         public async Task<List<SpecialPermitItemDto>> GetHighRiskAlertsAsync(string nik)
         {
             var alerts = new List<SpecialPermitItemDto>();
@@ -476,27 +629,32 @@ namespace Indexsafe.Api.Services
                 var nikClean = nik.Trim();
                 var nikTrimmed = nikClean.TrimStart('0');
 
-                // Permits active today where status is WAITING or APPROVED, user is PJO or Inspector, and haven't been inspected today
+                // Permits active within work schedule where user is PJO or Inspector, and has not yet been inspected/followed up
                 const string sql = @"
                     SELECT sp.id, sp.req_id, sp.activity_type, sp.status, sp.issue_date, sp.issue_time::text,
                            sp.pjo_nik, sp.pjo_name, sp.inspector_nik, sp.inspector_name,
-                           sp.work_location, sp.start_date, sp.end_date, sp.job_description, sp.special_equipment
+                           sp.work_location, sp.start_date, sp.end_date, sp.job_description, sp.special_equipment,
+                           sp.department_id, sp.department, sp.company_id, sp.company_name,
+                           sp.implementing_contractor, sp.applicant_nik, sp.applicant_name,
+                           sp.phone, sp.responsible_person_nik, sp.responsible_person_name, sp.work_related_hazard
                     FROM public.special_permit sp
                     WHERE (
                         TRIM(sp.pjo_nik) = @nikClean OR TRIM(sp.pjo_nik) = @nikTrimmed OR
-                        TRIM(sp.inspector_nik) = @nikClean OR TRIM(sp.inspector_nik) = @nikTrimmed OR
-                        EXISTS (
-                            SELECT 1 FROM public.tb_user u
-                            LEFT JOIN public.tb_role r ON u.role_id = r.id
-                            WHERE (TRIM(u.employee_id) = @nikClean OR TRIM(u.username) = @nikClean)
-                              AND (UPPER(r.name) LIKE '%HSE%' OR UPPER(r.name) LIKE '%VERIFICATOR%' OR UPPER(r.name) LIKE '%GM%' OR UPPER(r.name) LIKE '%MANAGER%' OR UPPER(r.name) LIKE '%ADMIN%')
-                        )
+                        TRIM(sp.inspector_nik) = @nikClean OR TRIM(sp.inspector_nik) = @nikTrimmed
                     )
                     AND UPPER(sp.status) IN ('WAITING', 'APPROVED')
+                    -- Tampilkan sesuai jam pekerjaan / schedule
+                    AND (
+                        (sp.start_date IS NOT NULL AND sp.start_date <= NOW() AND (sp.end_date IS NULL OR sp.end_date >= NOW()))
+                        OR
+                        (sp.start_date IS NULL AND sp.issue_date IS NOT NULL AND (sp.issue_date < CURRENT_DATE OR (sp.issue_date = CURRENT_DATE AND (sp.issue_time IS NULL OR sp.issue_time <= CURRENT_TIME))))
+                        OR
+                        (sp.start_date IS NULL AND sp.issue_date IS NULL)
+                    )
+                    -- Belum diinspeksi / follow-up sama sekali
                     AND NOT EXISTS (
                         SELECT 1 FROM public.tbl_m_folloup_special_permit f
                         WHERE (f.special_permit_id = sp.id OR f.req_id = sp.req_id)
-                          AND f.created_at::date = CURRENT_DATE
                     )
                     ORDER BY sp.created_at DESC
                     LIMIT 20;";
@@ -525,6 +683,17 @@ namespace Indexsafe.Api.Services
                         EndDate = rdr.IsDBNull(12) ? (DateTime?)null : rdr.GetDateTime(12),
                         JobDescription = rdr.IsDBNull(13) ? null : rdr.GetString(13),
                         SpecialEquipment = rdr.IsDBNull(14) ? null : rdr.GetString(14),
+                        DepartmentId = rdr.IsDBNull(15) ? null : Convert.ToInt32(rdr.GetValue(15)),
+                        Department = rdr.IsDBNull(16) ? null : rdr.GetString(16),
+                        CompanyId = rdr.IsDBNull(17) ? null : Convert.ToInt32(rdr.GetValue(17)),
+                        CompanyName = rdr.IsDBNull(18) ? null : rdr.GetString(18),
+                        ImplementingContractor = rdr.IsDBNull(19) ? null : rdr.GetString(19),
+                        ApplicantNik = rdr.IsDBNull(20) ? null : rdr.GetString(20),
+                        ApplicantName = rdr.IsDBNull(21) ? null : rdr.GetString(21),
+                        Phone = rdr.IsDBNull(22) ? null : rdr.GetString(22),
+                        ResponsiblePersonNik = rdr.IsDBNull(23) ? null : rdr.GetString(23),
+                        ResponsiblePersonName = rdr.IsDBNull(24) ? null : rdr.GetString(24),
+                        WorkRelatedHazard = rdr.IsDBNull(25) ? null : rdr.GetString(25),
                     });
                 }
             }

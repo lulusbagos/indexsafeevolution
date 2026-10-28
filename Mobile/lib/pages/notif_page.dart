@@ -15,6 +15,7 @@ import 'history/history_detail_page.dart';
 import 'inspeksi/inspection_hub_page.dart';
 import 'performance/action_tracker_page.dart';
 import 'roster_settings_page.dart';
+import 'special_permit/special_permit_followup_page.dart';
 import 'special_permit/special_permit_list_page.dart';
 
 class NotifPage extends StatefulWidget {
@@ -361,15 +362,16 @@ class _NotifPageState extends State<NotifPage> {
                 'id': spMap['id'],
                 'is_server_notif': true,
                 'is_special_permit': true,
-                'title': '⚠️ Inspeksi High Risk: $reqId',
-                'remark': 'Kegiatan risiko tinggi $actType di $loc. Pengawas/PJO: $picName. Segera lakukan verifikasi & inspeksi lapangan!',
+                'raw_permit': spMap,
+                'title': '⚠️ Observasi High Risk: $reqId',
+                'remark': 'Kegiatan risiko tinggi $actType di $loc. Pengawas/PJO: $picName. Segera lakukan verifikasi & observasi lapangan!',
                 'category': 'special_permit',
                 'notif_type': 'special_permit_high_risk',
-                'url': '/special_permit',
+                'url': 'special_permit_obs',
                 'sender_name': picName,
                 'priority': 'urgent',
                 'payload': spMap['id'],
-                'action_text': 'Inspeksi Sekarang',
+                'action_text': 'Observasi Sekarang',
                 'is_read': false,
                 'is_actioned': false,
                 'is_action_required': true,
@@ -716,7 +718,37 @@ class _NotifPageState extends State<NotifPage> {
         return;
       }
 
-      if (item['is_special_permit'] == true || cat.contains('special_permit') || url.contains('special_permit')) {
+      if (item['is_special_permit'] == true ||
+          cat.contains('special_permit') ||
+          url.contains('special_permit') ||
+          notifType.contains('special_permit') ||
+          (item['payload'] ?? '').toString().contains('special_permit')) {
+        if (item['raw_permit'] is Map<String, dynamic>) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => SpecialPermitFollowupPage(permit: item['raw_permit'] as Map<String, dynamic>),
+            ),
+          ).then((_) => _getData());
+          return;
+        }
+        final permitId = item['payload']?.toString();
+        if (permitId != null && permitId.isNotEmpty) {
+          _api.getSpecialPermitDetail(permitId).then((res) {
+            res.fold(
+              (_) => Navigator.push(context, MaterialPageRoute(builder: (_) => const SpecialPermitListPage())).then((_) => _getData()),
+              (detailData) {
+                final p = detailData['data'] as Map<String, dynamic>?;
+                if (p != null) {
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => SpecialPermitFollowupPage(permit: p))).then((_) => _getData());
+                } else {
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => const SpecialPermitListPage())).then((_) => _getData());
+                }
+              },
+            );
+          });
+          return;
+        }
         Navigator.push(
           context,
           MaterialPageRoute(builder: (_) => const SpecialPermitListPage()),

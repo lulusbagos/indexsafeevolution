@@ -17,17 +17,13 @@ import 'database.dart';
 import 'preference.dart';
 
 class ApiService {
-  // Domain Utama = https://api_mbs.indexim.id
-  // Domain Cadangan = https://api_mbs.idcoal.id
-  // HTTP Fallback & Local Dev
+  // Production Public API & Fallbacks
   static const List<String> _candidateUrls = [
     'https://api_mbs.indexim.id',
     'https://api_mbs.idcoal.id',
-    'http://api_mbs.indexim.id',
-    'http://api_mbs.idcoal.id',
-    'http://127.0.0.1:7302',
-    'http://192.168.137.1:7302',
     'http://192.168.130.236:7302',
+    'http://127.0.0.1:7302',
+    'http://10.0.2.2:7302',
   ];
   static String _activeBaseUrl = const String.fromEnvironment(
     'API_BASE_URL',
@@ -53,6 +49,31 @@ class ApiService {
     // 2. Tambahkan kandidat berikutnya (cadangan: idcoal.id, lalu fallback lokal)
     for (final candidate in _candidateUrls) {
       if (candidate == _activeBaseUrl) continue;
+      addTarget(candidate);
+    }
+    return list;
+  }
+
+  static const List<String> _specialPermitCandidateUrls = [
+    'https://api_mbs.indexim.id',
+    'https://api_mbs.idcoal.id',
+    'http://192.168.130.236:7302',
+    'http://10.0.2.2:7302',
+    'http://127.0.0.1:7302',
+  ];
+
+  /// Khusus Special Permit: prioritaskan backend lokal terlebih dahulu agar respon instan (< 200ms)
+  static List<String> _buildSpecialPermitCandidateUrls(String cleanPath) {
+    final List<String> list = [];
+    void addTarget(String base) {
+      final b = base.endsWith('/') ? base.substring(0, base.length - 1) : base;
+      final withApi = '$b/api$cleanPath';
+      final withoutApi = '$b$cleanPath';
+      if (!list.contains(withApi)) list.add(withApi);
+      if (!list.contains(withoutApi)) list.add(withoutApi);
+    }
+
+    for (final candidate in _specialPermitCandidateUrls) {
       addTarget(candidate);
     }
     return list;
@@ -4208,16 +4229,19 @@ class ApiService {
 
   Future<Either<Map<String, dynamic>, Map<String, dynamic>>> checkApprovalCenterStatus({String? nik}) async {
     try {
-      final activeNik = nik ?? PreferenceService.getUser() ?? PreferenceService.getProfile()?.noNik ?? '';
-      final targets = _buildCandidateUrls('/approval-center/status?nik=$activeNik');
+      final activeNik = (nik ?? PreferenceService.getUser() ?? PreferenceService.getProfile()?.noNik ?? PreferenceService.getOfflineNik() ?? '').trim();
+      final targets = _buildSpecialPermitCandidateUrls('/approval-center/status?nik=$activeNik');
 
       Response? lastResponse;
       DioException? lastDioError;
+      final fastOptions = Options(
+        sendTimeout: const Duration(seconds: 3),
+        receiveTimeout: const Duration(seconds: 4),
+      );
       for (final url in targets) {
         try {
-          final res = await dio.get(url);
+          final res = await dio.get(url, options: fastOptions);
           if (res.statusCode == 200 && res.data is Map) {
-            _updateActiveBaseUrlFromTarget(url);
             return Right(Map<String, dynamic>.from(res.data as Map));
           }
           lastResponse = res;
@@ -4244,17 +4268,20 @@ class ApiService {
     int pageSize = 50,
   }) async {
     try {
-      final activeNik = nik ?? PreferenceService.getUser() ?? PreferenceService.getProfile()?.noNik ?? '';
+      final activeNik = (nik ?? PreferenceService.getUser() ?? PreferenceService.getProfile()?.noNik ?? PreferenceService.getOfflineNik() ?? '').trim();
       final query = 'nik=$activeNik&module=${module ?? 'ALL'}&page=$page&pageSize=$pageSize';
-      final targets = _buildCandidateUrls('/approval-center/pending?$query');
+      final targets = _buildSpecialPermitCandidateUrls('/approval-center/pending?$query');
 
       Response? lastResponse;
       DioException? lastDioError;
+      final fastOptions = Options(
+        sendTimeout: const Duration(seconds: 4),
+        receiveTimeout: const Duration(seconds: 4),
+      );
       for (final url in targets) {
         try {
-          final res = await dio.get(url);
+          final res = await dio.get(url, options: fastOptions);
           if (res.statusCode == 200 && res.data is Map) {
-            _updateActiveBaseUrlFromTarget(url);
             return Right(Map<String, dynamic>.from(res.data as Map));
           }
           lastResponse = res;
@@ -4281,17 +4308,20 @@ class ApiService {
     int pageSize = 50,
   }) async {
     try {
-      final activeNik = nik ?? PreferenceService.getUser() ?? PreferenceService.getProfile()?.noNik ?? '';
+      final activeNik = (nik ?? PreferenceService.getUser() ?? PreferenceService.getProfile()?.noNik ?? PreferenceService.getOfflineNik() ?? '').trim();
       final query = 'nik=$activeNik&module=${module ?? 'ALL'}&page=$page&pageSize=$pageSize';
-      final targets = _buildCandidateUrls('/approval-center/submissions?$query');
+      final targets = _buildSpecialPermitCandidateUrls('/approval-center/submissions?$query');
 
       Response? lastResponse;
       DioException? lastDioError;
+      final fastOptions = Options(
+        sendTimeout: const Duration(seconds: 4),
+        receiveTimeout: const Duration(seconds: 4),
+      );
       for (final url in targets) {
         try {
-          final res = await dio.get(url);
+          final res = await dio.get(url, options: fastOptions);
           if (res.statusCode == 200 && res.data is Map) {
-            _updateActiveBaseUrlFromTarget(url);
             return Right(Map<String, dynamic>.from(res.data as Map));
           }
           lastResponse = res;
@@ -4313,15 +4343,18 @@ class ApiService {
 
   Future<Either<Map<String, dynamic>, Map<String, dynamic>>> getApprovalDetail(int approvalId, {String? nik}) async {
     try {
-      final activeNik = nik ?? PreferenceService.getUser() ?? PreferenceService.getProfile()?.noNik ?? '';
-      final targets = _buildCandidateUrls('/approval-center/detail/$approvalId?nik=$activeNik');
+      final activeNik = (nik ?? PreferenceService.getUser() ?? PreferenceService.getProfile()?.noNik ?? PreferenceService.getOfflineNik() ?? '').trim();
+      final targets = _buildSpecialPermitCandidateUrls('/approval-center/detail/$approvalId?nik=$activeNik');
       Response? lastResponse;
       DioException? lastDioError;
+      final fastOptions = Options(
+        sendTimeout: const Duration(seconds: 4),
+        receiveTimeout: const Duration(seconds: 4),
+      );
       for (final url in targets) {
         try {
-          final res = await dio.get(url);
+          final res = await dio.get(url, options: fastOptions);
           if (res.statusCode == 200 && res.data is Map) {
-            _updateActiveBaseUrlFromTarget(url);
             return Right(Map<String, dynamic>.from(res.data as Map));
           }
           lastResponse = res;
@@ -4349,7 +4382,7 @@ class ApiService {
     String? userName,
   }) async {
     try {
-      final activeNik = userNik ?? PreferenceService.getUser() ?? PreferenceService.getProfile()?.noNik ?? '';
+      final activeNik = (userNik ?? PreferenceService.getUser() ?? PreferenceService.getProfile()?.noNik ?? PreferenceService.getOfflineNik() ?? '').trim();
       final activeName = userName ?? PreferenceService.getProfile()?.namaLengkap ?? PreferenceService.getAuth()?.user?.name ?? '';
       final payload = {
         'approvalId': approvalId,
@@ -4359,14 +4392,17 @@ class ApiService {
         'userName': activeName,
       };
 
-      final targets = _buildCandidateUrls('/approval-center/action');
+      final targets = _buildSpecialPermitCandidateUrls('/approval-center/action');
       Response? lastResponse;
       DioException? lastDioError;
+      final fastOptions = Options(
+        sendTimeout: const Duration(seconds: 4),
+        receiveTimeout: const Duration(seconds: 4),
+      );
       for (final url in targets) {
         try {
-          final res = await dio.post(url, data: payload);
+          final res = await dio.post(url, data: payload, options: fastOptions);
           if (res.statusCode == 200 && res.data is Map) {
-            _updateActiveBaseUrlFromTarget(url);
             return Right(Map<String, dynamic>.from(res.data as Map));
           }
           lastResponse = res;
@@ -4394,7 +4430,7 @@ class ApiService {
     try {
       final user = PreferenceService.getUser();
       final profile = PreferenceService.getProfile();
-      final activeNik = user ?? profile?.noNik ?? '';
+      final activeNik = (user ?? profile?.noNik ?? PreferenceService.getOfflineNik() ?? '').trim();
       final activeName = profile?.namaLengkap ?? '';
 
       final payload = {
@@ -4405,14 +4441,17 @@ class ApiService {
         'userName': activeName,
       };
 
-      final targets = _buildCandidateUrls('/approval-center/batch-action');
+      final targets = _buildSpecialPermitCandidateUrls('/approval-center/batch-action');
       Response? lastResponse;
       DioException? lastDioError;
+      final fastOptions = Options(
+        sendTimeout: const Duration(seconds: 5),
+        receiveTimeout: const Duration(seconds: 5),
+      );
       for (final url in targets) {
         try {
-          final res = await dio.post(url, data: payload);
+          final res = await dio.post(url, data: payload, options: fastOptions);
           if (res.statusCode == 200 && res.data is Map) {
-            _updateActiveBaseUrlFromTarget(url);
             return Right(Map<String, dynamic>.from(res.data as Map));
           }
           lastResponse = res;
@@ -4441,9 +4480,9 @@ class ApiService {
     String? search,
   }) async {
     try {
-      final user = PreferenceService.getUser();
       final profile = PreferenceService.getProfile();
-      final activeNik = user ?? profile?.noNik ?? '';
+      final user = PreferenceService.getUser();
+      final activeNik = (user ?? profile?.noNik ?? PreferenceService.getOfflineNik() ?? '').trim();
 
       final queryParams = <String>[];
       if (activeNik.isNotEmpty) queryParams.add('nik=$activeNik');
@@ -4451,14 +4490,17 @@ class ApiService {
       if (search != null && search.isNotEmpty) queryParams.add('search=${Uri.encodeComponent(search)}');
       final query = queryParams.isNotEmpty ? '?${queryParams.join('&')}' : '';
 
-      final targets = _buildCandidateUrls('/special-permit/list$query');
+      final targets = _buildSpecialPermitCandidateUrls('/special-permit/list$query');
       Response? lastResponse;
       DioException? lastDioError;
+      final fastOptions = Options(
+        sendTimeout: const Duration(seconds: 4),
+        receiveTimeout: const Duration(seconds: 4),
+      );
       for (final url in targets) {
         try {
-          final res = await dio.get(url);
+          final res = await dio.get(url, options: fastOptions);
           if (res.statusCode == 200 && res.data is Map) {
-            _updateActiveBaseUrlFromTarget(url);
             return Right(Map<String, dynamic>.from(res.data as Map));
           }
           lastResponse = res;
@@ -4480,14 +4522,17 @@ class ApiService {
 
   Future<Either<Map<String, dynamic>, Map<String, dynamic>>> getSpecialPermitDetail(String permitId) async {
     try {
-      final targets = _buildCandidateUrls('/special-permit/detail/$permitId');
+      final targets = _buildSpecialPermitCandidateUrls('/special-permit/detail/$permitId');
       Response? lastResponse;
       DioException? lastDioError;
+      final fastOptions = Options(
+        sendTimeout: const Duration(seconds: 4),
+        receiveTimeout: const Duration(seconds: 4),
+      );
       for (final url in targets) {
         try {
-          final res = await dio.get(url);
+          final res = await dio.get(url, options: fastOptions);
           if (res.statusCode == 200 && res.data is Map) {
-            _updateActiveBaseUrlFromTarget(url);
             return Right(Map<String, dynamic>.from(res.data as Map));
           }
           lastResponse = res;
@@ -4513,7 +4558,7 @@ class ApiService {
     try {
       final user = PreferenceService.getUser();
       final profile = PreferenceService.getProfile();
-      final activeNik = user ?? profile?.noNik ?? '';
+      final activeNik = (user ?? profile?.noNik ?? PreferenceService.getOfflineNik() ?? '').trim();
       final activeName = profile?.namaLengkap ?? '';
 
       if ((payload['inspectorNik'] == null || payload['inspectorNik'].toString().isEmpty) && activeNik.isNotEmpty) {
@@ -4523,14 +4568,17 @@ class ApiService {
         payload['inspectorName'] = activeName;
       }
 
-      final targets = _buildCandidateUrls('/special-permit/followup');
+      final targets = _buildSpecialPermitCandidateUrls('/special-permit/followup');
       Response? lastResponse;
       DioException? lastDioError;
+      final fastOptions = Options(
+        sendTimeout: const Duration(seconds: 5),
+        receiveTimeout: const Duration(seconds: 5),
+      );
       for (final url in targets) {
         try {
-          final res = await dio.post(url, data: payload);
+          final res = await dio.post(url, data: payload, options: fastOptions);
           if (res.statusCode == 200 && res.data is Map) {
-            _updateActiveBaseUrlFromTarget(url);
             return Right(Map<String, dynamic>.from(res.data as Map));
           }
           lastResponse = res;
@@ -4552,18 +4600,21 @@ class ApiService {
 
   Future<Either<Map<String, dynamic>, Map<String, dynamic>>> getSpecialPermitAlerts() async {
     try {
-      final user = PreferenceService.getUser();
       final profile = PreferenceService.getProfile();
-      final activeNik = user ?? profile?.noNik ?? '';
+      final user = PreferenceService.getUser();
+      final activeNik = (user ?? profile?.noNik ?? PreferenceService.getOfflineNik() ?? '').trim();
 
-      final targets = _buildCandidateUrls('/special-permit/alerts?nik=$activeNik');
+      final targets = _buildSpecialPermitCandidateUrls('/special-permit/alerts?nik=$activeNik');
       Response? lastResponse;
       DioException? lastDioError;
+      final fastOptions = Options(
+        sendTimeout: const Duration(seconds: 4),
+        receiveTimeout: const Duration(seconds: 4),
+      );
       for (final url in targets) {
         try {
-          final res = await dio.get(url);
+          final res = await dio.get(url, options: fastOptions);
           if (res.statusCode == 200 && res.data is Map) {
-            _updateActiveBaseUrlFromTarget(url);
             return Right(Map<String, dynamic>.from(res.data as Map));
           }
           lastResponse = res;
@@ -4581,6 +4632,90 @@ class ApiService {
     } catch (e) {
       return Left({'message': e.toString()});
     }
+  }
+
+  Future<Either<Map<String, dynamic>, Map<String, dynamic>>> reassignSpecialPermitInspector({
+    required String permitId,
+    required String newInspectorNik,
+    required String newInspectorName,
+    String? reason,
+  }) async {
+    try {
+      final payload = {
+        'specialPermitId': permitId,
+        'newInspectorNik': newInspectorNik,
+        'newInspectorName': newInspectorName,
+        'reason': reason ?? 'Dialihkan oleh PJO',
+      };
+
+      final targets = _buildSpecialPermitCandidateUrls('/special-permit/reassign');
+      Response? lastResponse;
+      DioException? lastDioError;
+      final fastOptions = Options(
+        sendTimeout: const Duration(seconds: 4),
+        receiveTimeout: const Duration(seconds: 4),
+      );
+      for (final url in targets) {
+        try {
+          final res = await dio.post(url, data: payload, options: fastOptions);
+          if (res.statusCode == 200 && res.data is Map) {
+            return Right(Map<String, dynamic>.from(res.data as Map));
+          }
+          lastResponse = res;
+        } on DioException catch (de) {
+          lastDioError = de;
+        } catch (_) {}
+      }
+      if (lastResponse != null && lastResponse.data is Map) {
+        return Right(Map<String, dynamic>.from(lastResponse.data as Map));
+      }
+      if (lastDioError != null) {
+        return Left(errorHandler(lastDioError) as Map<String, dynamic>);
+      }
+      return const Left({'message': 'Gagal mengalihkan penugasan inspeksi'});
+    } catch (e) {
+      return Left({'message': e.toString()});
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> searchMasterEmployees(String query) async {
+    try {
+      final targets = _buildCandidateUrls('/master/employees?query=${Uri.encodeComponent(query)}&limit=30');
+      for (final url in targets) {
+        try {
+          final res = await dio.get(url);
+          if (res.statusCode == 200 && res.data != null) {
+            final raw = res.data is Map ? (res.data['data'] as List<dynamic>?) : (res.data as List<dynamic>?);
+            if (raw != null) {
+              return raw.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+            }
+          }
+        } catch (_) {}
+      }
+    } catch (_) {}
+    return [];
+  }
+
+  Future<List<Map<String, dynamic>>> searchInspectors(String query) async {
+    try {
+      final targets = _buildSpecialPermitCandidateUrls('/special-permit/inspectors?query=${Uri.encodeComponent(query)}');
+      final fastOptions = Options(
+        sendTimeout: const Duration(seconds: 4),
+        receiveTimeout: const Duration(seconds: 4),
+      );
+      for (final url in targets) {
+        try {
+          final res = await dio.get(url, options: fastOptions);
+          if (res.statusCode == 200 && res.data != null) {
+            final raw = res.data is Map ? (res.data['data'] as List<dynamic>?) : (res.data as List<dynamic>?);
+            if (raw != null) {
+              return raw.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+            }
+          }
+        } catch (_) {}
+      }
+    } catch (_) {}
+    return [];
   }
 }
 

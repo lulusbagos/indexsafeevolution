@@ -4,6 +4,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 
 import '../services/api.dart';
 import '../services/database.dart';
+import '../services/notification.dart';
 import '../services/preference.dart';
 import '../services/sync.dart';
 import '../utils/globals.dart' as globals;
@@ -257,6 +258,7 @@ class _SplashPageState extends State<SplashPage>
         (route) => false,
       );
     }
+    NotificationService.consumePendingPayload();
   }
 
   bool _isVersionLower(String current, String target) {

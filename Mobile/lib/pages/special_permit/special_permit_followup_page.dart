@@ -48,18 +48,26 @@ class _SpecialPermitFollowupPageState extends State<SpecialPermitFollowupPage> {
     _getCurrentCoordinates();
   }
 
+  bool _isAssigned = true;
+
   void _determineRole() {
     final profile = PreferenceService.getProfile();
-    final userNik = PreferenceService.getUser() ?? profile?.noNik ?? '';
+    final userNik = (PreferenceService.getUser() ?? profile?.noNik ?? PreferenceService.getOfflineNik() ?? '').trim();
     final pjoNik = widget.permit['pjoNik']?.toString().trim() ?? '';
     final inspectorNik = widget.permit['inspectorNik']?.toString().trim() ?? '';
 
-    if (userNik.isNotEmpty && pjoNik.isNotEmpty && (userNik == pjoNik || userNik.endsWith(pjoNik) || pjoNik.endsWith(userNik))) {
+    final isPjo = userNik.isNotEmpty && pjoNik.isNotEmpty && (userNik == pjoNik || userNik.endsWith(pjoNik) || pjoNik.endsWith(userNik));
+    final isInspector = userNik.isNotEmpty && inspectorNik.isNotEmpty && (userNik == inspectorNik || userNik.endsWith(inspectorNik) || inspectorNik.endsWith(userNik));
+
+    if (isPjo) {
       _inspectorRole = 'PJO';
-    } else if (userNik.isNotEmpty && inspectorNik.isNotEmpty && (userNik == inspectorNik || userNik.endsWith(inspectorNik) || inspectorNik.endsWith(userNik))) {
+      _isAssigned = true;
+    } else if (isInspector) {
       _inspectorRole = 'INSPECTOR';
+      _isAssigned = true;
     } else {
       _inspectorRole = 'SUPERVISOR';
+      _isAssigned = false;
     }
   }
 
@@ -130,6 +138,31 @@ class _SpecialPermitFollowupPageState extends State<SpecialPermitFollowupPage> {
       return;
     }
 
+    // Validasi WAJIB melampirkan foto dokumentasi
+    if (_capturedPhotos.isEmpty) {
+      HapticFeedback.heavyImpact();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Row(
+            children: [
+              Icon(Icons.add_a_photo_rounded, color: Colors.white, size: 20),
+              SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Wajib melampirkan minimal 1 foto dokumentasi bukti inspeksi lapangan!',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                ),
+              ),
+            ],
+          ),
+          backgroundColor: const Color(0xFFDC2626),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        ),
+      );
+      return;
+    }
+
     setState(() => _isSubmitting = true);
 
     try {
@@ -181,9 +214,72 @@ class _SpecialPermitFollowupPageState extends State<SpecialPermitFollowupPage> {
         (data) async {
           await HapticFeedback.heavyImpact();
           if (!mounted) return;
+
+          // Dialog konfirmasi hijau bahwa verifikasi sudah tersimpan
+          await showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (ctx) => AlertDialog(
+              backgroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+              contentPadding: const EdgeInsets.fromLTRB(24, 28, 24, 20),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 72,
+                    height: 72,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFECFDF5),
+                      shape: BoxShape.circle,
+                      border: Border.all(color: const Color(0xFFA7F3D0), width: 3),
+                    ),
+                    child: const Icon(Icons.check_circle_rounded, color: Color(0xFF059669), size: 46),
+                  ),
+                  const SizedBox(height: 18),
+                  const Text(
+                    'Verifikasi Berhasil Disimpan!',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w900,
+                      color: Color(0xFF065F46),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Observasi lapangan kegiatan ${_inspectionStatus.toUpperCase()} telah berhasil tercatat. Status permit kini telah diperbarui menjadi Sudah Diinspeksi.',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 12.5,
+                      color: Color(0xFF047857),
+                      height: 1.4,
+                    ),
+                  ),
+                  const SizedBox(height: 22),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 44,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF059669),
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      onPressed: () => Navigator.pop(ctx),
+                      child: const Text('OK, Selesai', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+
+          if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Verifikasi Follow-up Special Permit berhasil disimpan!'),
+              content: Text('✅ Verifikasi Follow-up Special Permit berhasil disimpan!'),
               backgroundColor: Color(0xFF059669),
             ),
           );
@@ -211,7 +307,6 @@ class _SpecialPermitFollowupPageState extends State<SpecialPermitFollowupPage> {
 
   @override
   Widget build(BuildContext context) {
-    const bgDark = Color(0xFF0F2628);
     final activityType = (widget.permit['activityType'] ?? 'SPECIAL PERMIT').toString().replaceAll('_', ' ');
     final actColor = _getActivityColor(activityType);
     final reqId = widget.permit['reqId']?.toString() ?? '-';
@@ -223,17 +318,18 @@ class _SpecialPermitFollowupPageState extends State<SpecialPermitFollowupPage> {
     final equipment = widget.permit['specialEquipment']?.toString();
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF3F7F7),
+      backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
-        backgroundColor: bgDark,
+        backgroundColor: Colors.white,
         elevation: 0,
+        centerTitle: false,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 20),
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Color(0xFF0F172A), size: 20),
           onPressed: () => Navigator.pop(context),
         ),
         title: const Text(
-          'Inspeksi Special Permit',
-          style: TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w800),
+          'Observasi Special Permit',
+          style: TextStyle(color: Color(0xFF0F172A), fontSize: 17, fontWeight: FontWeight.w800),
         ),
       ),
       body: SingleChildScrollView(
@@ -241,6 +337,35 @@ class _SpecialPermitFollowupPageState extends State<SpecialPermitFollowupPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            if (!_isAssigned) ...[
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                margin: const EdgeInsets.only(bottom: 14),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFEF2F2),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: const Color(0xFFFECACA)),
+                ),
+                child: const Row(
+                  children: [
+                    Icon(Icons.info_outline_rounded, color: Color(0xFFDC2626), size: 20),
+                    SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'Pemberitahuan: NIK Anda tidak terdaftar sebagai PJO Lapangan atau Inspector pada pengajuan permit ini.',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFF991B1B),
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+
             // Card Detail Kegiatan High Risk
             Container(
               width: double.infinity,
@@ -305,7 +430,7 @@ class _SpecialPermitFollowupPageState extends State<SpecialPermitFollowupPage> {
             // Bagian Form Follow-Up & Verifikasi
             const Text(
               'Form Hasil Verifikasi & Inspeksi',
-              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: Color(0xFF0F2628)),
+              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: Color(0xFF0F172A)),
             ),
             const SizedBox(height: 4),
             const Text(
@@ -379,7 +504,7 @@ class _SpecialPermitFollowupPageState extends State<SpecialPermitFollowupPage> {
       children: [
         const Text(
           'Status Kondisi Lapangan',
-          style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: Color(0xFF0F2628)),
+          style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
         ),
         const SizedBox(height: 8),
         _buildStatusOption(
@@ -452,7 +577,7 @@ class _SpecialPermitFollowupPageState extends State<SpecialPermitFollowupPage> {
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w800,
-                        color: isSelected ? color : const Color(0xFF0F2628),
+                        color: isSelected ? color : const Color(0xFF0F172A),
                       ),
                     ),
                     const SizedBox(height: 2),
@@ -488,7 +613,7 @@ class _SpecialPermitFollowupPageState extends State<SpecialPermitFollowupPage> {
             children: [
               const Text(
                 'Rating Kesiapan Tempat Kerja',
-                style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: Color(0xFF0F2628)),
+                style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
               ),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
@@ -538,7 +663,7 @@ class _SpecialPermitFollowupPageState extends State<SpecialPermitFollowupPage> {
         children: [
           const Text(
             'Peran Anda Dalam Inspeksi Ini',
-            style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: Color(0xFF0F2628)),
+            style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
           ),
           const SizedBox(height: 8),
           Row(
@@ -564,10 +689,10 @@ class _SpecialPermitFollowupPageState extends State<SpecialPermitFollowupPage> {
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 8),
           decoration: BoxDecoration(
-            color: isSelected ? const Color(0xFF0F2628) : const Color(0xFFF1F5F9),
+            color: isSelected ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
             borderRadius: BorderRadius.circular(10),
             border: Border.all(
-              color: isSelected ? const Color(0xFF0F2628) : const Color(0xFFCBD5E1),
+              color: isSelected ? const Color(0xFF0F172A) : const Color(0xFFCBD5E1),
             ),
           ),
           child: Center(
@@ -598,7 +723,7 @@ class _SpecialPermitFollowupPageState extends State<SpecialPermitFollowupPage> {
         children: [
           const Text(
             'Catatan / Hasil Pemeriksaan Kondisi Lapangan *',
-            style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: Color(0xFF0F2628)),
+            style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
           ),
           const SizedBox(height: 4),
           const Text(
@@ -687,13 +812,34 @@ class _SpecialPermitFollowupPageState extends State<SpecialPermitFollowupPage> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
-                'Dokumentasi Foto Lapangan',
-                style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: Color(0xFF0F2628)),
+              Row(
+                children: [
+                  const Text(
+                    'Dokumentasi Foto Lapangan',
+                    style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
+                  ),
+                  const SizedBox(width: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFEF2F2),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: const Color(0xFFFCA5A5)),
+                    ),
+                    child: const Text(
+                      'WAJIB',
+                      style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.w900, color: Color(0xFFDC2626)),
+                    ),
+                  ),
+                ],
               ),
               Text(
                 '${_capturedPhotos.length} foto terpilih',
-                style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  color: _capturedPhotos.isEmpty ? const Color(0xFFDC2626) : const Color(0xFF059669),
+                ),
               ),
             ],
           ),
@@ -702,6 +848,29 @@ class _SpecialPermitFollowupPageState extends State<SpecialPermitFollowupPage> {
             'Lampirkan foto kondisi aktual area kerja, APD, dan peralatan berisiko tinggi.',
             style: TextStyle(fontSize: 10.5, color: Color(0xFF64748B)),
           ),
+          if (_capturedPhotos.isEmpty) ...[
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFFBEB),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFFFDE68A)),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.info_outline_rounded, size: 15, color: Color(0xFFD97706)),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Wajib melampirkan minimal 1 foto bukti kondisi lapangan agar observasi dapat disimpan.',
+                      style: TextStyle(fontSize: 10.5, color: Color(0xFF92400E), fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
           const SizedBox(height: 10),
 
           // Action buttons: Kamera & Galeri
@@ -710,8 +879,8 @@ class _SpecialPermitFollowupPageState extends State<SpecialPermitFollowupPage> {
               Expanded(
                 child: OutlinedButton.icon(
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: const Color(0xFF0F2628),
-                    side: const BorderSide(color: Color(0xFF0F2628)),
+                    foregroundColor: const Color(0xFF0F172A),
+                    side: const BorderSide(color: Color(0xFFCBD5E1)),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                   ),
                   onPressed: () => _pickPhoto(ImageSource.camera),
@@ -798,11 +967,11 @@ class _SpecialPermitFollowupPageState extends State<SpecialPermitFollowupPage> {
         children: [
           const Row(
             children: [
-              Icon(Icons.shield_outlined, size: 16, color: Color(0xFF0F2628)),
+              Icon(Icons.shield_outlined, size: 16, color: Color(0xFF0F172A)),
               SizedBox(width: 6),
               Text(
                 'Identitas Verifikator Lapangan',
-                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Color(0xFF0F2628)),
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
               ),
             ],
           ),
@@ -825,13 +994,13 @@ class _SpecialPermitFollowupPageState extends State<SpecialPermitFollowupPage> {
                 const SizedBox(
                   width: 12,
                   height: 12,
-                  child: CircularProgressIndicator(strokeWidth: 1.5, color: Color(0xFF0F2628)),
+                  child: CircularProgressIndicator(strokeWidth: 1.5, color: Color(0xFF0F172A)),
                 )
               else
                 IconButton(
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),
-                  icon: const Icon(Icons.refresh, size: 16, color: Color(0xFF0F2628)),
+                  icon: const Icon(Icons.refresh, size: 16, color: Color(0xFF0F172A)),
                   onPressed: _getCurrentCoordinates,
                 ),
             ],
@@ -866,7 +1035,7 @@ class _SpecialPermitFollowupPageState extends State<SpecialPermitFollowupPage> {
           height: 48,
           child: ElevatedButton.icon(
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF0F2628),
+              backgroundColor: const Color(0xFF0F172A),
               foregroundColor: Colors.white,
               elevation: 0,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
@@ -880,7 +1049,7 @@ class _SpecialPermitFollowupPageState extends State<SpecialPermitFollowupPage> {
                   )
                 : const Icon(Icons.send_rounded, size: 18),
             label: Text(
-              _isSubmitting ? 'Menyimpan ke Database...' : 'Simpan Hasil Verifikasi Inspeksi',
+              _isSubmitting ? 'Menyimpan ke Database...' : 'Simpan Observasi & Follow-up',
               style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800),
             ),
           ),

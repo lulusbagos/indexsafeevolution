@@ -149,7 +149,7 @@ class _LoginPageState extends State<LoginPage> {
           currentPassword != '123456') {
         if (!mounted) return;
         setState(() => _isLoading = false);
-        SnackBarMsg.danger(context, 'Kata sandi otentikasi tidak sesuai!');
+        SnackBarMsg.danger(context, 'Kata sandi yang Anda masukkan salah. Silakan periksa kembali!');
         return;
       }
 
@@ -230,32 +230,52 @@ class _LoginPageState extends State<LoginPage> {
               errMsg.toLowerCase().contains('refused') ||
               errMsg.toLowerCase().contains('server');
 
+          final lowerErr = errMsg.toLowerCase();
+          final isPermitOrInactive = lowerErr.contains('permit') ||
+              lowerErr.contains('oneev') ||
+              lowerErr.contains('onedb') ||
+              lowerErr.contains('tidak aktif') ||
+              lowerErr.contains('nonaktif');
+
           if (errMsg.contains('pemetaan jabatan SAP') ||
               errMsg.contains('vw_r_karyawan_jabatan_mapping_preview') ||
-              errMsg.toLowerCase().contains('akses tidak diizinkan') ||
-              errMsg.toLowerCase().contains('akses ditolak')) {
+              lowerErr.contains('akses tidak diizinkan') ||
+              lowerErr.contains('akses ditolak') ||
+              isPermitOrInactive) {
             showDialog(
               context: context,
               builder: (ctx) => AlertDialog(
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                title: const Row(
+                title: Row(
                   children: [
-                    Icon(Icons.gpp_bad_rounded, color: Color(0xFFDC2626), size: 24),
-                    SizedBox(width: 10),
-                    Text(
-                      'Akses Ditolak',
-                      style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
+                    Icon(
+                      isPermitOrInactive
+                          ? Icons.warning_amber_rounded
+                          : Icons.gpp_bad_rounded,
+                      color: isPermitOrInactive
+                          ? const Color(0xFFD97706)
+                          : const Color(0xFFDC2626),
+                      size: 24,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        isPermitOrInactive ? 'Status Permit / Akun' : 'Akses Ditolak',
+                        style: const TextStyle(fontSize: 16.5, fontWeight: FontWeight.w700),
+                      ),
                     ),
                   ],
                 ),
                 content: Text(
                   errMsg,
-                  style: const TextStyle(fontSize: 13, height: 1.4, color: Color(0xFF475569)),
+                  style: const TextStyle(fontSize: 13.5, height: 1.45, color: Color(0xFF475569)),
                 ),
                 actions: [
                   ElevatedButton(
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFDC2626),
+                      backgroundColor: isPermitOrInactive
+                          ? const Color(0xFFD97706)
+                          : const Color(0xFFDC2626),
                       foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                     ),

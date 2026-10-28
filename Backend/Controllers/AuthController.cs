@@ -127,24 +127,24 @@ namespace Indexsafe.Api.Controllers
             // User must be registered in ONE DB MITRA
             if (karyawanMaster == null)
             {
-                return Unauthorized(new { message = "User tidak terdaftar." });
+                return Unauthorized(new { message = "NIK / Pengguna tidak terdaftar dalam sistem. Pastikan NIK yang Anda masukkan sudah benar dan terdaftar di aplikasi OneEV." });
             }
 
-            // User must be active
+            // User must be active & permit must be active
             if (!karyawanMaster.StatusAktif)
             {
-                return Unauthorized(new { message = "Status karyawan nonaktif di OneDB EV. Silahkan hubungi HR perusahaan." });
+                return Unauthorized(new { message = "Akun Anda saat ini tidak dapat digunakan karena status tidak aktif. Pastikan permit Anda masih aktif dengan memeriksanya di aplikasi OneEV, atau silakan hubungi HR / HSE perusahaan Anda." });
             }
 
             if (!isValid)
             {
-                return Unauthorized(new { message = "Tidak bisa login karena password salah." });
+                return Unauthorized(new { message = "Kata sandi yang Anda masukkan salah. Silakan periksa kembali atau gunakan fitur 'Lupa Password' jika ingin me-reset kata sandi." });
             }
 
             // Check excluded company
             if (ExcludedCompanies.IsExcluded(karyawanMaster.IdPerusahaan))
             {
-                return Unauthorized(new { message = "Akun tidak dapat digunakan pada sistem ini." });
+                return Unauthorized(new { message = "Perusahaan Anda belum memiliki izin akses ke sistem Indexsafe Evolution. Silakan hubungi administrator HSE." });
             }
 
             idPerusahaan = karyawanMaster.IdPerusahaan;
@@ -1130,7 +1130,7 @@ namespace Indexsafe.Api.Controllers
             {
                 return BadRequest(new
                 {
-                    message = "NIK tidak terdaftar dalam database perusahaan!"
+                    message = "NIK tidak terdaftar dalam database perusahaan. Silakan periksa kembali atau hubungi HR."
                 });
             }
 
@@ -1141,7 +1141,7 @@ namespace Indexsafe.Api.Controllers
             {
                 return BadRequest(new
                 {
-                    message = "Tanggal lahir salah! Silakan hubungi HR perusahaan Anda untuk memastikan tanggal lahir yang benar."
+                    message = "Tanggal lahir tidak sesuai dengan data terdaftar di aplikasi OneEV. Silakan periksa kembali atau hubungi HR perusahaan Anda."
                 });
             }
 

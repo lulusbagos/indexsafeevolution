@@ -180,29 +180,27 @@ class _ApprovalCenterPageState extends State<ApprovalCenterPage>
 
   @override
   Widget build(BuildContext context) {
-    const bgDark = Color(0xFF0F2628);
-
     return Scaffold(
-      backgroundColor: const Color(0xFFF3F7F7),
+      backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
-        backgroundColor: bgDark,
+        backgroundColor: Colors.white,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 20),
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Color(0xFF0F172A), size: 18),
           onPressed: () => Navigator.pop(context),
         ),
         title: const Text(
           'Approval Center',
           style: TextStyle(
-            color: Colors.white,
-            fontSize: 18,
+            color: Color(0xFF0F172A),
+            fontSize: 17,
             fontWeight: FontWeight.w800,
-            letterSpacing: 0.3,
+            letterSpacing: 0.2,
           ),
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.refresh_rounded, color: Colors.white),
+            icon: const Icon(Icons.refresh_rounded, color: Color(0xFF0F172A)),
             tooltip: 'Segarkan',
             onPressed: _loadAllData,
           ),
@@ -237,13 +235,18 @@ class _ApprovalCenterPageState extends State<ApprovalCenterPage>
   Widget _buildUserProfileHeader() {
     if (_isLoadingStatus) {
       return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        color: const Color(0xFF0F2628),
+        margin: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: const Color(0xFFE2E8F0)),
+        ),
         child: const Center(
           child: SizedBox(
             height: 20,
             width: 20,
-            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+            child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF1D4ED8)),
           ),
         ),
       );
@@ -257,175 +260,153 @@ class _ApprovalCenterPageState extends State<ApprovalCenterPage>
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(16, 6, 16, 16),
-      decoration: const BoxDecoration(
-        color: Color(0xFF0F2628),
-        borderRadius: BorderRadius.only(
-          bottomLeft: Radius.circular(24),
-          bottomRight: Radius.circular(24),
-        ),
+      margin: const EdgeInsets.fromLTRB(16, 10, 16, 4),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x06000000),
+            blurRadius: 8,
+            offset: Offset(0, 2),
+          ),
+        ],
       ),
-      child: Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.08),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 48,
-              height: 48,
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF0284C7), Color(0xFF0EA5E9)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
+      child: Row(
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFF1D4ED8), Color(0xFF2563EB)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Icon(Icons.verified_user_rounded, color: Colors.white, size: 24),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  fullname,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Color(0xFF0F172A),
+                    fontSize: 14.5,
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
-                borderRadius: BorderRadius.circular(14),
-                boxShadow: [
-                  BoxShadow(
-                    color: const Color(0xFF0284C7).withValues(alpha: 0.35),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: const Icon(Icons.verified_user_rounded, color: Colors.white, size: 26),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    fullname,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w800,
+                const SizedBox(height: 3),
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEFF6FF),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(color: const Color(0xFFBFDBFE)),
+                      ),
+                      child: Text(
+                        roleName,
+                        style: const TextStyle(
+                          color: Color(0xFF1D4ED8),
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 3),
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF38BDF8).withValues(alpha: 0.2),
-                          borderRadius: BorderRadius.circular(6),
-                          border: Border.all(color: const Color(0xFF38BDF8).withValues(alpha: 0.4)),
-                        ),
-                        child: Text(
-                          roleName,
-                          style: const TextStyle(
-                            color: Color(0xFFBAE6FD),
-                            fontSize: 10,
-                            fontWeight: FontWeight.w800,
-                          ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        '$dept • $company',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Color(0xFF64748B),
+                          fontSize: 11,
+                          fontWeight: FontWeight.w500,
                         ),
                       ),
-                      const SizedBox(width: 6),
-                      Expanded(
-                        child: Text(
-                          '$dept • $company',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.7),
-                            fontSize: 11,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            if (pendingCount > 0)
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFEF4444),
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFFEF4444).withValues(alpha: 0.4),
-                      blurRadius: 8,
-                      offset: const Offset(0, 3),
                     ),
                   ],
                 ),
-                child: Text(
-                  '$pendingCount Menunggu',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w900,
-                  ),
+              ],
+            ),
+          ),
+          if (pendingCount > 0)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4.5),
+              decoration: BoxDecoration(
+                color: const Color(0xFFEF4444),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Text(
+                '$pendingCount Menunggu',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w800,
                 ),
               ),
-          ],
-        ),
+            ),
+        ],
       ),
     );
   }
 
   Widget _buildSegmentedTabs() {
     return Container(
-      margin: const EdgeInsets.fromLTRB(16, 14, 16, 8),
+      margin: const EdgeInsets.fromLTRB(16, 8, 16, 6),
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x0C000000),
-            blurRadius: 10,
-            offset: Offset(0, 3),
-          ),
-        ],
+        color: const Color(0xFFF1F5F9),
+        borderRadius: BorderRadius.circular(14),
       ),
       child: TabBar(
         controller: _tabController,
         indicator: BoxDecoration(
-          color: const Color(0xFF0F2628),
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: [
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(10),
+          boxShadow: const [
             BoxShadow(
-              color: const Color(0xFF0F2628).withValues(alpha: 0.25),
-              blurRadius: 8,
-              offset: const Offset(0, 3),
+              color: Color(0x0C000000),
+              blurRadius: 4,
+              offset: Offset(0, 2),
             ),
           ],
         ),
-        labelColor: Colors.white,
+        labelColor: const Color(0xFF0F172A),
         unselectedLabelColor: const Color(0xFF64748B),
-        labelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800),
-        unselectedLabelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+        labelStyle: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800),
+        unselectedLabelStyle: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600),
         dividerColor: Colors.transparent,
         tabs: [
           Tab(
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(Icons.pending_actions_rounded, size: 18),
+                const Icon(Icons.pending_actions_rounded, size: 16),
                 const SizedBox(width: 6),
                 const Text('Perlu Persetujuan'),
                 if (_pendingList.isNotEmpty) ...[
                   const SizedBox(width: 6),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
                     decoration: BoxDecoration(
                       color: const Color(0xFFEF4444),
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: Text(
                       '${_pendingList.length}',
-                      style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                      style: const TextStyle(color: Colors.white, fontSize: 9.5, fontWeight: FontWeight.bold),
                     ),
                   ),
                 ],
@@ -436,20 +417,20 @@ class _ApprovalCenterPageState extends State<ApprovalCenterPage>
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(Icons.outbox_rounded, size: 18),
+                const Icon(Icons.outbox_rounded, size: 16),
                 const SizedBox(width: 6),
                 const Text('Proses Pengajuan'),
                 if (_submissionList.isNotEmpty) ...[
                   const SizedBox(width: 6),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF64748B).withValues(alpha: 0.2),
+                      color: const Color(0xFF0F172A),
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: Text(
                       '${_submissionList.length}',
-                      style: const TextStyle(color: Color(0xFF334155), fontSize: 10, fontWeight: FontWeight.bold),
+                      style: const TextStyle(color: Colors.white, fontSize: 9.5, fontWeight: FontWeight.bold),
                     ),
                   ),
                 ],
@@ -493,27 +474,27 @@ class _ApprovalCenterPageState extends State<ApprovalCenterPage>
             child: FilterChip(
               avatar: Icon(
                 icon,
-                size: 16,
+                size: 15,
                 color: isSelected ? Colors.white : const Color(0xFF475569),
               ),
               label: Text(label),
               labelStyle: TextStyle(
                 color: isSelected ? Colors.white : const Color(0xFF334155),
-                fontSize: 12,
+                fontSize: 11.5,
                 fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
               ),
               selected: isSelected,
               onSelected: (_) => _onModuleSelected(m),
-              selectedColor: const Color(0xFF0F2628),
+              selectedColor: const Color(0xFF1D4ED8),
               backgroundColor: Colors.white,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(20),
                 side: BorderSide(
-                  color: isSelected ? const Color(0xFF0F2628) : const Color(0xFFE2E8F0),
+                  color: isSelected ? const Color(0xFF1D4ED8) : const Color(0xFFE2E8F0),
                 ),
               ),
               showCheckmark: false,
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
             ),
           );
         }).toList(),
@@ -523,7 +504,7 @@ class _ApprovalCenterPageState extends State<ApprovalCenterPage>
 
   Widget _buildPendingList() {
     if (_isLoadingPending) {
-      return const Center(child: CircularProgressIndicator(color: Color(0xFF0F2628)));
+      return const Center(child: CircularProgressIndicator(color: Color(0xFF1D4ED8)));
     }
 
     if (_pendingList.isEmpty) {
@@ -543,7 +524,7 @@ class _ApprovalCenterPageState extends State<ApprovalCenterPage>
             const SizedBox(height: 16),
             const Text(
               'Tidak Ada Dokumen Menunggu',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Color(0xFF0F2628)),
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
             ),
             const SizedBox(height: 6),
             const Padding(
@@ -587,7 +568,7 @@ class _ApprovalCenterPageState extends State<ApprovalCenterPage>
                           _selectedIds.length == _pendingList.length
                               ? 'Batal Semua'
                               : 'Pilih Semua (${_pendingList.length})',
-                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Color(0xFF0F2628)),
+                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
                         ),
                       ],
                     ),
@@ -637,7 +618,7 @@ class _ApprovalCenterPageState extends State<ApprovalCenterPage>
         Expanded(
           child: RefreshIndicator(
             onRefresh: _loadPending,
-            color: const Color(0xFF0F2628),
+            color: const Color(0xFF1D4ED8),
             child: ListView.separated(
               padding: const EdgeInsets.fromLTRB(16, 2, 16, 80),
               itemCount: _pendingList.length,
@@ -717,7 +698,7 @@ class _ApprovalCenterPageState extends State<ApprovalCenterPage>
               children: [
                 Text(
                   '${_selectedIds.length} Dokumen Dipilih',
-                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900, color: Color(0xFF0F2628)),
+                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900, color: Color(0xFF0F172A)),
                 ),
                 const SizedBox(height: 2),
                 const Text(
@@ -776,7 +757,7 @@ class _ApprovalCenterPageState extends State<ApprovalCenterPage>
             const Expanded(
               child: Text(
                 'Setujui Sekaligus',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Color(0xFF0F2628)),
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
               ),
             ),
           ],
@@ -876,7 +857,7 @@ class _ApprovalCenterPageState extends State<ApprovalCenterPage>
 
   Widget _buildSubmissionsList() {
     if (_isLoadingSubmissions) {
-      return const Center(child: CircularProgressIndicator(color: Color(0xFF0F2628)));
+      return const Center(child: CircularProgressIndicator(color: Color(0xFF1D4ED8)));
     }
 
     if (_submissionList.isEmpty) {
@@ -896,7 +877,7 @@ class _ApprovalCenterPageState extends State<ApprovalCenterPage>
             const SizedBox(height: 16),
             const Text(
               'Belum Ada Pengajuan Terpantau',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Color(0xFF0F2628)),
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
             ),
             const SizedBox(height: 6),
             const Padding(
@@ -914,7 +895,7 @@ class _ApprovalCenterPageState extends State<ApprovalCenterPage>
 
     return RefreshIndicator(
       onRefresh: _loadSubmissions,
-      color: const Color(0xFF0F2628),
+      color: const Color(0xFF1D4ED8),
       child: ListView.separated(
         padding: const EdgeInsets.fromLTRB(16, 10, 16, 24),
         itemCount: _submissionList.length,
@@ -1036,7 +1017,7 @@ class _ApprovalCenterPageState extends State<ApprovalCenterPage>
               Text(
                 nomor,
                 style: const TextStyle(
-                  color: Color(0xFF0F2628),
+                  color: Color(0xFF0F172A),
                   fontSize: 13,
                   fontWeight: FontWeight.w800,
                   letterSpacing: 0.2,
@@ -1125,7 +1106,7 @@ class _ApprovalCenterPageState extends State<ApprovalCenterPage>
                   height: 36,
                   child: ElevatedButton.icon(
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF0F2628),
+                      backgroundColor: const Color(0xFF1D4ED8),
                       foregroundColor: Colors.white,
                       elevation: 0,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
@@ -1351,14 +1332,14 @@ class _ApprovalDetailBottomSheetState extends State<_ApprovalDetailBottomSheet> 
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
             child: Row(
               children: [
-                const Icon(Icons.article_rounded, color: Color(0xFF0F2628), size: 24),
+                const Icon(Icons.article_rounded, color: Color(0xFF0F172A), size: 24),
                 const SizedBox(width: 10),
                 const Text(
                   'Detail Pengajuan Approval',
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w800,
-                    color: Color(0xFF0F2628),
+                    color: Color(0xFF0F172A),
                   ),
                 ),
                 const Spacer(),
@@ -1373,7 +1354,7 @@ class _ApprovalDetailBottomSheetState extends State<_ApprovalDetailBottomSheet> 
 
           Expanded(
             child: _isLoading
-                ? const Center(child: CircularProgressIndicator(color: Color(0xFF0F2628)))
+                ? const Center(child: CircularProgressIndicator(color: Color(0xFF1D4ED8)))
                 : _detail == null
                     ? const Center(child: Text('Data tidak ditemukan'))
                     : _buildContent(),
@@ -1420,7 +1401,7 @@ class _ApprovalDetailBottomSheetState extends State<_ApprovalDetailBottomSheet> 
           ),
           child: Row(
             children: [
-              const Icon(Icons.remove_red_eye_rounded, color: Color(0xFF0F2628), size: 22),
+              const Icon(Icons.remove_red_eye_rounded, color: Color(0xFF0F172A), size: 22),
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
@@ -1480,7 +1461,7 @@ class _ApprovalDetailBottomSheetState extends State<_ApprovalDetailBottomSheet> 
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF0F2628),
+                        color: const Color(0xFF0F172A),
                         borderRadius: BorderRadius.circular(6),
                       ),
                       child: Text(
@@ -1515,7 +1496,7 @@ class _ApprovalDetailBottomSheetState extends State<_ApprovalDetailBottomSheet> 
           // Riwayat Alur Approval (Timeline)
           const Text(
             'Alur & Riwayat Persetujuan',
-            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: Color(0xFF0F2628)),
+            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
           ),
           const SizedBox(height: 10),
           if (history.isEmpty)
@@ -1534,7 +1515,7 @@ class _ApprovalDetailBottomSheetState extends State<_ApprovalDetailBottomSheet> 
           if (docs.isNotEmpty) ...[
             const Text(
               'Dokumen Terlampir',
-              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: Color(0xFF0F2628)),
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
             ),
             const SizedBox(height: 10),
             ...docs.map((d) {
@@ -1594,7 +1575,7 @@ class _ApprovalDetailBottomSheetState extends State<_ApprovalDetailBottomSheet> 
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: Color(0xFF0F2628)),
+                  borderSide: const BorderSide(color: Color(0xFF1D4ED8)),
                 ),
                 contentPadding: const EdgeInsets.all(12),
               ),
@@ -1674,7 +1655,7 @@ class _ApprovalDetailBottomSheetState extends State<_ApprovalDetailBottomSheet> 
                 children: [
                   Text(
                     'Level $level: $roleName',
-                    style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12, color: Color(0xFF0F2628)),
+                    style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12, color: Color(0xFF0F172A)),
                   ),
                   const Spacer(),
                   Container(

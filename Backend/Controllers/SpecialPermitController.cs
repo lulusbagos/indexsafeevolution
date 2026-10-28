@@ -82,6 +82,11 @@ namespace Indexsafe.Api.Controllers
                 return BadRequest(new { status = 400, message = "ID Special Permit wajib diisi" });
             }
 
+            if (request.PhotosBase64 == null || !request.PhotosBase64.Any())
+            {
+                return BadRequest(new { status = 400, message = "Wajib melampirkan minimal 1 foto dokumentasi bukti inspeksi lapangan" });
+            }
+
             if (string.IsNullOrWhiteSpace(request.InspectorNik))
             {
                 request.InspectorNik = GetCallerNik();
@@ -123,6 +128,52 @@ namespace Indexsafe.Api.Controllers
                 message = "Success",
                 count = alerts.Count,
                 data = alerts
+            });
+        }
+
+        [HttpPost("reassign")]
+        [AllowAnonymous]
+        public async Task<IActionResult> ReassignInspector([FromBody] ReassignSpecialPermitDto req)
+        {
+            if (string.IsNullOrWhiteSpace(req.SpecialPermitId) || string.IsNullOrWhiteSpace(req.NewInspectorNik))
+            {
+                return BadRequest(new { status = 400, message = "Special Permit ID dan NIK Inspector Baru wajib diisi." });
+            }
+
+            var callerNik = GetCallerNik();
+            var callerName = GetCallerName();
+
+            var success = await _spService.ReassignInspectorAsync(
+                req.SpecialPermitId,
+                req.NewInspectorNik,
+                req.NewInspectorName,
+                callerNik,
+                callerName,
+                req.Reason
+            );
+
+            if (!success)
+            {
+                return NotFound(new { status = 404, message = "Special Permit tidak ditemukan atau gagal memperbarui inspector." });
+            }
+
+            return Ok(new
+            {
+                status = 200,
+                message = $"Berhasil mengalihkan tugas inspeksi kepada {req.NewInspectorName} ({req.NewInspectorNik})."
+            });
+        }
+
+        [HttpGet("inspectors")]
+        [AllowAnonymous]
+        public async Task<IActionResult> SearchInspectors([FromQuery] string? query)
+        {
+            var list = await _spService.SearchInspectorsAsync(query);
+            return Ok(new
+            {
+                status = 200,
+                count = list.Count,
+                data = list
             });
         }
     }

@@ -112,8 +112,7 @@ namespace Indexsafe.Api.Controllers
             }
 
             var incidents = await query
-                .OrderByDescending(i => (i.Kategori != null && i.Kategori.Contains("Banner")) || i.IsBanner)
-                .ThenByDescending(i => i.TanggalKejadian ?? i.CreatedAt)
+                .OrderByDescending(i => i.TanggalKejadian ?? i.CreatedAt)
                 .ThenByDescending(i => i.Id)
                 .Take(limit)
                 .ToListAsync();
