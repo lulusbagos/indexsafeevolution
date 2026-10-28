@@ -476,7 +476,10 @@ class ApiService {
   }
 
   Future<Either<Map, Map>> logout() async {
-    dio.options.headers['Authorization'] = 'Bearer $_token';
+    final token = getToken;
+    if (token.isNotEmpty) {
+      dio.options.headers['Authorization'] = 'Bearer $token';
+    }
     try {
       var con = await Connectivity().checkConnectivity();
       if (con.contains(ConnectivityResult.wifi) == false &&
@@ -492,7 +495,10 @@ class ApiService {
   }
 
   Future<Either<Map, ProfileModel>> getProfile() async {
-    dio.options.headers['Authorization'] = 'Bearer $_token';
+    final token = getToken;
+    if (token.isNotEmpty) {
+      dio.options.headers['Authorization'] = 'Bearer $token';
+    }
     try {
       var con = await Connectivity().checkConnectivity();
       if (con.contains(ConnectivityResult.wifi) == false &&
@@ -509,7 +515,10 @@ class ApiService {
   }
 
   Future<Either<Map, Map>> changeProfile(File? pict) async {
-    dio.options.headers['Authorization'] = 'Bearer $_token';
+    final token = getToken;
+    if (token.isNotEmpty) {
+      dio.options.headers['Authorization'] = 'Bearer $token';
+    }
     try {
       var con = await Connectivity().checkConnectivity();
       if (con.contains(ConnectivityResult.wifi) == false &&
@@ -528,7 +537,10 @@ class ApiService {
   }
 
   Future<Either<Map, Map>> changePassword(oldPswd, newPswd) async {
-    dio.options.headers['Authorization'] = 'Bearer $_token';
+    final token = getToken;
+    if (token.isNotEmpty) {
+      dio.options.headers['Authorization'] = 'Bearer $token';
+    }
     try {
       var con = await Connectivity().checkConnectivity();
       if (con.contains(ConnectivityResult.wifi) == false &&
@@ -550,7 +562,10 @@ class ApiService {
 
   Future<Either<Map, Map>> getMaster(name) async {
     if (_token != null && _token!.isNotEmpty) {
-      dio.options.headers['Authorization'] = 'Bearer $_token';
+      final token = getToken;
+    if (token.isNotEmpty) {
+      dio.options.headers['Authorization'] = 'Bearer $token';
+    }
     } else {
       dio.options.headers.remove('Authorization');
     }
@@ -572,7 +587,10 @@ class ApiService {
   }
 
   Future<Either<Map, Map>> getTran(name) async {
-    dio.options.headers['Authorization'] = 'Bearer $_token';
+    final token = getToken;
+    if (token.isNotEmpty) {
+      dio.options.headers['Authorization'] = 'Bearer $token';
+    }
     try {
       var con = await Connectivity().checkConnectivity();
       if (con.contains(ConnectivityResult.wifi) == false &&
@@ -588,7 +606,10 @@ class ApiService {
   }
 
   Future<Either<Map, Map>> getDetail(name) async {
-    dio.options.headers['Authorization'] = 'Bearer $_token';
+    final token = getToken;
+    if (token.isNotEmpty) {
+      dio.options.headers['Authorization'] = 'Bearer $token';
+    }
     try {
       var con = await Connectivity().checkConnectivity();
       if (con.contains(ConnectivityResult.wifi) == false &&
@@ -604,7 +625,10 @@ class ApiService {
   }
 
   Future<Either<Map, Map>> getAction(name) async {
-    dio.options.headers['Authorization'] = 'Bearer $_token';
+    final token = getToken;
+    if (token.isNotEmpty) {
+      dio.options.headers['Authorization'] = 'Bearer $token';
+    }
     try {
       var con = await Connectivity().checkConnectivity();
       if (con.contains(ConnectivityResult.wifi) == false &&
@@ -621,7 +645,10 @@ class ApiService {
 
   Future<Either<Map, Map>> scanQr(String code,
       {String? scanType, double? lat, double? lng, double? acc}) async {
-    dio.options.headers['Authorization'] = 'Bearer $_token';
+    final token = getToken;
+    if (token.isNotEmpty) {
+      dio.options.headers['Authorization'] = 'Bearer $token';
+    }
     try {
       var con = await Connectivity().checkConnectivity();
       if (con.contains(ConnectivityResult.wifi) == false &&
@@ -1775,7 +1802,10 @@ class ApiService {
   }
 
   Future<Either<Map, List<dynamic>>> getAttendanceEvents() async {
-    dio.options.headers['Authorization'] = 'Bearer $_token';
+    final token = getToken;
+    if (token.isNotEmpty) {
+      dio.options.headers['Authorization'] = 'Bearer $token';
+    }
     try {
       var con = await Connectivity().checkConnectivity();
       if (con.contains(ConnectivityResult.wifi) == false &&
@@ -1801,7 +1831,10 @@ class ApiService {
     double? accuracy,
     String? scanType,
   }) async {
-    dio.options.headers['Authorization'] = 'Bearer $_token';
+    final token = getToken;
+    if (token.isNotEmpty) {
+      dio.options.headers['Authorization'] = 'Bearer $token';
+    }
     try {
       var con = await Connectivity().checkConnectivity();
       if (con.contains(ConnectivityResult.wifi) == false &&
@@ -1829,7 +1862,10 @@ class ApiService {
   }
 
   Future<Either<Map, List<dynamic>>> getAttendanceHistory() async {
-    dio.options.headers['Authorization'] = 'Bearer $_token';
+    final token = getToken;
+    if (token.isNotEmpty) {
+      dio.options.headers['Authorization'] = 'Bearer $token';
+    }
     try {
       var con = await Connectivity().checkConnectivity();
       if (con.contains(ConnectivityResult.wifi) == false &&
@@ -1849,7 +1885,10 @@ class ApiService {
   }
 
   Future<Either<Map, Map<String, dynamic>>> getMyScanPermissions() async {
-    dio.options.headers['Authorization'] = 'Bearer $_token';
+    final token = getToken;
+    if (token.isNotEmpty) {
+      dio.options.headers['Authorization'] = 'Bearer $token';
+    }
     try {
       var con = await Connectivity().checkConnectivity();
       if (con.contains(ConnectivityResult.wifi) == false &&
@@ -1869,7 +1908,10 @@ class ApiService {
   }
 
   Future<Either<Map, Map<String, dynamic>>> getPermitViolationMaster() async {
-    dio.options.headers['Authorization'] = 'Bearer $_token';
+    final token = getToken;
+    if (token.isNotEmpty) {
+      dio.options.headers['Authorization'] = 'Bearer $token';
+    }
     try {
       var con = await Connectivity().checkConnectivity();
       if (con.contains(ConnectivityResult.wifi) == false &&
@@ -1890,7 +1932,10 @@ class ApiService {
 
   Future<Either<Map, Map<String, dynamic>>> recordPermitViolation(
       Map<String, dynamic> payload) async {
-    dio.options.headers['Authorization'] = 'Bearer $_token';
+    final token = getToken;
+    if (token.isNotEmpty) {
+      dio.options.headers['Authorization'] = 'Bearer $token';
+    }
     try {
       var con = await Connectivity().checkConnectivity();
       if (con.contains(ConnectivityResult.wifi) == false &&
@@ -1912,7 +1957,10 @@ class ApiService {
 
   Future<Either<Map, Map<String, dynamic>>> recordPermitMovement(
       Map<String, dynamic> payload) async {
-    dio.options.headers['Authorization'] = 'Bearer $_token';
+    final token = getToken;
+    if (token.isNotEmpty) {
+      dio.options.headers['Authorization'] = 'Bearer $token';
+    }
     try {
       var con = await Connectivity().checkConnectivity();
       if (con.contains(ConnectivityResult.wifi) == false &&
@@ -2563,7 +2611,10 @@ class ApiService {
     try {
       _restoreStoredToken();
       if (_token != null && _token!.isNotEmpty) {
-        dio.options.headers['Authorization'] = 'Bearer $_token';
+        final token = getToken;
+    if (token.isNotEmpty) {
+      dio.options.headers['Authorization'] = 'Bearer $token';
+    }
       }
       final res = await dio.get('/master/benchmarks', queryParameters: {
         'areaUtama': areaUtama,
@@ -3243,6 +3294,21 @@ class ApiService {
 
     if (err.type == DioExceptionType.badResponse) {
       final statusCode = err.response?.statusCode;
+      if (statusCode == 401) {
+        try {
+          var res = Map<String, dynamic>.from(jsonDecode(err.response.toString()));
+          if ((res['message'] ?? '') != '') {
+            return <String, dynamic>{
+              'message': res['message'],
+              'isAuthError': true,
+            };
+          }
+        } catch (_) {}
+        return <String, dynamic>{
+          'message': 'Sesi login Anda telah berakhir (401 Unauthorized). Silakan logout dan login kembali.',
+          'isAuthError': true,
+        };
+      }
       if (statusCode != null && statusCode >= 502 && statusCode <= 504) {
         return <String, dynamic>{
           'message': 'Server tidak dapat dijangkau ($statusCode)',
