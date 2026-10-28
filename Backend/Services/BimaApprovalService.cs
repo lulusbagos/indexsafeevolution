@@ -677,26 +677,38 @@ namespace Indexsafe.Api.Services
             }
 
             // Validasi hak akses approver
-            if (!string.IsNullOrWhiteSpace(req.UserNik))
+            if (string.IsNullOrWhiteSpace(req.UserNik))
             {
-                var callerCtx = await GetUserContextAsync(conn, req.UserNik);
-                if (!callerCtx.IsRegistered)
-                {
-                    res.Message = "Anda tidak memiliki otorisasi approval di Bima.";
-                    return res;
-                }
+                res.Message = "NIK / NRP approver wajib diisi untuk memproses approval.";
+                return res;
+            }
+
+            var callerCtx = await GetUserContextAsync(conn, req.UserNik);
+            if (!callerCtx.IsRegistered)
+            {
+                res.Message = "Anda tidak memiliki otorisasi approval di Bima (Akun tidak terdaftar atau tidak aktif).";
+                return res;
             }
 
             await using var tran = await conn.BeginTransactionAsync();
             try
             {
-                // 1. Fetch current approval record
+                // 1. Fetch current approval record with lock
                 const string sqlCur = @"
-                    SELECT id, nomor, req_id, module, level_approval, workflow_id, employee_id,
-                           created_company_id, created_department_id, is_current_document, req_status, req_role_id
-                    FROM public.request_approval
-                    WHERE id = @id
-                    FOR UPDATE;";
+                    SELECT ra.id, ra.nomor, ra.req_id, ra.module, ra.level_approval, ra.workflow_id, ra.employee_id,
+                           ra.created_company_id, ra.created_department_id, ra.is_current_document, ra.req_status, ra.req_role_id,
+                           w.is_by_department, r.role_name,
+                           COALESCE(p.departemen, c.department, p2.departemen, '') as applicant_dept
+                    FROM public.request_approval ra
+                    LEFT JOIN public.workflow w ON ra.workflow_id = w.id
+                    LEFT JOIN public.tb_role r ON ra.req_role_id = r.id
+                    LEFT JOIN public.tb_permit p ON ra.module = 'PERMIT' AND ra.req_id = p.req_id
+                    LEFT JOIN public.tb_simper_unit su ON ra.module = 'SIMPER' AND ra.req_id = su.req_id
+                    LEFT JOIN public.tb_simper s ON su.simper_id = s.id
+                    LEFT JOIN public.tb_permit p2 ON s.permit_id = p2.id
+                    LEFT JOIN public.special_permit c ON ra.req_id = c.req_id AND ra.module = 'SPECIAL_PERMIT'
+                    WHERE ra.id = @id
+                    FOR UPDATE OF ra;";
 
                 await using var cmdCur = new NpgsqlCommand(sqlCur, conn, tran);
                 cmdCur.Parameters.AddWithValue("@id", req.ApprovalId);
@@ -718,12 +730,44 @@ namespace Indexsafe.Api.Services
                 var isCurrent = !rdrCur.IsDBNull(9) && rdrCur.GetBoolean(9);
                 var currentStatus = rdrCur.IsDBNull(10) ? string.Empty : rdrCur.GetString(10);
                 var reqRoleId = rdrCur.IsDBNull(11) ? (long?)null : Convert.ToInt64(rdrCur.GetValue(11));
+                var isByDept = rdrCur.IsDBNull(12) ? (bool?)null : rdrCur.GetBoolean(12);
+                var roleName = rdrCur.IsDBNull(13) ? string.Empty : rdrCur.GetString(13);
+                var applicantDept = rdrCur.IsDBNull(14) ? string.Empty : rdrCur.GetString(14);
                 await rdrCur.CloseAsync();
 
                 if (!isCurrent || currentStatus != "WAITING")
                 {
-                    res.Message = "Dokumen ini sudah diproses sebelumnya";
+                    res.Message = "Dokumen ini sudah diproses sebelumnya atau bukan tahapan aktif.";
                     return res;
+                }
+
+                // VALIDASI KEWENANGAN APPROVER SECARA KETAT
+                // 1. Role validation: pastikan approver memiliki role yang disyaratkan oleh level ini
+                if (!reqRoleId.HasValue || !callerCtx.RoleIds.Contains(reqRoleId.Value))
+                {
+                    var neededRole = !string.IsNullOrEmpty(roleName) ? roleName : $"Role ID {reqRoleId}";
+                    res.Message = $"Anda tidak memiliki wewenang untuk menyetujui tahap ini. Tahap ini memerlukan peran: {neededRole}.";
+                    return res;
+                }
+
+                // 2. Company validation
+                if (compId.HasValue && !callerCtx.CompanyIds.Contains(compId.Value))
+                {
+                    res.Message = "Anda tidak memiliki wewenang untuk menyetujui dokumen dari perusahaan ini.";
+                    return res;
+                }
+
+                // 3. Department validation (jika alur kerja berbasis departemen)
+                if (isByDept == true)
+                {
+                    bool deptMatches = (deptId.HasValue && callerCtx.DepartmentIds.Contains(deptId.Value)) ||
+                                       (!string.IsNullOrEmpty(applicantDept) && !string.IsNullOrEmpty(callerCtx.Department) &&
+                                        applicantDept.Equals(callerCtx.Department, StringComparison.OrdinalIgnoreCase));
+                    if (!deptMatches)
+                    {
+                        res.Message = "Anda tidak memiliki wewenang untuk menyetujui dokumen dari departemen ini.";
+                        return res;
+                    }
                 }
 
                 // 2. Mark current record as processed
@@ -781,30 +825,44 @@ namespace Indexsafe.Api.Services
 
                 // If APPROVED: determine next workflow step
                 const string sqlWorkflows = @"
-                    SELECT id, role_id, step_level, workflow_name, is_by_department
+                    SELECT id, role_id, step_level, workflow_name, is_by_department, company_id
                     FROM public.workflow
                     WHERE module_name = @module
                       AND (company_id = @compId OR company_id = 1 OR company_id = 0)
-                    ORDER BY step_level ASC;";
+                    ORDER BY (CASE WHEN company_id = @compId THEN 0 WHEN company_id = 1 THEN 1 ELSE 2 END) ASC, step_level ASC;";
 
                 await using var cmdWf = new NpgsqlCommand(sqlWorkflows, conn, tran);
                 cmdWf.Parameters.AddWithValue("@module", module);
                 cmdWf.Parameters.AddWithValue("@compId", compId ?? 1);
 
-                var workflows = new List<(long Id, long RoleId, long StepLevel, string Name, bool? IsByDept)>();
+                var allWfs = new List<(long Id, long RoleId, long StepLevel, string Name, bool? IsByDept, long CompanyId)>();
                 await using var rdrWf = await cmdWf.ExecuteReaderAsync();
                 while (await rdrWf.ReadAsync())
                 {
-                    workflows.Add((
+                    allWfs.Add((
                         Convert.ToInt64(rdrWf.GetValue(0)),
                         Convert.ToInt64(rdrWf.GetValue(1)),
                         Convert.ToInt64(rdrWf.GetValue(2)),
                         rdrWf.GetString(3),
-                        rdrWf.IsDBNull(4) ? null : rdrWf.GetBoolean(4)
+                        rdrWf.IsDBNull(4) ? null : rdrWf.GetBoolean(4),
+                        Convert.ToInt64(rdrWf.GetValue(5))
                     ));
                 }
                 await rdrWf.CloseAsync();
 
+                // Prioritaskan konfigurasi workflow spesifik milik perusahaan pemohon
+                var targetCompId = compId ?? 1;
+                var workflows = allWfs.Where(w => w.CompanyId == targetCompId).ToList();
+                if (!workflows.Any())
+                {
+                    workflows = allWfs.Where(w => w.CompanyId == 1).ToList();
+                }
+                if (!workflows.Any())
+                {
+                    workflows = allWfs.Where(w => w.CompanyId == 0).ToList();
+                }
+
+                var maxStepLevel = workflows.Any() ? workflows.Max(w => w.StepLevel) : 0;
                 var nextStepLevel = level + 1;
                 var nextWf = workflows.FirstOrDefault(w => w.StepLevel == nextStepLevel);
 
@@ -843,7 +901,7 @@ namespace Indexsafe.Api.Services
                     res.NextStatus = "WAITING";
                     return res;
                 }
-                else
+                else if (level >= maxStepLevel && maxStepLevel > 0)
                 {
                     // Final level reached: document is READY_TO_PRINT
                     if (module == "PERMIT")
@@ -874,6 +932,13 @@ namespace Indexsafe.Api.Services
                     res.Success = true;
                     res.Message = "Approval selesai (Semua tahap disetujui, siap cetak)";
                     res.NextStatus = "READY_TO_PRINT";
+                    return res;
+                }
+                else
+                {
+                    await tran.RollbackAsync();
+                    res.Success = false;
+                    res.Message = $"Tahapan workflow berikutnya (Level {nextStepLevel}) tidak ditemukan untuk modul {module}. Hubungi administrator.";
                     return res;
                 }
             }
