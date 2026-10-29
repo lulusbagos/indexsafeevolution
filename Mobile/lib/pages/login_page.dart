@@ -1,6 +1,8 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import '../widgets/professional_success_sheet.dart';
 
 import '../models/auth_model.dart';
 import '../models/profile_model.dart';
@@ -409,91 +411,35 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   void _showResetSuccessDialog(String nik) {
-    showDialog(
+    showProfessionalSuccessSheet(
       context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        contentPadding: const EdgeInsets.fromLTRB(24, 28, 24, 20),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: const BoxDecoration(
-                color: Color(0xFFECFDF5),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.check_circle_rounded,
-                size: 48,
-                color: Color(0xFF0D9488),
-              ),
-            ),
-            const SizedBox(height: 18),
-            const Text(
-              'Reset Berhasil!',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF0F172A),
-              ),
-            ),
-            const SizedBox(height: 10),
-            RichText(
-              textAlign: TextAlign.center,
-              text: TextSpan(
-                style: TextStyle(
-                  fontSize: 13,
-                  color: Colors.grey.shade700,
-                  height: 1.45,
-                ),
-                children: [
-                  const TextSpan(text: 'Kata sandi untuk NIK '),
-                  TextSpan(
-                    text: nik,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF0D9488),
-                    ),
-                  ),
-                  const TextSpan(text: ' telah di-reset ke '),
-                  const TextSpan(
-                    text: '123456',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF2563EB),
-                    ),
-                  ),
-                  const TextSpan(
-                    text:
-                        '.\n\nSilakan masuk sekarang dan perbarui kata sandi baru Anda di menu profile.',
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 22),
-            SizedBox(
-              width: double.infinity,
-              height: 46,
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF0D9488),
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  elevation: 0,
-                ),
-                onPressed: () => Navigator.pop(ctx),
-                child: const Text(
-                  'Siap, Masuk Sekarang',
-                  style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.bold),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
+      title: 'Kata Sandi Berhasil Direset!',
+      subtitle:
+          'Kata sandi untuk NIK $nik telah di-reset ke standar default (123456). Kolom NIK dan kata sandi telah otomatis terisi.',
+      referenceNumber:
+          'RESET-${DateTime.now().millisecondsSinceEpoch.toString().substring(6)}',
+      accentColor: const Color(0xFF0D9488),
+      icon: Icons.lock_reset_rounded,
+      statusBadgeText: 'PASSWORD RESET SUKSES (123456)',
+      receiptItems: [
+        SuccessReceiptItem(label: 'NIK Pengguna', value: nik, isHighlight: true),
+        const SuccessReceiptItem(
+            label: 'Kata Sandi Baru',
+            value: '123456',
+            isHighlight: true,
+            highlightColor: Color(0xFF2563EB)),
+        const SuccessReceiptItem(
+            label: 'Status Akun',
+            value: 'Aktif Terverifikasi',
+            highlightColor: Color(0xFF10B981)),
+        const SuccessReceiptItem(
+            label: 'Tindakan Lanjutan',
+            value: 'Silakan masuk lalu perbarui sandi di Profile'),
+      ],
+      primaryButtonText: 'Masuk Sekarang',
+      onPrimaryAction: () {
+        _login();
+      },
     );
   }
 
@@ -1172,6 +1118,7 @@ class _ResetPasswordBottomSheetState extends State<_ResetPasswordBottomSheet> {
   final _dobCtrl = TextEditingController();
   bool _isLoading = false;
   String? _errorMessage;
+  String? _formattedDobDisplay;
 
   @override
   void initState() {
@@ -1203,6 +1150,7 @@ class _ResetPasswordBottomSheetState extends State<_ResetPasswordBottomSheet> {
       final dd = picked.day.toString().padLeft(2, '0');
       setState(() {
         _dobCtrl.text = '$yyyy$mm$dd';
+        _formattedDobDisplay = DateFormat('dd MMMM yyyy', 'id_ID').format(picked);
         _errorMessage = null;
       });
     }
@@ -1454,11 +1402,37 @@ class _ResetPasswordBottomSheetState extends State<_ResetPasswordBottomSheet> {
                   }
                   final clean = val.replaceAll(RegExp(r'\D'), '');
                   if (clean.length != 8) {
-                    return 'Format harus 8 digit YYYYMMDD (contoh: 19900130)';
+                    return 'Format harus 8 digit YYYYMMDD atau DDMMYYYY';
                   }
                   return null;
                 },
               ),
+              if (_formattedDobDisplay != null) ...[
+                const SizedBox(height: 6),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEFF6FF),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFFBFDBFE)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.check_circle_rounded, size: 16, color: Color(0xFF2563EB)),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Tanggal Terpilih: $_formattedDobDisplay',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF1D4ED8),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
               const SizedBox(height: 14),
 
               // Helper Callout
