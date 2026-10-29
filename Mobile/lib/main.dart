@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
@@ -10,7 +12,17 @@ import 'services/preference.dart';
 
 final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>();
 
+class MyHttpOverrides extends HttpOverrides {
+  @override
+  HttpClient createHttpClient(SecurityContext? context) {
+    return super.createHttpClient(context)
+      ..badCertificateCallback =
+          (X509Certificate cert, String host, int port) => true;
+  }
+}
+
 Future<void> main() async {
+  HttpOverrides.global = MyHttpOverrides();
   WidgetsFlutterBinding.ensureInitialized();
 
   await PreferenceService.init();
@@ -48,21 +60,33 @@ class MyApp extends StatelessWidget {
           appBarTheme: const AppBarTheme(backgroundColor: Colors.white),
           inputDecorationTheme: InputDecorationTheme(
             // constraints: const BoxConstraints(maxHeight: 40),
-            contentPadding: const EdgeInsets.all(10),
-            isDense: true,
+            floatingLabelBehavior: FloatingLabelBehavior.always,
+            fillColor: Colors.white,
             filled: true,
-            fillColor: Colors.white54,
-            border: OutlineInputBorder(
-              borderSide: BorderSide(color: Colors.indigo.shade200),
-              borderRadius: BorderRadius.circular(20),
-            ),
+            isDense: true,
             enabledBorder: OutlineInputBorder(
-              borderSide: BorderSide(color: Colors.indigo.shade200),
-              borderRadius: BorderRadius.circular(20),
+              borderSide: BorderSide(
+                color: Colors.grey.shade300,
+              ),
+              borderRadius: BorderRadius.circular(8),
             ),
             focusedBorder: OutlineInputBorder(
-              borderSide: BorderSide(color: Colors.indigo.shade200),
-              borderRadius: BorderRadius.circular(20),
+              borderSide: const BorderSide(
+                color: Colors.blue,
+              ),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            errorBorder: OutlineInputBorder(
+              borderSide: const BorderSide(
+                color: Colors.red,
+              ),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            focusedErrorBorder: OutlineInputBorder(
+              borderSide: const BorderSide(
+                color: Colors.red,
+              ),
+              borderRadius: BorderRadius.circular(8),
             ),
           ),
         ),

@@ -155,57 +155,16 @@ class ApiService {
               try {
                 final loginDio = Dio(BaseOptions(
                   baseUrl: '$_activeBaseUrl/api',
-                  connectTimeout: const Duration(seconds: 4),
-                  receiveTimeout: const Duration(seconds: 6),
+                  connectTimeout: const Duration(seconds: 8),
+                  receiveTimeout: const Duration(seconds: 10),
                 ));
-                final loginPayload = <String, dynamic>{
-                  'email': savedNik,
-                  'nik': savedNik,
-                  'password': savedPass,
-                  'app_version': (globals.version.isNotEmpty) ? globals.version : '1.0.1',
-                };
-                final loginRes = await loginDio.post('/login', data: json.encode(loginPayload));
-                if (loginRes.statusCode == 200 && loginRes.data is Map) {
-                  final newToken = loginRes.data['token']?.toString();
-                  if (newToken != null && newToken.isNotEmpty) {
-                    _token = newToken;
-                    await PreferenceService.setAuth(AuthModel.fromJson(Map<String, dynamic>.from(loginRes.data as Map)));
-                    debugPrint('[ApiService] Silent auto re-login sukses! Token sesi berhasil diperbarui otomatis.');
-
-                    // Retry request yang tadi gagal dengan token baru
-                    final retryOptions = Options(
-                      method: err.requestOptions.method,
-                      headers: Map<String, dynamic>.from(err.requestOptions.headers),
-                      contentType: err.requestOptions.contentType,
-                      responseType: err.requestOptions.responseType,
-                    );
-                    retryOptions.headers?['Authorization'] = 'Bearer $newToken';
-                    final retryRes = await dio.request(
-                      err.requestOptions.path,
-                      data: err.requestOptions.data,
-                      queryParameters: err.requestOptions.queryParameters,
-                      options: retryOptions,
-                    );
-                    return handler.resolve(retryRes);
-                  }
-                }
-              } catch (silentErr) {
-                debugPrint('[ApiService] Silent auto re-login gagal: $silentErr');
-              }
-            }
-          }
-          // 1. Silent Auto Re-login jika sesi kedaluwarsa (HTTP 401)
-          if (err.response?.statusCode == 401 && !err.requestOptions.path.contains('/login')) {
-            final savedNik = (PreferenceService.getUser() ?? PreferenceService.getOfflineNik() ?? '').trim();
-            final savedPass = (PreferenceService.getPassword() ?? PreferenceService.getOfflinePassword() ?? '').trim();
-
-            if (savedNik.isNotEmpty && savedPass.isNotEmpty) {
-              try {
-                final loginDio = Dio(BaseOptions(
-                  baseUrl: '$_activeBaseUrl/api',
-                  connectTimeout: const Duration(seconds: 4),
-                  receiveTimeout: const Duration(seconds: 6),
-                ));
+                loginDio.httpClientAdapter = IOHttpClientAdapter(
+                  createHttpClient: () {
+                    final client = HttpClient();
+                    client.badCertificateCallback = (X509Certificate cert, String host, int port) => true;
+                    return client;
+                  },
+                );
                 final loginPayload = <String, dynamic>{
                   'email': savedNik,
                   'nik': savedNik,

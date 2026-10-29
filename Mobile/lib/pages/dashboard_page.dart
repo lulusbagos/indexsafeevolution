@@ -2438,7 +2438,6 @@ class _FullscreenHazardMapPageState extends State<_FullscreenHazardMapPage>
                         children: [
                           // Take Up Button
                           Expanded(
-                            flex: 6,
                             child: ElevatedButton.icon(
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: isWithin50Meters
@@ -2446,7 +2445,7 @@ class _FullscreenHazardMapPageState extends State<_FullscreenHazardMapPage>
                                     : const Color(0xFF1E293B),
                                 foregroundColor: Colors.white,
                                 padding: const EdgeInsets.symmetric(
-                                    vertical: 11, horizontal: 8),
+                                    vertical: 11, horizontal: 10),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(12),
                                   side: BorderSide(
@@ -2474,7 +2473,7 @@ class _FullscreenHazardMapPageState extends State<_FullscreenHazardMapPage>
                                 isWithin50Meters
                                     ? Icons.bolt_rounded
                                     : Icons.lock_outline_rounded,
-                                size: 17,
+                                size: 18,
                                 color: isWithin50Meters
                                     ? Colors.white
                                     : const Color(0xFF94A3B8),
@@ -2487,47 +2486,8 @@ class _FullscreenHazardMapPageState extends State<_FullscreenHazardMapPage>
                                 overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(
                                   fontWeight: FontWeight.w900,
-                                  fontSize: 11,
+                                  fontSize: 12,
                                   letterSpacing: 0.3,
-                                ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 6),
-
-                          // Button Lapor Fake Hazard
-                          Material(
-                            color: const Color(0xFFEF4444).withOpacity(0.18),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              side: const BorderSide(
-                                  color: Color(0xFFEF4444), width: 1.2),
-                            ),
-                            child: InkWell(
-                              onTap: () {
-                                HapticFeedback.mediumImpact();
-                                _showReportFakeHazardDialog(
-                                    context, target, distance);
-                              },
-                              borderRadius: BorderRadius.circular(12),
-                              child: const Padding(
-                                padding: EdgeInsets.symmetric(
-                                    horizontal: 9, vertical: 10),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(Icons.flag_rounded,
-                                        color: Color(0xFFF87171), size: 16),
-                                    SizedBox(width: 4),
-                                    Text(
-                                      'FAKE',
-                                      style: TextStyle(
-                                        color: Color(0xFFF87171),
-                                        fontWeight: FontWeight.w900,
-                                        fontSize: 11,
-                                      ),
-                                    ),
-                                  ],
                                 ),
                               ),
                             ),
