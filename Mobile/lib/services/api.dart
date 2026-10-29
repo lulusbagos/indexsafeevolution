@@ -534,6 +534,28 @@ class ApiService {
     }
   }
 
+  Future<Either<Map, Map>> getActiveWebCampaign([String? nik]) async {
+    try {
+      final headers = Map<String, dynamic>.from(dio.options.headers);
+      if (nik != null && nik.isNotEmpty) {
+        headers['X-User-Nik'] = nik;
+      }
+      final res = await dio.get(
+        '/web-campaign/active',
+        queryParameters: nik != null && nik.isNotEmpty ? {'nik': nik} : null,
+        options: Options(headers: headers),
+      );
+      if (res.data != null && res.data is Map) {
+        return Right(Map<String, dynamic>.from(res.data as Map));
+      }
+      return const Left({'message': 'Format respons tidak valid'});
+    } on DioException catch (err) {
+      return Left(errorHandler(err));
+    } catch (e) {
+      return Left({'message': e.toString()});
+    }
+  }
+
   Future<Either<Map, Map>> logout() async {
     final token = getToken;
     if (token.isNotEmpty) {

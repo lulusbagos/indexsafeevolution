@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../services/api.dart';
 import '../services/popup_ad_service.dart';
+import '../widgets/web_campaign_dialog.dart';
 import '../services/preference.dart';
 import '../utils/globals.dart' as globals;
 import 'dashboard_page.dart';
@@ -43,6 +44,12 @@ class _HomePageState extends State<HomePage> {
         Future.delayed(const Duration(milliseconds: 700), () {
           if (mounted) {
             PopupAdService.checkAndShowPopupAd(context);
+            WebCampaignDialog.checkAndShow(
+              context,
+              nik: _profile?.noNik ?? '',
+              nama: _profile?.namaLengkap ?? '',
+              depart: _profile?.depart ?? '',
+            );
           }
         });
       }

@@ -19,6 +19,7 @@ namespace Indexsafe.Api.Data
         public DbSet<TimelineComment> TimelineComments { get; set; } = null!;
         public DbSet<Notification> Notifications { get; set; } = null!;
         public DbSet<RunningText> RunningTexts { get; set; } = null!;
+        public DbSet<WebCampaign> WebCampaigns { get; set; } = null!;
         public DbSet<AppUser> AppUsers { get; set; } = null!;
         public DbSet<MasterArea> MasterAreas { get; set; } = null!;
         public DbSet<MasterBenchmark> Benchmarks { get; set; } = null!;
