@@ -53,6 +53,7 @@ class _HomePageState extends State<HomePage> {
             if (userNik.isEmpty) {
               userNik = PreferenceService.getOfflineNik() ?? '';
             }
+            debugPrint('[HomePage] Checking WebCampaign for NIK: $userNik');
             await WebCampaignDialog.checkAndShow(
               context,
               nik: userNik,

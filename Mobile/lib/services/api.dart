@@ -535,25 +535,39 @@ class ApiService {
   }
 
   Future<Either<Map, Map>> getActiveWebCampaign([String? nik]) async {
-    try {
-      final headers = Map<String, dynamic>.from(dio.options.headers);
-      if (nik != null && nik.isNotEmpty) {
-        headers['X-User-Nik'] = nik;
+    final candidateUrls = _buildCandidateUrls('/web-campaign/active');
+    final queryParams = (nik != null && nik.isNotEmpty) ? {'nik': nik} : null;
+
+    for (final targetUrl in candidateUrls) {
+      try {
+        final client = Dio(BaseOptions(
+          headers: {
+            'Accept': 'application/json',
+            if (nik != null && nik.isNotEmpty) 'X-User-Nik': nik,
+            if (getToken.isNotEmpty) 'Authorization': 'Bearer $getToken',
+          },
+          contentType: Headers.jsonContentType,
+          responseType: ResponseType.json,
+          connectTimeout: const Duration(seconds: 3),
+          receiveTimeout: const Duration(seconds: 4),
+        ));
+
+        final res = await client.get(
+          targetUrl,
+          queryParameters: queryParams,
+        );
+
+        if (res.statusCode != null && res.statusCode! >= 200 && res.statusCode! < 300) {
+          if (res.data != null && res.data is Map) {
+            _updateActiveBaseUrlFromTarget(targetUrl);
+            return Right(Map<String, dynamic>.from(res.data as Map));
+          }
+        }
+      } catch (_) {
+        continue;
       }
-      final res = await dio.get(
-        '/web-campaign/active',
-        queryParameters: nik != null && nik.isNotEmpty ? {'nik': nik} : null,
-        options: Options(headers: headers),
-      );
-      if (res.data != null && res.data is Map) {
-        return Right(Map<String, dynamic>.from(res.data as Map));
-      }
-      return const Left({'message': 'Format respons tidak valid'});
-    } on DioException catch (err) {
-      return Left(errorHandler(err));
-    } catch (e) {
-      return Left({'message': e.toString()});
     }
+    return const Left({'message': 'Tidak dapat menghubungi server web campaign'});
   }
 
   Future<Either<Map, Map>> logout() async {

@@ -40,7 +40,10 @@ class WebCampaignDialog extends StatefulWidget {
     try {
       final api = ApiService();
       final res = await api.getActiveWebCampaign(nik);
-      res.fold((_) {}, (data) async {
+      await res.fold((err) async {
+        debugPrint('[WebCampaignDialog] getActiveWebCampaign returned Left: $err');
+      }, (data) async {
+        debugPrint('[WebCampaignDialog] Received campaign response: $data');
         final isActive = data['active'] == true;
         if (!isActive) return;
 
