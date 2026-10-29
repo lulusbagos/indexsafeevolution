@@ -12,6 +12,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../services/api.dart';
 import '../services/preference.dart';
 import 'login_page.dart';
+import '../widgets/professional_success_sheet.dart';
 
 class ScanPage extends StatefulWidget {
   const ScanPage({super.key});
@@ -3631,9 +3632,13 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
                                             Navigator.pop(modalCtx);
                                             HapticFeedback.heavyImpact();
                                             _showViolationRecordedDialog(
-                                              violatorName,
-                                              selK['nama']?.toString() ?? '',
-                                              '${selS['nama']} (${selS['kode']})',
+                                              violatorName: violatorName,
+                                              violatorNik: violatorNik,
+                                              company: violatorCompany,
+                                              type: selK['nama']?.toString() ?? '-',
+                                              severity: '${selS['nama']} (${selS['kode']})',
+                                              location: locationController.text.trim(),
+                                              actionTaken: actionController.text.trim(),
                                             );
                                           },
                                         );
@@ -3672,66 +3677,32 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
     );
   }
 
-  void _showViolationRecordedDialog(String violatorName, String type, String severity) {
-    showDialog<void>(
+  void _showViolationRecordedDialog({
+    required String violatorName,
+    required String violatorNik,
+    required String company,
+    required String type,
+    required String severity,
+    required String location,
+    required String actionTaken,
+  }) {
+    showProfessionalSuccessSheet(
       context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: const Color(0xFF10B981).withValues(alpha: .15),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(Icons.check_circle_rounded, color: Color(0xFF10B981), size: 24),
-            ),
-            const SizedBox(width: 12),
-            const Expanded(
-              child: Text('Pelanggaran Tercatat', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
-            ),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Laporan pelanggaran K3 atas nama $violatorName telah resmi dicatat dan disinkronkan ke database sistem.',
-              style: const TextStyle(fontSize: 13, color: Color(0xFF475569)),
-            ),
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF8FAFC),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFFE2E8F0)),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Kategori: $type', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF1E293B))),
-                  const SizedBox(height: 4),
-                  Text('Tingkat Keparahan: $severity', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFFDC2626))),
-                ],
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF0F172A),
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            ),
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('OK', style: TextStyle(fontWeight: FontWeight.w700)),
-          ),
-        ],
-      ),
+      title: 'Pelanggaran K3 Berhasil Dicatat!',
+      subtitle: 'Laporan penegakan disiplin K3 telah resmi tercatat & disinkronkan ke database ONE_DB_MITRA.',
+      referenceNumber: 'PLG-${DateTime.now().millisecondsSinceEpoch.toString().substring(5)}',
+      accentColor: const Color(0xFFDC2626),
+      icon: Icons.gavel_rounded,
+      statusBadgeText: 'TERSIMPAN DI DATABASE PUSAT',
+      receiptItems: [
+        SuccessReceiptItem(label: 'Karyawan Pelanggar', value: '$violatorName ($violatorNik)', isHighlight: true),
+        SuccessReceiptItem(label: 'Perusahaan', value: company),
+        SuccessReceiptItem(label: 'Kriteria Pelanggaran', value: type, highlightColor: const Color(0xFFDC2626)),
+        SuccessReceiptItem(label: 'Sanksi Disanksikan', value: severity, isHighlight: true),
+        SuccessReceiptItem(label: 'Lokasi Kejadian', value: location.isEmpty ? 'Area Tambang' : location),
+        SuccessReceiptItem(label: 'Tindakan Diambil', value: actionTaken.isEmpty ? 'Teguran & Pembinaan Langsung' : actionTaken),
+      ],
+      primaryButtonText: 'Selesai & Tutup',
     );
   }
 
@@ -4381,12 +4352,15 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
                                             Navigator.pop(modalCtx);
                                             HapticFeedback.heavyImpact();
                                             _showMovementRecordedDialog(
-                                              nama,
-                                              selectedDirection,
-                                              unitController.text.trim(),
-                                              keperluanController.text.trim(),
-                                              jumlahPenumpang,
-                                              gpsStr != null ? '$gpsStr (${posController.text.trim()})' : posController.text.trim(),
+                                              nama: nama,
+                                              nik: nik,
+                                              perusahaan: perusahaan,
+                                              departemen: departemen,
+                                              direction: selectedDirection,
+                                              unit: unitController.text.trim(),
+                                              keperluan: keperluanController.text.trim(),
+                                              jumlahPenumpang: jumlahPenumpang,
+                                              lokasiDetail: gpsStr != null ? '$gpsStr (${posController.text.trim()})' : posController.text.trim(),
                                             );
                                           },
                                         );
@@ -4427,145 +4401,42 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
     );
   }
 
-  void _showMovementRecordedDialog(
-    String nama,
-    String direction,
-    String unit,
-    String keperluan,
-    int jumlahPenumpang, [
+  void _showMovementRecordedDialog({
+    required String nama,
+    required String nik,
+    required String perusahaan,
+    required String departemen,
+    required String direction,
+    required String unit,
+    required String keperluan,
+    required int jumlahPenumpang,
     String? lokasiDetail,
-  ]) {
+  }) {
     final isMasuk = direction == 'MASUK';
-    showDialog<void>(
+    showProfessionalSuccessSheet(
       context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: (isMasuk ? const Color(0xFF0D9488) : const Color(0xFFDC2626)).withValues(alpha: .15),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                isMasuk ? Icons.verified_rounded : Icons.logout_rounded,
-                color: isMasuk ? const Color(0xFF0D9488) : const Color(0xFFDC2626),
-                size: 24,
-              ),
-            ),
-            const SizedBox(width: 12),
-            const Expanded(
-              child: Text('Log Gerbang Dicatat', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
-            ),
-          ],
+      title: isMasuk ? 'Check-In Masuk Tambang Berhasil!' : 'Check-Out Keluar Tambang Berhasil!',
+      subtitle: 'Pergerakan keluar/masuk gerbang telah resmi tercatat di sistem Security Gate Management.',
+      referenceNumber: '${isMasuk ? "GATE-IN" : "GATE-OUT"}-${DateTime.now().millisecondsSinceEpoch.toString().substring(6)}',
+      accentColor: isMasuk ? const Color(0xFF0D9488) : const Color(0xFFDC2626),
+      icon: isMasuk ? Icons.door_sliding_outlined : Icons.logout_rounded,
+      statusBadgeText: isMasuk ? 'LOG MASUK TERSIMPAN' : 'LOG KELUAR TERSIMPAN',
+      receiptItems: [
+        SuccessReceiptItem(label: 'Nama Karyawan', value: '$nama ($nik)', isHighlight: true),
+        SuccessReceiptItem(label: 'Perusahaan / Dept', value: '$perusahaan ($departemen)'),
+        SuccessReceiptItem(
+          label: 'Arah Gerbang',
+          value: isMasuk ? 'MASUK TAMBANG (IN)' : 'KELUAR TAMBANG (OUT)',
+          isHighlight: true,
+          highlightColor: isMasuk ? const Color(0xFF0D9488) : const Color(0xFFDC2626),
         ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: isMasuk
-                        ? const Color(0xFF10B981).withValues(alpha: .2)
-                        : const Color(0xFFEF4444).withValues(alpha: .2),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    isMasuk ? 'MASUK TAMBANG (IN)' : 'KELUAR TAMBANG (OUT)',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w900,
-                      color: isMasuk ? const Color(0xFF059669) : const Color(0xFFDC2626),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
-            Text(
-              'Pergerakan atas nama $nama berhasil dicatat pada sistem pemeriksaan gerbang.',
-              style: const TextStyle(fontSize: 13, color: Color(0xFF475569)),
-            ),
-            const SizedBox(height: 12),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF8FAFC),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFFE2E8F0)),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Unit Kendaraan: $unit', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF1E293B))),
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      const Text(
-                        'Penumpang: ',
-                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF475569)),
-                      ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: !isMasuk ? const Color(0xFFFEF2F2) : const Color(0xFFF0FDF4),
-                          borderRadius: BorderRadius.circular(6),
-                          border: Border.all(
-                            color: !isMasuk ? const Color(0xFFFCA5A5) : const Color(0xFF86EFAC),
-                            width: 0.8,
-                          ),
-                        ),
-                        child: Text(
-                          jumlahPenumpang == 0 ? '0 (Hanya Sopir)' : '$jumlahPenumpang Orang Penumpang',
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w800,
-                            color: !isMasuk ? const Color(0xFFDC2626) : const Color(0xFF16A34A),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  Text('Keperluan: $keperluan', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF475569))),
-                  if (lokasiDetail != null && lokasiDetail.isNotEmpty) ...[
-                    const SizedBox(height: 6),
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Icon(Icons.my_location_rounded, size: 14, color: isMasuk ? const Color(0xFF0D9488) : const Color(0xFFDC2626)),
-                        const SizedBox(width: 5),
-                        Expanded(
-                          child: Text(
-                            'Lokasi GPS: $lokasiDetail',
-                            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: isMasuk ? const Color(0xFF0D9488) : const Color(0xFFDC2626)),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ],
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: isMasuk ? const Color(0xFF0D9488) : const Color(0xFFDC2626),
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            ),
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('OK', style: TextStyle(fontWeight: FontWeight.w700)),
-          ),
-        ],
-      ),
+        SuccessReceiptItem(label: 'Unit Kendaraan', value: unit, isHighlight: true),
+        SuccessReceiptItem(label: 'Penumpang', value: jumlahPenumpang == 0 ? '0 (Hanya Sopir)' : '$jumlahPenumpang Orang Penumpang'),
+        SuccessReceiptItem(label: 'Keperluan', value: keperluan.isEmpty ? 'Tugas Operasional' : keperluan),
+        if (lokasiDetail != null && lokasiDetail.isNotEmpty)
+          SuccessReceiptItem(label: 'Pos / Lokasi GPS', value: lokasiDetail),
+      ],
+      primaryButtonText: 'Selesai & Tutup',
     );
   }
 

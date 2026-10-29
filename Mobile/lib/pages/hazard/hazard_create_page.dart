@@ -14,6 +14,7 @@ import '../../services/preference.dart';
 import '../../widgets/sap_form_widgets.dart';
 import '../../widgets/snackbar_msg.dart';
 import '../../widgets/top_bar.dart';
+import '../../widgets/professional_success_sheet.dart';
 
 class JenisBahayaDef {
   final String name;
@@ -1864,8 +1865,25 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
       },
       (data) async {
         setState(() => _isSubmitting = false);
-        SnackBarMsg.success(context, 'Laporan Hazard berhasil dikirim ke server!');
-        Navigator.pop(context, true);
+        await showProfessionalSuccessSheet(
+          context: context,
+          title: 'Laporan Hazard Sukses Dikirim!',
+          subtitle: 'Temuan bahaya Anda telah terkirim dan resmi tercatat di database pusat IndexSafe.',
+          referenceNumber: 'HZD-${DateTime.now().millisecondsSinceEpoch.toString().substring(5)}',
+          accentColor: const Color(0xFFF97316),
+          icon: Icons.warning_amber_rounded,
+          statusBadgeText: 'DATABASE PUSAT (ONLINE)',
+          receiptItems: [
+            SuccessReceiptItem(label: 'Kategori Bahaya', value: fields['kategori_bahaya']?.toString() ?? '-', isHighlight: true),
+            SuccessReceiptItem(label: 'Jenis Bahaya', value: fields['jenis_bahaya']?.toString() ?? '-'),
+            SuccessReceiptItem(label: 'Tingkat Resiko', value: fields['tingkat_resiko']?.toString() ?? 'Sedang', highlightColor: const Color(0xFFEF4444)),
+            SuccessReceiptItem(label: 'Area & Lokasi', value: '${fields['area']} - ${fields['lokasi']}'),
+            SuccessReceiptItem(label: 'Penanggung Jawab (PJA)', value: fields['pja']?.toString() ?? '-'),
+            SuccessReceiptItem(label: 'Status Temuan', value: fields['status_temuan']?.toString() ?? 'Open', isHighlight: true),
+          ],
+          primaryButtonText: 'Kembali ke Hub Hazard',
+        );
+        if (mounted) Navigator.pop(context, true);
       },
     );
   }
@@ -1906,8 +1924,25 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
       await OfflineSyncService.instance.refresh();
       if (!mounted) return;
       setState(() => _isSubmitting = false);
-      SnackBarMsg.info(context, 'Laporan tersimpan di HP (Belum Sinkron). Tanda "Belum Sinkron" ditampilkan sampai data tersinkronkan ke server.');
-      Navigator.pop(context, true);
+      await showProfessionalSuccessSheet(
+        context: context,
+        title: 'Temuan Tersimpan di HP (Offline)!',
+        subtitle: 'Data tersimpan aman di database lokal HP & akan otomatis disinkronkan ke server pusat saat online.',
+        referenceNumber: code,
+        accentColor: const Color(0xFFD97706),
+        icon: Icons.cloud_done_rounded,
+        isOffline: true,
+        statusBadgeText: 'OFFLINE STORAGE (SIAP SINKRON)',
+        receiptItems: [
+          SuccessReceiptItem(label: 'Kategori Bahaya', value: fields['kategori_bahaya']?.toString() ?? '-', isHighlight: true),
+          SuccessReceiptItem(label: 'Jenis Bahaya', value: fields['jenis_bahaya']?.toString() ?? '-'),
+          SuccessReceiptItem(label: 'Tingkat Resiko', value: fields['tingkat_resiko']?.toString() ?? 'Sedang', highlightColor: const Color(0xFFEF4444)),
+          SuccessReceiptItem(label: 'Area & Lokasi', value: '${fields['area']} - ${fields['lokasi']}'),
+          SuccessReceiptItem(label: 'Penanggung Jawab (PJA)', value: fields['pja']?.toString() ?? '-'),
+        ],
+        primaryButtonText: 'Kembali ke Hub Hazard',
+      );
+      if (mounted) Navigator.pop(context, true);
     } catch (e) {
       if (!mounted) return;
       setState(() => _isSubmitting = false);

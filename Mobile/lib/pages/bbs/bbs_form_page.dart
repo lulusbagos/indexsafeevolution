@@ -14,6 +14,7 @@ import '../../services/offline_sync_service.dart';
 import '../../widgets/sap_form_widgets.dart';
 import '../../widgets/snackbar_msg.dart';
 import '../../widgets/top_bar.dart';
+import '../../widgets/professional_success_sheet.dart';
 import 'bbs_model.dart';
 import 'bbs_page.dart';
 
@@ -1480,15 +1481,31 @@ class _BbsFormPageState extends State<BbsFormPage> {
 
     if (!mounted) return;
     setState(() => _saving = false);
-    if (synced) {
-      SnackBarMsg.success(context, 'Laporan observasi BBS berhasil disinkronkan ke server.');
-    } else {
-      SnackBarMsg.info(context, 'Laporan tersimpan di perangkat (Mode Offline) & akan tersinkron otomatis saat online.');
-    }
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (_) => BbsDetailPage(observation)),
+    await showProfessionalSuccessSheet(
+      context: context,
+      title: 'Observasi BBS Berhasil Disimpan!',
+      subtitle: synced
+          ? 'Data perilaku observasi K3 telah tersimpan di database pusat IndexSafe.'
+          : 'Data tersimpan di penyimpanan lokal HP & otomatis disinkronkan saat online.',
+      referenceNumber: 'BBS-${DateTime.now().millisecondsSinceEpoch.toString().substring(5)}',
+      accentColor: const Color(0xFF2563EB),
+      icon: Icons.visibility_rounded,
+      isOffline: !synced,
+      statusBadgeText: synced ? 'DATABASE PUSAT (ONLINE)' : 'OFFLINE STORAGE (SIAP SINKRON)',
+      receiptItems: [
+        SuccessReceiptItem(label: 'Pekerja Diamati', value: '${_observedPerson.text.trim()} (${_observedNik.text.trim()})', isHighlight: true),
+        SuccessReceiptItem(label: 'Perusahaan / Dept', value: '${_companyName ?? "-"} - ${_observedPosition.text.trim()}'),
+        SuccessReceiptItem(label: 'Lokasi Observasi', value: '$_area - $_benchmark'),
+        SuccessReceiptItem(label: 'Komitmen Perbaikan', value: _commitment.text.trim().isEmpty ? 'Pekerja berkomitmen taat K3' : _commitment.text.trim()),
+      ],
+      primaryButtonText: 'Buka Detail Observasi',
     );
+    if (mounted) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => BbsDetailPage(observation)),
+      );
+    }
   }
 
   // ==================== PHOTO PICKER ====================

@@ -15,6 +15,7 @@ import '../../services/sync.dart';
 import '../../widgets/button_app.dart';
 import '../../widgets/snackbar_msg.dart';
 import '../../widgets/top_bar.dart';
+import '../../widgets/professional_success_sheet.dart';
 
 class P2HChecklistItem {
   final int id;
@@ -746,11 +747,27 @@ class _P2HFormPageState extends State<P2HFormPage> {
 
       // 4. Check Connectivity & Sync
       final isOnline = OfflineSyncService.instance.state.value.isOnline;
+      final isUnitSiap = !_golAItems.any((x) => x.status == 'NOT_GOOD');
       if (isOnline) {
         final synced = await syncTran(_db, _api, 'p2h', tranId);
         if (synced && mounted) {
-          SnackBarMsg.success(context, 'Laporan P2H berhasil dikirim dan tersinkronisasi!');
-          Navigator.pop(context, true);
+          await showProfessionalSuccessSheet(
+            context: context,
+            title: 'Laporan P2H Sukses Dikirim!',
+            subtitle: 'Pemeriksaan harian sarana unit telah resmi tercatat di database pusat IndexSafe.',
+            referenceNumber: 'P2H-${DateTime.now().millisecondsSinceEpoch.toString().substring(5)}',
+            accentColor: const Color(0xFF0284C7),
+            icon: Icons.car_repair_rounded,
+            statusBadgeText: 'DATABASE PUSAT (ONLINE)',
+            receiptItems: [
+              SuccessReceiptItem(label: 'Nomor Lambung', value: noLambung, isHighlight: true),
+              SuccessReceiptItem(label: 'Merek / Tipe', value: merek),
+              SuccessReceiptItem(label: 'Odometer (KM)', value: '${NumberFormat("#,##0", "id_ID").format(kmVal)} KM'),
+              SuccessReceiptItem(label: 'Kelayakan Unit', value: isUnitSiap ? 'SIAP PAKAI (LAYAK)' : 'STOP OPERASI (RUSAK)', highlightColor: isUnitSiap ? const Color(0xFF10B981) : const Color(0xFFDC2626), isHighlight: true),
+            ],
+            primaryButtonText: 'Kembali ke Menu P2H',
+          );
+          if (mounted) Navigator.pop(context, true);
           return;
         }
       }
@@ -758,11 +775,24 @@ class _P2HFormPageState extends State<P2HFormPage> {
       // If offline or sync failed, notify offline saved
       await OfflineSyncService.instance.refreshPendingCount();
       if (mounted) {
-        SnackBarMsg.info(
-          context,
-          'Laporan P2H tersimpan di perangkat (Mode Offline). Akan otomatis disinkronkan saat terhubung ke internet.',
+        await showProfessionalSuccessSheet(
+          context: context,
+          title: 'P2H Tersimpan di HP (Offline)!',
+          subtitle: 'Laporan pemeriksaan sarana tersimpan aman di HP & otomatis disinkronkan saat terhubung ke server.',
+          referenceNumber: 'P2H-OFFLINE-$tranId',
+          accentColor: const Color(0xFF0284C7),
+          icon: Icons.cloud_done_rounded,
+          isOffline: true,
+          statusBadgeText: 'OFFLINE STORAGE (SIAP SINKRON)',
+          receiptItems: [
+            SuccessReceiptItem(label: 'Nomor Lambung', value: noLambung, isHighlight: true),
+            SuccessReceiptItem(label: 'Merek / Tipe', value: merek),
+            SuccessReceiptItem(label: 'Odometer (KM)', value: '${NumberFormat("#,##0", "id_ID").format(kmVal)} KM'),
+            SuccessReceiptItem(label: 'Kelayakan Unit', value: isUnitSiap ? 'SIAP PAKAI (LAYAK)' : 'STOP OPERASI (RUSAK)', highlightColor: isUnitSiap ? const Color(0xFF10B981) : const Color(0xFFDC2626), isHighlight: true),
+          ],
+          primaryButtonText: 'Kembali ke Menu P2H',
         );
-        Navigator.pop(context, true);
+        if (mounted) Navigator.pop(context, true);
       }
     } catch (e) {
       debugPrint('[P2HForm] Submit error: $e');
@@ -777,7 +807,6 @@ class _P2HFormPageState extends State<P2HFormPage> {
   @override
   Widget build(BuildContext context) {
     final isOnline = OfflineSyncService.instance.state.value.isOnline;
-
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       appBar: const TopBar(title: 'P2H Kendaraan', back: 1),

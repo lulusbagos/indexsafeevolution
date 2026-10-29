@@ -12,6 +12,7 @@ import '../../utils/enums.dart';
 import '../../widgets/sap_form_widgets.dart';
 import '../../widgets/snackbar_msg.dart';
 import '../../widgets/top_bar.dart';
+import '../../widgets/professional_success_sheet.dart';
 
 class InspeksiFormPage extends StatefulWidget {
   const InspeksiFormPage(this.module, {this.idx, super.key});
@@ -1023,55 +1024,27 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
     }
   }
 
-  void _showSuccessDialog(int localId) {
-    showDialog(
+  void _showSuccessDialog(int localId) async {
+    final profile = PreferenceService.getProfile();
+    await showProfessionalSuccessSheet(
       context: context,
-      barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const SizedBox(height: 10),
-            Container(
-              width: 64,
-              height: 64,
-              decoration: const BoxDecoration(
-                color: Color(0xFFECFDF5),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(Icons.check_circle_rounded, color: primaryGreen, size: 40),
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              'Laporan Berhasil Disimpan!',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF0F172A)),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 6),
-            Text(
-              'Laporan inspeksi tersimpan di database lokal (Offline Mode #$localId) dan siap disinkronkan ke server pusat.',
-              style: const TextStyle(fontSize: 12, color: Color(0xFF64748B), height: 1.4),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 20),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: primaryGreen,
-                foregroundColor: Colors.white,
-                minimumSize: const Size(double.infinity, 44),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              ),
-              onPressed: () {
-                Navigator.pop(ctx);
-                Navigator.pop(context, true);
-              },
-              child: const Text('Kembali ke Hub', style: TextStyle(fontWeight: FontWeight.bold)),
-            ),
-          ],
-        ),
-      ),
+      title: 'Laporan Inspeksi Berhasil Disimpan!',
+      subtitle: 'Hasil checklist inspeksi telah tersimpan di database lokal HP & siap disinkronkan ke server pusat.',
+      referenceNumber: 'INSP-${localId.toString().padLeft(5, '0')}',
+      accentColor: primaryGreen,
+      icon: Icons.fact_check_rounded,
+      isOffline: true,
+      statusBadgeText: 'OFFLINE STORAGE (SIAP SINKRON)',
+      receiptItems: [
+        SuccessReceiptItem(label: 'Jenis Inspeksi', value: widget.module.name.toUpperCase(), isHighlight: true),
+        SuccessReceiptItem(label: 'Area Inspeksi', value: _area.isNotEmpty ? _area : 'Area Tambang'),
+        SuccessReceiptItem(label: 'Auditor / Pemeriksa', value: '${profile?.namaLengkap ?? "Auditor"} (${profile?.noNik ?? "-"})'),
+        SuccessReceiptItem(label: 'Penanggung Jawab (PJA)', value: _selectedPja?.nama ?? (_pjaSearchCtrl.text.trim().isEmpty ? '-' : _pjaSearchCtrl.text.trim())),
+        SuccessReceiptItem(label: 'Butir Checklist', value: '${_checkpoints.length + _customQuestions.length} Item Pemeriksaan'),
+      ],
+      primaryButtonText: 'Kembali ke Hub Inspeksi',
     );
+    if (mounted) Navigator.pop(context, true);
   }
 
   // --- UI BUILDER METHODS SAMA PERSIS DENGAN HAZARD CREATE PAGE ---
