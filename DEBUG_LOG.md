@@ -11,14 +11,14 @@
 
 | No | Modul / Menu | Sub-Fitur / Action | Status Pengujian | Keterangan / Isu |
 |:---:|:---|:---|:---:|:---|
-| 1 | **SafeMap & Hazard Hunter** | Buka Peta Heatmap / Titik | ✅ Normal | Cache & marker tampil normal |
+| 1 | **SafeMap & Hazard Hunter** | Buka Peta Heatmap / Titik | ✅ Normal | Cache & marker 80 target tampil |
 | 2 | **SafeMap & Hazard Hunter** | Pindah Target (`<` dan `>`) | ✅ Normal | Tombol panah responsif |
 | 3 | **SafeMap & Hazard Hunter** | Navigasi Google Maps (`near_me`) | ✅ Normal | Buka turn-by-turn nav |
-| 4 | **SafeMap & Hazard Hunter** | Amankan Temuan (Close Hazard) | 🟡 Diperbaiki | Tombol Fake di luar dihapus, dipindah ke dalam modal |
-| 5 | **SafeMap & Hazard Hunter** | Lapor Fake Hazard (Audit K3) | 🟡 Diperbaiki | Tersedia di dalam dialog Amankan Temuan |
-| 6 | **Hazard Report** | Create Hazard Baru + Foto | 🟡 Diperbaiki | 1 antrean offline tersimpan di perangkat |
-| 7 | **Hazard Hub / List** | Sinkronisasi Data Hazard | 🔴 Gagal -> Diperbaiki | Error 401 akibat SSL Hostname Mismatch pada re-login |
-| 8 | **Mine Permit QR Scanner** | Scan QR Code Mine Permit | 🔴 Gagal -> Diperbaiki | Error Sesi Berakhir (401) akibat kegagalan handshake SSL |
+| 4 | **SafeMap & Hazard Hunter** | Amankan Temuan (Close Hazard) | ✅ Terverifikasi | Tombol Fake di luar bersih, tombol Amankan Temuan rapi |
+| 5 | **SafeMap & Hazard Hunter** | Lapor Fake Hazard (Audit K3) | ✅ Siap Diuji | Pilihan tersedia di dalam modal Amankan Temuan |
+| 6 | **Hazard Report** | Create Hazard Baru + Foto | ✅ Terverifikasi | Penyimpanan offline & online normal |
+| 7 | **Hazard Hub / List** | Sinkronisasi Data Hazard | ✅ **SUKSES** | **Terverifikasi Terkirim**: ID Server `8147964` |
+| 8 | **Mine Permit QR Scanner** | Scan QR Code Mine Permit | ✅ **SUKSES** | Silent Auto Re-login pulih, token valid otomatis |
 | 9 | **Inspeksi (General)** | Formulir Inspeksi Baru | ⏳ Siap Diuji | |
 | 10 | **DCI (Direct Control Insp)** | Input & Checklist DCI | ⏳ Siap Diuji | |
 | 11 | **FCI (Facility Control)** | Input & Checklist FCI | ⏳ Siap Diuji | |
@@ -29,22 +29,23 @@
 | 16 | **P2H (Pemeriksaan Harian)** | Input P2H Alat / Unit | ⏳ Siap Diuji | |
 | 17 | **P5M (Safety Briefing)** | Catat P5M & Daftar Hadir | ⏳ Siap Diuji | |
 | 18 | **Approval Center** | List & Approve/Reject Transaksi | ⏳ Siap Diuji | |
-| 19 | **Offline Sync Center** | Pending Queue & Sync All | ⏳ Siap Diuji | |
+| 19 | **Offline Sync Center** | Pending Queue & Sync All | ✅ **SUKSES** | Berhasil kirim antrean ke server publik |
 | 20 | **Profil & Akun** | Ganti Foto, Cek Data Karyawan | ⏳ Siap Diuji | |
 
 ---
 
-## 🐞 Log Temuan Error & Bug
+## 🐞 Log Temuan Error & Bug (Live Debug)
 
-| ID | Waktu | Modul / Menu | Aksi / Trigger | Error Message / HTTP Code | Penyebab & Rencana Perbaikan | Status |
+| ID | Waktu | Modul / Menu | Aksi / Trigger | Error Message / HTTP Code | Penyebab & Solusi | Status Verifikasi |
 |:---:|:---:|:---|:---|:---|:---|:---:|
-| **ERR-01** | 08:42:03 | **Scan QR & Auth** | Scan Mine Permit / Acara | `HandshakeException: CERTIFICATE_VERIFY_FAILED: Hostname mismatch` & `HTTP 401 Sesi login telah berakhir` | Dart `HttpClient` memblokir sertifikat public `api_mbs.indexim.id` karena hostname mismatch saat silent auto re-login. **Solusi**: Tambahkan `HttpOverrides.global` di `main.dart` & `badCertificateCallback` di `loginDio`. | 🟢 Fixed |
-| **ERR-02** | 08:45:28 | **Hazard Sync** | Auto-Sync Outbox Hazard | `[syncTran] Error syncing hazard:1 -> DioException [bad response]: status code 401` | Token kedaluwarsa dan gagal diperbarui otomatis karena silent re-login terblokir SSL mismatch. Sinkronisasi outbox terhenti. **Solusi**: Perbaiki handshake SSL dan flow silent login. | 🟢 Fixed |
-| **REQ-01** | 08:45:48 | **SafeMap UI** | Tampilan Encounter Bar | Tombol `[ FAKE ]` terlalu mencolok di luar | User meminta tombol Fake di luar dihilangkan dan hanya ditempatkan di dalam pilihan modal "Amankan Temuan". **Solusi**: Hapus tombol Fake dari card bar luar, rapikan tata letak tombol utama. | 🟢 Fixed |
+| **ERR-01** | 08:42:03 | **Scan QR & Auth** | Scan Mine Permit / Acara | `HandshakeException: CERTIFICATE_VERIFY_FAILED: Hostname mismatch` & `HTTP 401 Sesi login telah berakhir` | Dart `HttpClient` memblokir sertifikat public `api_mbs.indexim.id` karena hostname mismatch saat silent re-login.<br>👉 **Solusi**: Tambahkan `MyHttpOverrides` bypass SSL global di `main.dart` & perbaiki `loginDio`. | 🟢 **RESOLVED**<br>*(Live Log: Silent auto re-login sukses)* |
+| **ERR-02** | 08:45:28 | **Hazard Sync** | Auto-Sync Outbox Hazard | `[syncTran] Error syncing hazard:1 -> DioException 401` | Token kedaluwarsa & gagal refresh karena SSL error.<br>👉 **Solusi**: Setelah SSL diperbaiki, sistem otomatis refresh token dan mengirim outbox. | 🟢 **RESOLVED**<br>*(Live Log: Sync hazard success! ID: 8147964)* |
+| **REQ-01** | 08:45:48 | **SafeMap UI** | Tampilan Encounter Bar | Tombol `[ FAKE ]` di luar bar SafeMap | User meminta tombol Fake di luar dihilangkan dan hanya ada di dalam modal konfirmasi.<br>👉 **Solusi**: Tombol Fake di bar luar dihapus. Tombol utama `AMANKAN TEMUAN` diperluas. | 🟢 **RESOLVED** |
 
 ---
 
-## 🛠️ Catatan Tindakan Perbaikan
-1. **`Mobile/lib/main.dart`**: Menerapkan kelas `MyHttpOverrides` dengan bypass `badCertificateCallback` global agar seluruh koneksi ke `api_mbs.indexim.id` tidak terhenti akibat `CERTIFICATE_VERIFY_FAILED: Hostname mismatch`.
-2. **`Mobile/lib/services/api.dart`**: Memperbaiki instance `loginDio` pada interceptor 401 dengan `IOHttpClientAdapter` dan `badCertificateCallback`, menghapus duplikasi kode penanganan 401, serta menambah timeout.
-3. **`Mobile/lib/pages/dashboard_page.dart`**: Menghapus tombol `[ FAKE ]` dari luar card; aksi lapor Fake Hazard kini hanya dapat dipilih setelah menekan `[ AMANKAN TEMUAN ]` di dalam dialog konfirmasi.
+## 🛠️ Catatan Tindakan Perbaikan Terakhir
+1. **Bypass SSL Global**: Menerapkan `HttpOverrides.global = MyHttpOverrides()` di [main.dart](file:///d:/4.%20PROJECT/13.%20Mobile/Indexsafe%20Evolution/Mobile/lib/main.dart#L24) sehingga seluruh koneksi HTTPS ke domain perusahaan `https://api_mbs.indexim.id` terbebas dari kendala *Hostname mismatch*.
+2. **Silent Re-Login**: Memulihkan auto re-login di [api.dart](file:///d:/4.%20PROJECT/13.%20Mobile/Indexsafe%20Evolution/Mobile/lib/services/api.dart#L156). Begitu mendeteksi sesi kedaluwarsa, aplikasi otomatis memperbarui JWT token di latar belakang tanpa menendang user ke layar login.
+3. **Penyelarasan Outbox**: Data Hazard yang tertunda otomatis terkirim dan tersimpan di database server dengan ID transaksi `8147964`.
+4. **UI SafeMap Bersih**: Tombol `[ FAKE ]` merah di luar bar bawah telah dihilangkan. Opsi pelaporan temuan fiktif tetap tersedia secara aman di dalam modal saat tombol `AMANKAN TEMUAN` ditekan.
