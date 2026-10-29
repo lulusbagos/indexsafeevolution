@@ -6,6 +6,7 @@ namespace Indexsafe.Api.DTOs
     public class BimaUserStatusDto
     {
         public bool IsRegistered { get; set; }
+        public bool IsApprover { get; set; }
         public int? UserId { get; set; }
         public string? Fullname { get; set; }
         public string? EmployeeId { get; set; }

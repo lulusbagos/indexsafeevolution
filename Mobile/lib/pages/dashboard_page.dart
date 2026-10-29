@@ -2797,9 +2797,11 @@ class _DashboardPageState extends State<DashboardPage> with WidgetsBindingObserv
           if (mounted) {
             final d = data['data'] as Map<String, dynamic>?;
             final isReg = d?['isRegistered'] as bool? ?? false;
+            final isApprover = d?['isApprover'] as bool? ?? false;
             final pCount = d?['pendingCount'] as int? ?? 0;
             setState(() {
-              _isApprovalRegistered = isReg;
+              // Approval Center hanya muncul jika akun terdaftar di Bima DAN memiliki peran approver / ada dokumen pending
+              _isApprovalRegistered = isReg && (isApprover || pCount > 0);
               _pendingApprovalCount = pCount;
             });
           }

@@ -22,11 +22,22 @@ namespace Indexsafe.Api.Controllers
 
         private string GetCallerNik(string? fallbackNik = null)
         {
+            var headerNik = Request?.Headers["X-User-Nik"].ToString();
+            if (!string.IsNullOrWhiteSpace(headerNik))
+            {
+                return headerNik.Trim();
+            }
+
+            if (!string.IsNullOrWhiteSpace(fallbackNik))
+            {
+                return fallbackNik.Trim();
+            }
+
             var claimNik = User?.FindFirst(ClaimTypes.NameIdentifier)?.Value
                            ?? User?.FindFirst("nrp")?.Value
                            ?? User?.FindFirst("nik")?.Value;
 
-            return !string.IsNullOrWhiteSpace(fallbackNik) ? fallbackNik.Trim() : (claimNik?.Trim() ?? string.Empty);
+            return claimNik?.Trim() ?? string.Empty;
         }
 
         private string GetCallerName(string? fallbackName = null)
@@ -137,9 +148,10 @@ namespace Indexsafe.Api.Controllers
                 return BadRequest(new { status = 400, message = "Data request approval tidak valid" });
             }
 
-            if (string.IsNullOrWhiteSpace(request.UserNik))
+            var activeNik = GetCallerNik(request.UserNik);
+            if (!string.IsNullOrWhiteSpace(activeNik))
             {
-                request.UserNik = GetCallerNik();
+                request.UserNik = activeNik;
             }
 
             if (string.IsNullOrWhiteSpace(request.UserName))
@@ -165,9 +177,10 @@ namespace Indexsafe.Api.Controllers
                 return BadRequest(new { status = 400, message = "Daftar ID approval tidak boleh kosong" });
             }
 
-            if (string.IsNullOrWhiteSpace(request.UserNik))
+            var activeNik = GetCallerNik(request.UserNik);
+            if (!string.IsNullOrWhiteSpace(activeNik))
             {
-                request.UserNik = GetCallerNik();
+                request.UserNik = activeNik;
             }
 
             if (string.IsNullOrWhiteSpace(request.UserName))

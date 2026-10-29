@@ -18,6 +18,32 @@ namespace Indexsafe.Api.Services
         private const string User = "postgres";
         private const string Pass = "index.123";
 
+        public static readonly HashSet<int> ApproverRoleIds = new()
+        {
+            1,  // ADMIN DEPARTMENT
+            2,  // ADMIN HSE
+            3,  // KLINIK / MEDIK
+            4,  // SUPERINTENDENT DEPARTMENT
+            5,  // MANAGER DEPARTMENT
+            6,  // SENIOR MANAGER QHSE
+            7,  // GM - KTT PT INDEXIM COALINDO
+            10, // VERIFICATOR
+            11, // TC / VERIFICATOR COMMISIONNING
+            12, // EMERGENCY RESPONSE TEAM (ERT)
+            13, // SUPERINTENDENT QHSE
+            14, // PJO / HSE
+            17, // TIM COMMISSIONER
+            18, // INSPECTOR CHECKLIST
+            19  // HSE COMMISSIONING
+        };
+
+        public static readonly HashSet<int> DepartmentScopedRoleIds = new()
+        {
+            1, // ADMIN DEPARTMENT
+            4, // SUPERINTENDENT DEPARTMENT
+            5  // MANAGER DEPARTMENT
+        };
+
         public BimaApprovalService(ILogger<BimaApprovalService> logger, IConfiguration config)
         {
             _logger = logger;
@@ -68,6 +94,7 @@ namespace Indexsafe.Api.Services
         private class BimaUserContext
         {
             public bool IsRegistered { get; set; }
+            public bool IsApprover { get; set; }
             public int? UserId { get; set; }
             public string? Fullname { get; set; }
             public string? EmployeeId { get; set; }
@@ -194,6 +221,8 @@ namespace Indexsafe.Api.Services
             // Fallback default jika kosong
             if (!ctx.CompanyIds.Any()) ctx.CompanyIds.Add(1);
 
+            ctx.IsApprover = ctx.RoleIds.Any(r => ApproverRoleIds.Contains((int)r));
+
             return ctx;
         }
 
@@ -215,6 +244,7 @@ namespace Indexsafe.Api.Services
                 if (!ctx.IsRegistered) return res;
 
                 res.IsRegistered = true;
+                res.IsApprover = ctx.IsApprover;
                 res.UserId = ctx.UserId;
                 res.Fullname = ctx.Fullname;
                 res.EmployeeId = ctx.EmployeeId;
@@ -232,17 +262,28 @@ namespace Indexsafe.Api.Services
                     const string sqlPendingCount = @"
                         SELECT COUNT(DISTINCT ra.id)
                         FROM public.request_approval ra
-                        LEFT JOIN public.tb_permit p ON ra.req_id = p.req_id AND ra.module = 'PERMIT'
+                        LEFT JOIN public.tb_role r ON ra.req_role_id = r.id
                         LEFT JOIN public.workflow w ON ra.workflow_id = w.id
+                        LEFT JOIN public.tb_permit p ON ra.req_id = p.req_id AND ra.module = 'PERMIT'
+                        LEFT JOIN public.tb_simper_unit su ON ra.req_id = su.req_id AND ra.module = 'SIMPER'
+                        LEFT JOIN public.tb_simper s ON su.simper_id = s.id
+                        LEFT JOIN public.tb_permit p2 ON s.permit_id = p2.id
+                        LEFT JOIN public.special_permit c ON ra.req_id = c.req_id AND ra.module = 'SPECIAL_PERMIT'
                         WHERE ra.is_current_document = true 
                           AND ra.req_status = 'WAITING'
                           AND ra.req_role_id = ANY(@roleIds)
-                          AND (ra.created_company_id = ANY(@companyIds) OR p.company_id = ANY(@companyIds))
                           AND (
-                            w.is_by_department IS NOT TRUE 
-                            OR ra.created_department_id = ANY(@deptIds) 
-                            OR p.id_departemen = ANY(@deptIds)
-                            OR TRIM(UPPER(p.departemen)) = TRIM(UPPER(@deptName))
+                            ra.created_company_id = ANY(@companyIds) 
+                            OR COALESCE(p.company_id, p2.company_id) = ANY(@companyIds)
+                          )
+                          AND (
+                            (ra.req_role_id NOT IN (1, 4, 5) AND COALESCE(w.is_by_department, false) = false)
+                            OR
+                            (
+                              ra.created_department_id = ANY(@deptIds)
+                              OR COALESCE(p.id_departemen, p2.id_departemen) = ANY(@deptIds)
+                              OR TRIM(UPPER(COALESCE(p.departemen, c.department, p2.departemen, ''))) = TRIM(UPPER(@deptName))
+                            )
                           );";
 
                     await using var cmdPending = new NpgsqlCommand(sqlPendingCount, conn);
@@ -301,7 +342,7 @@ namespace Indexsafe.Api.Services
             try
             {
                 var ctx = await GetUserContextAsync(conn, nik);
-                if (!ctx.IsRegistered || !ctx.RoleIds.Any()) return list;
+                if (!ctx.IsRegistered || !ctx.IsApprover || !ctx.RoleIds.Any()) return list;
 
                 var sql = @"
                     SELECT DISTINCT ON (ra.id)
@@ -324,12 +365,18 @@ namespace Indexsafe.Api.Services
                     WHERE ra.is_current_document = true 
                       AND ra.req_status = 'WAITING'
                       AND ra.req_role_id = ANY(@roleIds)
-                      AND (ra.created_company_id = ANY(@companyIds) OR p.company_id = ANY(@companyIds))
                       AND (
-                        w.is_by_department IS NOT TRUE 
-                        OR ra.created_department_id = ANY(@deptIds) 
-                        OR p.id_departemen = ANY(@deptIds)
-                        OR TRIM(UPPER(p.departemen)) = TRIM(UPPER(@deptName))
+                        ra.created_company_id = ANY(@companyIds) 
+                        OR COALESCE(p.company_id, p2.company_id) = ANY(@companyIds)
+                      )
+                      AND (
+                        (ra.req_role_id NOT IN (1, 4, 5) AND COALESCE(w.is_by_department, false) = false)
+                        OR
+                        (
+                          ra.created_department_id = ANY(@deptIds)
+                          OR COALESCE(p.id_departemen, p2.id_departemen) = ANY(@deptIds)
+                          OR TRIM(UPPER(COALESCE(p.departemen, c.department, p2.departemen, ''))) = TRIM(UPPER(@deptName))
+                        )
                       )
                       " + (!string.IsNullOrWhiteSpace(module) && module != "ALL" ? "AND ra.module = @module" : "") + @"
                     ORDER BY ra.id DESC, ra.req_time DESC
@@ -552,15 +599,28 @@ namespace Indexsafe.Api.Services
                 long? createdDeptId = rdr.IsDBNull(25) ? null : Convert.ToInt64(rdr.GetValue(25));
                 await rdr.CloseAsync();
 
-                // Cek apakah pemanggil memiliki hak approval untuk dokumen ini
+                // Cek apakah pemanggil memiliki hak approval untuk dokumen ini (Validasi Ketat Anti-Bocor)
                 if (!string.IsNullOrWhiteSpace(callerNik) && detail.Header.IsCurrentDocument && detail.Header.ReqStatus == "WAITING")
                 {
                     var callerCtx = await GetUserContextAsync(conn, callerNik);
-                    if (callerCtx.IsRegistered && detail.Header.RoleId.HasValue)
+                    if (callerCtx.IsRegistered && callerCtx.IsApprover && detail.Header.RoleId.HasValue)
                     {
-                        bool roleMatches = callerCtx.RoleIds.Contains(detail.Header.RoleId.Value);
+                        var reqRoleId = detail.Header.RoleId.Value;
+                        bool roleMatches = callerCtx.RoleIds.Contains(reqRoleId);
                         bool compMatches = createdCompId == null || callerCtx.CompanyIds.Contains(createdCompId.Value);
-                        bool deptMatches = isByDept != true || createdDeptId == null || callerCtx.DepartmentIds.Contains(createdDeptId.Value) || (detail.Header.Department.Equals(callerCtx.Department, StringComparison.OrdinalIgnoreCase));
+
+                        bool isDeptScoped = DepartmentScopedRoleIds.Contains(reqRoleId) || isByDept == true;
+                        bool deptMatches;
+                        if (isDeptScoped)
+                        {
+                            deptMatches = (createdDeptId.HasValue && callerCtx.DepartmentIds.Contains(createdDeptId.Value)) ||
+                                          (!string.IsNullOrEmpty(detail.Header.Department) && !string.IsNullOrEmpty(callerCtx.Department) &&
+                                           detail.Header.Department.Equals(callerCtx.Department, StringComparison.OrdinalIgnoreCase));
+                        }
+                        else
+                        {
+                            deptMatches = true;
+                        }
 
                         detail.CanApprove = roleMatches && compMatches && deptMatches;
                     }
@@ -741,12 +801,18 @@ namespace Indexsafe.Api.Services
                     return res;
                 }
 
-                // VALIDASI KEWENANGAN APPROVER SECARA KETAT
+                // VALIDASI KEWENANGAN APPROVER SECARA KETAT & ANTI-BOCOR
+                if (!callerCtx.IsApprover)
+                {
+                    res.Message = "Akun Anda tidak memiliki hak akses sebagai Approver.";
+                    return res;
+                }
+
                 // 1. Role validation: pastikan approver memiliki role yang disyaratkan oleh level ini
                 if (!reqRoleId.HasValue || !callerCtx.RoleIds.Contains(reqRoleId.Value))
                 {
                     var neededRole = !string.IsNullOrEmpty(roleName) ? roleName : $"Role ID {reqRoleId}";
-                    res.Message = $"Anda tidak memiliki wewenang untuk menyetujui tahap ini. Tahap ini memerlukan peran: {neededRole}.";
+                    res.Message = $"Anda tidak memiliki wewenang untuk menyetujui tahap ini. Peran Anda: '{callerCtx.RoleName ?? "User"}', tahap ini memerlukan peran: '{neededRole}'.";
                     return res;
                 }
 
@@ -757,15 +823,16 @@ namespace Indexsafe.Api.Services
                     return res;
                 }
 
-                // 3. Department validation (jika alur kerja berbasis departemen)
-                if (isByDept == true)
+                // 3. Department validation (untuk role departemen 1, 4, 5 atau alur kerja berbasis departemen)
+                bool isDeptScoped = (reqRoleId.HasValue && DepartmentScopedRoleIds.Contains((int)reqRoleId.Value)) || isByDept == true;
+                if (isDeptScoped)
                 {
                     bool deptMatches = (deptId.HasValue && callerCtx.DepartmentIds.Contains(deptId.Value)) ||
                                        (!string.IsNullOrEmpty(applicantDept) && !string.IsNullOrEmpty(callerCtx.Department) &&
                                         applicantDept.Equals(callerCtx.Department, StringComparison.OrdinalIgnoreCase));
                     if (!deptMatches)
                     {
-                        res.Message = "Anda tidak memiliki wewenang untuk menyetujui dokumen dari departemen ini.";
+                        res.Message = $"Anda tidak memiliki wewenang untuk menyetujui dokumen dari departemen '{applicantDept}'. Departemen Anda: '{callerCtx.Department ?? "-"}'.";
                         return res;
                     }
                 }
