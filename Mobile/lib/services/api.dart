@@ -139,13 +139,109 @@ class ApiService {
       InterceptorsWrapper(
         onRequest: (options, handler) {
           _restoreStoredToken();
-          final token = _token ?? PreferenceService.getAuth()?.token ?? '';
-          if (token.isNotEmpty && !options.headers.containsKey('Authorization')) {
+          final token = getToken;
+          if (token.isNotEmpty && !token.startsWith('offline_token_')) {
             options.headers['Authorization'] = 'Bearer $token';
           }
           return handler.next(options);
         },
         onError: (DioException err, ErrorInterceptorHandler handler) async {
+          // 1. Silent Auto Re-login jika sesi kedaluwarsa (HTTP 401)
+          if (err.response?.statusCode == 401 && !err.requestOptions.path.contains('/login')) {
+            final savedNik = (PreferenceService.getUser() ?? PreferenceService.getOfflineNik() ?? '').trim();
+            final savedPass = (PreferenceService.getPassword() ?? PreferenceService.getOfflinePassword() ?? '').trim();
+
+            if (savedNik.isNotEmpty && savedPass.isNotEmpty) {
+              try {
+                final loginDio = Dio(BaseOptions(
+                  baseUrl: '$_activeBaseUrl/api',
+                  connectTimeout: const Duration(seconds: 4),
+                  receiveTimeout: const Duration(seconds: 6),
+                ));
+                final loginPayload = <String, dynamic>{
+                  'email': savedNik,
+                  'nik': savedNik,
+                  'password': savedPass,
+                  'app_version': (globals.version.isNotEmpty) ? globals.version : '1.0.1',
+                };
+                final loginRes = await loginDio.post('/login', data: json.encode(loginPayload));
+                if (loginRes.statusCode == 200 && loginRes.data is Map) {
+                  final newToken = loginRes.data['token']?.toString();
+                  if (newToken != null && newToken.isNotEmpty) {
+                    _token = newToken;
+                    await PreferenceService.setAuth(AuthModel.fromJson(Map<String, dynamic>.from(loginRes.data as Map)));
+                    debugPrint('[ApiService] Silent auto re-login sukses! Token sesi berhasil diperbarui otomatis.');
+
+                    // Retry request yang tadi gagal dengan token baru
+                    final retryOptions = Options(
+                      method: err.requestOptions.method,
+                      headers: Map<String, dynamic>.from(err.requestOptions.headers),
+                      contentType: err.requestOptions.contentType,
+                      responseType: err.requestOptions.responseType,
+                    );
+                    retryOptions.headers?['Authorization'] = 'Bearer $newToken';
+                    final retryRes = await dio.request(
+                      err.requestOptions.path,
+                      data: err.requestOptions.data,
+                      queryParameters: err.requestOptions.queryParameters,
+                      options: retryOptions,
+                    );
+                    return handler.resolve(retryRes);
+                  }
+                }
+              } catch (silentErr) {
+                debugPrint('[ApiService] Silent auto re-login gagal: $silentErr');
+              }
+            }
+          }
+          // 1. Silent Auto Re-login jika sesi kedaluwarsa (HTTP 401)
+          if (err.response?.statusCode == 401 && !err.requestOptions.path.contains('/login')) {
+            final savedNik = (PreferenceService.getUser() ?? PreferenceService.getOfflineNik() ?? '').trim();
+            final savedPass = (PreferenceService.getPassword() ?? PreferenceService.getOfflinePassword() ?? '').trim();
+
+            if (savedNik.isNotEmpty && savedPass.isNotEmpty) {
+              try {
+                final loginDio = Dio(BaseOptions(
+                  baseUrl: '$_activeBaseUrl/api',
+                  connectTimeout: const Duration(seconds: 4),
+                  receiveTimeout: const Duration(seconds: 6),
+                ));
+                final loginPayload = <String, dynamic>{
+                  'email': savedNik,
+                  'nik': savedNik,
+                  'password': savedPass,
+                  'app_version': (globals.version.isNotEmpty) ? globals.version : '1.0.1',
+                };
+                final loginRes = await loginDio.post('/login', data: json.encode(loginPayload));
+                if (loginRes.statusCode == 200 && loginRes.data is Map) {
+                  final newToken = loginRes.data['token']?.toString();
+                  if (newToken != null && newToken.isNotEmpty) {
+                    _token = newToken;
+                    await PreferenceService.setAuth(AuthModel.fromJson(Map<String, dynamic>.from(loginRes.data as Map)));
+                    debugPrint('[ApiService] Silent auto re-login sukses! Token sesi berhasil diperbarui otomatis.');
+
+                    // Retry request yang tadi gagal dengan token baru
+                    final retryOptions = Options(
+                      method: err.requestOptions.method,
+                      headers: Map<String, dynamic>.from(err.requestOptions.headers),
+                      contentType: err.requestOptions.contentType,
+                      responseType: err.requestOptions.responseType,
+                    );
+                    retryOptions.headers?['Authorization'] = 'Bearer $newToken';
+                    final retryRes = await dio.request(
+                      err.requestOptions.path,
+                      data: err.requestOptions.data,
+                      queryParameters: err.requestOptions.queryParameters,
+                      options: retryOptions,
+                    );
+                    return handler.resolve(retryRes);
+                  }
+                }
+              } catch (silentErr) {
+                debugPrint('[ApiService] Silent auto re-login gagal: $silentErr');
+              }
+            }
+          }
           final isFailoverError = err.type == DioExceptionType.connectionError ||
               err.type == DioExceptionType.connectionTimeout ||
               err.type == DioExceptionType.sendTimeout ||
@@ -561,7 +657,7 @@ class ApiService {
   }
 
   Future<Either<Map, Map>> getMaster(name) async {
-    if (_token != null && _token!.isNotEmpty) {
+    if (getToken.isNotEmpty && !getToken.startsWith('offline_token_')) {
       final token = getToken;
     if (token.isNotEmpty) {
       dio.options.headers['Authorization'] = 'Bearer $token';
@@ -1012,7 +1108,7 @@ class ApiService {
   Future<Either<Map, Map<String, dynamic>>> getSafeMapPoints(
       {int? month, int? year}) async {
     try {
-      if (_token != null && _token!.isNotEmpty) {
+      if (getToken.isNotEmpty && !getToken.startsWith('offline_token_')) {
         dio.options.headers['Authorization'] = 'Bearer $getToken';
       }
       Response res;
@@ -1347,7 +1443,7 @@ class ApiService {
     String? photoPath,
   }) async {
     try {
-      if (_token != null && _token!.isNotEmpty) {
+      if (getToken.isNotEmpty && !getToken.startsWith('offline_token_')) {
         dio.options.headers['Authorization'] = 'Bearer $getToken';
       }
       var formData = FormData.fromMap({
@@ -1397,7 +1493,7 @@ class ApiService {
     String? search,
   }) async {
     try {
-      if (_token != null && _token!.isNotEmpty) {
+      if (getToken.isNotEmpty && !getToken.startsWith('offline_token_')) {
         dio.options.headers['Authorization'] = 'Bearer $getToken';
       }
       final params = <String, dynamic>{};
@@ -1441,7 +1537,7 @@ class ApiService {
     File? fotoPerbaikan,
   }) async {
     try {
-      if (_token != null && _token!.isNotEmpty) {
+      if (getToken.isNotEmpty && !getToken.startsWith('offline_token_')) {
         dio.options.headers['Authorization'] = 'Bearer $getToken';
       }
       var formData = FormData.fromMap(fields);
@@ -1497,7 +1593,7 @@ class ApiService {
     File? fotoPerbaikan,
   }) async {
     try {
-      if (_token != null && _token!.isNotEmpty) {
+      if (getToken.isNotEmpty && !getToken.startsWith('offline_token_')) {
         dio.options.headers['Authorization'] = 'Bearer $getToken';
       }
       var formDataMap = <String, dynamic>{
@@ -1557,7 +1653,7 @@ class ApiService {
     String keterangan,
   ) async {
     try {
-      if (_token != null && _token!.isNotEmpty) {
+      if (getToken.isNotEmpty && !getToken.startsWith('offline_token_')) {
         dio.options.headers['Authorization'] = 'Bearer $getToken';
       }
       final payload = {
@@ -1602,7 +1698,7 @@ class ApiService {
 
   Future<Either<Map, Map<String, dynamic>>> deleteHazardDirect(int id) async {
     try {
-      if (_token != null && _token!.isNotEmpty) {
+      if (getToken.isNotEmpty && !getToken.startsWith('offline_token_')) {
         dio.options.headers['Authorization'] = 'Bearer $getToken';
       }
 
@@ -1640,7 +1736,7 @@ class ApiService {
   Future<Either<Map, List<Map<String, dynamic>>>> searchPja(String query,
       {bool lintasPerusahaan = true}) async {
     try {
-      if (_token != null && _token!.isNotEmpty) {
+      if (getToken.isNotEmpty && !getToken.startsWith('offline_token_')) {
         dio.options.headers['Authorization'] = 'Bearer $getToken';
       }
       final params = {
@@ -1686,7 +1782,7 @@ class ApiService {
   Future<Either<Map, Map<String, dynamic>>> takeUpHazard(int id,
       {String? note}) async {
     try {
-      if (_token != null && _token!.isNotEmpty) {
+      if (getToken.isNotEmpty && !getToken.startsWith('offline_token_')) {
         dio.options.headers['Authorization'] = 'Bearer $getToken';
       }
       final payload = {
@@ -1712,7 +1808,7 @@ class ApiService {
     double? lon,
   }) async {
     try {
-      if (_token != null && _token!.isNotEmpty) {
+      if (getToken.isNotEmpty && !getToken.startsWith('offline_token_')) {
         dio.options.headers['Authorization'] = 'Bearer $getToken';
       }
 
@@ -1766,7 +1862,7 @@ class ApiService {
 
   Future<Either<Map, Map<String, dynamic>>> getHazardDetailById(int id) async {
     try {
-      if (_token != null && _token!.isNotEmpty) {
+      if (getToken.isNotEmpty && !getToken.startsWith('offline_token_')) {
         dio.options.headers['Authorization'] = 'Bearer $getToken';
       }
 
@@ -2326,7 +2422,7 @@ class ApiService {
 
     // 2. Query backend API
     try {
-      if (_token != null && _token!.isNotEmpty) {
+      if (getToken.isNotEmpty && !getToken.startsWith('offline_token_')) {
         dio.options.headers['Authorization'] = 'Bearer $getToken';
       }
       final res = await dio.get('/observation/departments',
@@ -2364,7 +2460,7 @@ class ApiService {
   Future<Map<String, dynamic>?> getObservationOptions(
       {int? perusahaanId}) async {
     try {
-      if (_token != null && _token!.isNotEmpty) {
+      if (getToken.isNotEmpty && !getToken.startsWith('offline_token_')) {
         dio.options.headers['Authorization'] = 'Bearer $getToken';
       }
       final res = await dio.get('/observation/options', queryParameters: {
@@ -2610,7 +2706,7 @@ class ApiService {
       {int? perusahaanId}) async {
     try {
       _restoreStoredToken();
-      if (_token != null && _token!.isNotEmpty) {
+      if (getToken.isNotEmpty && !getToken.startsWith('offline_token_')) {
         final token = getToken;
     if (token.isNotEmpty) {
       dio.options.headers['Authorization'] = 'Bearer $token';
@@ -2644,7 +2740,7 @@ class ApiService {
     String? createdByName,
   }) async {
     try {
-      if (_token != null && _token!.isNotEmpty) {
+      if (getToken.isNotEmpty && !getToken.startsWith('offline_token_')) {
         dio.options.headers['Authorization'] = 'Bearer $getToken';
       }
       final res = await dio.post('/master/benchmarks', data: {
@@ -2670,7 +2766,7 @@ class ApiService {
     String? createdByName,
   }) async {
     try {
-      if (_token != null && _token!.isNotEmpty) {
+      if (getToken.isNotEmpty && !getToken.startsWith('offline_token_')) {
         dio.options.headers['Authorization'] = 'Bearer $getToken';
       }
       final res = await dio.post('/master/areas', data: {
@@ -3391,7 +3487,7 @@ class ApiService {
             'Accept': 'application/json',
             'Connection': 'Keep-Alive',
             'company': company,
-            if (_token != null && _token!.isNotEmpty) 'Authorization': 'Bearer $_token',
+            if (getToken.isNotEmpty && !getToken.startsWith('offline_token_')) 'Authorization': 'Bearer $_token',
           },
           contentType: Headers.jsonContentType,
           responseType: ResponseType.json,
@@ -3547,7 +3643,7 @@ class ApiService {
             'Accept': 'application/json',
             'Connection': 'Keep-Alive',
             'company': company,
-            if (_token != null && _token!.isNotEmpty) 'Authorization': 'Bearer $_token',
+            if (getToken.isNotEmpty && !getToken.startsWith('offline_token_')) 'Authorization': 'Bearer $_token',
           },
           contentType: data is FormData ? 'multipart/form-data' : Headers.jsonContentType,
           responseType: ResponseType.json,
@@ -3688,7 +3784,7 @@ class ApiService {
             'Accept': 'application/json',
             'Connection': 'Keep-Alive',
             'company': company,
-            if (_token != null && _token!.isNotEmpty) 'Authorization': 'Bearer $_token',
+            if (getToken.isNotEmpty && !getToken.startsWith('offline_token_')) 'Authorization': 'Bearer $_token',
           },
           contentType: data is FormData ? 'multipart/form-data' : Headers.jsonContentType,
           responseType: ResponseType.json,
@@ -3913,7 +4009,7 @@ class ApiService {
             'Accept': 'application/json',
             'Connection': 'Keep-Alive',
             'company': company,
-            if (_token != null && _token!.isNotEmpty) 'Authorization': 'Bearer $_token',
+            if (getToken.isNotEmpty && !getToken.startsWith('offline_token_')) 'Authorization': 'Bearer $_token',
           },
           contentType: data is FormData ? 'multipart/form-data' : Headers.jsonContentType,
           responseType: ResponseType.json,
