@@ -10,6 +10,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:url_launcher/url_launcher.dart';
+import '../services/offline_sync_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:webview_flutter_android/webview_flutter_android.dart';
@@ -1056,7 +1058,7 @@ class _FullscreenHazardMapPageState extends State<_FullscreenHazardMapPage>
                         color: Colors.amber, size: 20),
                     SizedBox(width: 6),
                     Text(
-                      'Reward Hunter: +50 XP & Amankan Area Lapangan',
+                      'Pilih Tindakan Temuan Lapangan',
                       style: TextStyle(
                         color: Color(0xFFE0F2FE),
                         fontWeight: FontWeight.w700,
@@ -1069,9 +1071,11 @@ class _FullscreenHazardMapPageState extends State<_FullscreenHazardMapPage>
               const SizedBox(height: 18),
 
               // Action Buttons
-              Row(
+              Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Expanded(
+                  SizedBox(
+                    width: double.infinity,
                     child: ElevatedButton.icon(
                       style: ElevatedButton.styleFrom(
                         backgroundColor: canTakeUp
@@ -1082,7 +1086,7 @@ class _FullscreenHazardMapPageState extends State<_FullscreenHazardMapPage>
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
-                        elevation: canTakeUp ? 6 : 0,
+                        elevation: canTakeUp ? 4 : 0,
                         shadowColor: canTakeUp
                             ? const Color(0xFF10B981).withOpacity(0.6)
                             : null,
@@ -1090,9 +1094,6 @@ class _FullscreenHazardMapPageState extends State<_FullscreenHazardMapPage>
                       onPressed: canTakeUp
                           ? () {
                               Navigator.pop(modalCtx);
-                              setState(() {
-                                _score += 50;
-                              });
                               widget.onCloseHazard(context, target.id);
                             }
                           : () {
@@ -1106,28 +1107,78 @@ class _FullscreenHazardMapPageState extends State<_FullscreenHazardMapPage>
                           size: 18),
                       label: Text(
                         canTakeUp
-                            ? 'Amankan & Close Temuan (+50P)'
+                            ? 'Amankan & Selesaikan Temuan'
                             : 'Terkunci (Harus < 50M)',
                         style: const TextStyle(
-                            fontWeight: FontWeight.w800, fontSize: 12.5),
+                            fontWeight: FontWeight.w800, fontSize: 13),
                       ),
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  IconButton(
-                    style: IconButton.styleFrom(
-                      backgroundColor: Colors.white12,
-                      padding: const EdgeInsets.all(12),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: const Color(0xFFF87171),
+                            side: const BorderSide(
+                                color: Color(0xFFEF4444), width: 1.2),
+                            backgroundColor:
+                                const Color(0xFFEF4444).withOpacity(0.08),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          onPressed: () {
+                            Navigator.pop(modalCtx);
+                            _showReportFakeHazardDialog(
+                                context, target, distance);
+                          },
+                          icon: const Icon(Icons.warning_amber_rounded,
+                              size: 18, color: Color(0xFFF87171)),
+                          label: const Text(
+                            'Lapor Fake Hazard',
+                            style: TextStyle(
+                                fontWeight: FontWeight.w800, fontSize: 12),
+                          ),
+                        ),
                       ),
-                    ),
-                    onPressed: () {
-                      Navigator.pop(modalCtx);
-                      widget.onShowDetail(context, target.id);
-                    },
-                    icon: const Icon(Icons.info_outline_rounded,
-                        color: Colors.white),
+                      const SizedBox(width: 8),
+                      Material(
+                        color: Colors.white12,
+                        borderRadius: BorderRadius.circular(12),
+                        child: InkWell(
+                          onTap: () {
+                            Navigator.pop(modalCtx);
+                            _openGoogleMapsNavigation(target);
+                          },
+                          borderRadius: BorderRadius.circular(12),
+                          child: const Padding(
+                            padding: EdgeInsets.all(12),
+                            child: Icon(Icons.near_me_rounded,
+                                color: Color(0xFF00E5FF), size: 20),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Material(
+                        color: Colors.white12,
+                        borderRadius: BorderRadius.circular(12),
+                        child: InkWell(
+                          onTap: () {
+                            Navigator.pop(modalCtx);
+                            widget.onShowDetail(context, target.id);
+                          },
+                          borderRadius: BorderRadius.circular(12),
+                          child: const Padding(
+                            padding: EdgeInsets.all(12),
+                            child: Icon(Icons.info_outline_rounded,
+                                color: Colors.white, size: 20),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -1135,6 +1186,472 @@ class _FullscreenHazardMapPageState extends State<_FullscreenHazardMapPage>
           ),
         );
       },
+    );
+  }
+
+  Future<void> _openGoogleMapsNavigation(MapHazardItem target) async {
+    final lat = target.lat;
+    final lng = target.lng;
+    if (lat == 0.0 && lng == 0.0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Koordinat temuan tidak valid.'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    _flyToTarget(target);
+
+    final navUri = Uri.parse('google.navigation:q=$lat,$lng&mode=d');
+    final mapsWebUri =
+        Uri.parse('https://www.google.com/maps/dir/?api=1&destination=$lat,$lng');
+
+    try {
+      if (await canLaunchUrl(navUri)) {
+        await launchUrl(navUri);
+      } else if (await canLaunchUrl(mapsWebUri)) {
+        await launchUrl(mapsWebUri, mode: LaunchMode.externalApplication);
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Peta diarahkan ke titik target (#${target.id})'),
+            backgroundColor: const Color(0xFF0284C7),
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('Error launching navigation: $e');
+    }
+  }
+
+  Future<void> _showReportFakeHazardDialog(
+      BuildContext context, MapHazardItem target, double distance) async {
+    // 1. Peringatan keras sebelum melapor
+    final bool? proceed = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1E293B),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: const Color(0xFFEF4444).withOpacity(0.2),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.warning_amber_rounded,
+                  color: Color(0xFFEF4444), size: 24),
+            ),
+            const SizedBox(width: 10),
+            const Expanded(
+              child: Text(
+                'PERINGATAN AUDIT K3',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w900,
+                  fontSize: 15,
+                  letterSpacing: 0.5,
+                ),
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Laporan temuan fiktif / fake hazard akan dicatat secara permanen dan diaudit ketat oleh Tim K3 & HSE bersama identitas & NIK Anda.',
+              style: TextStyle(
+                  color: Color(0xFFCBD5E1), fontSize: 13, height: 1.4),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFF0F172A),
+                borderRadius: BorderRadius.circular(10),
+                border:
+                    Border.all(color: const Color(0xFFEF4444).withOpacity(0.3)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('ID TEMUAN: #${target.id}',
+                      style: const TextStyle(
+                          color: Color(0xFF94A3B8),
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 3),
+                  Text(target.title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700)),
+                  const SizedBox(height: 3),
+                  Text(
+                      'Lokasi: ${target.area}',
+                      style: const TextStyle(
+                          color: Color(0xFF38BDF8), fontSize: 11)),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              'Pastikan Anda benar-benar telah berada di lokasi fisik dan memverifikasi bahwa bahaya tersebut fiktif atau tidak ada di lapangan.',
+              style: TextStyle(
+                  color: Color(0xFFFCA5A5),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  height: 1.3),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Batal',
+                style: TextStyle(
+                    color: Color(0xFF94A3B8), fontWeight: FontWeight.bold)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFEF4444),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10)),
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Lanjutkan Lapor Fake',
+                style: TextStyle(fontWeight: FontWeight.w800)),
+          ),
+        ],
+      ),
+    );
+
+    if (proceed != true || !mounted) return;
+
+    // 2. Tampilkan form detail pelaporan fake hazard
+    String selectedReason = 'Temuan fiktif / tidak pernah ada di lokasi';
+    final reasonController = TextEditingController();
+    File? evidencePhoto;
+    final picker = ImagePicker();
+    bool isSubmitting = false;
+
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (bottomSheetCtx) => StatefulBuilder(
+        builder: (ctx, setModalState) {
+          return Padding(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
+              left: 20,
+              right: 20,
+              top: 14,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 44,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade300,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.red.shade50,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(Icons.flag_rounded,
+                          color: Colors.red.shade700, size: 24),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Laporkan Fake Hazard',
+                            style: TextStyle(
+                                fontSize: 16, fontWeight: FontWeight.w900),
+                          ),
+                          Text(
+                            'Temuan #${target.id} • ${target.area}',
+                            style: TextStyle(
+                                fontSize: 12, color: Colors.grey.shade600),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'PILIH ALASAN:',
+                  style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                      color: Colors.black54),
+                ),
+                const SizedBox(height: 6),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: [
+                    'Temuan fiktif / tidak pernah ada di lokasi',
+                    'Objek bahaya sudah bersih / nihil',
+                    'Koordinat GPS salah / tidak ditemukan',
+                    'Lainnya',
+                  ].map((r) {
+                    final isSel = selectedReason == r;
+                    return ChoiceChip(
+                      label: Text(r, style: TextStyle(
+                        fontSize: 11.5,
+                        fontWeight: isSel ? FontWeight.w800 : FontWeight.w500,
+                        color: isSel ? Colors.white : Colors.black87,
+                      )),
+                      selected: isSel,
+                      selectedColor: const Color(0xFFEF4444),
+                      backgroundColor: Colors.grey.shade100,
+                      onSelected: (val) {
+                        if (val) {
+                          setModalState(() {
+                            selectedReason = r;
+                          });
+                        }
+                      },
+                    );
+                  }).toList(),
+                ),
+                if (selectedReason == 'Lainnya') ...[
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: reasonController,
+                    maxLines: 2,
+                    decoration: InputDecoration(
+                      hintText: 'Tuliskan alasan lengkap mengapa temuan ini fiktif...',
+                      hintStyle: const TextStyle(fontSize: 12),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      contentPadding: const EdgeInsets.all(12),
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 14),
+                const Text(
+                  'FOTO BUKTI LOKASI SEBENARNYA (OPSIONAL):',
+                  style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                      color: Colors.black54),
+                ),
+                const SizedBox(height: 6),
+                InkWell(
+                  onTap: () async {
+                    final picked = await picker.pickImage(
+                      source: ImageSource.camera,
+                      imageQuality: 70,
+                      maxWidth: 1024,
+                    );
+                    if (picked != null) {
+                      setModalState(() {
+                        evidencePhoto = File(picked.path);
+                      });
+                    }
+                  },
+                  borderRadius: BorderRadius.circular(12),
+                  child: Container(
+                    height: 80,
+                    width: double.infinity,
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Colors.grey.shade300, style: BorderStyle.solid),
+                      borderRadius: BorderRadius.circular(12),
+                      color: Colors.grey.shade50,
+                    ),
+                    child: evidencePhoto != null
+                        ? Stack(
+                            alignment: Alignment.center,
+                            children: [
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(12),
+                                child: Image.file(evidencePhoto!,
+                                    width: double.infinity,
+                                    height: 80,
+                                    fit: BoxFit.cover),
+                              ),
+                              Positioned(
+                                top: 4,
+                                right: 4,
+                                child: CircleAvatar(
+                                  radius: 12,
+                                  backgroundColor: Colors.black54,
+                                  child: IconButton(
+                                    padding: EdgeInsets.zero,
+                                    icon: const Icon(Icons.close,
+                                        size: 14, color: Colors.white),
+                                    onPressed: () {
+                                      setModalState(() {
+                                        evidencePhoto = null;
+                                      });
+                                    },
+                                  ),
+                                ),
+                              ),
+                            ],
+                          )
+                        : const Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.camera_alt_outlined, color: Colors.black45),
+                              SizedBox(width: 8),
+                              Text('Ambil Foto Kondisi Lapangan Saat Ini',
+                                  style: TextStyle(
+                                      color: Colors.black54,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600)),
+                            ],
+                          ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFEF4444),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      elevation: 3,
+                    ),
+                    onPressed: isSubmitting
+                        ? null
+                        : () async {
+                            final finalReason = selectedReason == 'Lainnya' &&
+                                    reasonController.text.trim().isNotEmpty
+                                ? reasonController.text.trim()
+                                : selectedReason;
+
+                            setModalState(() {
+                              isSubmitting = true;
+                            });
+
+                            // Try direct report to server
+                            bool sentOnline = false;
+                            try {
+                              final res = await _api.reportFakeHazard(
+                                id: target.id,
+                                reason: finalReason,
+                                photoPath: evidencePhoto?.path,
+                                latitude: _currentPos?.latitude,
+                                longitude: _currentPos?.longitude,
+                                distance: distance,
+                              );
+                              res.fold(
+                                (err) => sentOnline = false,
+                                (data) => sentOnline = true,
+                              );
+                            } catch (_) {
+                              sentOnline = false;
+                            }
+
+                            // If not sent online, store into offline sync queue!
+                            if (!sentOnline) {
+                              try {
+                                await OfflineSyncService.instance.enqueue(
+                                  feature: 'fake_hazard',
+                                  localId: '${target.id}',
+                                  payload: {
+                                    'id': target.id,
+                                    'reason': finalReason,
+                                    'photoPath': evidencePhoto?.path,
+                                    'latitude': _currentPos?.latitude,
+                                    'longitude': _currentPos?.longitude,
+                                    'distance': distance,
+                                  },
+                                );
+                              } catch (e) {
+                                debugPrint('Error enqueue fake hazard: $e');
+                              }
+                            }
+
+                            if (!mounted) return;
+                            Navigator.pop(bottomSheetCtx);
+
+                            // Remove from local lists and update map
+                            setState(() {
+                              _liveHazards.removeWhere((h) => h.id == target.id);
+                              widget.unclosedHazards.removeWhere((h) => h.id == target.id);
+                              if (_currentTargetIndex >= _liveHazards.length &&
+                                  _liveHazards.isNotEmpty) {
+                                _currentTargetIndex = _liveHazards.length - 1;
+                              }
+                            });
+
+                            try {
+                              _controller.runJavaScript(
+                                'if (typeof removeHazardMarker === "function") removeHazardMarker(${target.id});');
+                            } catch (_) {}
+
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(sentOnline
+                                    ? 'Laporan fake hazard berhasil dikirim untuk diaudit K3.'
+                                    : 'Laporan fake hazard disimpan di offline queue (tersimpan di lokal).'),
+                                backgroundColor: sentOnline
+                                    ? const Color(0xFF10B981)
+                                    : const Color(0xFF0284C7),
+                              ),
+                            );
+                          },
+                    child: isSubmitting
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Text(
+                            'KIRIM LAPORAN FAKE HAZARD',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w900,
+                              fontSize: 13,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
     );
   }
 
@@ -1337,23 +1854,7 @@ class _FullscreenHazardMapPageState extends State<_FullscreenHazardMapPage>
                                         ),
                                       ),
                                     ),
-                                    const SizedBox(width: 4),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: 4, vertical: 1),
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFFF59E0B),
-                                        borderRadius: BorderRadius.circular(5),
-                                      ),
-                                      child: Text(
-                                        '${_score}P',
-                                        style: const TextStyle(
-                                          color: Colors.black,
-                                          fontWeight: FontWeight.w900,
-                                          fontSize: 8.5,
-                                        ),
-                                      ),
-                                    ),
+
                                   ],
                                 ),
                                 const SizedBox(height: 1),
@@ -1579,7 +2080,7 @@ class _FullscreenHazardMapPageState extends State<_FullscreenHazardMapPage>
                             ),
                             Text(
                               isWithin50Meters
-                                  ? '${distance.round()} METER • SIAP CLOSING (+50P)'
+                                  ? '${distance.round()} METER • SIAP CLOSING'
                                   : '${distance.round()} METER • KE ${dirName.toUpperCase()}',
                               style: TextStyle(
                                 color: isWithin50Meters
@@ -1761,43 +2262,60 @@ class _FullscreenHazardMapPageState extends State<_FullscreenHazardMapPage>
                           ),
                           Row(
                             children: [
-                              IconButton(
-                                constraints: const BoxConstraints(),
-                                padding: const EdgeInsets.all(4),
-                                icon: const Icon(
-                                    Icons.arrow_back_ios_new_rounded,
-                                    size: 14,
-                                    color: Colors.white70),
-                                onPressed: () {
-                                  HapticFeedback.selectionClick();
-                                  setState(() {
-                                    _currentTargetIndex = (_currentTargetIndex -
-                                            1 +
-                                            sorted.length) %
-                                        sorted.length;
-                                    _hasVibratedForTarget = false;
-                                  });
-                                  _flyToTarget(sorted[_currentTargetIndex]);
-                                },
+                              Material(
+                                color: Colors.white.withOpacity(0.12),
+                                borderRadius: BorderRadius.circular(8),
+                                child: InkWell(
+                                  onTap: () {
+                                    HapticFeedback.selectionClick();
+                                    setState(() {
+                                      _currentTargetIndex =
+                                          (_currentTargetIndex -
+                                                  1 +
+                                                  sorted.length) %
+                                              sorted.length;
+                                      _hasVibratedForTarget = false;
+                                    });
+                                    _flyToTarget(sorted[_currentTargetIndex]);
+                                  },
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: const Padding(
+                                    padding: EdgeInsets.symmetric(
+                                        horizontal: 10, vertical: 7),
+                                    child: Icon(
+                                      Icons.arrow_back_ios_new_rounded,
+                                      size: 15,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ),
                               ),
-                              const SizedBox(width: 8),
-                              IconButton(
-                                constraints: const BoxConstraints(),
-                                padding: const EdgeInsets.all(4),
-                                icon: const Icon(
-                                    Icons.arrow_forward_ios_rounded,
-                                    size: 14,
-                                    color: Colors.white70),
-                                onPressed: () {
-                                  HapticFeedback.selectionClick();
-                                  setState(() {
-                                    _currentTargetIndex =
-                                        (_currentTargetIndex + 1) %
-                                            sorted.length;
-                                    _hasVibratedForTarget = false;
-                                  });
-                                  _flyToTarget(sorted[_currentTargetIndex]);
-                                },
+                              const SizedBox(width: 6),
+                              Material(
+                                color: Colors.white.withOpacity(0.12),
+                                borderRadius: BorderRadius.circular(8),
+                                child: InkWell(
+                                  onTap: () {
+                                    HapticFeedback.selectionClick();
+                                    setState(() {
+                                      _currentTargetIndex =
+                                          (_currentTargetIndex + 1) %
+                                              sorted.length;
+                                      _hasVibratedForTarget = false;
+                                    });
+                                    _flyToTarget(sorted[_currentTargetIndex]);
+                                  },
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: const Padding(
+                                    padding: EdgeInsets.symmetric(
+                                        horizontal: 10, vertical: 7),
+                                    child: Icon(
+                                      Icons.arrow_forward_ios_rounded,
+                                      size: 15,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ),
                               ),
                             ],
                           ),
@@ -1918,15 +2436,17 @@ class _FullscreenHazardMapPageState extends State<_FullscreenHazardMapPage>
                       // Tactical Action Bar
                       Row(
                         children: [
+                          // Take Up Button
                           Expanded(
+                            flex: 6,
                             child: ElevatedButton.icon(
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: isWithin50Meters
                                     ? const Color(0xFF10B981)
                                     : const Color(0xFF1E293B),
                                 foregroundColor: Colors.white,
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 12),
+                                padding: const EdgeInsets.symmetric(
+                                    vertical: 11, horizontal: 8),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(12),
                                   side: BorderSide(
@@ -1936,9 +2456,9 @@ class _FullscreenHazardMapPageState extends State<_FullscreenHazardMapPage>
                                     width: isWithin50Meters ? 1.5 : 1,
                                   ),
                                 ),
-                                elevation: isWithin50Meters ? 6 : 0,
+                                elevation: isWithin50Meters ? 5 : 0,
                                 shadowColor: isWithin50Meters
-                                    ? const Color(0xFF10B981).withOpacity(0.7)
+                                    ? const Color(0xFF10B981).withOpacity(0.6)
                                     : null,
                               ),
                               onPressed: isWithin50Meters
@@ -1954,50 +2474,94 @@ class _FullscreenHazardMapPageState extends State<_FullscreenHazardMapPage>
                                 isWithin50Meters
                                     ? Icons.bolt_rounded
                                     : Icons.lock_outline_rounded,
-                                size: 19,
+                                size: 17,
                                 color: isWithin50Meters
                                     ? Colors.white
                                     : const Color(0xFF94A3B8),
                               ),
                               label: Text(
                                 isWithin50Meters
-                                    ? '⚡ AMANKAN TEMUAN (+50 XP)'
-                                    : 'DEKATI TARGET (< 50M) • ${distance.round()}M',
-                                style: TextStyle(
+                                    ? 'AMANKAN TEMUAN'
+                                    : 'DEKATI (< 50M) • ${distance.round()}M',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
                                   fontWeight: FontWeight.w900,
-                                  fontSize: 12,
-                                  letterSpacing: 0.5,
-                                  color: isWithin50Meters
-                                      ? Colors.white
-                                      : const Color(0xFFCBD5E1),
+                                  fontSize: 11,
+                                  letterSpacing: 0.3,
                                 ),
                               ),
                             ),
                           ),
-                          const SizedBox(width: 8),
+                          const SizedBox(width: 6),
 
-                          // Fly Camera
+                          // Button Lapor Fake Hazard
                           Material(
-                            color: Colors.white.withOpacity(0.08),
-                            borderRadius: BorderRadius.circular(12),
+                            color: const Color(0xFFEF4444).withOpacity(0.18),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              side: const BorderSide(
+                                  color: Color(0xFFEF4444), width: 1.2),
+                            ),
                             child: InkWell(
                               onTap: () {
-                                HapticFeedback.selectionClick();
-                                _flyToTarget(target);
+                                HapticFeedback.mediumImpact();
+                                _showReportFakeHazardDialog(
+                                    context, target, distance);
                               },
                               borderRadius: BorderRadius.circular(12),
                               child: const Padding(
-                                padding: EdgeInsets.all(11),
+                                padding: EdgeInsets.symmetric(
+                                    horizontal: 9, vertical: 10),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.flag_rounded,
+                                        color: Color(0xFFF87171), size: 16),
+                                    SizedBox(width: 4),
+                                    Text(
+                                      'FAKE',
+                                      style: TextStyle(
+                                        color: Color(0xFFF87171),
+                                        fontWeight: FontWeight.w900,
+                                        fontSize: 11,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+
+                          // Navigation to Google Maps
+                          Material(
+                            color: const Color(0xFF00E5FF).withOpacity(0.15),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              side: BorderSide(
+                                color: const Color(0xFF00E5FF).withOpacity(0.5),
+                                width: 1,
+                              ),
+                            ),
+                            child: InkWell(
+                              onTap: () {
+                                HapticFeedback.selectionClick();
+                                _openGoogleMapsNavigation(target);
+                              },
+                              borderRadius: BorderRadius.circular(12),
+                              child: const Padding(
+                                padding: EdgeInsets.all(10),
                                 child: Icon(Icons.near_me_rounded,
                                     color: Color(0xFF00E5FF), size: 20),
                               ),
                             ),
                           ),
-                          const SizedBox(width: 8),
+                          const SizedBox(width: 6),
 
                           // Detail Button
                           Material(
-                            color: Colors.white.withOpacity(0.08),
+                            color: Colors.white.withOpacity(0.1),
                             borderRadius: BorderRadius.circular(12),
                             child: InkWell(
                               onTap: () {
@@ -2006,7 +2570,7 @@ class _FullscreenHazardMapPageState extends State<_FullscreenHazardMapPage>
                               },
                               borderRadius: BorderRadius.circular(12),
                               child: const Padding(
-                                padding: EdgeInsets.all(11),
+                                padding: EdgeInsets.all(10),
                                 child: Icon(Icons.info_outline_rounded,
                                     color: Colors.white, size: 20),
                               ),

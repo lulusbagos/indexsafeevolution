@@ -395,6 +395,44 @@ class OfflineSyncService {
     return (success: success, failed: failed);
   }
 
+  Future<({int success, int failed})> syncFakeHazardPending() async {
+    if (!state.value.isOnline) return (success: 0, failed: 0);
+    var success = 0;
+    var failed = 0;
+    for (final job in await _jobs()) {
+      if (job.feature != 'fake_hazard') continue;
+      try {
+        final payload = job.payload;
+        final id = int.tryParse(payload['id']?.toString() ?? '0') ?? 0;
+        final reason = payload['reason']?.toString() ?? 'Temuan fiktif';
+        final photoPath = payload['photoPath']?.toString();
+        final lat = double.tryParse(payload['latitude']?.toString() ?? '');
+        final lng = double.tryParse(payload['longitude']?.toString() ?? '');
+        final dist = double.tryParse(payload['distance']?.toString() ?? '');
+
+        final res = await _api.reportFakeHazard(
+          id: id,
+          reason: reason,
+          photoPath: photoPath,
+          latitude: lat,
+          longitude: lng,
+          distance: dist,
+        );
+
+        if (res.isRight()) {
+          await discard(feature: job.feature, localId: job.localId);
+          success++;
+        } else {
+          failed++;
+        }
+      } catch (e) {
+        failed++;
+      }
+    }
+    await refresh();
+    return (success: success, failed: failed);
+  }
+
   Future<void> refresh() async {
     int pending = (await _jobs()).length;
     for (final name in const [
@@ -460,6 +498,7 @@ class OfflineSyncService {
       await syncDciPending();
       await syncSpiPending();
       await syncGciPending();
+      await syncFakeHazardPending();
 
     } finally {
       _syncing = false;

@@ -1488,6 +1488,75 @@ class ApiService {
     }
   }
 
+  Future<Either<Map, Map<String, dynamic>>> reportFakeHazard({
+    required int id,
+    required String reason,
+    String? photoPath,
+    double? latitude,
+    double? longitude,
+    double? distance,
+  }) async {
+    try {
+      if (getToken.isNotEmpty && !getToken.startsWith('offline_token_')) {
+        dio.options.headers['Authorization'] = 'Bearer ';
+      }
+      final auth = PreferenceService.getAuth();
+      final profile = PreferenceService.getProfile();
+      final nik = profile?.noNik ?? PreferenceService.getOfflineNik() ?? '';
+      final nama = profile?.namaLengkap ?? auth?.user?.name ?? '';
+      final dept = profile?.depart ?? '';
+      final comp = profile?.company ?? '';
+
+      var formData = FormData.fromMap({
+        'id': id,
+        'hazard_id': id,
+        'reason': reason,
+        'alasan': reason,
+        'reporter_nik': nik,
+        'reporter_name': nama,
+        'reporter_dept': dept,
+        'reporter_company': comp,
+        if (latitude != null) 'latitude': latitude,
+        if (longitude != null) 'longitude': longitude,
+        if (distance != null) 'distance': distance,
+      });
+      if (photoPath != null && photoPath.isNotEmpty) {
+        formData.files.add(MapEntry(
+          'photo',
+          await MultipartFile.fromFile(photoPath),
+        ));
+      }
+      Response res;
+      try {
+        res = await dio.post('/api/performance/safemap/report-fake',
+            data: formData);
+      } on DioException catch (dioErr) {
+        if (dioErr.type == DioExceptionType.connectionTimeout ||
+            dioErr.type == DioExceptionType.connectionError ||
+            dioErr.type == DioExceptionType.unknown ||
+            dioErr.response?.statusCode == 404) {
+          final fallbackHost =
+              baseUrl.contains('192.168.') ? 'http://127.0.0.1:7302' : baseUrl;
+          final fallbackDio = Dio(BaseOptions(
+            baseUrl: fallbackHost,
+            headers: dio.options.headers,
+            connectTimeout: const Duration(seconds: 4),
+          ));
+          res = await fallbackDio.post('/api/performance/safemap/report-fake',
+              data: formData);
+        } else {
+          rethrow;
+        }
+      }
+      if (res.data is Map) {
+        return Right(Map<String, dynamic>.from(res.data as Map));
+      }
+      return const Right({});
+    } on DioException catch (err) {
+      return Left(errorHandler(err));
+    }
+  }
+
   Future<Either<Map, Map<String, dynamic>>> getHazardHub({
     String? filter,
     String? search,

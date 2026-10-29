@@ -22,11 +22,13 @@ namespace Indexsafe.Api.Controllers
     {
         private readonly AppDbContext _context;
         private readonly CompanyHierarchyService _companyHierarchyService;
+        private readonly ImageUploadService _imageUploadService;
 
-        public PerformanceController(AppDbContext context, CompanyHierarchyService companyHierarchyService)
+        public PerformanceController(AppDbContext context, CompanyHierarchyService companyHierarchyService, ImageUploadService imageUploadService)
         {
             _context = context;
             _companyHierarchyService = companyHierarchyService;
+            _imageUploadService = imageUploadService;
         }
 
         public class GeoSafetyPointDto
@@ -335,6 +337,118 @@ namespace Indexsafe.Api.Controllers
                 status = true,
                 message = "Temuan Hazard berhasil ditindaklanjuti dan di-close!",
                 data = new { id, status = "Closed", perbaikan = action }
+            });
+        }
+
+        /// <summary>
+        /// POST /api/performance/safemap/report-fake
+        /// Melaporkan temuan hazard sebagai fake/fiktif/tidak ditemukan di lapangan.
+        /// Dicatat ke tbl_t_hazard_fake_report dan diaudit oleh tim K3.
+        /// </summary>
+        [HttpPost("safemap/report-fake")]
+        public async Task<IActionResult> ReportFakeHazard([FromForm] IFormCollection form)
+        {
+            var idStr = form["id"].FirstOrDefault() ?? form["hazard_id"].FirstOrDefault();
+            if (!int.TryParse(idStr, out var hazardId) || hazardId <= 0)
+            {
+                return BadRequest(new { status = false, message = "ID Hazard tidak valid." });
+            }
+
+            var reason = form["reason"].FirstOrDefault() ?? form["alasan"].FirstOrDefault() ?? "Temuan fiktif / tidak ditemukan di lokasi.";
+            var userNik = User?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value 
+                          ?? form["reporter_nik"].FirstOrDefault() 
+                          ?? form["nik"].FirstOrDefault() 
+                          ?? "0000";
+            var userName = User?.Identity?.Name 
+                           ?? User?.FindFirst(System.Security.Claims.ClaimTypes.Name)?.Value 
+                           ?? form["reporter_name"].FirstOrDefault() 
+                           ?? form["nama"].FirstOrDefault() 
+                           ?? "Pengguna Mobile";
+            var userDept = User?.FindFirst("Department")?.Value 
+                           ?? form["reporter_dept"].FirstOrDefault() 
+                           ?? form["departemen"].FirstOrDefault() 
+                           ?? "GENERAL";
+            var userComp = User?.FindFirst("Company")?.Value 
+                           ?? form["reporter_company"].FirstOrDefault() 
+                           ?? form["perusahaan"].FirstOrDefault() 
+                           ?? "PT INDEXIM COALINDO";
+
+            double? lat = double.TryParse(form["latitude"].FirstOrDefault(), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var parsedLat) ? parsedLat : null;
+            double? lng = double.TryParse(form["longitude"].FirstOrDefault(), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var parsedLng) ? parsedLng : null;
+            double? distance = double.TryParse(form["distance_meters"].FirstOrDefault(), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var parsedDist) ? parsedDist : null;
+
+            string? evidencePhotoUrl = null;
+            if (form.Files.Count > 0 && form.Files[0] != null)
+            {
+                try
+                {
+                    evidencePhotoUrl = await _imageUploadService.UploadAndCompressImageAsync(form.Files[0], "fake_hazard_reports", "fake_");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[ReportFakeHazard] Gagal simpan foto: {ex.Message}");
+                }
+            }
+
+            // Simpan ke tbl_t_hazard_fake_report
+            var conn = _context.Database.GetDbConnection();
+            bool wasClosed = conn.State == System.Data.ConnectionState.Closed;
+            if (wasClosed) await conn.OpenAsync();
+            try
+            {
+                using var cmd = conn.CreateCommand();
+                cmd.CommandText = @"
+                    INSERT INTO tbl_t_hazard_fake_report 
+                    (hazard_id, reporter_nik, reporter_name, reporter_dept, reporter_company, reason, evidence_photo, latitude, longitude, distance_meters, reported_at, status)
+                    VALUES 
+                    (@hazard_id, @reporter_nik, @reporter_name, @reporter_dept, @reporter_company, @reason, @evidence_photo, @latitude, @longitude, @distance_meters, GETDATE(), 'PENDING_REVIEW');
+                ";
+                void AddParam(string name, object? val)
+                {
+                    var p = cmd.CreateParameter();
+                    p.ParameterName = name;
+                    p.Value = val ?? DBNull.Value;
+                    cmd.Parameters.Add(p);
+                }
+                AddParam("@hazard_id", hazardId);
+                AddParam("@reporter_nik", userNik);
+                AddParam("@reporter_name", userName);
+                AddParam("@reporter_dept", userDept);
+                AddParam("@reporter_company", userComp);
+                AddParam("@reason", reason);
+                AddParam("@evidence_photo", evidencePhotoUrl);
+                AddParam("@latitude", lat);
+                AddParam("@longitude", lng);
+                AddParam("@distance_meters", distance);
+
+                await cmd.ExecuteNonQueryAsync();
+            }
+            finally
+            {
+                if (wasClosed) await conn.CloseAsync();
+            }
+
+            // Update status temuan di tbl_t_hazard_report agar tidak muncul lagi sebagai hazard open
+            var hazard = await _context.HazardReports.FirstOrDefaultAsync(h => h.Id == hazardId && !h.IsDeleted);
+            if (hazard != null)
+            {
+                hazard.StatusTemuan = "Fake Reported";
+                hazard.Perbaikan = $"[DILAPORKAN FAKE oleh {userName} ({userNik})]: {reason}";
+                await _context.SaveChangesAsync();
+            }
+
+            return Ok(new
+            {
+                status = true,
+                message = "Laporan Fake Hazard berhasil dikirim dan dicatat untuk diverifikasi oleh tim K3.",
+                data = new
+                {
+                    hazard_id = hazardId,
+                    reporter_nik = userNik,
+                    reporter_name = userName,
+                    reason,
+                    status = "PENDING_REVIEW"
+                }
             });
         }
 
