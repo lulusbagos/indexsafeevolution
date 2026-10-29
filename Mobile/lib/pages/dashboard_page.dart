@@ -374,6 +374,17 @@ class _FullscreenHazardMapPageState extends State<_FullscreenHazardMapPage>
     _mapMode = PreferenceService.getHazardMapMode();
     _currentPos = widget.initialUserPosition;
     _liveHazards = List<MapHazardItem>.from(widget.unclosedHazards);
+    if (_liveHazards.isEmpty) {
+      final cachedJson = PreferenceService.getCachedHazardMapJson();
+      if (cachedJson != null && cachedJson.isNotEmpty) {
+        try {
+          final decoded = jsonDecode(cachedJson) as List;
+          _liveHazards = decoded
+              .map((item) => MapHazardItem.fromJson(item as Map<String, dynamic>))
+              .toList();
+        } catch (_) {}
+      }
+    }
 
     _pulseCtrl = AnimationController(
       vsync: this,
@@ -569,15 +580,36 @@ class _FullscreenHazardMapPageState extends State<_FullscreenHazardMapPage>
           }
 
           if (items.isNotEmpty) {
-            setState(() {
-              _liveHazards = items;
-            });
-            final jsonStr = jsonEncode(items.map((e) => e.toJson()).toList());
-            _controller.runJavaScript(
-              'if(window.renderHazardPoints) window.renderHazardPoints($jsonStr);',
-            );
-            _updateMapGuide();
-            if (!silent) HapticFeedback.mediumImpact();
+            bool hasChanged = false;
+            if (items.length != _liveHazards.length) {
+              hasChanged = true;
+            } else {
+              for (int i = 0; i < items.length; i++) {
+                if (items[i].id != _liveHazards[i].id ||
+                    items[i].status != _liveHazards[i].status) {
+                  hasChanged = true;
+                  break;
+                }
+              }
+            }
+
+            if (hasChanged) {
+              setState(() {
+                _liveHazards = items;
+              });
+              final jsonStr = jsonEncode(items.map((e) => e.toJson()).toList());
+              PreferenceService.setCachedHazardMapPoints(
+                jsonString: jsonStr,
+                dateStr: DateTime.now().toIso8601String().substring(0, 10),
+              );
+              _controller.runJavaScript(
+                'if(window.renderHazardPoints) window.renderHazardPoints($jsonStr);',
+              );
+              _updateMapGuide();
+              if (!silent) HapticFeedback.mediumImpact();
+            } else {
+              debugPrint('[HazardHunter] Data temuan sama. Melewati redraw DOM (hemat daya).');
+            }
           }
         },
       );
@@ -2771,6 +2803,12 @@ class _DashboardPageState extends State<DashboardPage> with WidgetsBindingObserv
             debugPrint('[SafeMap] Resource error: code=${error.errorCode}, desc=${error.description}, url=${error.url}');
           },
         ),
+      )
+      ..loadHtmlString(
+        _hazardMapHtml(
+          mapMode: _hazardMapMode,
+          userPosition: _lastUserPosition,
+        ),
       );
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -3310,16 +3348,32 @@ class _DashboardPageState extends State<DashboardPage> with WidgetsBindingObserv
               ));
             }
 
-            // Simpan cache 1 hari sekali
-            PreferenceService.setCachedHazardMapPoints(
-              jsonString: jsonEncode(items.map((e) => e.toJson()).toList()),
-              dateStr: todayStr,
-            );
+            bool hasChanged = false;
+            if (items.length != _unclosedHazards.length) {
+              hasChanged = true;
+            } else {
+              for (int i = 0; i < items.length; i++) {
+                if (items[i].id != _unclosedHazards[i].id ||
+                    items[i].status != _unclosedHazards[i].status) {
+                  hasChanged = true;
+                  break;
+                }
+              }
+            }
 
-            setState(() {
-              _unclosedHazards = items;
-            });
-            _reloadMap();
+            if (hasChanged) {
+              PreferenceService.setCachedHazardMapPoints(
+                jsonString: jsonEncode(items.map((e) => e.toJson()).toList()),
+                dateStr: todayStr,
+              );
+
+              setState(() {
+                _unclosedHazards = items;
+              });
+              _reloadMap();
+            } else {
+              debugPrint('[SafeMap Dashboard] Data temuan tidak berubah, lewati reload map.');
+            }
           }
         },
       );
@@ -3445,11 +3499,9 @@ class _DashboardPageState extends State<DashboardPage> with WidgetsBindingObserv
 
   void _reloadMap() {
     print('===> DASHBOARD RELOAD MAP: length=${_unclosedHazards.length} <===');
-    _hazardMapCtrl.loadHtmlString(
-      _hazardMapHtml(
-        mapMode: _hazardMapMode,
-        userPosition: _lastUserPosition,
-      ),
+    final jsonStr = jsonEncode(_unclosedHazards.map((e) => e.toJson()).toList());
+    _hazardMapCtrl.runJavaScript(
+      'if(window.renderHazardPoints) { window.renderHazardPoints($jsonStr); } else { location.reload(); }',
     );
   }
 
