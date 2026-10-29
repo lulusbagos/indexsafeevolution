@@ -82,6 +82,12 @@ class ApiService {
   static void _updateActiveBaseUrlFromTarget(String targetUrl) {
     for (final candidate in _candidateUrls) {
       if (targetUrl.startsWith(candidate)) {
+        // Protect public production backend: Never permanently downgrade activeBaseUrl to localhost/LAN
+        if (candidate.contains('127.0.0.1') ||
+            candidate.contains('10.0.2.2') ||
+            candidate.contains('192.168.')) {
+          return;
+        }
         if (_activeBaseUrl != candidate) {
           _activeBaseUrl = candidate;
           debugPrint('[ApiService] Updated activeBaseUrl to: ');

@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import '../widgets/professional_success_sheet.dart';
@@ -475,37 +476,48 @@ class _LoginPageState extends State<LoginPage> {
                           children: [
                             const Spacer(flex: 1),
                             const SizedBox(height: 12),
-                            // Logo MBS with elevated circular badge
+                            // Logo MBS with enhanced 3D Pedestal
                             Center(
                               child: Container(
                                 padding: const EdgeInsets.all(16),
                                 decoration: BoxDecoration(
                                   color: Colors.white,
                                   shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: Colors.white,
+                                    width: 3.0,
+                                  ),
                                   boxShadow: [
                                     BoxShadow(
-                                      color: const Color(0xFF0F766E)
-                                          .withValues(alpha: 0.10),
-                                      blurRadius: 28,
+                                      color: const Color(0xFF0D9488)
+                                          .withValues(alpha: 0.16),
+                                      blurRadius: 32,
                                       spreadRadius: 6,
-                                      offset: const Offset(0, 6),
+                                      offset: const Offset(0, 10),
                                     ),
                                     BoxShadow(
-                                      color: Colors.black.withValues(alpha: 0.04),
-                                      blurRadius: 10,
+                                      color: const Color(0xFF0F172A)
+                                          .withValues(alpha: 0.08),
+                                      blurRadius: 16,
                                       spreadRadius: 1,
-                                      offset: const Offset(0, 2),
+                                      offset: const Offset(0, 4),
+                                    ),
+                                    const BoxShadow(
+                                      color: Colors.white,
+                                      blurRadius: 10,
+                                      spreadRadius: 2,
+                                      offset: Offset(-3, -3),
                                     ),
                                   ],
                                 ),
                                 child: Image.asset(
                                   'assets/images/logo-mbs.png',
-                                  width: 155,
+                                  width: 145,
                                   fit: BoxFit.contain,
                                 ),
                               ),
                             ),
-                            const SizedBox(height: 20),
+                            const SizedBox(height: 18),
                             // Greeting text
                             const Text(
                               'Halo Semangat Pagi!',
@@ -516,7 +528,7 @@ class _LoginPageState extends State<LoginPage> {
                                 letterSpacing: -0.3,
                               ),
                             ),
-                            const SizedBox(height: 6),
+                            const SizedBox(height: 5),
                             Text(
                               'Silakan masuk dengan NIK dan kata sandi Anda',
                               style: TextStyle(
@@ -524,310 +536,329 @@ class _LoginPageState extends State<LoginPage> {
                                 color: Colors.grey.shade600,
                               ),
                             ),
-                            const SizedBox(height: 26),
+                            const SizedBox(height: 20),
 
-                            // Input NIK
-                            TextFormField(
-                              controller: _userCtrl,
-                              textCapitalization: TextCapitalization.characters,
-                              style: const TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w600,
-                                letterSpacing: 0.5,
-                              ),
-                              decoration: InputDecoration(
-                                labelText: 'NIK',
-                                hintText: 'Masukkan NIK Anda',
-                                hintStyle: TextStyle(
-                                  fontSize: 14,
-                                  color: Colors.grey.shade400,
-                                  fontWeight: FontWeight.normal,
+                            // 3D Neumorphic Form Card
+                            Container(
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(26),
+                                border: Border.all(
+                                  color: Colors.white,
+                                  width: 2.0,
                                 ),
-                                labelStyle: TextStyle(
-                                  fontSize: 14,
-                                  color: Colors.grey.shade700,
-                                ),
-                                prefixIcon: const Icon(
-                                  Icons.badge_outlined,
-                                  color: Color(0xFF1565C0),
-                                  size: 22,
-                                ),
-                                filled: true,
-                                fillColor: const Color(0xFFF8FAFC),
-                                contentPadding: const EdgeInsets.symmetric(
-                                  horizontal: 16,
-                                  vertical: 16,
-                                ),
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(14),
-                                  borderSide:
-                                      BorderSide(color: Colors.grey.shade300),
-                                ),
-                                enabledBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(14),
-                                  borderSide:
-                                      BorderSide(color: Colors.grey.shade200),
-                                ),
-                                focusedBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(14),
-                                  borderSide: const BorderSide(
-                                    color: Color(0xFF1565C0),
-                                    width: 1.8,
+                                boxShadow: [
+                                  // Deep 3D ambient shadow
+                                  BoxShadow(
+                                    color: const Color(0xFF0F172A)
+                                        .withValues(alpha: 0.08),
+                                    offset: const Offset(0, 20),
+                                    blurRadius: 36,
+                                    spreadRadius: 2,
                                   ),
-                                ),
-                              ),
-                              validator: validator,
-                              onChanged: (String val) => setState(() {}),
-                            ),
-                            const SizedBox(height: 16),
-
-                            // Input Password
-                            TextFormField(
-                              controller: _pswdCtrl,
-                              obscureText: _obscureText,
-                              style: const TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w600,
-                              ),
-                              decoration: InputDecoration(
-                                labelText: 'Password',
-                                hintText: 'Masukkan kata sandi',
-                                hintStyle: TextStyle(
-                                  fontSize: 14,
-                                  color: Colors.grey.shade400,
-                                  fontWeight: FontWeight.normal,
-                                ),
-                                labelStyle: TextStyle(
-                                  fontSize: 14,
-                                  color: Colors.grey.shade700,
-                                ),
-                                prefixIcon: const Icon(
-                                  Icons.lock_outline_rounded,
-                                  color: Color(0xFF1565C0),
-                                  size: 22,
-                                ),
-                                suffixIcon: IconButton(
-                                  icon: Icon(
-                                    _obscureText
-                                        ? Icons.visibility_outlined
-                                        : Icons.visibility_off_outlined,
-                                    size: 20,
-                                    color: Colors.grey.shade600,
+                                  // Directional elevation shadow
+                                  BoxShadow(
+                                    color: const Color(0xFF0F172A)
+                                        .withValues(alpha: 0.04),
+                                    offset: const Offset(0, 6),
+                                    blurRadius: 12,
+                                    spreadRadius: -2,
                                   ),
-                                  onPressed: () {
-                                    setState(() {
-                                      _obscureText = !_obscureText;
-                                    });
-                                  },
-                                ),
-                                filled: true,
-                                fillColor: const Color(0xFFF8FAFC),
-                                contentPadding: const EdgeInsets.symmetric(
-                                  horizontal: 16,
-                                  vertical: 16,
-                                ),
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(14),
-                                  borderSide:
-                                      BorderSide(color: Colors.grey.shade300),
-                                ),
-                                enabledBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(14),
-                                  borderSide:
-                                      BorderSide(color: Colors.grey.shade200),
-                                ),
-                                focusedBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(14),
-                                  borderSide: const BorderSide(
-                                    color: Color(0xFF1565C0),
-                                    width: 1.8,
+                                  // Top reflection highlight
+                                  const BoxShadow(
+                                    color: Colors.white,
+                                    offset: Offset(-3, -3),
+                                    blurRadius: 10,
+                                    spreadRadius: 2,
                                   ),
-                                ),
+                                ],
                               ),
-                              validator: validator,
-                              onChanged: (String val) => setState(() {}),
-                            ),
-                            const SizedBox(height: 14),
-
-                            // Remember Me & Lupa Password Row
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                InkWell(
-                                  onTap: () {
-                                    setState(() => _remember = !_remember);
-                                  },
-                                  borderRadius: BorderRadius.circular(6),
-                                  child: Padding(
-                                    padding: const EdgeInsets.symmetric(
-                                      vertical: 4,
-                                      horizontal: 2,
-                                    ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        SizedBox(
-                                          width: 20,
-                                          height: 20,
-                                          child: Checkbox(
-                                            value: _remember,
-                                            activeColor: const Color(0xFF1565C0),
-                                            shape: RoundedRectangleBorder(
-                                              borderRadius:
-                                                  BorderRadius.circular(4),
-                                            ),
-                                            side: BorderSide(
-                                              color: _remember
-                                                  ? const Color(0xFF1565C0)
-                                                  : Colors.grey.shade400,
-                                              width: 1.5,
-                                            ),
-                                            onChanged: (bool? val) {
-                                              setState(
-                                                  () => _remember = val ?? true);
-                                            },
-                                          ),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 20,
+                                vertical: 24,
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  // 3D Inset Input NIK
+                                  Container(
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFF8FAFC),
+                                      borderRadius: BorderRadius.circular(16),
+                                      border: Border.all(
+                                        color: const Color(0xFFE2E8F0),
+                                        width: 1.2,
+                                      ),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: const Color(0xFF0F172A)
+                                              .withValues(alpha: 0.035),
+                                          offset: const Offset(0, 3),
+                                          blurRadius: 6,
+                                          spreadRadius: -1,
                                         ),
-                                        const SizedBox(width: 8),
-                                        Text(
-                                          'Remember Me',
-                                          style: TextStyle(
-                                            fontSize: 13,
-                                            fontWeight: FontWeight.w500,
-                                            color: Colors.grey.shade700,
-                                          ),
+                                        const BoxShadow(
+                                          color: Colors.white,
+                                          offset: Offset(0, -1),
+                                          blurRadius: 2,
                                         ),
                                       ],
                                     ),
-                                  ),
-                                ),
-                                TextButton(
-                                  onPressed: _showForgotPasswordSheet,
-                                  style: TextButton.styleFrom(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 4,
-                                      vertical: 4,
-                                    ),
-                                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                  ),
-                                  child: const Text(
-                                    'Lupa Password?',
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w600,
-                                      color: Color(0xFF1565C0),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-
-                            const SizedBox(height: 24),
-
-                            // Guaranteed Visible 3-Dimensional Login Button
-                            SizedBox(
-                              width: double.infinity,
-                              height: 52,
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(16),
-                                  boxShadow: [
-                                    // Solid 3D bevel extrusion at bottom
-                                    const BoxShadow(
-                                      color: Color(0xFF0F2B7A),
-                                      offset: Offset(0, 4),
-                                      blurRadius: 0,
-                                    ),
-                                    // Ambient glow shadow
-                                    BoxShadow(
-                                      color: const Color(0xFF1D4ED8)
-                                          .withValues(alpha: 0.35),
-                                      offset: const Offset(0, 8),
-                                      blurRadius: 16,
-                                      spreadRadius: 1,
-                                    ),
-                                  ],
-                                ),
-                                child: ElevatedButton(
-                                  onPressed: _isLoading ? null : _login,
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: const Color(0xFF2563EB),
-                                    foregroundColor: Colors.white,
-                                    elevation: 0,
-                                    shadowColor: Colors.transparent,
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(16),
-                                      side: BorderSide(
-                                        color: Colors.white
-                                            .withValues(alpha: 0.35),
-                                        width: 1.5,
+                                    child: TextFormField(
+                                      controller: _userCtrl,
+                                      textCapitalization:
+                                          TextCapitalization.characters,
+                                      style: const TextStyle(
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.w700,
+                                        letterSpacing: 0.5,
+                                        color: Color(0xFF0F172A),
                                       ),
-                                    ),
-                                    padding: EdgeInsets.zero,
-                                  ),
-                                  child: Ink(
-                                    decoration: BoxDecoration(
-                                      borderRadius: BorderRadius.circular(16),
-                                      gradient: const LinearGradient(
-                                        begin: Alignment.topCenter,
-                                        end: Alignment.bottomCenter,
-                                        colors: [
-                                          Color(0xFF3B82F6),
-                                          Color(0xFF2563EB),
-                                          Color(0xFF1D4ED8),
-                                        ],
-                                      ),
-                                    ),
-                                    child: Container(
-                                      alignment: Alignment.center,
-                                      constraints:
-                                          const BoxConstraints(minHeight: 52),
-                                      child: _isLoading
-                                          ? const SizedBox(
-                                              width: 22,
-                                              height: 22,
-                                              child:
-                                                  CircularProgressIndicator(
-                                                color: Colors.white,
-                                                strokeWidth: 2.5,
+                                      decoration: InputDecoration(
+                                        labelText: 'NIK',
+                                        hintText: 'Masukkan NIK Anda',
+                                        hintStyle: TextStyle(
+                                          fontSize: 14,
+                                          color: Colors.grey.shade400,
+                                          fontWeight: FontWeight.normal,
+                                        ),
+                                        labelStyle: TextStyle(
+                                          fontSize: 14,
+                                          color: Colors.grey.shade600,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                        prefixIcon: Container(
+                                          margin: const EdgeInsets.only(
+                                            left: 12,
+                                            right: 10,
+                                            top: 8,
+                                            bottom: 8,
+                                          ),
+                                          padding: const EdgeInsets.all(8),
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFFEFF6FF),
+                                            borderRadius:
+                                                BorderRadius.circular(10),
+                                            boxShadow: [
+                                              BoxShadow(
+                                                color: const Color(0xFF2563EB)
+                                                    .withValues(alpha: 0.12),
+                                                offset: const Offset(0, 2),
+                                                blurRadius: 4,
                                               ),
-                                            )
-                                          : const Row(
-                                              mainAxisAlignment:
-                                                  MainAxisAlignment.center,
-                                              mainAxisSize: MainAxisSize.min,
-                                              children: [
-                                                Text(
-                                                  'LOGIN',
-                                                  style: TextStyle(
-                                                    fontSize: 16,
-                                                    fontWeight: FontWeight.bold,
-                                                    letterSpacing: 1.5,
-                                                    color: Colors.white,
-                                                    shadows: [
-                                                      Shadow(
-                                                        color: Colors.black45,
-                                                        offset: Offset(0, 1.5),
-                                                        blurRadius: 2,
-                                                      ),
-                                                    ],
-                                                  ),
-                                                ),
-                                                SizedBox(width: 8),
-                                                Icon(
-                                                  Icons.arrow_forward_rounded,
-                                                  size: 20,
-                                                  color: Colors.white,
-                                                ),
-                                              ],
-                                            ),
+                                            ],
+                                          ),
+                                          child: const Icon(
+                                            Icons.badge_rounded,
+                                            color: Color(0xFF2563EB),
+                                            size: 20,
+                                          ),
+                                        ),
+                                        filled: false,
+                                        contentPadding:
+                                            const EdgeInsets.symmetric(
+                                          horizontal: 16,
+                                          vertical: 14,
+                                        ),
+                                        border: InputBorder.none,
+                                        enabledBorder: InputBorder.none,
+                                        focusedBorder: InputBorder.none,
+                                      ),
+                                      validator: validator,
+                                      onChanged: (String val) => setState(() {}),
                                     ),
                                   ),
-                                ),
+                                  const SizedBox(height: 16),
+
+                                  // 3D Inset Input Password
+                                  Container(
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFF8FAFC),
+                                      borderRadius: BorderRadius.circular(16),
+                                      border: Border.all(
+                                        color: const Color(0xFFE2E8F0),
+                                        width: 1.2,
+                                      ),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: const Color(0xFF0F172A)
+                                              .withValues(alpha: 0.035),
+                                          offset: const Offset(0, 3),
+                                          blurRadius: 6,
+                                          spreadRadius: -1,
+                                        ),
+                                        const BoxShadow(
+                                          color: Colors.white,
+                                          offset: Offset(0, -1),
+                                          blurRadius: 2,
+                                        ),
+                                      ],
+                                    ),
+                                    child: TextFormField(
+                                      controller: _pswdCtrl,
+                                      obscureText: _obscureText,
+                                      style: const TextStyle(
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.w700,
+                                        color: Color(0xFF0F172A),
+                                      ),
+                                      decoration: InputDecoration(
+                                        labelText: 'Password',
+                                        hintText: 'Masukkan kata sandi',
+                                        hintStyle: TextStyle(
+                                          fontSize: 14,
+                                          color: Colors.grey.shade400,
+                                          fontWeight: FontWeight.normal,
+                                        ),
+                                        labelStyle: TextStyle(
+                                          fontSize: 14,
+                                          color: Colors.grey.shade600,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                        prefixIcon: Container(
+                                          margin: const EdgeInsets.only(
+                                            left: 12,
+                                            right: 10,
+                                            top: 8,
+                                            bottom: 8,
+                                          ),
+                                          padding: const EdgeInsets.all(8),
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFFEFF6FF),
+                                            borderRadius:
+                                                BorderRadius.circular(10),
+                                            boxShadow: [
+                                              BoxShadow(
+                                                color: const Color(0xFF2563EB)
+                                                    .withValues(alpha: 0.12),
+                                                offset: const Offset(0, 2),
+                                                blurRadius: 4,
+                                              ),
+                                            ],
+                                          ),
+                                          child: const Icon(
+                                            Icons.lock_rounded,
+                                            color: Color(0xFF2563EB),
+                                            size: 20,
+                                          ),
+                                        ),
+                                        suffixIcon: IconButton(
+                                          icon: Icon(
+                                            _obscureText
+                                                ? Icons.visibility_outlined
+                                                : Icons.visibility_off_outlined,
+                                            size: 20,
+                                            color: Colors.grey.shade600,
+                                          ),
+                                          onPressed: () {
+                                            setState(() {
+                                              _obscureText = !_obscureText;
+                                            });
+                                          },
+                                        ),
+                                        filled: false,
+                                        contentPadding:
+                                            const EdgeInsets.symmetric(
+                                          horizontal: 16,
+                                          vertical: 14,
+                                        ),
+                                        border: InputBorder.none,
+                                        enabledBorder: InputBorder.none,
+                                        focusedBorder: InputBorder.none,
+                                      ),
+                                      validator: validator,
+                                      onChanged: (String val) => setState(() {}),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 14),
+
+                                  // Remember Me & Lupa Password Row
+                                  Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      InkWell(
+                                        onTap: () {
+                                          setState(() => _remember = !_remember);
+                                        },
+                                        borderRadius: BorderRadius.circular(6),
+                                        child: Padding(
+                                          padding: const EdgeInsets.symmetric(
+                                            vertical: 4,
+                                            horizontal: 2,
+                                          ),
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              SizedBox(
+                                                width: 20,
+                                                height: 20,
+                                                child: Checkbox(
+                                                  value: _remember,
+                                                  activeColor:
+                                                      const Color(0xFF2563EB),
+                                                  shape: RoundedRectangleBorder(
+                                                    borderRadius:
+                                                        BorderRadius.circular(4),
+                                                  ),
+                                                  side: BorderSide(
+                                                    color: _remember
+                                                        ? const Color(0xFF2563EB)
+                                                        : Colors.grey.shade400,
+                                                    width: 1.5,
+                                                  ),
+                                                  onChanged: (bool? val) {
+                                                    setState(() =>
+                                                        _remember = val ?? true);
+                                                  },
+                                                ),
+                                              ),
+                                              const SizedBox(width: 8),
+                                              Text(
+                                                'Remember Me',
+                                                style: TextStyle(
+                                                  fontSize: 13,
+                                                  fontWeight: FontWeight.w600,
+                                                  color: Colors.grey.shade700,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                      TextButton(
+                                        onPressed: _showForgotPasswordSheet,
+                                        style: TextButton.styleFrom(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 4,
+                                            vertical: 4,
+                                          ),
+                                          tapTargetSize:
+                                              MaterialTapTargetSize.shrinkWrap,
+                                        ),
+                                        child: const Text(
+                                          'Lupa Password?',
+                                          style: TextStyle(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w700,
+                                            color: Color(0xFF2563EB),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 22),
+
+                                  // Tactile 3D Login Button with Mechanical Keycap Travel & Haptics
+                                  _Tactile3DButton(
+                                    label: 'LOGIN',
+                                    isLoading: _isLoading,
+                                    onPressed: _isLoading ? null : _login,
+                                  ),
+                                ],
                               ),
                             ),
-
-                            const Spacer(flex: 1),
+const Spacer(flex: 1),
                             const SizedBox(height: 16),
 
                             // Version & Copyright Footer
@@ -1526,3 +1557,166 @@ class _ResetPasswordBottomSheetState extends State<_ResetPasswordBottomSheet> {
 }
 
 
+
+
+/// Custom Pressable 3D Tactile Button with Mechanical Keycap Travel & Haptics
+class _Tactile3DButton extends StatefulWidget {
+  final VoidCallback? onPressed;
+  final bool isLoading;
+  final String label;
+
+  const _Tactile3DButton({
+    required this.onPressed,
+    required this.isLoading,
+    required this.label,
+  });
+
+  @override
+  State<_Tactile3DButton> createState() => _Tactile3DButtonState();
+}
+
+class _Tactile3DButtonState extends State<_Tactile3DButton> {
+  bool _isPressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final enabled = widget.onPressed != null && !widget.isLoading;
+    final depth = _isPressed ? 1.5 : 5.0;
+    final translateOffset = _isPressed ? 3.5 : 0.0;
+
+    return Listener(
+      onPointerDown: enabled
+          ? (_) {
+              HapticFeedback.mediumImpact();
+              setState(() => _isPressed = true);
+            }
+          : null,
+      onPointerUp: enabled
+          ? (_) {
+              if (_isPressed) {
+                setState(() => _isPressed = false);
+                HapticFeedback.lightImpact();
+              }
+            }
+          : null,
+      onPointerCancel: enabled
+          ? (_) {
+              if (_isPressed) setState(() => _isPressed = false);
+            }
+          : null,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 60),
+        curve: Curves.easeOutQuad,
+        transform: Matrix4.translationValues(0, translateOffset, 0),
+        child: Container(
+          width: double.infinity,
+          height: 54,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              // Bottom solid 3D extrusion bevel
+              BoxShadow(
+                color: enabled ? const Color(0xFF0F2B7A) : Colors.grey.shade600,
+                offset: Offset(0, depth),
+                blurRadius: 0,
+              ),
+              // Soft ambient glow
+              if (!_isPressed && enabled)
+                BoxShadow(
+                  color: const Color(0xFF2563EB).withValues(alpha: 0.40),
+                  offset: const Offset(0, 10),
+                  blurRadius: 18,
+                  spreadRadius: 1,
+                ),
+            ],
+          ),
+          child: ElevatedButton(
+            onPressed: enabled ? widget.onPressed : null,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF2563EB),
+              foregroundColor: Colors.white,
+              elevation: 0,
+              shadowColor: Colors.transparent,
+              padding: EdgeInsets.zero,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+                side: BorderSide(
+                  color: Colors.white.withValues(alpha: 0.65),
+                  width: 1.5,
+                ),
+              ),
+            ),
+            child: Ink(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(16),
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: enabled
+                      ? const [
+                          Color(0xFF60A5FA), // Crisp glossy highlight
+                          Color(0xFF2563EB), // Rich cobalt
+                          Color(0xFF1D4ED8), // Deep blue base
+                        ]
+                      : [
+                          Colors.grey.shade400,
+                          Colors.grey.shade500,
+                          Colors.grey.shade600,
+                        ],
+                ),
+              ),
+              child: Container(
+                alignment: Alignment.center,
+                constraints: const BoxConstraints(minHeight: 54),
+                child: widget.isLoading
+                    ? const SizedBox(
+                        width: 22,
+                        height: 22,
+                        child: CircularProgressIndicator(
+                          color: Colors.white,
+                          strokeWidth: 2.6,
+                        ),
+                      )
+                    : Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            widget.label,
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 1.5,
+                              color: Colors.white,
+                              shadows: [
+                                Shadow(
+                                  color: Color(0xFF0B2163),
+                                  offset: Offset(0, 1.8),
+                                  blurRadius: 2.5,
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.22),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.arrow_forward_rounded,
+                              size: 16,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ],
+                      ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
