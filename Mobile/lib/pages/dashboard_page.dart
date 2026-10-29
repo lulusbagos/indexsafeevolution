@@ -259,15 +259,21 @@ class MapHazardItem {
     } catch (_) {}
 
     return MapHazardItem(
-      id: json['id'] is int ? json['id'] as int : int.tryParse(json['id']?.toString() ?? '0') ?? 0,
+      id: json['id'] is int
+          ? json['id'] as int
+          : int.tryParse(json['id']?.toString() ?? '0') ?? 0,
       title: json['title']?.toString() ?? 'Temuan Hazard',
       area: json['area']?.toString() ?? 'Area Tambang',
       level: json['level']?.toString() ?? 'Sedang',
       color: json['color']?.toString() ?? '#f59e0b',
       status: json['status']?.toString() ?? 'Open',
       statusColor: json['statusColor']?.toString() ?? '#ef4444',
-      lat: (json['lat'] is num) ? (json['lat'] as num).toDouble() : double.tryParse(json['lat']?.toString() ?? '0') ?? 0.0,
-      lng: (json['lng'] is num) ? (json['lng'] as num).toDouble() : double.tryParse(json['lng']?.toString() ?? '0') ?? 0.0,
+      lat: (json['lat'] is num)
+          ? (json['lat'] as num).toDouble()
+          : double.tryParse(json['lat']?.toString() ?? '0') ?? 0.0,
+      lng: (json['lng'] is num)
+          ? (json['lng'] as num).toDouble()
+          : double.tryParse(json['lng']?.toString() ?? '0') ?? 0.0,
       photo: json['photo']?.toString() ?? '',
       notes: json['notes']?.toString() ?? '',
       date: parsedDate,
@@ -380,7 +386,8 @@ class _FullscreenHazardMapPageState extends State<_FullscreenHazardMapPage>
         try {
           final decoded = jsonDecode(cachedJson) as List;
           _liveHazards = decoded
-              .map((item) => MapHazardItem.fromJson(item as Map<String, dynamic>))
+              .map((item) =>
+                  MapHazardItem.fromJson(item as Map<String, dynamic>))
               .toList();
         } catch (_) {}
       }
@@ -574,8 +581,8 @@ class _FullscreenHazardMapPageState extends State<_FullscreenHazardMapPage>
               date: tgl,
               pelapor: p['nama']?.toString() ?? 'Pelapor Lapangan',
               pja: p['pja']?.toString() ?? 'Foreman Area',
-              kategori: p['kategoriBahaya']?.toString() ??
-                  'Kondisi Tidak Aman (KTA)',
+              kategori:
+                  p['kategoriBahaya']?.toString() ?? 'Kondisi Tidak Aman (KTA)',
             ));
           }
 
@@ -608,7 +615,8 @@ class _FullscreenHazardMapPageState extends State<_FullscreenHazardMapPage>
               _updateMapGuide();
               if (!silent) HapticFeedback.mediumImpact();
             } else {
-              debugPrint('[HazardHunter] Data temuan sama. Melewati redraw DOM (hemat daya).');
+              debugPrint(
+                  '[HazardHunter] Data temuan sama. Melewati redraw DOM (hemat daya).');
             }
           }
         },
@@ -1237,8 +1245,8 @@ class _FullscreenHazardMapPageState extends State<_FullscreenHazardMapPage>
     _flyToTarget(target);
 
     final navUri = Uri.parse('google.navigation:q=$lat,$lng&mode=d');
-    final mapsWebUri =
-        Uri.parse('https://www.google.com/maps/dir/?api=1&destination=$lat,$lng');
+    final mapsWebUri = Uri.parse(
+        'https://www.google.com/maps/dir/?api=1&destination=$lat,$lng');
 
     try {
       if (await canLaunchUrl(navUri)) {
@@ -1327,8 +1335,7 @@ class _FullscreenHazardMapPageState extends State<_FullscreenHazardMapPage>
                           fontSize: 12,
                           fontWeight: FontWeight.w700)),
                   const SizedBox(height: 3),
-                  Text(
-                      'Lokasi: ${target.area}',
+                  Text('Lokasi: ${target.area}',
                       style: const TextStyle(
                           color: Color(0xFF38BDF8), fontSize: 11)),
                 ],
@@ -1458,11 +1465,13 @@ class _FullscreenHazardMapPageState extends State<_FullscreenHazardMapPage>
                   ].map((r) {
                     final isSel = selectedReason == r;
                     return ChoiceChip(
-                      label: Text(r, style: TextStyle(
-                        fontSize: 11.5,
-                        fontWeight: isSel ? FontWeight.w800 : FontWeight.w500,
-                        color: isSel ? Colors.white : Colors.black87,
-                      )),
+                      label: Text(r,
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            fontWeight:
+                                isSel ? FontWeight.w800 : FontWeight.w500,
+                            color: isSel ? Colors.white : Colors.black87,
+                          )),
                       selected: isSel,
                       selectedColor: const Color(0xFFEF4444),
                       backgroundColor: Colors.grey.shade100,
@@ -1482,7 +1491,8 @@ class _FullscreenHazardMapPageState extends State<_FullscreenHazardMapPage>
                     controller: reasonController,
                     maxLines: 2,
                     decoration: InputDecoration(
-                      hintText: 'Tuliskan alasan lengkap mengapa temuan ini fiktif...',
+                      hintText:
+                          'Tuliskan alasan lengkap mengapa temuan ini fiktif...',
                       hintStyle: const TextStyle(fontSize: 12),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
@@ -1518,7 +1528,9 @@ class _FullscreenHazardMapPageState extends State<_FullscreenHazardMapPage>
                     height: 80,
                     width: double.infinity,
                     decoration: BoxDecoration(
-                      border: Border.all(color: Colors.grey.shade300, style: BorderStyle.solid),
+                      border: Border.all(
+                          color: Colors.grey.shade300,
+                          style: BorderStyle.solid),
                       borderRadius: BorderRadius.circular(12),
                       color: Colors.grey.shade50,
                     ),
@@ -1556,7 +1568,8 @@ class _FullscreenHazardMapPageState extends State<_FullscreenHazardMapPage>
                         : const Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Icon(Icons.camera_alt_outlined, color: Colors.black45),
+                              Icon(Icons.camera_alt_outlined,
+                                  color: Colors.black45),
                               SizedBox(width: 8),
                               Text('Ambil Foto Kondisi Lapangan Saat Ini',
                                   style: TextStyle(
@@ -1636,8 +1649,10 @@ class _FullscreenHazardMapPageState extends State<_FullscreenHazardMapPage>
 
                             // Remove from local lists and update map
                             setState(() {
-                              _liveHazards.removeWhere((h) => h.id == target.id);
-                              widget.unclosedHazards.removeWhere((h) => h.id == target.id);
+                              _liveHazards
+                                  .removeWhere((h) => h.id == target.id);
+                              widget.unclosedHazards
+                                  .removeWhere((h) => h.id == target.id);
                               if (_currentTargetIndex >= _liveHazards.length &&
                                   _liveHazards.isNotEmpty) {
                                 _currentTargetIndex = _liveHazards.length - 1;
@@ -1646,7 +1661,7 @@ class _FullscreenHazardMapPageState extends State<_FullscreenHazardMapPage>
 
                             try {
                               _controller.runJavaScript(
-                                'if (typeof removeHazardMarker === "function") removeHazardMarker(${target.id});');
+                                  'if (typeof removeHazardMarker === "function") removeHazardMarker(${target.id});');
                             } catch (_) {}
 
                             ScaffoldMessenger.of(context).showSnackBar(
@@ -1687,7 +1702,8 @@ class _FullscreenHazardMapPageState extends State<_FullscreenHazardMapPage>
     );
   }
 
-  void _showImageZoomDialog(BuildContext context, String imageUrl, String title) {
+  void _showImageZoomDialog(
+      BuildContext context, String imageUrl, String title) {
     showDialog(
       context: context,
       builder: (ctx) => Dialog(
@@ -1886,7 +1902,6 @@ class _FullscreenHazardMapPageState extends State<_FullscreenHazardMapPage>
                                         ),
                                       ),
                                     ),
-
                                   ],
                                 ),
                                 const SizedBox(height: 1),
@@ -2029,8 +2044,8 @@ class _FullscreenHazardMapPageState extends State<_FullscreenHazardMapPage>
               child: SafeArea(
                 child: Center(
                   child: Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 14, vertical: 8),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                     decoration: BoxDecoration(
                       color: const Color(0xFF070B14).withOpacity(0.95),
                       borderRadius: BorderRadius.circular(22),
@@ -2430,8 +2445,8 @@ class _FullscreenHazardMapPageState extends State<_FullscreenHazardMapPage>
                                         borderRadius: BorderRadius.circular(3),
                                         child: LinearProgressIndicator(
                                           value: (1.0 -
-                                                  ((distance - 50.0).clamp(
-                                                          0.0, 450.0) /
+                                                  ((distance - 50.0)
+                                                          .clamp(0.0, 450.0) /
                                                       450.0))
                                               .clamp(0.05, 1.0),
                                           minHeight: 4,
@@ -2620,7 +2635,8 @@ class _FullscreenHazardMapPageState extends State<_FullscreenHazardMapPage>
           style: TextStyle(
             fontSize: 10,
             fontWeight: isSelected ? FontWeight.w900 : FontWeight.w600,
-            color: isSelected ? const Color(0xFF00E5FF) : const Color(0xFF94A3B8),
+            color:
+                isSelected ? const Color(0xFF00E5FF) : const Color(0xFF94A3B8),
             letterSpacing: 0.3,
           ),
         ),
@@ -2661,7 +2677,8 @@ class DashboardPage extends StatefulWidget {
   State<DashboardPage> createState() => _DashboardPageState();
 }
 
-class _DashboardPageState extends State<DashboardPage> with WidgetsBindingObserver {
+class _DashboardPageState extends State<DashboardPage>
+    with WidgetsBindingObserver {
   final _profile = PreferenceService.getProfile();
   final _api = ApiService();
   final _hazardMapCtrl = WebViewController();
@@ -2675,7 +2692,8 @@ class _DashboardPageState extends State<DashboardPage> with WidgetsBindingObserv
   String _searchText = '';
 
   // Banner State
-  static List<IncidentNewsModel> _cachedBanners = PreferenceService.getCachedHomeBanners();
+  static List<IncidentNewsModel> _cachedBanners =
+      PreferenceService.getCachedHomeBanners();
   List<IncidentNewsModel> _homeBanners = List.from(_cachedBanners);
   bool _isLoadingBanners = _cachedBanners.isEmpty;
   int _currentBannerIndex = 0;
@@ -2798,9 +2816,17 @@ class _DashboardPageState extends State<DashboardPage> with WidgetsBindingObserv
           onPageFinished: (url) {
             debugPrint('[SafeMap] Page finished: $url');
             _injectCurrentPosition(_hazardMapCtrl);
+            // Leaflet may start before the embedded WebView receives its final
+            // size inside the dashboard card. Recalculate once it is laid out.
+            Future.delayed(const Duration(milliseconds: 350), () {
+              _hazardMapCtrl.runJavaScript(
+                'if (window.map) { window.map.invalidateSize(true); }',
+              );
+            });
           },
           onWebResourceError: (error) {
-            debugPrint('[SafeMap] Resource error: code=${error.errorCode}, desc=${error.description}, url=${error.url}');
+            debugPrint(
+                '[SafeMap] Resource error: code=${error.errorCode}, desc=${error.description}, url=${error.url}');
           },
         ),
       )
@@ -2823,6 +2849,20 @@ class _DashboardPageState extends State<DashboardPage> with WidgetsBindingObserv
       _checkSpecialPermitHighRiskAlerts();
       _initLocationAndProximity();
       _fetchHazardPointsFromApi();
+
+      // The dashboard map sits inside a clipped, scrollable card. On some
+      // Android WebViews the first load happens while that surface is still
+      // 0x0, leaving Leaflet blank until a fullscreen route recreates it.
+      // Reload once the card has a real, laid-out surface.
+      Future.delayed(const Duration(milliseconds: 650), () {
+        if (!mounted) return;
+        _hazardMapCtrl.loadHtmlString(
+          _hazardMapHtml(
+            mapMode: _hazardMapMode,
+            userPosition: _lastUserPosition,
+          ),
+        );
+      });
     });
   }
 
@@ -2860,24 +2900,43 @@ class _DashboardPageState extends State<DashboardPage> with WidgetsBindingObserv
 
             // VALIDASI KETAT NIK: Pastikan permit ini benar-benar ditugaskan ke NIK login!
             final profile = PreferenceService.getProfile();
-            final rawUserNik = (profile?.noNik ?? PreferenceService.getUser() ?? PreferenceService.getOfflineNik() ?? '').trim();
+            final rawUserNik = (profile?.noNik ??
+                    PreferenceService.getUser() ??
+                    PreferenceService.getOfflineNik() ??
+                    '')
+                .trim();
             final cleanUserNik = rawUserNik.replaceAll(RegExp(r'[^0-9]'), '');
 
-            final pjoNik = (first['pjoNik'] ?? first['pjo_nik'] ?? '').toString().trim().replaceAll(RegExp(r'[^0-9]'), '');
-            final inspectorNik = (first['inspectorNik'] ?? first['inspector_nik'] ?? '').toString().trim().replaceAll(RegExp(r'[^0-9]'), '');
+            final pjoNik = (first['pjoNik'] ?? first['pjo_nik'] ?? '')
+                .toString()
+                .trim()
+                .replaceAll(RegExp(r'[^0-9]'), '');
+            final inspectorNik =
+                (first['inspectorNik'] ?? first['inspector_nik'] ?? '')
+                    .toString()
+                    .trim()
+                    .replaceAll(RegExp(r'[^0-9]'), '');
 
-            final isAssigned = cleanUserNik.isNotEmpty && (
-              (pjoNik.isNotEmpty && (cleanUserNik == pjoNik || cleanUserNik.endsWith(pjoNik) || pjoNik.endsWith(cleanUserNik))) ||
-              (inspectorNik.isNotEmpty && (cleanUserNik == inspectorNik || cleanUserNik.endsWith(inspectorNik) || inspectorNik.endsWith(cleanUserNik)))
-            );
+            final isAssigned = cleanUserNik.isNotEmpty &&
+                ((pjoNik.isNotEmpty &&
+                        (cleanUserNik == pjoNik ||
+                            cleanUserNik.endsWith(pjoNik) ||
+                            pjoNik.endsWith(cleanUserNik))) ||
+                    (inspectorNik.isNotEmpty &&
+                        (cleanUserNik == inspectorNik ||
+                            cleanUserNik.endsWith(inspectorNik) ||
+                            inspectorNik.endsWith(cleanUserNik))));
 
             // Jika NIK login bukan PJO atau Inspector yang ditugaskan, lewati dan jangan tampilkan apa pun
             if (!isAssigned) return;
 
-            final actType = (first['activityType'] ?? 'Pekerjaan Khusus').toString().replaceAll('_', ' ');
+            final actType = (first['activityType'] ?? 'Pekerjaan Khusus')
+                .toString()
+                .replaceAll('_', ' ');
             final loc = first['workLocation'] ?? 'Area Operasional';
             final permitId = first['id']?.toString() ?? '';
-            final hasFollowup = first['hasFollowup'] == true || first['has_followup'] == true;
+            final hasFollowup =
+                first['hasFollowup'] == true || first['has_followup'] == true;
 
             // Jika sudah ada follow-up/inspeksi, jangan tampilkan notifikasi lagi
             if (hasFollowup) return;
@@ -2889,7 +2948,8 @@ class _DashboardPageState extends State<DashboardPage> with WidgetsBindingObserv
             final nowMillis = DateTime.now().millisecondsSinceEpoch;
 
             const oneHourMillis = 60 * 60 * 1000;
-            if (lastAlertMillis > 0 && (nowMillis - lastAlertMillis) < oneHourMillis) {
+            if (lastAlertMillis > 0 &&
+                (nowMillis - lastAlertMillis) < oneHourMillis) {
               return;
             }
 
@@ -2904,7 +2964,8 @@ class _DashboardPageState extends State<DashboardPage> with WidgetsBindingObserv
             // Tanpa modal dialog Flutter yang mengganggu tampilan dashboard/login
             await NotificationService.display(
               title: '⚠️ Peringatan Kegiatan High Risk!',
-              body: 'Kegiatan $actType di $loc aktif untuk NIK Anda. Lakukan inspeksi lapangan.',
+              body:
+                  'Kegiatan $actType di $loc aktif untuk NIK Anda. Lakukan inspeksi lapangan.',
               payload: 'special_permit_id:$permitId',
               priority: 'urgent',
               notifType: 'special_permit',
@@ -2915,15 +2976,21 @@ class _DashboardPageState extends State<DashboardPage> with WidgetsBindingObserv
     } catch (_) {}
   }
 
-  void _showSpecialPermitHighRiskObservationDialog(Map<String, dynamic> permit, int totalAlerts) {
+  void _showSpecialPermitHighRiskObservationDialog(
+      Map<String, dynamic> permit, int totalAlerts) {
     if (!mounted) return;
     _isShowingSpecialPermitModal = true;
     _lastAlertedSpecialPermitId = permit['id']?.toString() ?? '';
 
-    final actType = (permit['activityType'] ?? 'Pekerjaan Khusus').toString().replaceAll('_', ' ').toUpperCase();
+    final actType = (permit['activityType'] ?? 'Pekerjaan Khusus')
+        .toString()
+        .replaceAll('_', ' ')
+        .toUpperCase();
     final reqId = permit['reqId']?.toString() ?? '-';
     final loc = permit['workLocation']?.toString() ?? 'Area Operasional';
-    final company = permit['companyName']?.toString() ?? permit['implementingContractor']?.toString() ?? '-';
+    final company = permit['companyName']?.toString() ??
+        permit['implementingContractor']?.toString() ??
+        '-';
     final pjoName = permit['pjoName']?.toString() ?? '-';
     final inspectorName = permit['inspectorName']?.toString() ?? '-';
 
@@ -2992,7 +3059,8 @@ class _DashboardPageState extends State<DashboardPage> with WidgetsBindingObserv
                       Row(
                         children: [
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 7, vertical: 2),
                             decoration: BoxDecoration(
                               color: const Color(0xFFDC2626),
                               borderRadius: BorderRadius.circular(6),
@@ -3010,7 +3078,8 @@ class _DashboardPageState extends State<DashboardPage> with WidgetsBindingObserv
                           if (totalAlerts > 1) ...[
                             const SizedBox(width: 6),
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 6, vertical: 2),
                               decoration: BoxDecoration(
                                 color: const Color(0xFFFEF3C7),
                                 borderRadius: BorderRadius.circular(6),
@@ -3066,13 +3135,15 @@ class _DashboardPageState extends State<DashboardPage> with WidgetsBindingObserv
                         ),
                       ),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 2),
                         decoration: BoxDecoration(
                           color: const Color(0xFFEFF6FF),
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: Text(
-                          permit['status']?.toString().toUpperCase() ?? 'APPROVED',
+                          permit['status']?.toString().toUpperCase() ??
+                              'APPROVED',
                           style: const TextStyle(
                             fontSize: 10,
                             fontWeight: FontWeight.w800,
@@ -3096,7 +3167,8 @@ class _DashboardPageState extends State<DashboardPage> with WidgetsBindingObserv
                   const SizedBox(height: 10),
                   _buildPermitInfoRow(Icons.place_rounded, 'Lokasi', loc),
                   const SizedBox(height: 6),
-                  _buildPermitInfoRow(Icons.business_rounded, 'Perusahaan', company),
+                  _buildPermitInfoRow(
+                      Icons.business_rounded, 'Perusahaan', company),
                   if (pjoName != '-' || inspectorName != '-') ...[
                     const SizedBox(height: 6),
                     _buildPermitInfoRow(
@@ -3121,7 +3193,8 @@ class _DashboardPageState extends State<DashboardPage> with WidgetsBindingObserv
               child: const Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(Icons.info_outline_rounded, color: Color(0xFFD97706), size: 18),
+                  Icon(Icons.info_outline_rounded,
+                      color: Color(0xFFD97706), size: 18),
                   SizedBox(width: 8),
                   Expanded(
                     child: Text(
@@ -3156,7 +3229,8 @@ class _DashboardPageState extends State<DashboardPage> with WidgetsBindingObserv
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => SpecialPermitFollowupPage(permit: permit),
+                      builder: (context) =>
+                          SpecialPermitFollowupPage(permit: permit),
                     ),
                   ).then((_) {
                     _checkSpecialPermitHighRiskAlerts();
@@ -3216,12 +3290,18 @@ class _DashboardPageState extends State<DashboardPage> with WidgetsBindingObserv
         const SizedBox(width: 6),
         Text(
           '$label: ',
-          style: const TextStyle(fontSize: 12, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
+          style: const TextStyle(
+              fontSize: 12,
+              color: Color(0xFF64748B),
+              fontWeight: FontWeight.w500),
         ),
         Expanded(
           child: Text(
             value,
-            style: const TextStyle(fontSize: 12, color: Color(0xFF1E293B), fontWeight: FontWeight.w700),
+            style: const TextStyle(
+                fontSize: 12,
+                color: Color(0xFF1E293B),
+                fontWeight: FontWeight.w700),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
@@ -3255,13 +3335,15 @@ class _DashboardPageState extends State<DashboardPage> with WidgetsBindingObserv
     super.dispose();
   }
 
-  Future<void> _fetchHazardPointsFromApi({Position? pos, bool force = false}) async {
+  Future<void> _fetchHazardPointsFromApi(
+      {Position? pos, bool force = false}) async {
     final todayStr = DateTime.now().toIso8601String().substring(0, 10);
     final lastFetchDate = PreferenceService.getHazardMapLastFetchDate();
 
     // Jika sudah pernah load hari ini dan cache tersedia, lewati panggilan API (1 hari sekali)
     if (!force && lastFetchDate == todayStr && _unclosedHazards.isNotEmpty) {
-      debugPrint('[SafeMap] Menggunakan cache Safe Map hari ini ($todayStr), melewati panggilan network.');
+      debugPrint(
+          '[SafeMap] Menggunakan cache Safe Map hari ini ($todayStr), melewati panggilan network.');
       _reloadMap();
       return;
     }
@@ -3269,7 +3351,8 @@ class _DashboardPageState extends State<DashboardPage> with WidgetsBindingObserv
     if (_isFetchingHazards) return;
     _isFetchingHazards = true;
     try {
-      debugPrint('[SafeMap] Memuat titik Safe Map dari API (1x sehari / reload)...');
+      debugPrint(
+          '[SafeMap] Memuat titik Safe Map dari API (1x sehari / reload)...');
       final res = await _api.getSafeMapHazardPoints(
         days: 30,
         onlyOpen: true,
@@ -3372,7 +3455,8 @@ class _DashboardPageState extends State<DashboardPage> with WidgetsBindingObserv
               });
               _reloadMap();
             } else {
-              debugPrint('[SafeMap Dashboard] Data temuan tidak berubah, lewati reload map.');
+              debugPrint(
+                  '[SafeMap Dashboard] Data temuan tidak berubah, lewati reload map.');
             }
           }
         },
@@ -3405,7 +3489,8 @@ class _DashboardPageState extends State<DashboardPage> with WidgetsBindingObserv
       _positionStreamSub = Geolocator.getPositionStream(
         locationSettings: const LocationSettings(
           accuracy: LocationAccuracy.medium, // Hemat baterai & suhu dingin
-          distanceFilter: 15, // Hanya update jika berpindah 15 meter (tidak jitter di meja)
+          distanceFilter:
+              15, // Hanya update jika berpindah 15 meter (tidak jitter di meja)
         ),
       ).listen((pos) {
         _onUserPositionUpdated(pos);
@@ -3421,7 +3506,9 @@ class _DashboardPageState extends State<DashboardPage> with WidgetsBindingObserv
 
     final now = DateTime.now();
     // Throttle JS bridge update to at most once every 3 seconds to save GPU/CPU
-    if (isFirstLoc || _lastPosJsUpdateTime == null || now.difference(_lastPosJsUpdateTime!).inSeconds >= 3) {
+    if (isFirstLoc ||
+        _lastPosJsUpdateTime == null ||
+        now.difference(_lastPosJsUpdateTime!).inSeconds >= 3) {
       _lastPosJsUpdateTime = now;
       _hazardMapCtrl.runJavaScript(
         'if(window.setUserLocation) window.setUserLocation(${pos.latitude}, ${pos.longitude}, ${pos.accuracy});',
@@ -3499,7 +3586,8 @@ class _DashboardPageState extends State<DashboardPage> with WidgetsBindingObserv
 
   void _reloadMap() {
     print('===> DASHBOARD RELOAD MAP: length=${_unclosedHazards.length} <===');
-    final jsonStr = jsonEncode(_unclosedHazards.map((e) => e.toJson()).toList());
+    final jsonStr =
+        jsonEncode(_unclosedHazards.map((e) => e.toJson()).toList());
     _hazardMapCtrl.runJavaScript(
       'if(window.renderHazardPoints) { window.renderHazardPoints($jsonStr); } else { location.reload(); }',
     );
@@ -4323,9 +4411,12 @@ class _DashboardPageState extends State<DashboardPage> with WidgetsBindingObserv
       int count = 0;
       final counts = await _api.getNotificationCounts();
       count = counts['total'] ?? counts['unread'] ?? 0;
-      final activeHazardCount = (counts['active_hazard_count'] as num?)?.toInt() ?? 0;
-      final activeActionPlanCount = (counts['active_action_plan_count'] as num?)?.toInt() ?? 0;
-      final unactionedCount = (counts['unactioned_count'] as num?)?.toInt() ?? 0;
+      final activeHazardCount =
+          (counts['active_hazard_count'] as num?)?.toInt() ?? 0;
+      final activeActionPlanCount =
+          (counts['active_action_plan_count'] as num?)?.toInt() ?? 0;
+      final unactionedCount =
+          (counts['unactioned_count'] as num?)?.toInt() ?? 0;
 
       // Juga periksa apakah ada action_plans lokal di SQLite yang mengarah ke user
       int localCnt = 0;
@@ -4359,7 +4450,12 @@ class _DashboardPageState extends State<DashboardPage> with WidgetsBindingObserv
       } catch (_) {}
 
       // GETARAN FISIK: Jika user dijadikan PIC / PJA temuan K3, ada Approval Menunggu, atau Special Permit High Risk
-      if (activeHazardCount > 0 || activeActionPlanCount > 0 || localCnt > 0 || unactionedCount > 0 || _pendingApprovalCount > 0 || spAlertCount > 0) {
+      if (activeHazardCount > 0 ||
+          activeActionPlanCount > 0 ||
+          localCnt > 0 ||
+          unactionedCount > 0 ||
+          _pendingApprovalCount > 0 ||
+          spAlertCount > 0) {
         NotificationService.vibrateForPicAssignment();
       }
 
@@ -5000,8 +5096,7 @@ class _DashboardPageState extends State<DashboardPage> with WidgetsBindingObserv
                 ),
               ),
               // Quick Action Card: Approval Center (khusus user terdaftar di Bima)
-              if (_isApprovalRegistered)
-                _buildApprovalQuickCard(),
+              if (_isApprovalRegistered) _buildApprovalQuickCard(),
               Padding(
                 padding:
                     const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
@@ -5087,14 +5182,7 @@ class _DashboardPageState extends State<DashboardPage> with WidgetsBindingObserv
                         child: Stack(
                           children: [
                             Positioned.fill(
-                              child: WebViewWidget(
-                                controller: _hazardMapCtrl,
-                                gestureRecognizers: {
-                                  Factory<OneSequenceGestureRecognizer>(
-                                    () => EagerGestureRecognizer(),
-                                  ),
-                                },
-                              ),
+                              child: buildSafeMapWebView(_hazardMapCtrl),
                             ),
                             // Tombol Cepat Masuk Mode Hazard Hunter
                             Positioned(
@@ -5290,11 +5378,13 @@ class _DashboardPageState extends State<DashboardPage> with WidgetsBindingObserv
         child: InkWell(
           borderRadius: BorderRadius.circular(18),
           onTap: () {
-            Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (context) => const ApprovalCenterPage(),
-              ),
-            ).then((_) => _checkApprovalAccess());
+            Navigator.of(context)
+                .push(
+                  MaterialPageRoute(
+                    builder: (context) => const ApprovalCenterPage(),
+                  ),
+                )
+                .then((_) => _checkApprovalAccess());
           },
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
@@ -5348,7 +5438,9 @@ class _DashboardPageState extends State<DashboardPage> with WidgetsBindingObserv
                     borderRadius: BorderRadius.circular(13),
                     boxShadow: [
                       BoxShadow(
-                        color: (hasPending ? const Color(0xFFEF4444) : const Color(0xFF0D9488))
+                        color: (hasPending
+                                ? const Color(0xFFEF4444)
+                                : const Color(0xFF0D9488))
                             .withValues(alpha: 0.35),
                         blurRadius: 8,
                         offset: const Offset(0, 3),
@@ -5356,7 +5448,9 @@ class _DashboardPageState extends State<DashboardPage> with WidgetsBindingObserv
                     ],
                   ),
                   child: Icon(
-                    hasPending ? Icons.pending_actions_rounded : Icons.fact_check_rounded,
+                    hasPending
+                        ? Icons.pending_actions_rounded
+                        : Icons.fact_check_rounded,
                     color: Colors.white,
                     size: 24,
                   ),
@@ -5375,13 +5469,16 @@ class _DashboardPageState extends State<DashboardPage> with WidgetsBindingObserv
                             style: TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w800,
-                              color: hasPending ? Colors.white : const Color(0xFF0F2628),
+                              color: hasPending
+                                  ? Colors.white
+                                  : const Color(0xFF0F2628),
                             ),
                           ),
                           if (hasPending) ...[
                             const SizedBox(width: 8),
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 7, vertical: 2),
                               decoration: BoxDecoration(
                                 color: const Color(0xFFEF4444),
                                 borderRadius: BorderRadius.circular(12),
@@ -5419,7 +5516,9 @@ class _DashboardPageState extends State<DashboardPage> with WidgetsBindingObserv
                 Icon(
                   Icons.arrow_forward_ios_rounded,
                   size: 15,
-                  color: hasPending ? const Color(0xFF2DD4BF) : const Color(0xFF94A3B8),
+                  color: hasPending
+                      ? const Color(0xFF2DD4BF)
+                      : const Color(0xFF94A3B8),
                 ),
               ],
             ),
