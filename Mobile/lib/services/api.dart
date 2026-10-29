@@ -790,11 +790,14 @@ class ApiService {
   }
 
   Future<Either<Map, List<NotificationItemModel>>> getNotifications(
-      {int limit = 30}) async {
+      {int limit = 100, int? sinceId, int months = 3}) async {
     try {
       dio.options.headers['Authorization'] = 'Bearer $getToken';
-      var res =
-          await dio.get('/notifications', queryParameters: {'limit': limit});
+      final params = <String, dynamic>{'limit': limit, 'months': months};
+      if (sinceId != null && sinceId > 0) {
+        params['sinceId'] = sinceId;
+      }
+      var res = await dio.get('/notifications', queryParameters: params);
       if (res.data is Map && res.data['data'] is List) {
         final list = (res.data['data'] as List)
             .map((item) => NotificationItemModel.fromJson(

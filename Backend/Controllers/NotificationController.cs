@@ -466,7 +466,7 @@ namespace Indexsafe.Api.Controllers
         }
 
         [HttpGet("notifications")]
-        public async Task<IActionResult> GetNotifications([FromQuery] int limit = 50)
+        public async Task<IActionResult> GetNotifications([FromQuery] int limit = 100, [FromQuery] int? sinceId = null, [FromQuery] int months = 3)
         {
             await EnsureSchemaAsync();
             var userNik = GetCurrentNik()?.Trim() ?? "";
@@ -475,17 +475,28 @@ namespace Indexsafe.Api.Controllers
                 await EnsurePendingTagNotificationsAsync(userNik);
             }
             var coachingCutoff = DateTime.Now.AddDays(-7);
+            var cutoffDate = DateTime.Now.AddMonths(-Math.Max(1, months));
 
             // Sesuai permintaan pengguna:
-            // 1. Notifikasi yang sudah complete / closed tidak usah ditampilkan
-            // 2. Notifikasi Coaching otomatis kadaluarsa & hilang setelah 7 hari
-            var notifs = await _context.Notifications
+            // 1. Tarik data 3 bulan terakhir agar tidak berat
+            // 2. Jika ada sinceId, hanya ambil data terbaru di atas sinceId (incremental fetch)
+            // 3. Notifikasi yang sudah complete / closed tidak usah ditampilkan
+            // 4. Notifikasi Coaching otomatis kadaluarsa & hilang setelah 7 hari
+            var query = _context.Notifications
                 .Where(n => !string.IsNullOrEmpty(n.RecipientNik) && n.RecipientNik.Trim() == userNik)
+                .Where(n => n.CreatedAt >= cutoffDate)
                 .Where(n => !n.IsActioned && n.NotifType != "hazard_completed" && n.NotifType != "hazard_closed")
                 .Where(n => !(
                     (n.Title.Contains("Coaching") || n.Title.Contains("Pembinaan") || n.Message.Contains("Coaching") || n.Message.Contains("Pembinaan") || (n.NotifType != null && n.NotifType.Contains("coaching")) || (n.Url != null && n.Url.Contains("Performance")))
                     && n.CreatedAt < coachingCutoff
-                ))
+                ));
+
+            if (sinceId.HasValue && sinceId.Value > 0)
+            {
+                query = query.Where(n => n.Id > sinceId.Value);
+            }
+
+            var notifs = await query
                 .OrderByDescending(n => n.CreatedAt)
                 .Take(limit)
                 .ToListAsync();

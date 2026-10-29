@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
+import '../models/notification_item_model.dart';
 
 class DatabaseService {
   static DatabaseService? _instance;
@@ -27,6 +28,7 @@ class DatabaseService {
     await _ensureGciTable(_database!);
     await _ensureSafetyTransColumns(_database!);
     await _ensureCoachingTransColumns(_database!);
+    await _ensureNotificationsTable(_database!);
     return _database!;
   }
 
@@ -55,6 +57,111 @@ class DatabaseService {
     await _ensureGciTable(db);
     await _ensureSafetyTransColumns(db);
     await _ensureCoachingTransColumns(db);
+    await _ensureNotificationsTable(db);
+  }
+
+  static Future<void> _ensureNotificationsTable(Database db) async {
+    try {
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS tbl_t_notifications (
+          id INTEGER PRIMARY KEY,
+          title TEXT,
+          message TEXT,
+          url TEXT,
+          notif_type TEXT,
+          logo TEXT,
+          category TEXT,
+          sender_name TEXT,
+          priority TEXT,
+          payload TEXT,
+          action_text TEXT,
+          is_read INTEGER DEFAULT 0,
+          is_actioned INTEGER DEFAULT 0,
+          is_action_required INTEGER DEFAULT 0,
+          created_at TEXT
+        );
+      ''');
+    } catch (_) {}
+  }
+
+  Future<List<NotificationItemModel>> getLocalNotifications({int months = 3}) async {
+    final db = await database;
+    try {
+      final cutoff = DateTime.now().subtract(Duration(days: months * 30)).toIso8601String();
+      final rows = await db.rawQuery(
+        'SELECT * FROM tbl_t_notifications WHERE created_at >= ? ORDER BY id DESC',
+        [cutoff],
+      );
+      return rows.map((r) => NotificationItemModel.fromSqlite(r)).toList();
+    } catch (e) {
+      debugPrint('[DatabaseService] Error getLocalNotifications: \$e');
+      return [];
+    }
+  }
+
+  Future<int> getMaxNotificationId() async {
+    final db = await database;
+    try {
+      final res = await db.rawQuery('SELECT MAX(id) as max_id FROM tbl_t_notifications');
+      if (res.isNotEmpty && res.first['max_id'] != null) {
+        return (res.first['max_id'] as num).toInt();
+      }
+    } catch (_) {}
+    return 0;
+  }
+
+  Future<void> saveLocalNotifications(List<NotificationItemModel> items) async {
+    if (items.isEmpty) return;
+    final db = await database;
+    try {
+      final batch = db.batch();
+      for (var item in items) {
+        batch.insert(
+          'tbl_t_notifications',
+          item.toSqliteMap(),
+          conflictAlgorithm: ConflictAlgorithm.replace,
+        );
+      }
+      await batch.commit(noResult: true);
+    } catch (e) {
+      debugPrint('[DatabaseService] Error saveLocalNotifications: \$e');
+    }
+  }
+
+  Future<void> purgeOldNotifications({int months = 3}) async {
+    final db = await database;
+    try {
+      final cutoff = DateTime.now().subtract(Duration(days: months * 30)).toIso8601String();
+      await db.delete(
+        'tbl_t_notifications',
+        where: 'created_at < ?',
+        whereArgs: [cutoff],
+      );
+    } catch (_) {}
+  }
+
+  Future<void> updateLocalNotificationRead(int id, bool isRead) async {
+    final db = await database;
+    try {
+      await db.update(
+        'tbl_t_notifications',
+        {'is_read': isRead ? 1 : 0},
+        where: 'id = ?',
+        whereArgs: [id],
+      );
+    } catch (_) {}
+  }
+
+  Future<void> updateLocalNotificationActioned(int id, bool isActioned) async {
+    final db = await database;
+    try {
+      await db.update(
+        'tbl_t_notifications',
+        {'is_actioned': isActioned ? 1 : 0},
+        where: 'id = ?',
+        whereArgs: [id],
+      );
+    } catch (_) {}
   }
 
   static Future<void> _ensureSpiTable(Database db) async {

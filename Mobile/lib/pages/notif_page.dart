@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import '../services/api.dart';
+import '../models/notification_item_model.dart';
 import '../services/database.dart';
 import '../services/notification.dart';
 import '../services/preference.dart';
@@ -172,12 +173,35 @@ class _NotifPageState extends State<NotifPage> {
     try {
       final List<Map<String, dynamic>> combined = [];
 
-      // 1. Fetch online server notifications (berisi notifikasi penugasan PJA Hazard dsb)
-      final serverRes = await _api.getNotifications(limit: 60);
-      serverRes.fold(
-        (_) {},
-        (serverNotifs) {
-          for (var n in serverNotifs) {
+      // 1. Ambil notifikasi dari database lokal SQLite (3 bulan terakhir)
+      List<NotificationItemModel> localNotifs = await _db.getLocalNotifications(months: 3);
+      final int maxLocalId = await _db.getMaxNotificationId();
+
+      // 2. Tarik update dari server:
+      // - Jika lokal kosong (habis didelete/fresh): tarik 3 bulan terakhir (sinceId: null)
+      // - Jika lokal sudah ada: HANYA tarik notifikasi baru (sinceId: maxLocalId) agar hemat bandwidth & tidak berat
+      try {
+        final serverRes = await _api.getNotifications(
+          limit: maxLocalId == 0 ? 100 : 50,
+          sinceId: maxLocalId > 0 ? maxLocalId : null,
+          months: 3,
+        );
+
+        await serverRes.fold(
+          (_) async {},
+          (newNotifs) async {
+            if (newNotifs.isNotEmpty) {
+              await _db.saveLocalNotifications(newNotifs);
+              await _db.purgeOldNotifications(months: 3);
+              localNotifs = await _db.getLocalNotifications(months: 3);
+            }
+          },
+        );
+      } catch (e) {
+        debugPrint('[NotifPage] Error fetch online, menampilkan data lokal: \$e');
+      }
+
+      for (var n in localNotifs) {
             // Sesuai permintaan pengguna: notifikasi yang sudah complete / actioned tidak usah ditampilkan
             if (n.isActioned ||
                 n.notifType.toLowerCase().contains('completed') ||
@@ -269,9 +293,7 @@ class _NotifPageState extends State<NotifPage> {
                           ? 'Pos Security Tambang'
                           : (n.url ?? ''))),
             });
-          }
-        },
-      );
+      }
 
       // 2. Fetch local SQLite action plans
       final val = await _db.rawQuery(
@@ -698,6 +720,7 @@ class _NotifPageState extends State<NotifPage> {
     if (item['is_server_notif'] == true) {
       final notifId = item['id'] as int? ?? 0;
       if (notifId > 0 && item['is_read'] != true) {
+        _db.updateLocalNotificationRead(notifId, true);
         _api.markNotificationRead(notifId);
       }
       

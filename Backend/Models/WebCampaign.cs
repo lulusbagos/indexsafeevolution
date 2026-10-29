@@ -48,3 +48,4 @@ namespace Indexsafe.Api.Models
         public DateTime? UpdatedAt { get; set; } = DateTime.Now;
     }
 }
+

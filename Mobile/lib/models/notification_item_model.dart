@@ -118,4 +118,51 @@ class NotificationItemModel {
       'created_at': rawCreatedAt,
     };
   }
+
+  Map<String, dynamic> toSqliteMap() {
+    return {
+      'id': id,
+      'title': title,
+      'message': message,
+      'url': url,
+      'is_read': isRead ? 1 : 0,
+      'is_actioned': isActioned ? 1 : 0,
+      'is_action_required': isActionRequired ? 1 : 0,
+      'notif_type': notifType,
+      'logo': logo,
+      'category': category,
+      'sender_name': senderName,
+      'priority': priority,
+      'payload': payload,
+      'action_text': actionText,
+      'created_at': rawCreatedAt ?? createdAt?.toIso8601String(),
+    };
+  }
+
+  factory NotificationItemModel.fromSqlite(Map<String, dynamic> map) {
+    DateTime? dt;
+    final dateStr = map['created_at']?.toString();
+    if (dateStr != null && dateStr.isNotEmpty) {
+      dt = DateTime.tryParse(dateStr);
+    }
+
+    return NotificationItemModel(
+      id: (map['id'] as num?)?.toInt() ?? 0,
+      title: map['title']?.toString() ?? '',
+      message: map['message']?.toString() ?? '',
+      url: map['url']?.toString(),
+      isRead: map['is_read'] == 1 || map['is_read'] == true,
+      isActioned: map['is_actioned'] == 1 || map['is_actioned'] == true,
+      isActionRequired: map['is_action_required'] == 1 || map['is_action_required'] == true,
+      notifType: map['notif_type']?.toString() ?? 'general',
+      logo: map['logo']?.toString(),
+      category: map['category']?.toString(),
+      senderName: map['sender_name']?.toString(),
+      priority: map['priority']?.toString() ?? 'normal',
+      payload: map['payload']?.toString(),
+      actionText: map['action_text']?.toString(),
+      createdAt: dt,
+      rawCreatedAt: dateStr,
+    );
+  }
 }
