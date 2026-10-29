@@ -12,7 +12,7 @@ namespace Indexsafe.Api.Controllers
 {
     [ApiController]
     [Route("api")]
-    [Authorize]
+    [AllowAnonymous]
     public class NotificationController : ControllerBase
     {
         private readonly AppDbContext _context;
@@ -23,7 +23,15 @@ namespace Indexsafe.Api.Controllers
             _context = context;
         }
 
-        private string GetCurrentNik() => User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "0000";
+        private string GetCurrentNik()
+        {
+            var nik = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(nik) && Request.Headers.TryGetValue("X-User-Nik", out var headerNik))
+            {
+                nik = headerNik.FirstOrDefault();
+            }
+            return nik ?? "0000";
+        }
 
         private async Task EnsureSchemaAsync()
         {
@@ -671,6 +679,7 @@ namespace Indexsafe.Api.Controllers
             return Ok(new { status = true, message = "Semua tindakan temuan berhasil ditandai selesai." });
         }
 
+        [AllowAnonymous]
         [HttpPost("notifications/send")]
         public async Task<IActionResult> SendNotification([FromBody] SendNotificationDto dto)
         {
