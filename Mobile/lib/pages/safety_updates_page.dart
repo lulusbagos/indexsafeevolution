@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import '../models/incident_news_model.dart';
 import '../services/api.dart';
+import '../services/preference.dart';
 
 class SafetyUpdatesPage extends StatefulWidget {
   const SafetyUpdatesPage({super.key, this.selectedIncident});
@@ -35,10 +36,23 @@ class _SafetyUpdatesPageState extends State<SafetyUpdatesPage> {
     'Kebakaran',
   ];
 
+  bool _isBackgroundSyncing = false;
+
   @override
   void initState() {
     super.initState();
-    _fetchUpdates();
+    
+    // 1. Ambil data lokal terlebih dahulu agar halaman langsung tampil instan (0 ms)
+    final cached = PreferenceService.getCachedSafetyUpdates();
+    if (cached.isNotEmpty) {
+      _allUpdates = cached;
+      _isLoading = false;
+    } else {
+      _isLoading = true;
+    }
+
+    // 2. Tarik update terbaru secara background / incremental (hanya data baru jika sudah ada cache)
+    _fetchUpdates(incremental: cached.isNotEmpty);
 
     // Jika dibuka langsung dari banner home, langsung tampilkan detail modal
     if (widget.selectedIncident != null) {
@@ -54,49 +68,99 @@ class _SafetyUpdatesPageState extends State<SafetyUpdatesPage> {
     super.dispose();
   }
 
-  Future<void> _fetchUpdates() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
+  Future<void> _fetchUpdates({bool incremental = false, bool forceFullRefresh = false}) async {
+    if (_allUpdates.isEmpty) {
+      setState(() {
+        _isLoading = true;
+        _errorMessage = null;
+      });
+    } else {
+      _isBackgroundSyncing = true;
+    }
 
     try {
+      int? sinceId;
+      if (incremental && !forceFullRefresh && _allUpdates.isNotEmpty) {
+        // Ambil ID terbesar di local cache untuk hanya meminta data baru
+        sinceId = _allUpdates.fold<int>(0, (max, item) => item.id > max ? item.id : max);
+      }
+
       // Ambil yang di-setting is_update = true atau ambil seluruh berita aktif
-      final res = await _api.getIncidents(limit: 50, isUpdate: true);
+      final res = await _api.getIncidents(
+        limit: 50,
+        isUpdate: true,
+        sinceId: sinceId,
+      );
 
       res.fold(
         (err) {
           if (mounted) {
             setState(() {
-              _isLoading = false;
-              _errorMessage = err['message']?.toString() ?? 'Gagal memuat safety updates';
+              _isBackgroundSyncing = false;
+              // Hanya tampilkan error layar penuh jika cache lokal benar-benar kosong
+              if (_allUpdates.isEmpty) {
+                _isLoading = false;
+                _errorMessage = err['message']?.toString() ?? 'Gagal memuat safety updates';
+              }
             });
           }
         },
-        (data) {
+        (data) async {
           if (mounted) {
-            final list = List<IncidentNewsModel>.from(data);
+            final incomingList = List<IncidentNewsModel>.from(data);
 
-            // Jika ada selectedIncident dari banner yang di-klik dan belum ada di list (misal hanya di-setting is_banner=1)
+            List<IncidentNewsModel> finalList;
+            if (sinceId != null && sinceId > 0) {
+              // Mode Incremental: gabungkan berita baru dengan data lokal
+              final map = <int, IncidentNewsModel>{
+                for (var item in _allUpdates) item.id: item,
+              };
+              for (var item in incomingList) {
+                map[item.id] = item;
+              }
+              finalList = map.values.toList();
+            } else {
+              // Full Refresh: ganti list secara keseluruhan
+              finalList = incomingList;
+            }
+
+            // Jika ada selectedIncident dari banner yang di-klik dan belum ada di list
             if (widget.selectedIncident != null) {
-              final exists = list.any((item) => item.id == widget.selectedIncident!.id);
+              final exists = finalList.any((item) => item.id == widget.selectedIncident!.id);
               if (!exists) {
-                list.insert(0, widget.selectedIncident!);
+                finalList.insert(0, widget.selectedIncident!);
               }
             }
 
-            setState(() {
-              _allUpdates = list;
-              _isLoading = false;
+            // Urutkan dari kejadian/dibuat paling baru
+            finalList.sort((a, b) {
+              final aDate = a.tanggalKejadian ?? a.createdAt ?? DateTime(2000);
+              final bDate = b.tanggalKejadian ?? b.createdAt ?? DateTime(2000);
+              final cmp = bDate.compareTo(aDate);
+              if (cmp != 0) return cmp;
+              return b.id.compareTo(a.id);
             });
+
+            setState(() {
+              _allUpdates = finalList;
+              _isLoading = false;
+              _isBackgroundSyncing = false;
+              _errorMessage = null;
+            });
+
+            // Simpan pembaruan ke memori lokal SharedPreferences secara offline
+            await PreferenceService.setCachedSafetyUpdates(finalList);
           }
         },
       );
     } catch (e) {
       if (mounted) {
         setState(() {
-          _isLoading = false;
-          _errorMessage = e.toString();
+          _isBackgroundSyncing = false;
+          if (_allUpdates.isEmpty) {
+            _isLoading = false;
+            _errorMessage = e.toString();
+          }
         });
       }
     }
@@ -205,7 +269,7 @@ class _SafetyUpdatesPageState extends State<SafetyUpdatesPage> {
         bottom: false,
         child: RefreshIndicator(
           color: _primaryBlue,
-          onRefresh: _fetchUpdates,
+          onRefresh: () => _fetchUpdates(forceFullRefresh: true),
           child: CustomScrollView(
             physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
             slivers: [
@@ -330,6 +394,21 @@ class _SafetyUpdatesPageState extends State<SafetyUpdatesPage> {
                   ),
                 ),
               ),
+
+              if (_isBackgroundSyncing)
+                const SliverToBoxAdapter(
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.all(Radius.circular(2)),
+                      child: LinearProgressIndicator(
+                        minHeight: 2,
+                        backgroundColor: Color(0xFFE2E8F0),
+                        valueColor: AlwaysStoppedAnimation<Color>(_primaryBlue),
+                      ),
+                    ),
+                  ),
+                ),
 
               // Horizontal Category Chips
               SliverToBoxAdapter(

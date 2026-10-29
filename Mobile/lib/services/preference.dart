@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/foundation.dart';
 
 import '../models/auth_model.dart';
+import '../models/incident_news_model.dart';
 import '../models/profile_model.dart';
 import '../utils/crypto_util.dart';
 
@@ -307,5 +308,50 @@ class PreferenceService {
 
   static String? getFcmToken() {
     return prefs?.getString('fcm_token');
+  }
+
+  /// Cache Safety Updates / Berita Kejadian secara offline
+  static List<IncidentNewsModel> getCachedSafetyUpdates() {
+    final raw = prefs?.getString('cached_safety_updates_json');
+    if (raw == null || raw.isEmpty) return [];
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is List) {
+        return decoded
+            .map((item) => IncidentNewsModel.fromJson(Map<String, dynamic>.from(item as Map)))
+            .toList();
+      }
+    } catch (_) {}
+    return [];
+  }
+
+  static Future<void> setCachedSafetyUpdates(List<IncidentNewsModel> list) async {
+    try {
+      final jsonList = list.map((item) => item.toJson()).toList();
+      await prefs?.setString('cached_safety_updates_json', jsonEncode(jsonList));
+      await prefs?.setString('cached_safety_updates_timestamp', DateTime.now().toIso8601String());
+    } catch (_) {}
+  }
+
+  /// Cache Home Banners secara offline
+  static List<IncidentNewsModel> getCachedHomeBanners() {
+    final raw = prefs?.getString('cached_home_banners_json');
+    if (raw == null || raw.isEmpty) return [];
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is List) {
+        return decoded
+            .map((item) => IncidentNewsModel.fromJson(Map<String, dynamic>.from(item as Map)))
+            .toList();
+      }
+    } catch (_) {}
+    return [];
+  }
+
+  static Future<void> setCachedHomeBanners(List<IncidentNewsModel> list) async {
+    try {
+      final jsonList = list.map((item) => item.toJson()).toList();
+      await prefs?.setString('cached_home_banners_json', jsonEncode(jsonList));
+    } catch (_) {}
   }
 }

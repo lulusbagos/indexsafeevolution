@@ -2643,7 +2643,7 @@ class _DashboardPageState extends State<DashboardPage> with WidgetsBindingObserv
   String _searchText = '';
 
   // Banner State
-  static List<IncidentNewsModel> _cachedBanners = [];
+  static List<IncidentNewsModel> _cachedBanners = PreferenceService.getCachedHomeBanners();
   List<IncidentNewsModel> _homeBanners = List.from(_cachedBanners);
   bool _isLoadingBanners = _cachedBanners.isEmpty;
   int _currentBannerIndex = 0;
@@ -4232,6 +4232,7 @@ class _DashboardPageState extends State<DashboardPage> with WidgetsBindingObserv
         (banners) {
           if (mounted) {
             _cachedBanners = banners;
+            PreferenceService.setCachedHomeBanners(banners);
             setState(() {
               _homeBanners = banners;
               _isLoadingBanners = false;

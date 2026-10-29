@@ -846,6 +846,7 @@ class ApiService {
     String? search,
     bool? isBanner,
     bool? isUpdate,
+    int? sinceId,
   }) async {
     try {
       dio.options.headers['Authorization'] = 'Bearer $getToken';
@@ -861,6 +862,9 @@ class ApiService {
       }
       if (isUpdate != null) {
         params['is_update'] = isUpdate;
+      }
+      if (sinceId != null && sinceId > 0) {
+        params['since_id'] = sinceId;
       }
 
       Response res;

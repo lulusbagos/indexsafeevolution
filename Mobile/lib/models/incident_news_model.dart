@@ -78,6 +78,7 @@ class IncidentNewsModel {
       'dibuat_oleh': dibuatOleh,
       'created_at': rawTanggal,
       'is_banner': isBanner,
+      'is_update': isUpdate,
       'banner_urutan': bannerUrutan,
       'tags': tags,
     };

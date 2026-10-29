@@ -76,13 +76,19 @@ namespace Indexsafe.Api.Controllers
             [FromQuery] string? category = null,
             [FromQuery] string? search = null,
             [FromQuery] bool? is_banner = null,
-            [FromQuery] bool? is_update = null)
+            [FromQuery] bool? is_update = null,
+            [FromQuery] int? since_id = null)
         {
             // Hanya ambil berita asli: buang data import corrupt / placeholder ("System Import Excel", "SYSTEM", konten terlalu pendek)
             var query = _context.IncidentNewsList.Where(i => i.IsPublished &&
                                                              i.NikPembuat != "SYSTEM" &&
                                                              !i.DibuatOleh.Contains("System Import Excel") &&
                                                              i.Konten.Length >= 15);
+
+            if (since_id.HasValue && since_id.Value > 0)
+            {
+                query = query.Where(i => i.Id > since_id.Value);
+            }
 
             if (days.HasValue && days.Value > 0)
             {
