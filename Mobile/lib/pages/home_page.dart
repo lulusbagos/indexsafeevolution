@@ -41,16 +41,25 @@ class _HomePageState extends State<HomePage> {
 
       // Tampilkan iklan popup jika ada dari backend (1 hari sekali)
       if (mounted) {
-        Future.delayed(const Duration(milliseconds: 700), () {
-          if (mounted) {
-            PopupAdService.checkAndShowPopupAd(context);
-            WebCampaignDialog.checkAndShow(
+        Future.delayed(const Duration(milliseconds: 700), () async {
+          if (!mounted) return;
+          try {
+            await PopupAdService.checkAndShowPopupAd(context);
+          } catch (_) {}
+
+          if (!mounted) return;
+          try {
+            String userNik = _profile?.noNik?.trim() ?? '';
+            if (userNik.isEmpty) {
+              userNik = PreferenceService.getOfflineNik() ?? '';
+            }
+            await WebCampaignDialog.checkAndShow(
               context,
-              nik: _profile?.noNik ?? '',
+              nik: userNik,
               nama: _profile?.namaLengkap ?? '',
               depart: _profile?.depart ?? '',
             );
-          }
+          } catch (_) {}
         });
       }
     });

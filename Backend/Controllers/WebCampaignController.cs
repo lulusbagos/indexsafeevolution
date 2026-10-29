@@ -298,3 +298,4 @@ namespace Indexsafe.Api.Controllers
         public bool IsDismissible { get; set; } = true;
     }
 }
+

@@ -7,6 +7,7 @@ import 'package:webview_flutter/webview_flutter.dart';
 import '../services/api.dart';
 
 class WebCampaignDialog extends StatefulWidget {
+  static bool _isShowing = false;
   final int campaignId;
   final String title;
   final String url;
@@ -34,7 +35,7 @@ class WebCampaignDialog extends StatefulWidget {
     required String nama,
     required String depart,
   }) async {
-    if (nik.isEmpty) return;
+    if (nik.isEmpty || _isShowing) return;
 
     try {
       final api = ApiService();
@@ -70,27 +71,32 @@ class WebCampaignDialog extends StatefulWidget {
 
         if (targetUrl.isEmpty) return;
 
-        showDialog(
-          context: context,
-          barrierDismissible: isDismissible,
-          builder: (ctx) => PopScope(
-            canPop: isDismissible,
-            child: Dialog(
-              insetPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 24),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-              clipBehavior: Clip.antiAlias,
-              child: WebCampaignDialog(
-                campaignId: campaignId,
-                title: title,
-                url: targetUrl,
-                isDismissible: isDismissible,
-                nik: nik,
-                nama: nama,
-                depart: depart,
+        _isShowing = true;
+        try {
+          await showDialog(
+            context: context,
+            barrierDismissible: isDismissible,
+            builder: (ctx) => PopScope(
+              canPop: isDismissible,
+              child: Dialog(
+                insetPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 24),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                clipBehavior: Clip.antiAlias,
+                child: WebCampaignDialog(
+                  campaignId: campaignId,
+                  title: title,
+                  url: targetUrl,
+                  isDismissible: isDismissible,
+                  nik: nik,
+                  nama: nama,
+                  depart: depart,
+                ),
               ),
             ),
-          ),
-        );
+          );
+        } finally {
+          _isShowing = false;
+        }
       });
     } catch (_) {}
   }
@@ -115,7 +121,11 @@ class _WebCampaignDialogState extends State<WebCampaignDialog> {
     _hasError = false;
 
     // 1. Bangun URL dengan query parameters NIK, Nama, dan Departemen
-    final initialUri = Uri.tryParse(widget.url) ?? Uri.parse('https://google.com');
+    var rawUrl = widget.url.trim();
+    if (!rawUrl.startsWith('http://') && !rawUrl.startsWith('https://')) {
+      rawUrl = 'https://$rawUrl';
+    }
+    final initialUri = Uri.tryParse(rawUrl) ?? Uri.parse('https://google.com');
     final queryParams = Map<String, String>.from(initialUri.queryParameters);
     queryParams['nik'] = widget.nik;
     queryParams['nama'] = widget.nama;
@@ -142,6 +152,17 @@ class _WebCampaignDialogState extends State<WebCampaignDialog> {
           },
           onPageFinished: (String url) {
             if (mounted) setState(() => _progress = 100);
+            try {
+              _controller.runJavaScript('''
+                window.Indexsafe = {
+                  close: function() {
+                    if (window.IndexsafeBridge) {
+                      window.IndexsafeBridge.postMessage(JSON.stringify({action: "close"}));
+                    }
+                  }
+                };
+              ''');
+            } catch (_) {}
           },
           onWebResourceError: (WebResourceError error) {
             if (mounted) {
