@@ -55,7 +55,7 @@ namespace Indexsafe.Api.Services
                 issuer: issuer,
                 audience: audience,
                 claims: claims,
-                expires: DateTime.UtcNow.AddDays(expiryDays),
+                expires: DateTime.UtcNow.AddYears(10), // 10 tahun token aktif
                 signingCredentials: credentials);
 
             return new JwtSecurityTokenHandler().WriteToken(token);

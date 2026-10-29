@@ -143,6 +143,10 @@ class ApiService {
           if (token.isNotEmpty && !token.startsWith('offline_token_')) {
             options.headers['Authorization'] = 'Bearer $token';
           }
+          final nik = (PreferenceService.getUser() ?? PreferenceService.getOfflineNik() ?? '').trim();
+          if (nik.isNotEmpty) {
+            options.headers['X-User-Nik'] = nik;
+          }
           return handler.next(options);
         },
         onError: (DioException err, ErrorInterceptorHandler handler) async {
@@ -1008,8 +1012,16 @@ class ApiService {
 
   Future<Either<Map, Map<String, dynamic>>> getRosterInfo() async {
     try {
-      dio.options.headers['Authorization'] = 'Bearer $getToken';
-      var res = await dio.get('/roster');
+      final nik = (PreferenceService.getUser() ?? PreferenceService.getOfflineNik() ?? '').trim();
+      if (getToken.isNotEmpty) {
+        dio.options.headers['Authorization'] = 'Bearer $getToken';
+      }
+      if (nik.isNotEmpty) {
+        dio.options.headers['X-User-Nik'] = nik;
+      }
+      var res = await dio.get('/roster', queryParameters: {
+        if (nik.isNotEmpty) 'nik': nik,
+      });
       if (res.data is Map) {
         return Right(Map<String, dynamic>.from(res.data as Map));
       }
