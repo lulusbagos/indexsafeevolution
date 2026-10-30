@@ -32,7 +32,9 @@ class _NotifPageState extends State<NotifPage> {
   final _api = ApiService();
   final _profile = PreferenceService.getProfile();
   List<dynamic> _rawData = [];
-  bool _isLoading = false;
+  bool _isSyncing = false;
+  bool _isOfflineMode = false;
+  DateTime? _lastSyncTime;
   String _selectedFilter = 'all'; // 'all', 'hazard', 'inspection'
 
   @override
@@ -40,7 +42,8 @@ class _NotifPageState extends State<NotifPage> {
     super.initState();
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _getData();
+      _loadLocalData();
+      _syncOnlineData();
       _fetchApiActions();
     });
   }
@@ -168,251 +171,279 @@ class _NotifPageState extends State<NotifPage> {
     super.dispose();
   }
 
-  Future<void> _getData() async {
-    setState(() => _isLoading = true);
+  void _processRawNotificationItems(List<NotificationItemModel> notifs, List<Map<String, dynamic>> combined) {
+    for (var n in notifs) {
+      if (n.isActioned ||
+          n.notifType.toLowerCase().contains('completed') ||
+          n.notifType.toLowerCase().contains('closed')) {
+        continue;
+      }
+
+      final titleLower = (n.title).toLowerCase();
+      final msgLower = (n.message).toLowerCase();
+      final urlLower = (n.url ?? '').toLowerCase();
+      final typeLower = (n.notifType).toLowerCase();
+
+      final isCoaching = typeLower.contains('coaching') ||
+          titleLower.contains('coaching') ||
+          titleLower.contains('pembinaan') ||
+          msgLower.contains('coaching') ||
+          msgLower.contains('pembinaan') ||
+          urlLower.contains('performance');
+
+      final isRoster = typeLower.contains('roster') ||
+          urlLower.contains('roster') ||
+          titleLower.contains('roster') ||
+          titleLower.contains('periode tugas');
+
+      if (isCoaching && n.createdAt != null) {
+        final diffDays = DateTime.now().difference(n.createdAt!).inDays;
+        if (diffDays >= 7) continue;
+      }
+
+      final isViolation = typeLower.contains('violation') ||
+          titleLower.contains('pelanggaran');
+
+      final isGateMovement = typeLower.contains('movement') ||
+          titleLower.contains('gerbang') ||
+          titleLower.contains('gate');
+
+      final isHazard = !isCoaching && !isRoster && !isViolation && !isGateMovement && (typeLower.contains('hazard') || urlLower.contains('hazard'));
+      final isInspect = !isCoaching && !isRoster && !isViolation && !isGateMovement && (typeLower.contains('inspect') || urlLower.contains('inspect'));
+
+      final String category = isCoaching
+          ? 'coaching'
+          : (isRoster
+              ? 'roster'
+              : (isViolation
+                  ? 'violation'
+                  : (isGateMovement
+                      ? 'movement'
+                      : (isHazard ? 'hazard' : (isInspect ? 'inspection' : 'general')))));
+
+      combined.add({
+        'id': n.id,
+        'is_server_notif': true,
+        'title': n.title,
+        'remark': n.message,
+        'category': (n.category != null && n.category!.isNotEmpty) ? n.category : category,
+        'notif_type': isCoaching ? 'coaching' : n.notifType,
+        'url': n.url,
+        'logo': n.logo,
+        'sender_name': n.senderName,
+        'priority': n.priority,
+        'payload': n.payload,
+        'action_text': n.actionText,
+        'is_read': n.isRead,
+        'is_actioned': n.isActioned,
+        'is_action_required': (isCoaching || isRoster || isGateMovement) ? false : (isViolation ? true : n.isActionRequired),
+        'date': n.createdAt != null ? DateFormat('yyyy-MM-dd').format(n.createdAt!) : '',
+        'time': n.createdAt != null ? DateFormat('HH:mm').format(n.createdAt!) : '',
+        'created_at_dt': n.createdAt ?? DateTime.now(),
+        'status': isCoaching ? -1 : (isRoster || isGateMovement ? (n.isRead ? 1 : 0) : (isViolation ? 0 : (n.isActioned ? 2 : (n.isRead ? 1 : 0)))),
+        'area_name': isCoaching
+            ? 'Kinerja & Pembinaan'
+            : (isRoster
+                ? 'Jadwal Kerja & SAP'
+                : (isViolation
+                    ? 'K3 Pelanggaran Permit'
+                    : (isGateMovement
+                        ? 'Security & Akses Gerbang'
+                        : (isHazard ? 'K3 Temuan Lapangan' : 'Sistem SAP')))),
+        'location_name': isRoster
+            ? 'Pengaturan Roster'
+            : (isViolation
+                ? 'Area Operasional Tambang'
+                : (isGateMovement
+                    ? 'Pos Security Tambang'
+                    : (n.url ?? ''))),
+      });
+    }
+  }
+
+  /// 1. Ambil data lokal SQLite INSTAN (0 detik) agar mode offline langsung aktif tanpa nunggu network
+  Future<void> _loadLocalData() async {
     try {
       final List<Map<String, dynamic>> combined = [];
 
-      // 1. Ambil notifikasi dari database lokal SQLite (3 bulan terakhir)
-      List<NotificationItemModel> localNotifs = await _db.getLocalNotifications(months: 3);
+      // Notifikasi dari database lokal SQLite (3 bulan terakhir)
+      final localNotifs = await _db.getLocalNotifications(months: 3);
+      _processRawNotificationItems(localNotifs, combined);
+
+      // Action plans lokal dari SQLite
+      final profileId = _profile?.id ?? 0;
+      if (profileId > 0) {
+        try {
+          final val = await _db.rawQuery(
+              '''select tr.*, me1.name as area_name, me2.name as location_name, 1 as sync_id,
+                (select e.nama_lengkap from employees e where e.id=tr.pja_id) as pja_name,
+                (select e.nama_lengkap from employees e where e.id=tr.pic_id) as pic_name
+                from action_plans tr
+                left join enum_masters me1 on me1.type='area' and me1.id=tr.area_id and me1.deleted_at is null
+                left join enum_masters me2 on me2.type='location' and me2.id=tr.location_id and me2.deleted_at is null
+                where tr.deleted_at is null and ((tr.pja_id=$profileId and tr.status<1) or (tr.pic_id=$profileId and tr.status<2))
+                order by tr.id desc''');
+
+          for (var row in val) {
+            final m = Map<String, dynamic>.from(row);
+            m['is_server_notif'] = false;
+            combined.add(m);
+          }
+        } catch (_) {}
+      }
+
+      await PreferenceService.setNotif(combined.length);
+      if (mounted) {
+        setState(() {
+          _rawData = combined;
+          // loaded
+        });
+      }
+    } catch (e) {
+      debugPrint('[NotifPage] Error _loadLocalData: $e');
+      // loaded
+    }
+  }
+
+  /// 2. Unduh dan perbarui data server di background (hemat kuota & jika offline tetap berjalan mulus)
+  Future<void> _syncOnlineData({bool isManual = false}) async {
+    if (_isSyncing) return;
+    if (mounted) setState(() => _isSyncing = true);
+
+    bool isSuccess = false;
+    int downloadedCount = 0;
+
+    try {
       final int maxLocalId = await _db.getMaxNotificationId();
 
-      // 2. Tarik update dari server:
-      // - Jika lokal kosong (habis didelete/fresh): tarik 3 bulan terakhir (sinceId: null)
-      // - Jika lokal sudah ada: HANYA tarik notifikasi baru (sinceId: maxLocalId) agar hemat bandwidth & tidak berat
-      try {
-        final serverRes = await _api.getNotifications(
-          limit: maxLocalId == 0 ? 100 : 50,
-          sinceId: maxLocalId > 0 ? maxLocalId : null,
-          months: 3,
-        );
+      final serverRes = await _api.getNotifications(
+        limit: maxLocalId == 0 ? 100 : 50,
+        sinceId: maxLocalId > 0 ? maxLocalId : null,
+        months: 3,
+      );
 
-        await serverRes.fold(
-          (_) async {},
-          (newNotifs) async {
-            if (newNotifs.isNotEmpty) {
-              await _db.saveLocalNotifications(newNotifs);
-              await _db.purgeOldNotifications(months: 3);
-              localNotifs = await _db.getLocalNotifications(months: 3);
-            }
-          },
-        );
-      } catch (e) {
-        debugPrint('[NotifPage] Error fetch online, menampilkan data lokal: \$e');
-      }
-
-      for (var n in localNotifs) {
-            // Sesuai permintaan pengguna: notifikasi yang sudah complete / actioned tidak usah ditampilkan
-            if (n.isActioned ||
-                n.notifType.toLowerCase().contains('completed') ||
-                n.notifType.toLowerCase().contains('closed')) {
-              continue;
-            }
-
-            final titleLower = (n.title).toLowerCase();
-            final msgLower = (n.message).toLowerCase();
-            final urlLower = (n.url ?? '').toLowerCase();
-            final typeLower = (n.notifType).toLowerCase();
-
-            final isCoaching = typeLower.contains('coaching') ||
-                titleLower.contains('coaching') ||
-                titleLower.contains('pembinaan') ||
-                msgLower.contains('coaching') ||
-                msgLower.contains('pembinaan') ||
-                urlLower.contains('performance');
-
-            final isRoster = typeLower.contains('roster') ||
-                urlLower.contains('roster') ||
-                titleLower.contains('roster') ||
-                titleLower.contains('periode tugas');
-
-            // Sesuai permintaan pengguna:
-            // "dan akan hilang 7 hari berikutnya di notifikasi"
-            if (isCoaching && n.createdAt != null) {
-              final diffDays = DateTime.now().difference(n.createdAt!).inDays;
-              if (diffDays >= 7) {
-                continue; // Melewati notifikasi coaching yang sudah lewat 7 hari
-              }
-            }
-
-            final isViolation = typeLower.contains('violation') ||
-                titleLower.contains('pelanggaran');
-
-            final isGateMovement = typeLower.contains('movement') ||
-                titleLower.contains('gerbang') ||
-                titleLower.contains('gate');
-
-            final isHazard = !isCoaching && !isRoster && !isViolation && !isGateMovement && (typeLower.contains('hazard') || urlLower.contains('hazard'));
-            final isInspect = !isCoaching && !isRoster && !isViolation && !isGateMovement && (typeLower.contains('inspect') || urlLower.contains('inspect'));
-
-            final String category = isCoaching
-                ? 'coaching'
-                : (isRoster
-                    ? 'roster'
-                    : (isViolation
-                        ? 'violation'
-                        : (isGateMovement
-                            ? 'movement'
-                            : (isHazard ? 'hazard' : (isInspect ? 'inspection' : 'general')))));
-
-            combined.add({
-              'id': n.id,
-              'is_server_notif': true,
-              'title': n.title,
-              'remark': n.message,
-              'category': (n.category != null && n.category!.isNotEmpty) ? n.category : category,
-              'notif_type': isCoaching ? 'coaching' : n.notifType,
-              'url': n.url,
-              'logo': n.logo,
-              'sender_name': n.senderName,
-              'priority': n.priority,
-              'payload': n.payload,
-              'action_text': n.actionText,
-              'is_read': n.isRead,
-              'is_actioned': n.isActioned,
-              'is_action_required': (isCoaching || isRoster || isGateMovement) ? false : (isViolation ? true : n.isActionRequired),
-              'date': n.createdAt != null ? DateFormat('yyyy-MM-dd').format(n.createdAt!) : '',
-              'time': n.createdAt != null ? DateFormat('HH:mm').format(n.createdAt!) : '',
-              'created_at_dt': n.createdAt ?? DateTime.now(),
-              // Coaching / Roster / Movement tidak ada status penalti (-1)
-              'status': isCoaching ? -1 : (isRoster || isGateMovement ? (n.isRead ? 1 : 0) : (isViolation ? 0 : (n.isActioned ? 2 : (n.isRead ? 1 : 0)))),
-              'area_name': isCoaching
-                  ? 'Kinerja & Pembinaan'
-                  : (isRoster
-                      ? 'Jadwal Kerja & SAP'
-                      : (isViolation
-                          ? 'K3 Pelanggaran Permit'
-                          : (isGateMovement
-                              ? 'Security & Akses Gerbang'
-                              : (isHazard ? 'K3 Temuan Lapangan' : 'Sistem SAP')))),
-              'location_name': isRoster
-                  ? 'Pengaturan Roster'
-                  : (isViolation
-                      ? 'Area Operasional Tambang'
-                      : (isGateMovement
-                          ? 'Pos Security Tambang'
-                          : (n.url ?? ''))),
+      await serverRes.fold(
+        (err) async {
+          // Gagal sambung ke server -> Aktifkan flag Mode Offline
+          if (mounted) setState(() => _isOfflineMode = true);
+        },
+        (newNotifs) async {
+          isSuccess = true;
+          downloadedCount = newNotifs.length;
+          if (newNotifs.isNotEmpty) {
+            await _db.saveLocalNotifications(newNotifs);
+            await _db.purgeOldNotifications(months: 3);
+          }
+          if (mounted) {
+            setState(() {
+              _isOfflineMode = false;
+              _lastSyncTime = DateTime.now();
             });
-      }
+          }
+        },
+      );
 
-      // 2. Fetch local SQLite action plans
-      final val = await _db.rawQuery(
-          '''select tr.*, me1.name as area_name, me2.name as location_name, 1 as sync_id,
-            (select e.nama_lengkap from employees e where e.id=tr.pja_id) as pja_name,
-            (select e.nama_lengkap from employees e where e.id=tr.pic_id) as pic_name
-            from action_plans tr
-            left join enum_masters me1 on me1.type='area' and me1.id=tr.area_id and me1.deleted_at is null
-            left join enum_masters me2 on me2.type='location' and me2.id=tr.location_id and me2.deleted_at is null
-            where tr.deleted_at is null and ((tr.pja_id=${_profile?.id} and tr.status<1) or (tr.pic_id=${_profile?.id} and tr.status<2))
-            order by tr.id desc''');
+      // Muat ulang data SQLite lokal setelah sync
+      await _loadLocalData();
 
-      for (var row in val) {
-        final m = Map<String, dynamic>.from(row);
-        m['is_server_notif'] = false;
-        combined.add(m);
-      }
+      // Jika online, tarik data approval dan special permit
+      if (isSuccess) {
+        try {
+          final approvalRes = await _api.getPendingApprovals();
+          approvalRes.fold(
+            (_) {},
+            (data) {
+              final items = (data['data'] as List<dynamic>?) ?? [];
+              for (var a in items) {
+                final aMap = a as Map<String, dynamic>;
+                final aId = aMap['approvalId'] as int? ?? 0;
+                final mod = aMap['module']?.toString() ?? 'Persetujuan';
+                final nomor = aMap['nomor']?.toString() ?? '-';
+                final applicant = aMap['applicantName']?.toString() ?? 'Pemohon';
+                final comp = aMap['companyName']?.toString() ?? '-';
+                final dept = aMap['department']?.toString() ?? '-';
+                final roleTarget = aMap['roleName']?.toString() ?? 'Approver';
+                final reqTimeStr = aMap['reqTime']?.toString();
+                DateTime? reqDate;
+                if (reqTimeStr != null) reqDate = DateTime.tryParse(reqTimeStr);
 
-      // 3. Fetch online pending approvals (Approval Center)
-      try {
-        final approvalRes = await _api.getPendingApprovals();
-        approvalRes.fold(
-          (_) {},
-          (data) {
-            final items = (data['data'] as List<dynamic>?) ?? [];
-            for (var a in items) {
-              final aMap = a as Map<String, dynamic>;
-              final aId = aMap['approvalId'] as int? ?? 0;
-              final mod = aMap['module']?.toString() ?? 'Persetujuan';
-              final nomor = aMap['nomor']?.toString() ?? '-';
-              final applicant = aMap['applicantName']?.toString() ?? 'Pemohon';
-              final comp = aMap['companyName']?.toString() ?? '-';
-              final dept = aMap['department']?.toString() ?? '-';
-              final roleTarget = aMap['roleName']?.toString() ?? 'Approver';
-              final reqTimeStr = aMap['reqTime']?.toString();
-              DateTime? reqDate;
-              if (reqTimeStr != null) {
-                reqDate = DateTime.tryParse(reqTimeStr);
+                _rawData.add({
+                  'id': aId,
+                  'is_server_notif': true,
+                  'is_approval_item': true,
+                  'title': 'Persetujuan $mod: $nomor',
+                  'remark': 'Permohonan $mod oleh $applicant ($dept • $comp). Menunggu persetujuan Anda ($roleTarget).',
+                  'category': 'approval',
+                  'notif_type': 'approval_request',
+                  'url': '/approval_center',
+                  'sender_name': applicant,
+                  'priority': 'urgent',
+                  'payload': aId.toString(),
+                  'action_text': 'Tinjau Persetujuan',
+                  'is_read': false,
+                  'is_actioned': false,
+                  'is_action_required': true,
+                  'date': reqDate != null ? DateFormat('yyyy-MM-dd').format(reqDate) : '',
+                  'time': reqDate != null ? DateFormat('HH:mm').format(reqDate) : '',
+                  'created_at_dt': reqDate ?? DateTime.now(),
+                  'status': 0,
+                  'area_name': 'Approval Center',
+                  'location_name': mod,
+                });
               }
+            },
+          );
+        } catch (_) {}
 
-              combined.add({
-                'id': aId,
-                'is_server_notif': true,
-                'is_approval_item': true,
-                'title': 'Persetujuan $mod: $nomor',
-                'remark': 'Permohonan $mod oleh $applicant ($dept • $comp). Menunggu persetujuan Anda ($roleTarget).',
-                'category': 'approval',
-                'notif_type': 'approval_request',
-                'url': '/approval_center',
-                'sender_name': applicant,
-                'priority': 'urgent',
-                'payload': aId.toString(),
-                'action_text': 'Tinjau Persetujuan',
-                'is_read': false,
-                'is_actioned': false,
-                'is_action_required': true,
-                'date': reqDate != null ? DateFormat('yyyy-MM-dd').format(reqDate) : '',
-                'time': reqDate != null ? DateFormat('HH:mm').format(reqDate) : '',
-                'created_at_dt': reqDate ?? DateTime.now(),
-                'status': 0,
-                'area_name': 'Approval Center',
-                'location_name': mod,
-              });
-            }
-          },
-        );
-      } catch (err) {
-        debugPrint('Error fetching approval notifs: $err');
+        try {
+          final spRes = await _api.getSpecialPermitAlerts();
+          spRes.fold(
+            (_) {},
+            (spData) {
+              final list = (spData['data'] as List<dynamic>?) ?? [];
+              for (var sp in list) {
+                final spMap = sp as Map<String, dynamic>;
+                final reqId = spMap['reqId']?.toString() ?? '-';
+                final actType = (spMap['activityType']?.toString() ?? 'Pekerjaan Khusus').replaceAll('_', ' ');
+                final loc = spMap['workLocation']?.toString() ?? 'Area Operasional Tambang';
+                final picName = spMap['applicantName']?.toString() ?? spMap['pjoName']?.toString() ?? 'PIC Tim';
+                final issueTime = spMap['issueTime']?.toString() ?? '';
+                final issueDate = spMap['issueDate']?.toString() ?? '';
+
+                _rawData.add({
+                  'id': spMap['id'],
+                  'is_server_notif': true,
+                  'is_special_permit': true,
+                  'raw_permit': spMap,
+                  'title': '⚠️ Observasi High Risk: $reqId',
+                  'remark': 'Kegiatan risiko tinggi $actType di $loc. Pengawas/PJO: $picName. Segera lakukan verifikasi & observasi lapangan!',
+                  'category': 'special_permit',
+                  'notif_type': 'special_permit_high_risk',
+                  'url': 'special_permit_obs',
+                  'sender_name': picName,
+                  'priority': 'urgent',
+                  'payload': spMap['id'],
+                  'action_text': 'Observasi Sekarang',
+                  'is_read': false,
+                  'is_actioned': false,
+                  'is_action_required': true,
+                  'date': issueDate.isNotEmpty ? issueDate.substring(0, 10.clamp(0, issueDate.length)) : '',
+                  'time': issueTime,
+                  'created_at_dt': DateTime.now(),
+                  'status': 0,
+                  'area_name': 'Special Permit',
+                  'location_name': loc,
+                });
+              }
+            },
+          );
+        } catch (_) {}
+
+        if (mounted) setState(() {});
       }
 
-      // 4. Fetch Special Permit high risk alerts & pending inspections
-      try {
-        final spRes = await _api.getSpecialPermitAlerts();
-        spRes.fold(
-          (_) {},
-          (spData) {
-            final list = (spData['data'] as List<dynamic>?) ?? [];
-            for (var sp in list) {
-              final spMap = sp as Map<String, dynamic>;
-              final reqId = spMap['reqId']?.toString() ?? '-';
-              final actType = (spMap['activityType']?.toString() ?? 'Pekerjaan Khusus').replaceAll('_', ' ');
-              final loc = spMap['workLocation']?.toString() ?? 'Area Operasional Tambang';
-              final picName = spMap['applicantName']?.toString() ?? spMap['pjoName']?.toString() ?? 'PIC Tim';
-              final issueTime = spMap['issueTime']?.toString() ?? '';
-              final issueDate = spMap['issueDate']?.toString() ?? '';
-
-              combined.add({
-                'id': spMap['id'],
-                'is_server_notif': true,
-                'is_special_permit': true,
-                'raw_permit': spMap,
-                'title': '⚠️ Observasi High Risk: $reqId',
-                'remark': 'Kegiatan risiko tinggi $actType di $loc. Pengawas/PJO: $picName. Segera lakukan verifikasi & observasi lapangan!',
-                'category': 'special_permit',
-                'notif_type': 'special_permit_high_risk',
-                'url': 'special_permit_obs',
-                'sender_name': picName,
-                'priority': 'urgent',
-                'payload': spMap['id'],
-                'action_text': 'Observasi Sekarang',
-                'is_read': false,
-                'is_actioned': false,
-                'is_action_required': true,
-                'date': issueDate.isNotEmpty ? issueDate.substring(0, 10.clamp(0, issueDate.length)) : '',
-                'time': issueTime,
-                'created_at_dt': DateTime.now(),
-                'status': 0,
-                'area_name': 'Special Permit',
-                'location_name': loc,
-              });
-            }
-          },
-        );
-      } catch (err) {
-        debugPrint('Error fetching special permit notifs: $err');
-      }
-
-      // GETARAN FISIK: Pastikan bergetar jika ada notifikasi penugasan PIC/PJA atau prioritas urgent
-      final hasPicAssignments = combined.any((item) {
+      // Getaran fisik jika ada prioritas tinggi
+      final hasPicAssignments = _rawData.any((item) {
         final isActionReq = item['is_action_required'] == true;
         final isRead = item['is_read'] == true;
         final status = (item['status'] as num?)?.toInt() ?? 0;
@@ -424,20 +455,38 @@ class _NotifPageState extends State<NotifPage> {
       if (hasPicAssignments) {
         NotificationService.vibrateForPicAssignment();
       }
-
-      await PreferenceService.setNotif(combined.length);
-      if (mounted) {
-        setState(() {
-          _rawData = combined;
-          _isLoading = false;
-        });
-      }
     } catch (e) {
-      debugPrint('Error getting notifications: $e');
-      if (mounted) {
-        setState(() => _isLoading = false);
+      debugPrint('[NotifPage] Error _syncOnlineData: $e');
+      if (mounted) setState(() => _isOfflineMode = true);
+    } finally {
+      if (mounted) setState(() => _isSyncing = false);
+      if (isManual && mounted) {
+        if (isSuccess) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Berhasil menyinkronkan & mengunduh $downloadedCount notifikasi baru ke penyimpanan lokal HP (Mode Offline Siap).'),
+              backgroundColor: const Color(0xFF009688),
+              behavior: SnackBarBehavior.floating,
+              duration: const Duration(seconds: 3),
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Mode Offline: Menggunakan ${_rawData.length} notifikasi yang tersimpan di HP.'),
+              backgroundColor: const Color(0xFFD97706),
+              behavior: SnackBarBehavior.floating,
+              duration: const Duration(seconds: 3),
+            ),
+          );
+        }
       }
     }
+  }
+
+  Future<void> _getData() async {
+    await _loadLocalData();
+    await _syncOnlineData();
   }
 
   List<dynamic> get _filteredData {
@@ -910,9 +959,50 @@ class _NotifPageState extends State<NotifPage> {
           ],
         ),
         actions: [
+          // Status Pill: Mode Offline vs Online
+          Container(
+            margin: const EdgeInsets.symmetric(vertical: 14),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+            decoration: BoxDecoration(
+              color: _isOfflineMode
+                  ? const Color(0xFFFEF3C7)
+                  : const Color(0xFFE6F4EA),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: _isOfflineMode
+                    ? const Color(0xFFF59E0B).withValues(alpha: 0.5)
+                    : const Color(0xFF34A853).withValues(alpha: 0.3),
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  _isOfflineMode
+                      ? Icons.cloud_off_rounded
+                      : Icons.cloud_done_rounded,
+                  size: 13,
+                  color: _isOfflineMode
+                      ? const Color(0xFFD97706)
+                      : const Color(0xFF1E8E3E),
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  _isOfflineMode ? 'Offline' : 'Online',
+                  style: TextStyle(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w700,
+                    color: _isOfflineMode
+                        ? const Color(0xFFB45309)
+                        : const Color(0xFF1E8E3E),
+                  ),
+                ),
+              ],
+            ),
+          ),
           IconButton(
-            tooltip: 'Segarkan Notifikasi',
-            icon: _isLoading
+            tooltip: 'Unduh Notifikasi untuk Mode Offline',
+            icon: _isSyncing
                 ? const SizedBox(
                     width: 18,
                     height: 18,
@@ -922,15 +1012,15 @@ class _NotifPageState extends State<NotifPage> {
                     ),
                   )
                 : const Icon(
-                    Icons.refresh_rounded,
+                    Icons.sync_rounded,
                     color: Color(0xFF334155),
                   ),
             onPressed: () {
-              _getData();
+              _syncOnlineData(isManual: true);
               _fetchApiActions();
             },
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 6),
         ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(56),
@@ -962,20 +1052,65 @@ class _NotifPageState extends State<NotifPage> {
       body: RefreshIndicator(
         color: const Color(0xFF009688),
         onRefresh: () async {
-          await _getData();
+          await _syncOnlineData(isManual: true);
           _fetchApiActions();
         },
-        child: filtered.isNotEmpty
-            ? ListView.builder(
-                controller: _scrollCtrl,
-                padding: const EdgeInsets.fromLTRB(16, 14, 16, 32),
-                itemCount: filtered.length,
-                itemBuilder: (context, index) {
-                  final item = filtered[index] as Map<String, dynamic>;
-                  return _buildNotificationCard(item);
-                },
-              )
-            : _buildEmptyState(),
+        child: Column(
+          children: [
+            if (_isOfflineMode)
+              Container(
+                width: double.infinity,
+                margin: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFFBEB),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: const Color(0xFFFCD34D)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.offline_bolt_rounded, size: 16, color: Color(0xFFD97706)),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Mode Offline Aktif • Menampilkan ${_rawData.length} notifikasi tersimpan di HP${_lastSyncTime != null ? ' (Sinkron ${DateFormat('HH:mm').format(_lastSyncTime!)})' : ''}',
+                        style: const TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF92400E),
+                        ),
+                      ),
+                    ),
+                    InkWell(
+                      onTap: () => _syncOnlineData(isManual: true),
+                      child: const Text(
+                        'Sinkron',
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFFB45309),
+                          decoration: TextDecoration.underline,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            Expanded(
+              child: filtered.isNotEmpty
+                  ? ListView.builder(
+                      controller: _scrollCtrl,
+                      padding: const EdgeInsets.fromLTRB(16, 10, 16, 32),
+                      itemCount: filtered.length,
+                      itemBuilder: (context, index) {
+                        final item = filtered[index] as Map<String, dynamic>;
+                        return _buildNotificationCard(item);
+                      },
+                    )
+                  : _buildEmptyState(),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1696,7 +1831,11 @@ class _NotifPageState extends State<NotifPage> {
                           ),
                           onPressed: () {
                             final notifId = item['id'] as int? ?? 0;
-                            if (notifId > 0) _api.markNotificationActioned(notifId);
+                            if (notifId > 0) {
+                              _db.updateLocalNotificationActioned(notifId, true);
+                              _db.updateLocalNotificationRead(notifId, true);
+                              _api.markNotificationActioned(notifId);
+                            }
                             Navigator.push(
                               context,
                               MaterialPageRoute(builder: (_) => const HazardHubPage()),
@@ -1736,7 +1875,10 @@ class _NotifPageState extends State<NotifPage> {
                           ),
                           onPressed: () {
                             final notifId = item['id'] as int? ?? 0;
-                            if (notifId > 0) _api.markNotificationRead(notifId);
+                            if (notifId > 0) {
+                              _db.updateLocalNotificationRead(notifId, true);
+                              _api.markNotificationRead(notifId);
+                            }
                             Navigator.push(
                               context,
                               MaterialPageRoute(builder: (_) => const InspectionHubPage(initialTab: InspectionHubTab.pjaArea)),
@@ -1759,7 +1901,10 @@ class _NotifPageState extends State<NotifPage> {
                           ),
                           onPressed: () {
                             final notifId = item['id'] as int? ?? 0;
-                            if (notifId > 0) _api.markNotificationRead(notifId);
+                            if (notifId > 0) {
+                              _db.updateLocalNotificationRead(notifId, true);
+                              _api.markNotificationRead(notifId);
+                            }
                             Navigator.push(
                               context,
                               MaterialPageRoute(builder: (_) => const ActionTrackerPage()),

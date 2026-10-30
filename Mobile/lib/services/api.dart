@@ -774,7 +774,11 @@ class ApiService {
   Future<Map<String, int>> getNotificationCounts() async {
     try {
       dio.options.headers['Authorization'] = 'Bearer $getToken';
-      var res = await dio.get('/notifications/count');
+      final fastOptions = Options(
+        sendTimeout: const Duration(seconds: 4),
+        receiveTimeout: const Duration(seconds: 4),
+      );
+      var res = await dio.get('/notifications/count', options: fastOptions);
       if (res.data is Map) {
         final m = res.data as Map;
         final unread = (m['unread_count'] as num?)?.toInt() ?? 0;
@@ -789,22 +793,6 @@ class ApiService {
       }
       return {'unread': 0, 'unactioned': 0, 'total': 0};
     } catch (_) {
-      try {
-        var resFallback =
-            await dio.get('/notifications', queryParameters: {'limit': 1});
-        if (resFallback.data is Map) {
-          final m = resFallback.data as Map;
-          final unread = (m['unread_count'] as num?)?.toInt() ?? 0;
-          final unactioned = (m['unactioned_count'] as num?)?.toInt() ?? 0;
-          final total = (m['total_pending_count'] as num?)?.toInt() ??
-              (unread + unactioned);
-          return {
-            'unread': unread,
-            'unactioned': unactioned,
-            'total': total,
-          };
-        }
-      } catch (_) {}
       return {'unread': 0, 'unactioned': 0, 'total': 0};
     }
   }
@@ -817,7 +805,11 @@ class ApiService {
       if (sinceId != null && sinceId > 0) {
         params['sinceId'] = sinceId;
       }
-      var res = await dio.get('/notifications', queryParameters: params);
+      final fastOptions = Options(
+        sendTimeout: const Duration(seconds: 4),
+        receiveTimeout: const Duration(seconds: 5),
+      );
+      var res = await dio.get('/notifications', queryParameters: params, options: fastOptions);
       if (res.data is Map && res.data['data'] is List) {
         final list = (res.data['data'] as List)
             .map((item) => NotificationItemModel.fromJson(

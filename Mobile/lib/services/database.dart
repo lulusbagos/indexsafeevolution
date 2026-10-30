@@ -87,16 +87,51 @@ class DatabaseService {
   Future<List<NotificationItemModel>> getLocalNotifications({int months = 3}) async {
     final db = await database;
     try {
-      final cutoff = DateTime.now().subtract(Duration(days: months * 30)).toIso8601String();
+      final cutoffDate = DateTime.now().subtract(Duration(days: months * 30));
+      final cutoff = cutoffDate.toIso8601String().substring(0, 10); // 'YYYY-MM-DD'
       final rows = await db.rawQuery(
-        'SELECT * FROM tbl_t_notifications WHERE created_at >= ? ORDER BY id DESC',
-        [cutoff],
+        'SELECT * FROM tbl_t_notifications '
+        'WHERE (created_at IS NULL OR created_at = \'\' OR substr(created_at, 1, 10) >= ? OR replace(created_at, \'T\', \' \') >= ?) '
+        'ORDER BY id DESC',
+        [cutoff, cutoff],
       );
       return rows.map((r) => NotificationItemModel.fromSqlite(r)).toList();
     } catch (e) {
       debugPrint('[DatabaseService] Error getLocalNotifications: \$e');
       return [];
     }
+  }
+
+  Future<int> getOfflineUnreadNotificationCount({int months = 3}) async {
+    final db = await database;
+    try {
+      final cutoffDate = DateTime.now().subtract(Duration(days: months * 30));
+      final cutoff = cutoffDate.toIso8601String().substring(0, 10);
+      final res = await db.rawQuery(
+        'SELECT count(*) as cnt FROM tbl_t_notifications '
+        'WHERE (created_at IS NULL OR created_at = \'\' OR substr(created_at, 1, 10) >= ? OR replace(created_at, \'T\', \' \') >= ?) '
+        'AND is_read = 0 AND is_actioned = 0 '
+        'AND notif_type NOT LIKE \'%completed%\' '
+        'AND notif_type NOT LIKE \'%closed%\'',
+        [cutoff, cutoff],
+      );
+      if (res.isNotEmpty && res.first['cnt'] != null) {
+        return (res.first['cnt'] as num).toInt();
+      }
+    } catch (e) {
+      debugPrint('[DatabaseService] Error getOfflineUnreadNotificationCount: \$e');
+    }
+    return 0;
+  }
+
+  Future<void> markAllLocalNotificationsRead() async {
+    final db = await database;
+    try {
+      await db.update(
+        'tbl_t_notifications',
+        {'is_read': 1},
+      );
+    } catch (_) {}
   }
 
   Future<int> getMaxNotificationId() async {

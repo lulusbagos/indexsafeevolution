@@ -4340,6 +4340,14 @@ class _DashboardPageState extends State<DashboardPage> with WidgetsBindingObserv
         }
       } catch (_) {}
 
+      // Juga periksa notifikasi lokal tbl_t_notifications di SQLite (Mode Offline)
+      try {
+        final offlineNotifs = await DatabaseService().getOfflineUnreadNotificationCount(months: 3);
+        if (offlineNotifs > count) {
+          count = offlineNotifs;
+        }
+      } catch (_) {}
+
       // Tambahkan pending approval jika user memiliki permohonan persetujuan
       if (_pendingApprovalCount > 0) {
         count += _pendingApprovalCount;
