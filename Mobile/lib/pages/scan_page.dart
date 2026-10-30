@@ -10,7 +10,9 @@ import 'package:qr_flutter/qr_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../services/api.dart';
+import '../services/database.dart';
 import '../services/preference.dart';
+import '../widgets/snackbar_msg.dart';
 import 'login_page.dart';
 import '../widgets/professional_success_sheet.dart';
 
@@ -24,6 +26,9 @@ class ScanPage extends StatefulWidget {
 class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin {
   int _selectedTab = 0; // 0: Pindai QR, 1: Daftar Acara
   final ApiService _api = ApiService();
+  final DatabaseService _db = DatabaseService();
+  int _offlineSimperCount = 0;
+  bool _isSyncingSimper = false;
 
   // Camera & Scanner State
   MobileScannerController? _scannerController;
@@ -71,6 +76,49 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
     _checkPermissionAndInit();
     _loadMyPermissions();
     _loadEvents();
+    _refreshOfflineSimperCount();
+  }
+
+  Future<void> _refreshOfflineSimperCount() async {
+    try {
+      final cnt = await _db.getOfflineSimperCount();
+      if (mounted) setState(() => _offlineSimperCount = cnt);
+    } catch (_) {}
+  }
+
+  Future<void> _syncSimperOfflineData() async {
+    if (_isSyncingSimper) return;
+    setState(() => _isSyncingSimper = true);
+    HapticFeedback.mediumImpact();
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Mengunduh dataset SIMPER aktif untuk mode offline...'),
+        duration: Duration(seconds: 2),
+      ),
+    );
+    try {
+      final res = await _api.getSimperOfflineDataset();
+      await res.fold(
+        (err) async {
+          if (mounted) {
+            SnackBarMsg.danger(context, 'Sinkron SIMPER Gagal: ${err['message']}');
+          }
+        },
+        (items) async {
+          final count = await _db.saveOfflineSimpers(items);
+          await _refreshOfflineSimperCount();
+          if (mounted) {
+            SnackBarMsg.success(context, 'Berhasil mengunduh $count SIMPER siap scan offline!');
+          }
+        },
+      );
+    } catch (e) {
+      if (mounted) {
+        SnackBarMsg.danger(context, 'Kendala sinkron SIMPER: $e');
+      }
+    } finally {
+      if (mounted) setState(() => _isSyncingSimper = false);
+    }
   }
 
   @override
@@ -330,6 +378,29 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
 
     await res.fold(
       (err) async {
+        // Fallback Mode Offline untuk SIMPER
+        final offlineSimper = await _db.getOfflineSimperByQr(rawCode);
+        if (offlineSimper != null) {
+          final daysLeft = offlineSimper['days_left'] as int? ?? 999;
+          final isExpired = offlineSimper['is_expired'] == true || daysLeft < 0;
+          final isWarning30Days = !isExpired && daysLeft <= 30;
+
+          if (isExpired || isWarning30Days) {
+            _triggerWarningVibration();
+          }
+
+          await _showResultDialog(
+            isSuccess: true,
+            title: isExpired ? 'SIMPER Kadaluarsa (Offline)' : 'SIMPER Terverifikasi (Offline)',
+            message: isExpired
+                ? 'SIMPER telah habis masa berlaku! (Data Lokal HP)'
+                : 'Data SIMPER & unit kewenangan terverifikasi dari memori HP.',
+            actionType: 'Simper',
+            data: offlineSimper,
+          );
+          return;
+        }
+
         final errMsg = err['message']?.toString() ?? 'QR tidak valid atau server bermasalah.';
         final isAuth = err['isAuthError'] == true || errMsg.toLowerCase().contains('sesi login') || errMsg.toLowerCase().contains('401');
         await _showResultDialog(
@@ -374,6 +445,10 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
             data: payload,
           );
         } else if (actionType == 'Simper' && isSuccess && payload != null) {
+          // Asynchronously update/cache ke database lokal HP
+          _db.saveOfflineSimpers([payload]);
+          _refreshOfflineSimperCount();
+
           await _showResultDialog(
             isSuccess: true,
             title: 'SIMPER Terverifikasi',
@@ -520,19 +595,22 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
             statusBadgeText = 'MINE PERMIT AKTIF';
           }
         } else if (isSimper) {
+          final isOffline = data?['is_offline_verified'] == true;
           if (isExpiredPermit) {
             primaryColor = const Color(0xFFEF4444);
             iconData = Icons.warning_amber_rounded;
-            statusBadgeText = 'SIMPER KADALUARSA';
+            statusBadgeText = isOffline ? 'SIMPER KADALUARSA (OFFLINE)' : 'SIMPER KADALUARSA';
           } else if (isExpiringSoon) {
             primaryColor = const Color(0xFFF59E0B); // Amber Warning K3
             iconData = Icons.warning_amber_rounded;
             final d = daysLeft ?? 0;
-            statusBadgeText = 'MASA BERLAKU < 30 HARI ($d HARI LAGI)';
+            statusBadgeText = isOffline
+                ? 'SIMPER < 30 HARI ($d HARI LAGI) [OFFLINE]'
+                : 'MASA BERLAKU < 30 HARI ($d HARI LAGI)';
           } else {
             primaryColor = const Color(0xFF0D9488);
             iconData = Icons.drive_eta_rounded;
-            statusBadgeText = 'SIMPER AKTIF';
+            statusBadgeText = isOffline ? 'SIMPER AKTIF (OFFLINE)' : 'SIMPER AKTIF';
           }
         } else if (isVehicle) {
           primaryColor = const Color(0xFFF59E0B);
@@ -2064,6 +2142,34 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                if (data['is_offline_verified'] == true) ...[
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 12),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF0F766E).withValues(alpha: 0.35),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: const Color(0xFF2DD4BF), width: 1.2),
+                    ),
+                    child: Row(
+                      children: const [
+                        Icon(Icons.offline_pin_rounded, size: 18, color: Color(0xFF2DD4BF)),
+                        SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'MODE OFFLINE: Data diverifikasi dari memori lokal HP.',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Color(0xFF5EEAD4),
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 0.3,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
                 // Nomor SIMPER Badge
                 Container(
                   width: double.infinity,
@@ -4922,7 +5028,55 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
                   ],
                 ),
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: 8),
+              // SIMPER Offline Button
+              GestureDetector(
+                onTap: _syncSimperOfflineData,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                  decoration: BoxDecoration(
+                    color: _offlineSimperCount > 0
+                        ? const Color(0xFF0F766E).withValues(alpha: isDark ? 0.35 : 0.12)
+                        : const Color(0xFFEF4444).withValues(alpha: isDark ? 0.3 : 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: _offlineSimperCount > 0
+                          ? const Color(0xFF2DD4BF).withValues(alpha: 0.6)
+                          : const Color(0xFFFCA5A5),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _isSyncingSimper
+                          ? const SizedBox(
+                              width: 13,
+                              height: 13,
+                              child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF0D9488)),
+                            )
+                          : Icon(
+                              _offlineSimperCount > 0 ? Icons.offline_pin_rounded : Icons.cloud_download_rounded,
+                              size: 15,
+                              color: _offlineSimperCount > 0 ? const Color(0xFF0D9488) : const Color(0xFFEF4444),
+                            ),
+                      const SizedBox(width: 4),
+                      Text(
+                        _offlineSimperCount > 0
+                            ? '$_offlineSimperCount SIMPER'
+                            : 'Sinkron SIMPER',
+                        style: TextStyle(
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w800,
+                          color: _offlineSimperCount > 0
+                              ? (isDark ? const Color(0xFF5EEAD4) : const Color(0xFF0F766E))
+                              : const Color(0xFFDC2626),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 6),
               // Refresh button
               IconButton(
                 onPressed: () {

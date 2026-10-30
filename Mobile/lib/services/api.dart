@@ -2038,6 +2038,24 @@ class ApiService {
     }
   }
 
+  Future<Either<Map, List<dynamic>>> getSimperOfflineDataset() async {
+    final token = getToken;
+    if (token.isNotEmpty && !token.startsWith('offline_token_')) {
+      dio.options.headers['Authorization'] = 'Bearer $token';
+    } else {
+      dio.options.headers.remove('Authorization');
+    }
+    try {
+      var res = await dio.get('/qr/simper/offline-dataset');
+      if (res.statusCode == 200 && res.data is Map && res.data['data'] is List) {
+        return Right(res.data['data'] as List<dynamic>);
+      }
+      return const Left({'message': 'Format dataset SIMPER tidak valid'});
+    } catch (e) {
+      return Left({'message': e.toString()});
+    }
+  }
+
   Future<Either<Map, List<dynamic>>> getAttendanceHistory() async {
     final token = getToken;
     if (token.isNotEmpty) {

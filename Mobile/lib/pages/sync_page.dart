@@ -41,6 +41,7 @@ class _SyncPageState extends State<SyncPage> {
     'vehicle',
     'areas',
     'benchmarks',
+    'simper',
   ];
 
   final _friendlyNames = {
@@ -58,6 +59,7 @@ class _SyncPageState extends State<SyncPage> {
     'vehicle': 'Daftar Alat Berat & Kendaraan',
     'areas': 'Area Utama Tambang',
     'benchmarks': 'Detail Lokasi & Benchmark',
+    'simper': 'Data SIMPER (Siap Scan Offline)',
   };
 
   String _name = '';
@@ -137,6 +139,28 @@ class _SyncPageState extends State<SyncPage> {
               );
             } catch (e) {
               debugPrint('[SyncPage] Error syncing $name: $e');
+            }
+            continue;
+          }
+
+          if (name == 'simper') {
+            try {
+              final res = await _api.getMaster('simper');
+              await res.fold(
+                (err) async {
+                  debugPrint('[SyncPage] Error simper: ${err['message']}');
+                },
+                (response) async {
+                  final items = (response['data'] as List?) ?? [];
+                  final count = await _db.saveOfflineSimpers(items);
+                  debugPrint('[SyncPage] Saved $count offline SIMPERs');
+                  _progress.value = 100;
+                  master[name] = 1;
+                  PreferenceService.setDataSync(master);
+                },
+              );
+            } catch (e) {
+              debugPrint('[SyncPage] Error syncing simper: $e');
             }
             continue;
           }

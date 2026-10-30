@@ -873,6 +873,259 @@ namespace Indexsafe.Api.Services
 
             return null;
         }
+
+        public async Task<List<SimperOfflineItemDto>> GetSimperOfflineDatasetAsync()
+        {
+            var result = new List<SimperOfflineItemDto>();
+
+            NpgsqlConnection? activeConn = null;
+            foreach (var host in _candidateHosts)
+            {
+                var dbsToTry = new List<string> { "Bima", "BimaTest", "sysinteg_indexsafe2", "postgres" };
+                foreach (var db in dbsToTry)
+                {
+                    try
+                    {
+                        var builder = new NpgsqlConnectionStringBuilder
+                        {
+                            Host = host,
+                            Port = 5432,
+                            Database = db,
+                            Username = User,
+                            Password = Pass,
+                            Timeout = 5,
+                            CommandTimeout = 15
+                        };
+                        var conn = new NpgsqlConnection(builder.ConnectionString);
+                        await conn.OpenAsync();
+
+                        await using (var checkCmd = new NpgsqlCommand("SELECT to_regclass('public.tb_simper')::text;", conn))
+                        {
+                            var reg = await checkCmd.ExecuteScalarAsync();
+                            if (reg != null && reg != DBNull.Value && !string.IsNullOrWhiteSpace(reg.ToString()))
+                            {
+                                activeConn = conn;
+                                break;
+                            }
+                        }
+                        await conn.DisposeAsync();
+                    }
+                    catch { }
+                }
+                if (activeConn != null) break;
+            }
+
+            if (activeConn == null) return result;
+
+            await using (activeConn)
+            {
+                try
+                {
+                    const string sqlSimper = @"
+                        SELECT 
+                            s.id, 
+                            s.nomor, 
+                            s.employee_id, 
+                            s.status, 
+                            s.jenis_simper, 
+                            s.jenis_sim, 
+                            s.nomor_sim, 
+                            s.masa_berlaku, 
+                            s.expired_date, 
+                            s.kacamata, 
+                            s.qr_encrypt, 
+                            s.qr_decrypt, 
+                            s.printed_count, 
+                            s.printed_at,
+                            COALESCE(p.nama, 'Karyawan Tambang') as nama,
+                            COALESCE(p.perusahaan, 'PT INDEXIM COALINDO') as perusahaan,
+                            COALESCE(s.departemen, p.departemen, '-') as departemen,
+                            COALESCE(p.jabatan, '-') as jabatan
+                        FROM public.tb_simper s
+                        LEFT JOIN public.tb_permit p ON s.permit_id = p.id
+                        WHERE s.deleted_at IS NULL
+                          AND (
+                              UPPER(COALESCE(s.status, '')) LIKE '%PRINT%'
+                              OR COALESCE(s.printed_count, 0) > 0
+                              OR s.printed_at IS NOT NULL
+                          )
+                        ORDER BY s.id DESC;";
+
+                    var dict = new Dictionary<long, SimperOfflineItemDto>();
+
+                    await using (var cmd = new NpgsqlCommand(sqlSimper, activeConn))
+                    {
+                        cmd.CommandTimeout = 30;
+                        await using var r = await cmd.ExecuteReaderAsync();
+                        while (await r.ReadAsync())
+                        {
+                            var id = r.GetInt64(r.GetOrdinal("id"));
+                            var empId = r.IsDBNull(r.GetOrdinal("employee_id")) ? "" : r.GetString(r.GetOrdinal("employee_id"));
+
+                            var item = new SimperOfflineItemDto
+                            {
+                                Id = id,
+                                Nomor = r.IsDBNull(r.GetOrdinal("nomor")) ? null : r.GetString(r.GetOrdinal("nomor")),
+                                EmployeeId = empId,
+                                Nama = r.IsDBNull(r.GetOrdinal("nama")) ? "Karyawan Tambang" : r.GetString(r.GetOrdinal("nama")),
+                                Perusahaan = r.IsDBNull(r.GetOrdinal("perusahaan")) ? "PT INDEXIM COALINDO" : r.GetString(r.GetOrdinal("perusahaan")),
+                                Departemen = r.IsDBNull(r.GetOrdinal("departemen")) ? "-" : r.GetString(r.GetOrdinal("departemen")),
+                                Jabatan = r.IsDBNull(r.GetOrdinal("jabatan")) ? "-" : r.GetString(r.GetOrdinal("jabatan")),
+                                JenisSimper = r.IsDBNull(r.GetOrdinal("jenis_simper")) ? null : r.GetString(r.GetOrdinal("jenis_simper")),
+                                JenisSim = r.IsDBNull(r.GetOrdinal("jenis_sim")) ? null : r.GetString(r.GetOrdinal("jenis_sim")),
+                                NomorSim = r.IsDBNull(r.GetOrdinal("nomor_sim")) ? null : r.GetString(r.GetOrdinal("nomor_sim")),
+                                Status = r.IsDBNull(r.GetOrdinal("status")) ? "PRINTED" : r.GetString(r.GetOrdinal("status")),
+                                QrEncrypt = r.IsDBNull(r.GetOrdinal("qr_encrypt")) ? null : r.GetString(r.GetOrdinal("qr_encrypt")),
+                                QrDecrypt = r.IsDBNull(r.GetOrdinal("qr_decrypt")) ? null : r.GetString(r.GetOrdinal("qr_decrypt")),
+                                PhotoUrl = string.IsNullOrWhiteSpace(empId) ? null : $"/api/qr/permit/photo/{empId.Trim()}"
+                            };
+
+                            if (!r.IsDBNull(r.GetOrdinal("kacamata")))
+                            {
+                                var kVal = r.GetValue(r.GetOrdinal("kacamata"));
+                                item.Kacamata = kVal is bool b ? (b ? "WAJIB KACAMATA" : "TIDAK") : kVal.ToString();
+                            }
+
+                            DateTime? dtMasaBerlaku = ParseDateFlexible(r.GetValue(r.GetOrdinal("masa_berlaku")));
+                            if (dtMasaBerlaku.HasValue) item.MasaBerlaku = dtMasaBerlaku.Value.ToString("yyyy-MM-dd");
+
+                            DateTime? dtExpired = ParseDateFlexible(r.GetValue(r.GetOrdinal("expired_date")));
+                            if (dtExpired.HasValue) item.ExpiredDate = dtExpired.Value.ToString("yyyy-MM-dd");
+
+                            DateTime? effectiveExpiry = dtMasaBerlaku ?? dtExpired;
+                            if (effectiveExpiry.HasValue)
+                            {
+                                item.DaysLeft = (effectiveExpiry.Value.Date - DateTime.Today).Days;
+                                item.IsExpired = DateTime.Today > effectiveExpiry.Value.Date;
+                            }
+                            else
+                            {
+                                item.DaysLeft = 999;
+                                item.IsExpired = false;
+                            }
+
+                            dict[id] = item;
+                            result.Add(item);
+                        }
+                    }
+
+                    // Query tb_simper_unit for active SIMPERs
+                    const string sqlUnits = @"
+                        SELECT u.id, u.simper_id, u.kendaraan, u.kewenangan, u.jam_min, u.jam_aktual, 
+                               u.equipment_classification, u.equipment_type, u.equipment_model
+                        FROM public.tb_simper_unit u
+                        WHERE u.simper_id IN (
+                            SELECT id FROM public.tb_simper 
+                            WHERE deleted_at IS NULL 
+                              AND (UPPER(COALESCE(status, '')) LIKE '%PRINT%' OR COALESCE(printed_count, 0) > 0 OR printed_at IS NOT NULL)
+                        )
+                        ORDER BY u.id ASC;";
+
+                    await using (var cmdUnits = new NpgsqlCommand(sqlUnits, activeConn))
+                    {
+                        cmdUnits.CommandTimeout = 30;
+                        await using var uReader = await cmdUnits.ExecuteReaderAsync();
+                        while (await uReader.ReadAsync())
+                        {
+                            var sId = uReader.GetInt64(1);
+                            if (dict.TryGetValue(sId, out var item))
+                            {
+                                item.Units.Add(new SimperUnitDto
+                                {
+                                    Id = uReader.GetInt64(0),
+                                    SimperId = sId,
+                                    Kendaraan = uReader.IsDBNull(2) ? null : uReader.GetString(2),
+                                    Kewenangan = uReader.IsDBNull(3) ? null : uReader.GetString(3),
+                                    JamMin = uReader.IsDBNull(4) ? null : Convert.ToInt32(uReader.GetValue(4)),
+                                    JamAktual = uReader.IsDBNull(5) ? null : Convert.ToInt32(uReader.GetValue(5)),
+                                    EquipmentClassification = uReader.IsDBNull(6) ? null : uReader.GetString(6),
+                                    EquipmentType = uReader.IsDBNull(7) ? null : uReader.GetString(7),
+                                    EquipmentModel = uReader.IsDBNull(8) ? null : uReader.GetString(8),
+                                });
+                            }
+                        }
+                    }
+
+                    // Serialize Units to UnitsJson for ultra-fast SQLite caching
+                    foreach (var item in result)
+                    {
+                        item.UnitsJson = System.Text.Json.JsonSerializer.Serialize(item.Units);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "[PermitService] Error in GetSimperOfflineDatasetAsync: {Msg}", ex.Message);
+                }
+            }
+
+            return result;
+        }
+    }
+
+    public class SimperOfflineItemDto
+    {
+        [JsonPropertyName("id")]
+        public long Id { get; set; }
+
+        [JsonPropertyName("nomor")]
+        public string? Nomor { get; set; }
+
+        [JsonPropertyName("employee_id")]
+        public string? EmployeeId { get; set; }
+
+        [JsonPropertyName("nama")]
+        public string? Nama { get; set; }
+
+        [JsonPropertyName("perusahaan")]
+        public string? Perusahaan { get; set; }
+
+        [JsonPropertyName("departemen")]
+        public string? Departemen { get; set; }
+
+        [JsonPropertyName("jabatan")]
+        public string? Jabatan { get; set; }
+
+        [JsonPropertyName("jenis_simper")]
+        public string? JenisSimper { get; set; }
+
+        [JsonPropertyName("jenis_sim")]
+        public string? JenisSim { get; set; }
+
+        [JsonPropertyName("nomor_sim")]
+        public string? NomorSim { get; set; }
+
+        [JsonPropertyName("masa_berlaku")]
+        public string? MasaBerlaku { get; set; }
+
+        [JsonPropertyName("expired_date")]
+        public string? ExpiredDate { get; set; }
+
+        [JsonPropertyName("status")]
+        public string? Status { get; set; }
+
+        [JsonPropertyName("kacamata")]
+        public string? Kacamata { get; set; }
+
+        [JsonPropertyName("qr_encrypt")]
+        public string? QrEncrypt { get; set; }
+
+        [JsonPropertyName("qr_decrypt")]
+        public string? QrDecrypt { get; set; }
+
+        [JsonPropertyName("days_left")]
+        public int DaysLeft { get; set; }
+
+        [JsonPropertyName("is_expired")]
+        public bool IsExpired { get; set; }
+
+        [JsonPropertyName("units")]
+        public List<SimperUnitDto> Units { get; set; } = new();
+
+        [JsonPropertyName("units_json")]
+        public string? UnitsJson { get; set; }
+
+        [JsonPropertyName("photo_url")]
+        public string? PhotoUrl { get; set; }
     }
 
     public class SimperUnitDto
