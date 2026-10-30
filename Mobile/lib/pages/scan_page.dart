@@ -1,4 +1,6 @@
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'dart:async';
+import 'dart:convert';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -28,7 +30,12 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
   final ApiService _api = ApiService();
   final DatabaseService _db = DatabaseService();
   int _offlineSimperCount = 0;
+  int _offlinePermitCount = 0;
+  int _pendingOfflineCount = 0;
   bool _isSyncingSimper = false;
+  bool _isSyncingPermit = false;
+  bool _isSyncingQueue = false;
+  StreamSubscription<List<ConnectivityResult>>? _connectivitySub;
 
   // Camera & Scanner State
   MobileScannerController? _scannerController;
@@ -76,14 +83,109 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
     _checkPermissionAndInit();
     _loadMyPermissions();
     _loadEvents();
-    _refreshOfflineSimperCount();
+    _refreshOfflineCounters();
+    _connectivitySub = Connectivity().onConnectivityChanged.listen((results) {
+      final isOnline = results.any((r) => r != ConnectivityResult.none);
+      if (isOnline) {
+        _syncPendingOfflineQueues();
+      }
+    });
   }
 
-  Future<void> _refreshOfflineSimperCount() async {
+  Future<void> _refreshOfflineCounters() async {
     try {
-      final cnt = await _db.getOfflineSimperCount();
-      if (mounted) setState(() => _offlineSimperCount = cnt);
+      final cntS = await _db.getOfflineSimperCount();
+      final cntP = await _db.getOfflinePermitCount();
+      final cntQ = await _db.getPendingOfflineQueueCount();
+      if (mounted) {
+        setState(() {
+          _offlineSimperCount = cntS;
+          _offlinePermitCount = cntP;
+          _pendingOfflineCount = cntQ;
+        });
+      }
     } catch (_) {}
+  }
+
+  Future<void> _refreshOfflineSimperCount() => _refreshOfflineCounters();
+
+  Future<void> _syncPermitOfflineData() async {
+    if (_isSyncingPermit) return;
+    setState(() => _isSyncingPermit = true);
+    HapticFeedback.mediumImpact();
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Mengunduh dataset Mine Permit aktif untuk mode offline...'),
+        duration: Duration(seconds: 2),
+      ),
+    );
+    try {
+      final res = await _api.getPermitOfflineDataset();
+      await res.fold(
+        (err) async {
+          if (mounted) {
+            SnackBarMsg.danger(context, 'Sinkron Permit Gagal: ');
+          }
+        },
+        (items) async {
+          final count = await _db.saveOfflinePermits(items);
+          await _refreshOfflineCounters();
+          if (mounted) {
+            SnackBarMsg.success(context, 'Berhasil mengunduh \ Mine Permit siap scan offline!');
+          }
+        },
+      );
+    } catch (e) {
+      if (mounted) {
+        SnackBarMsg.danger(context, 'Kendala sinkron Mine Permit: ');
+      }
+    } finally {
+      if (mounted) setState(() => _isSyncingPermit = false);
+    }
+  }
+
+  Future<void> _syncPendingOfflineQueues() async {
+    if (_isSyncingQueue) return;
+    setState(() => _isSyncingQueue = true);
+    try {
+      final movements = await _db.getPendingOfflineMovements();
+      final violations = await _db.getPendingOfflineViolations();
+
+      int uploadedM = 0;
+      for (final item in movements) {
+        try {
+          final id = item['id'] as int;
+          final payload = jsonDecode(item['payload'] as String) as Map<String, dynamic>;
+          final res = await _api.recordPermitMovement(payload);
+          if (res.isRight()) {
+            await _db.deleteOfflineMovement(id);
+            uploadedM++;
+          }
+        } catch (_) {}
+        await Future.delayed(const Duration(milliseconds: 300));
+      }
+
+      int uploadedV = 0;
+      for (final item in violations) {
+        try {
+          final id = item['id'] as int;
+          final payload = jsonDecode(item['payload'] as String) as Map<String, dynamic>;
+          final res = await _api.recordPermitViolation(payload);
+          if (res.isRight()) {
+            await _db.deleteOfflineViolation(id);
+            uploadedV++;
+          }
+        } catch (_) {}
+        await Future.delayed(const Duration(milliseconds: 300));
+      }
+
+      await _refreshOfflineCounters();
+      if (mounted && (uploadedM > 0 || uploadedV > 0)) {
+        SnackBarMsg.success(context, 'Sinkronisasi offline selesai: \ gerbang & \ pelanggaran terkirim.');
+      }
+    } catch (_) {} finally {
+      if (mounted) setState(() => _isSyncingQueue = false);
+    }
   }
 
   Future<void> _syncSimperOfflineData() async {
@@ -123,6 +225,7 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
 
   @override
   void dispose() {
+    _connectivitySub?.cancel();
     _eventSearchCtrl.dispose();
     _animController.dispose();
     _scannerController?.dispose();
@@ -378,6 +481,29 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
 
     await res.fold(
       (err) async {
+        // Fallback Mode Offline untuk Mine Permit
+        final offlinePermit = await _db.getOfflinePermitByQr(rawCode);
+        if (offlinePermit != null) {
+          final daysLeft = offlinePermit['days_left'] as int? ?? 999;
+          final isExpired = offlinePermit['is_expired'] == true || daysLeft < 0;
+          final isWarning30Days = !isExpired && daysLeft <= 30;
+
+          if (isExpired || isWarning30Days) {
+            _triggerWarningVibration();
+          }
+
+          await _showResultDialog(
+            isSuccess: true,
+            title: isExpired ? 'Mine Permit Kadaluarsa (Offline)' : 'Mine Permit Terverifikasi (Offline)',
+            message: isExpired
+                ? 'Mine Permit telah habis masa berlaku! (Data Lokal HP)'
+                : 'Data Mine Permit terverifikasi dari memori HP.',
+            actionType: 'MinePermit',
+            data: offlinePermit,
+          );
+          return;
+        }
+
         // Fallback Mode Offline untuk SIMPER
         final offlineSimper = await _db.getOfflineSimperByQr(rawCode);
         if (offlineSimper != null) {
@@ -437,6 +563,10 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
         }
 
         if (actionType == 'MinePermit' && isSuccess && payload != null) {
+          // Asynchronously update/cache ke database lokal HP
+          _db.saveOfflinePermits([payload]);
+          _refreshOfflineCounters();
+
           await _showResultDialog(
             isSuccess: true,
             title: 'Mine Permit Terverifikasi',
@@ -447,7 +577,7 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
         } else if (actionType == 'Simper' && isSuccess && payload != null) {
           // Asynchronously update/cache ke database lokal HP
           _db.saveOfflineSimpers([payload]);
-          _refreshOfflineSimperCount();
+          _refreshOfflineCounters();
 
           await _showResultDialog(
             isSuccess: true,
@@ -3725,11 +3855,43 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
                                         if (!mounted) return;
                                         setModalState(() => isSubmitting = false);
 
-                                        res.fold(
-                                          (err) {
+                                        await res.fold(
+                                          (err) async {
+                                            final errMsg = err['message']?.toString() ?? '';
+                                            final isNetwork = errMsg.toLowerCase().contains('koneksi') ||
+                                                errMsg.toLowerCase().contains('timeout') ||
+                                                errMsg.toLowerCase().contains('offline') ||
+                                                errMsg.toLowerCase().contains('socket') ||
+                                                errMsg.toLowerCase().contains('network') ||
+                                                errMsg.toLowerCase().contains('failed host lookup');
+
+                                            if (isNetwork) {
+                                              await _db.queueOfflineViolation(payload);
+                                              _refreshOfflineCounters();
+                                              if (!mounted) return;
+                                              Navigator.pop(modalCtx);
+                                              HapticFeedback.heavyImpact();
+                                              _showViolationRecordedDialog(
+                                                violatorName: violatorName,
+                                                violatorNik: violatorNik,
+                                                company: violatorCompany,
+                                                type: selK['nama']?.toString() ?? '-',
+                                                severity: '${selS['nama']} (${selS['kode']}) [OFFLINE]',
+                                                location: locationController.text.trim(),
+                                                actionTaken: actionController.text.trim(),
+                                              );
+                                              ScaffoldMessenger.of(context).showSnackBar(
+                                                const SnackBar(
+                                                  content: Text('Tersimpan di antrean offline HP! Akan otomatis disinkronkan saat terhubung kembali.'),
+                                                  backgroundColor: Color(0xFFD97706),
+                                                ),
+                                              );
+                                              return;
+                                            }
+
                                             ScaffoldMessenger.of(context).showSnackBar(
                                               SnackBar(
-                                                content: Text(err['message']?.toString() ?? 'Gagal mencatat pelanggaran.'),
+                                                content: Text(errMsg.isNotEmpty ? errMsg : 'Gagal mencatat pelanggaran.'),
                                                 backgroundColor: const Color(0xFFDC2626),
                                               ),
                                             );
@@ -4445,11 +4607,45 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
                                         if (!mounted) return;
                                         setModalState(() => isSubmitting = false);
 
-                                        res.fold(
-                                          (err) {
+                                        await res.fold(
+                                          (err) async {
+                                            final errMsg = err['message']?.toString() ?? '';
+                                            final isNetwork = errMsg.toLowerCase().contains('koneksi') ||
+                                                errMsg.toLowerCase().contains('timeout') ||
+                                                errMsg.toLowerCase().contains('offline') ||
+                                                errMsg.toLowerCase().contains('socket') ||
+                                                errMsg.toLowerCase().contains('network') ||
+                                                errMsg.toLowerCase().contains('failed host lookup');
+
+                                            if (isNetwork) {
+                                              await _db.queueOfflineMovement(payload);
+                                              _refreshOfflineCounters();
+                                              if (!mounted) return;
+                                              Navigator.pop(modalCtx);
+                                              HapticFeedback.heavyImpact();
+                                              _showMovementRecordedDialog(
+                                                nama: nama,
+                                                nik: nik,
+                                                perusahaan: perusahaan,
+                                                departemen: departemen,
+                                                direction: '$selectedDirection [OFFLINE]',
+                                                unit: unitController.text.trim(),
+                                                keperluan: keperluanController.text.trim(),
+                                                jumlahPenumpang: jumlahPenumpang,
+                                                lokasiDetail: gpsStr != null ? '$gpsStr (${posController.text.trim()})' : posController.text.trim(),
+                                              );
+                                              ScaffoldMessenger.of(context).showSnackBar(
+                                                const SnackBar(
+                                                  content: Text('Tersimpan di antrean offline HP! Akan otomatis disinkronkan saat terhubung kembali.'),
+                                                  backgroundColor: Color(0xFFD97706),
+                                                ),
+                                              );
+                                              return;
+                                            }
+
                                             ScaffoldMessenger.of(context).showSnackBar(
                                               SnackBar(
-                                                content: Text(err['message']?.toString() ?? 'Gagal mencatat log keluar masuk.'),
+                                                content: Text(errMsg.isNotEmpty ? errMsg : 'Gagal mencatat log keluar masuk.'),
                                                 backgroundColor: const Color(0xFFDC2626),
                                               ),
                                             );
@@ -5029,18 +5225,18 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
                 ),
               ),
               const SizedBox(width: 8),
-              // SIMPER Offline Button
+              // Offline Data & Queue Manager Button
               GestureDetector(
-                onTap: _syncSimperOfflineData,
+                onTap: _showOfflineOptionsSheet,
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
                   decoration: BoxDecoration(
-                    color: _offlineSimperCount > 0
+                    color: (_offlineSimperCount > 0 || _offlinePermitCount > 0)
                         ? const Color(0xFF0F766E).withValues(alpha: isDark ? 0.35 : 0.12)
                         : const Color(0xFFEF4444).withValues(alpha: isDark ? 0.3 : 0.1),
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
-                      color: _offlineSimperCount > 0
+                      color: (_offlineSimperCount > 0 || _offlinePermitCount > 0)
                           ? const Color(0xFF2DD4BF).withValues(alpha: 0.6)
                           : const Color(0xFFFCA5A5),
                     ),
@@ -5048,30 +5244,52 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      _isSyncingSimper
+                      (_isSyncingSimper || _isSyncingPermit || _isSyncingQueue)
                           ? const SizedBox(
                               width: 13,
                               height: 13,
                               child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF0D9488)),
                             )
                           : Icon(
-                              _offlineSimperCount > 0 ? Icons.offline_pin_rounded : Icons.cloud_download_rounded,
+                              (_offlineSimperCount > 0 || _offlinePermitCount > 0)
+                                  ? Icons.offline_pin_rounded
+                                  : Icons.cloud_download_rounded,
                               size: 15,
-                              color: _offlineSimperCount > 0 ? const Color(0xFF0D9488) : const Color(0xFFEF4444),
+                              color: (_offlineSimperCount > 0 || _offlinePermitCount > 0)
+                                  ? const Color(0xFF0D9488)
+                                  : const Color(0xFFEF4444),
                             ),
                       const SizedBox(width: 4),
                       Text(
-                        _offlineSimperCount > 0
-                            ? '$_offlineSimperCount SIMPER'
-                            : 'Sinkron SIMPER',
+                        (_offlineSimperCount > 0 || _offlinePermitCount > 0)
+                            ? 'Offline (${_offlineSimperCount + _offlinePermitCount})'
+                            : 'Sinkron Offline',
                         style: TextStyle(
                           fontSize: 10.5,
                           fontWeight: FontWeight.w800,
-                          color: _offlineSimperCount > 0
+                          color: (_offlineSimperCount > 0 || _offlinePermitCount > 0)
                               ? (isDark ? const Color(0xFF5EEAD4) : const Color(0xFF0F766E))
                               : const Color(0xFFDC2626),
                         ),
                       ),
+                      if (_pendingOfflineCount > 0) ...[
+                        const SizedBox(width: 4),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFEF4444),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Text(
+                            '$_pendingOfflineCount',
+                            style: const TextStyle(
+                              fontSize: 9,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -6391,6 +6609,190 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  void _showOfflineOptionsSheet() {
+    HapticFeedback.lightImpact();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (modalCtx, setModalState) {
+            return Container(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.15),
+                    blurRadius: 20,
+                    offset: const Offset(0, -4),
+                  ),
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      margin: const EdgeInsets.only(bottom: 16),
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF475569) : const Color(0xFFCBD5E1),
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF0D9488).withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Icon(Icons.offline_pin_rounded, color: Color(0xFF0D9488), size: 22),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Pusat Data Mode Offline',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w800,
+                                color: isDark ? Colors.white : const Color(0xFF0F172A),
+                              ),
+                            ),
+                            Text(
+                              'Kelola database lokal & antrean pengiriman offline',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 18),
+                  _buildOfflineSheetItem(
+                    isDark: isDark,
+                    icon: Icons.badge_rounded,
+                    title: 'Database SIMPER Aktif',
+                    subtitle: '$_offlineSimperCount data SIMPER tersimpan di HP.',
+                    buttonText: 'Sinkron Ulang',
+                    isLoading: _isSyncingSimper,
+                    onTap: () async {
+                      Navigator.pop(ctx);
+                      await _syncSimperOfflineData();
+                    },
+                  ),
+                  const SizedBox(height: 10),
+                  _buildOfflineSheetItem(
+                    isDark: isDark,
+                    icon: Icons.card_membership_rounded,
+                    title: 'Database Mine Permit Aktif',
+                    subtitle: '$_offlinePermitCount data Mine Permit tersimpan di HP.',
+                    buttonText: 'Sinkron Ulang',
+                    isLoading: _isSyncingPermit,
+                    onTap: () async {
+                      Navigator.pop(ctx);
+                      await _syncPermitOfflineData();
+                    },
+                  ),
+                  const SizedBox(height: 10),
+                  _buildOfflineSheetItem(
+                    isDark: isDark,
+                    icon: Icons.sync_problem_rounded,
+                    title: 'Antrean Offline HP',
+                    subtitle: '$_pendingOfflineCount data gerbang/pelanggaran menunggu upload.',
+                    buttonText: 'Upload Sekarang',
+                    isLoading: _isSyncingQueue,
+                    onTap: () async {
+                      Navigator.pop(ctx);
+                      await _syncPendingOfflineQueues();
+                    },
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildOfflineSheetItem({
+    required bool isDark,
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required String buttonText,
+    required bool isLoading,
+    required VoidCallback onTap,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF0F172A).withValues(alpha: 0.6) : const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+        ),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: const Color(0xFF0D9488), size: 22),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: isDark ? Colors.white : const Color(0xFF0F172A),
+                  ),
+                ),
+                Text(
+                  subtitle,
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          ElevatedButton(
+            onPressed: isLoading ? null : onTap,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF0D9488),
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              elevation: 0,
+            ),
+            child: isLoading
+                ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                : Text(buttonText, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+          ),
+        ],
       ),
     );
   }

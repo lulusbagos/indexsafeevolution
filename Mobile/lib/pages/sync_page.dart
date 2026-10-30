@@ -42,6 +42,7 @@ class _SyncPageState extends State<SyncPage> {
     'areas',
     'benchmarks',
     'simper',
+    'permit',
   ];
 
   final _friendlyNames = {
@@ -60,6 +61,7 @@ class _SyncPageState extends State<SyncPage> {
     'areas': 'Area Utama Tambang',
     'benchmarks': 'Detail Lokasi & Benchmark',
     'simper': 'Data SIMPER (Siap Scan Offline)',
+    'permit': 'Data Mine Permit (Siap Scan Offline)',
   };
 
   String _name = '';
@@ -161,6 +163,28 @@ class _SyncPageState extends State<SyncPage> {
               );
             } catch (e) {
               debugPrint('[SyncPage] Error syncing simper: $e');
+            }
+            continue;
+          }
+
+          if (name == 'permit') {
+            try {
+              final res = await _api.getMaster('permit');
+              await res.fold(
+                (err) async {
+                  debugPrint('[SyncPage] Error permit: ${err['message']}');
+                },
+                (response) async {
+                  final items = (response['data'] as List?) ?? [];
+                  final count = await _db.saveOfflinePermits(items);
+                  debugPrint('[SyncPage] Saved $count offline Mine Permits');
+                  _progress.value = 100;
+                  master[name] = 1;
+                  PreferenceService.setDataSync(master);
+                },
+              );
+            } catch (e) {
+              debugPrint('[SyncPage] Error syncing permit: $e');
             }
             continue;
           }

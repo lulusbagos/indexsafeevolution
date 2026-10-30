@@ -922,7 +922,7 @@ namespace Indexsafe.Api.Services
                 try
                 {
                     const string sqlSimper = @"
-                        SELECT 
+                        SELECT DISTINCT ON (TRIM(s.employee_id))
                             s.id, 
                             s.nomor, 
                             s.employee_id, 
@@ -944,12 +944,13 @@ namespace Indexsafe.Api.Services
                         FROM public.tb_simper s
                         LEFT JOIN public.tb_permit p ON s.permit_id = p.id
                         WHERE s.deleted_at IS NULL
+                          AND s.employee_id IS NOT NULL AND TRIM(s.employee_id) <> ''
                           AND (
                               UPPER(COALESCE(s.status, '')) LIKE '%PRINT%'
                               OR COALESCE(s.printed_count, 0) > 0
                               OR s.printed_at IS NOT NULL
                           )
-                        ORDER BY s.id DESC;";
+                        ORDER BY TRIM(s.employee_id), s.id DESC;";
 
                     var dict = new Dictionary<long, SimperOfflineItemDto>();
 
@@ -1060,6 +1061,202 @@ namespace Indexsafe.Api.Services
 
             return result;
         }
+
+        public async Task<List<PermitOfflineItemDto>> GetPermitOfflineDatasetAsync()
+        {
+            var result = new List<PermitOfflineItemDto>();
+
+            NpgsqlConnection? activeConn = null;
+            foreach (var host in _candidateHosts)
+            {
+                var dbsToTry = new List<string> { "Bima", "BimaTest", "sysinteg_indexsafe2", "postgres" };
+                foreach (var db in dbsToTry)
+                {
+                    try
+                    {
+                        var builder = new NpgsqlConnectionStringBuilder
+                        {
+                            Host = host,
+                            Port = 5432,
+                            Database = db,
+                            Username = User,
+                            Password = Pass,
+                            Timeout = 5,
+                            CommandTimeout = 15
+                        };
+                        var conn = new NpgsqlConnection(builder.ConnectionString);
+                        await conn.OpenAsync();
+
+                        await using (var checkCmd = new NpgsqlCommand("SELECT to_regclass('public.tb_permit')::text;", conn))
+                        {
+                            var reg = await checkCmd.ExecuteScalarAsync();
+                            if (reg != null && reg != DBNull.Value && !string.IsNullOrWhiteSpace(reg.ToString()))
+                            {
+                                activeConn = conn;
+                                break;
+                            }
+                        }
+                        await conn.DisposeAsync();
+                    }
+                    catch { }
+                }
+                if (activeConn != null) break;
+            }
+
+            if (activeConn == null) return result;
+
+            await using (activeConn)
+            {
+                try
+                {
+                    const string sqlPermit = @"
+                        SELECT DISTINCT ON (TRIM(p.nik))
+                            p.id, 
+                            p.nomor, 
+                            p.nik, 
+                            p.nama, 
+                            p.perusahaan, 
+                            p.departemen, 
+                            p.jabatan, 
+                            p.posisi,
+                            p.status, 
+                            p.akses_lokasi, 
+                            p.mulai_kerja, 
+                            p.berakhir_kerja, 
+                            p.last_expired,
+                            p.tercetak, 
+                            p.waktu_tercetak
+                        FROM public.tb_permit p
+                        WHERE p.deleted_at IS NULL
+                          AND p.nik IS NOT NULL AND TRIM(p.nik) <> ''
+                          AND (
+                              UPPER(COALESCE(p.status, '')) LIKE '%PRINT%'
+                              OR COALESCE(p.tercetak, 0) > 0
+                              OR p.waktu_tercetak IS NOT NULL
+                          )
+                          AND (
+                              p.berakhir_kerja >= CURRENT_DATE - INTERVAL '180 days'
+                              OR p.last_expired >= CURRENT_DATE - INTERVAL '180 days'
+                              OR (p.berakhir_kerja IS NULL AND p.last_expired IS NULL)
+                          )
+                        ORDER BY TRIM(p.nik), p.id DESC;";
+
+                    await using var cmd = new NpgsqlCommand(sqlPermit, activeConn);
+                    cmd.CommandTimeout = 30;
+                    await using var r = await cmd.ExecuteReaderAsync();
+                    while (await r.ReadAsync())
+                    {
+                        var id = r.GetInt64(r.GetOrdinal("id"));
+                        var nik = r.IsDBNull(r.GetOrdinal("nik")) ? "" : r.GetString(r.GetOrdinal("nik")).Trim();
+                        if (string.IsNullOrEmpty(nik)) continue;
+
+                        var item = new PermitOfflineItemDto
+                        {
+                            Id = id,
+                            Nomor = r.IsDBNull(r.GetOrdinal("nomor")) ? null : r.GetString(r.GetOrdinal("nomor")),
+                            Nik = nik,
+                            Nama = r.IsDBNull(r.GetOrdinal("nama")) ? "Karyawan Tambang" : r.GetString(r.GetOrdinal("nama")),
+                            Perusahaan = r.IsDBNull(r.GetOrdinal("perusahaan")) ? "PT INDEXIM COALINDO" : r.GetString(r.GetOrdinal("perusahaan")),
+                            Departemen = r.IsDBNull(r.GetOrdinal("departemen")) ? "-" : r.GetString(r.GetOrdinal("departemen")),
+                            Jabatan = r.IsDBNull(r.GetOrdinal("jabatan")) ? "-" : r.GetString(r.GetOrdinal("jabatan")),
+                            Posisi = r.IsDBNull(r.GetOrdinal("posisi")) ? null : r.GetString(r.GetOrdinal("posisi")),
+                            Status = r.IsDBNull(r.GetOrdinal("status")) ? "PRINTED" : r.GetString(r.GetOrdinal("status")),
+                            AksesLokasi = r.IsDBNull(r.GetOrdinal("akses_lokasi")) ? null : r.GetString(r.GetOrdinal("akses_lokasi")),
+                            PhotoUrl = $"/api/qr/permit/photo/{nik}"
+                        };
+
+                        DateTime? dtMulai = ParseDateFlexible(r.GetValue(r.GetOrdinal("mulai_kerja")));
+                        if (dtMulai.HasValue) item.MulaiKerja = dtMulai.Value.ToString("yyyy-MM-dd");
+
+                        DateTime? dtBerakhir = ParseDateFlexible(r.GetValue(r.GetOrdinal("berakhir_kerja")));
+                        if (dtBerakhir.HasValue) item.BerakhirKerja = dtBerakhir.Value.ToString("yyyy-MM-dd");
+
+                        DateTime? dtLastExp = ParseDateFlexible(r.GetValue(r.GetOrdinal("last_expired")));
+                        if (dtLastExp.HasValue) item.LastExpired = dtLastExp.Value.ToString("yyyy-MM-dd");
+
+                        DateTime? effectiveExpiry = dtBerakhir ?? dtLastExp;
+                        if (dtLastExp.HasValue && dtBerakhir.HasValue)
+                        {
+                            effectiveExpiry = dtBerakhir.Value > dtLastExp.Value ? dtBerakhir : dtLastExp;
+                        }
+
+                        if (effectiveExpiry.HasValue)
+                        {
+                            item.MasaAktifPermit = effectiveExpiry.Value.ToString("yyyy-MM-dd");
+                            item.DaysLeft = (effectiveExpiry.Value.Date - DateTime.Today).Days;
+                            item.IsExpired = DateTime.Today > effectiveExpiry.Value.Date;
+                        }
+                        else
+                        {
+                            item.DaysLeft = 999;
+                            item.IsExpired = false;
+                        }
+
+                        result.Add(item);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "[PermitService] Error in GetPermitOfflineDatasetAsync: {Msg}", ex.Message);
+                }
+            }
+
+            return result;
+        }
+    }
+
+    public class PermitOfflineItemDto
+    {
+        [JsonPropertyName("id")]
+        public long Id { get; set; }
+
+        [JsonPropertyName("nomor")]
+        public string? Nomor { get; set; }
+
+        [JsonPropertyName("nik")]
+        public string Nik { get; set; } = string.Empty;
+
+        [JsonPropertyName("nama")]
+        public string? Nama { get; set; }
+
+        [JsonPropertyName("perusahaan")]
+        public string? Perusahaan { get; set; }
+
+        [JsonPropertyName("departemen")]
+        public string? Departemen { get; set; }
+
+        [JsonPropertyName("jabatan")]
+        public string? Jabatan { get; set; }
+
+        [JsonPropertyName("posisi")]
+        public string? Posisi { get; set; }
+
+        [JsonPropertyName("status")]
+        public string? Status { get; set; }
+
+        [JsonPropertyName("akses_lokasi")]
+        public string? AksesLokasi { get; set; }
+
+        [JsonPropertyName("mulai_kerja")]
+        public string? MulaiKerja { get; set; }
+
+        [JsonPropertyName("berakhir_kerja")]
+        public string? BerakhirKerja { get; set; }
+
+        [JsonPropertyName("last_expired")]
+        public string? LastExpired { get; set; }
+
+        [JsonPropertyName("masa_aktif_permit")]
+        public string? MasaAktifPermit { get; set; }
+
+        [JsonPropertyName("days_left")]
+        public int DaysLeft { get; set; }
+
+        [JsonPropertyName("is_expired")]
+        public bool IsExpired { get; set; }
+
+        [JsonPropertyName("photo_url")]
+        public string? PhotoUrl { get; set; }
     }
 
     public class SimperOfflineItemDto

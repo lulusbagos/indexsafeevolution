@@ -54,6 +54,13 @@ namespace Indexsafe.Api.Controllers
                 case "simpers":
                     var simperList = await _permitService.GetSimperOfflineDatasetAsync();
                     return Ok(new { data = simperList });
+
+                case "permit":
+                case "permits":
+                case "minepermit":
+                case "minepermits":
+                    var permitList = await _permitService.GetPermitOfflineDatasetAsync();
+                    return Ok(new { data = permitList });
                 case "area":
                 case "areas":
                     var areas = await _context.MasterAreas
