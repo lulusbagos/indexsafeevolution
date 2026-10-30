@@ -608,6 +608,46 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
             data: payload,
           );
         } else if (actionType == 'UnrecognizedQr' || actionType == 'General') {
+          // Double-check SQLite offline cache before giving up
+          final offlinePermit = await _db.getOfflinePermitByQr(rawCode);
+          if (offlinePermit != null) {
+            final daysLeft = offlinePermit['days_left'] as int? ?? 999;
+            final isExpired = offlinePermit['is_expired'] == true || daysLeft < 0;
+            final isWarning30Days = !isExpired && daysLeft <= 30;
+            if (isExpired || isWarning30Days) {
+              _triggerWarningVibration();
+            }
+            await _showResultDialog(
+              isSuccess: true,
+              title: isExpired ? 'Mine Permit Kadaluarsa (Offline)' : 'Mine Permit Terverifikasi (Offline)',
+              message: isExpired
+                  ? 'Mine Permit telah habis masa berlaku! (Data Lokal HP)'
+                  : 'Data Mine Permit terverifikasi dari memori HP.',
+              actionType: 'MinePermit',
+              data: offlinePermit,
+            );
+            return;
+          }
+
+          final offlineSimper = await _db.getOfflineSimperByQr(rawCode);
+          if (offlineSimper != null) {
+            final daysLeft = offlineSimper['days_left'] as int? ?? 999;
+            final isExpired = offlineSimper['is_expired'] == true || daysLeft < 0;
+            final isWarning30Days = !isExpired && daysLeft <= 30;
+            if (isExpired || isWarning30Days) {
+              _triggerWarningVibration();
+            }
+            await _showResultDialog(
+              isSuccess: true,
+              title: isExpired ? 'SIMPER Kadaluarsa (Offline)' : 'SIMPER Terverifikasi (Offline)',
+              message: isExpired
+                  ? 'SIMPER telah habis masa berlaku! (Data Lokal HP)'
+                  : 'Data SIMPER & unit kewenangan terverifikasi dari memori HP.',
+              actionType: 'Simper',
+              data: offlineSimper,
+            );
+            return;
+          }
           await _showResultDialog(
             isSuccess: false,
             title: payload?['is_url'] == true ? 'Tautan Web Terdeteksi' : 'Kode di Luar Sistem',
@@ -3876,6 +3916,8 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
                                                 errMsg.toLowerCase().contains('offline') ||
                                                 errMsg.toLowerCase().contains('socket') ||
                                                 errMsg.toLowerCase().contains('network') ||
+                                                errMsg.toLowerCase().contains('no internet') ||
+                                                errMsg.toLowerCase().contains('internet') ||
                                                 errMsg.toLowerCase().contains('failed host lookup');
 
                                             if (isNetwork) {
@@ -4628,6 +4670,8 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
                                                 errMsg.toLowerCase().contains('offline') ||
                                                 errMsg.toLowerCase().contains('socket') ||
                                                 errMsg.toLowerCase().contains('network') ||
+                                                errMsg.toLowerCase().contains('no internet') ||
+                                                errMsg.toLowerCase().contains('internet') ||
                                                 errMsg.toLowerCase().contains('failed host lookup');
 
                                             if (isNetwork) {

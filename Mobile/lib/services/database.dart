@@ -298,7 +298,7 @@ class DatabaseService {
     if (rawTrim.isEmpty) return null;
     var clean = rawTrim;
 
-    if (clean.contains('/') && !clean.contains('/QrAttendance/Scan/')) {
+    if ((clean.startsWith('http://') || clean.startsWith('https://')) && !clean.contains('/QrAttendance/Scan/')) {
       final segs = clean.split('/').where((s) => s.isNotEmpty).toList();
       if (segs.isNotEmpty) {
         var last = segs.last.trim();
@@ -308,7 +308,9 @@ class DatabaseService {
     }
     if (clean.contains(':')) clean = clean.split(':').last.trim();
     if (clean.contains('|')) clean = clean.split('|').last.trim();
-    if (clean.toUpperCase().startsWith('IC')) clean = clean.substring(2).trim();
+    if (RegExp(r'^IC-?\d+$', caseSensitive: false).hasMatch(clean)) {
+      clean = clean.replaceFirst(RegExp(r'^IC-?', caseSensitive: false), '').trim();
+    }
 
     final cleanNoZero = clean.replaceFirst(RegExp(r'^0+'), '');
 
@@ -408,6 +410,8 @@ class DatabaseService {
           'simper_units': units,
           'photo_url': photoUrl,
           'foto': photoUrl,
+          'can_input_pelanggaran': true,
+          'can_input_keluar_masuk': true,
         };
 
         return result;
@@ -548,7 +552,7 @@ class DatabaseService {
     var clean = rawCode.trim();
     if (clean.isEmpty) return null;
 
-    if (clean.contains('/') && !clean.contains('/QrAttendance/Scan/')) {
+    if ((clean.startsWith('http://') || clean.startsWith('https://')) && !clean.contains('/QrAttendance/Scan/')) {
       final segs = clean.split('/').where((s) => s.isNotEmpty).toList();
       if (segs.isNotEmpty) {
         var last = segs.last.trim();
@@ -558,7 +562,9 @@ class DatabaseService {
     }
     if (clean.contains(':')) clean = clean.split(':').last.trim();
     if (clean.contains('|')) clean = clean.split('|').last.trim();
-    if (clean.toUpperCase().startsWith('IC')) clean = clean.substring(2).trim();
+    if (RegExp(r'^IC-?\d+$', caseSensitive: false).hasMatch(clean)) {
+      clean = clean.replaceFirst(RegExp(r'^IC-?', caseSensitive: false), '').trim();
+    }
 
     final cleanNoZero = clean.replaceFirst(RegExp(r'^0+'), '');
 
