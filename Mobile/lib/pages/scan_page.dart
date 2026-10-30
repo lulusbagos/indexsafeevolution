@@ -484,6 +484,15 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
         // Fallback Mode Offline untuk Mine Permit
         final offlinePermit = await _db.getOfflinePermitByQr(rawCode);
         if (offlinePermit != null) {
+          if (!_canScanMinePermit && !_canScanPermitPelanggaran && !_canScanPermitKeluarMasuk) {
+            await _showResultDialog(
+              isSuccess: false,
+              title: 'Otorisasi Terbatas',
+              message: 'Akun Anda tidak memiliki hak akses untuk memindai Mine Permit. Hubungi Administrator K3 di menu Manajemen User Scan.',
+              actionType: 'Denied',
+            );
+            return;
+          }
           final daysLeft = offlinePermit['days_left'] as int? ?? 999;
           final isExpired = offlinePermit['is_expired'] == true || daysLeft < 0;
           final isWarning30Days = !isExpired && daysLeft <= 30;
@@ -507,6 +516,15 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
         // Fallback Mode Offline untuk SIMPER
         final offlineSimper = await _db.getOfflineSimperByQr(rawCode);
         if (offlineSimper != null) {
+          if (!_canScanSimper && !_canScanMinePermit) {
+            await _showResultDialog(
+              isSuccess: false,
+              title: 'Otorisasi Terbatas',
+              message: 'Akun Anda tidak memiliki hak akses untuk memverifikasi SIMPER. Hubungi Administrator K3 di menu Manajemen User Scan.',
+              actionType: 'Denied',
+            );
+            return;
+          }
           final daysLeft = offlineSimper['days_left'] as int? ?? 999;
           final isExpired = offlineSimper['is_expired'] == true || daysLeft < 0;
           final isWarning30Days = !isExpired && daysLeft <= 30;
@@ -611,6 +629,15 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
           // Double-check SQLite offline cache before giving up
           final offlinePermit = await _db.getOfflinePermitByQr(rawCode);
           if (offlinePermit != null) {
+            if (!_canScanMinePermit && !_canScanPermitPelanggaran && !_canScanPermitKeluarMasuk) {
+              await _showResultDialog(
+                isSuccess: false,
+                title: 'Otorisasi Terbatas',
+                message: 'Akun Anda tidak memiliki hak akses untuk memindai Mine Permit. Hubungi Administrator K3 di menu Manajemen User Scan.',
+                actionType: 'Denied',
+              );
+              return;
+            }
             final daysLeft = offlinePermit['days_left'] as int? ?? 999;
             final isExpired = offlinePermit['is_expired'] == true || daysLeft < 0;
             final isWarning30Days = !isExpired && daysLeft <= 30;
@@ -631,6 +658,15 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
 
           final offlineSimper = await _db.getOfflineSimperByQr(rawCode);
           if (offlineSimper != null) {
+            if (!_canScanSimper && !_canScanMinePermit) {
+              await _showResultDialog(
+                isSuccess: false,
+                title: 'Otorisasi Terbatas',
+                message: 'Akun Anda tidak memiliki hak akses untuk memverifikasi SIMPER. Hubungi Administrator K3 di menu Manajemen User Scan.',
+                actionType: 'Denied',
+              );
+              return;
+            }
             final daysLeft = offlineSimper['days_left'] as int? ?? 999;
             final isExpired = offlineSimper['is_expired'] == true || daysLeft < 0;
             final isWarning30Days = !isExpired && daysLeft <= 30;
