@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../../utils/links.dart';
 import '../../utils/routers.dart';
-import '../../widgets/activity_hub_header.dart';
 
 const _hubInk = Color(0xFF0D2F31);
 
@@ -13,13 +12,8 @@ class ExtraPage extends StatelessWidget {
   Widget build(BuildContext context) => Scaffold(
         backgroundColor: const Color(0xFFF5F9F8),
         body: SafeArea(
-          child: Column(children: [
-            const ActivityHubHeader(
-              title: 'Performance Hub',
-              subtitle: 'Pantau pencapaian, tindak lanjut, dan informasi SAP',
-            ),
-            Expanded(
-                child: CustomScrollView(slivers: [
+          child: CustomScrollView(slivers: [
+              SliverToBoxAdapter(child: _hubHero(context)),
               const SliverPadding(
                 padding: EdgeInsets.fromLTRB(16, 18, 16, 10),
                 sliver: SliverToBoxAdapter(
@@ -48,7 +42,7 @@ class ExtraPage extends StatelessWidget {
                     childCount: listMenuExtra.length,
                   ),
                   gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 3,
+                    crossAxisCount: 2,
                     mainAxisSpacing: 10,
                     crossAxisSpacing: 10,
                     childAspectRatio: .92,
@@ -56,11 +50,17 @@ class ExtraPage extends StatelessWidget {
                 ),
               ),
               const SliverToBoxAdapter(child: SizedBox(height: 24)),
-            ])),
-          ]),
+            ]),
         ),
       );
 }
+
+Widget _hubHero(BuildContext context) => SizedBox(height: 156, child: Stack(children: [
+  Positioned.fill(child: DecoratedBox(decoration: BoxDecoration(gradient: LinearGradient(colors: [const Color(0xFFF8FBFF), const Color(0xFFDDEEFF), const Color(0xFFB9D7FF)])))),
+  Positioned(right: 8, top: 8, bottom: 0, child: Icon(Icons.query_stats_rounded, size: 150, color: const Color(0xFF2563EB).withValues(alpha: .14))),
+  Positioned(top: 10,left: 11,child: Material(color: Colors.white.withValues(alpha:.75),shape: const CircleBorder(),child: InkWell(customBorder: const CircleBorder(),onTap:()=>Navigator.maybePop(context),child: const SizedBox(width:37,height:37,child:Icon(Icons.chevron_left_rounded,color:_hubInk))))),
+  const Positioned(left:18,right:115,bottom:18,child: Column(crossAxisAlignment: CrossAxisAlignment.start,children:[Text('Performance Hub',style:TextStyle(color:_hubInk,fontSize:25,fontWeight:FontWeight.w900)),SizedBox(height:7),Text('Pantau pencapaian, tindak lanjut, dan\ninformasi SAP.',style:TextStyle(color:Color(0xFF64748B),fontSize:11.5,fontWeight:FontWeight.w600))])),
+]));
 
 class _HubModuleCard extends StatelessWidget {
   const _HubModuleCard({required this.index});

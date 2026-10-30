@@ -96,7 +96,8 @@ class _TopBarState extends State<TopBar> {
       }
 
       try {
-        final offlineNotifs = await _db.getOfflineUnreadNotificationCount(months: 3);
+        final offlineNotifs =
+            await _db.getOfflineUnreadNotificationCount(months: 3);
         if (offlineNotifs > count) count = offlineNotifs;
       } catch (_) {}
 
@@ -113,7 +114,8 @@ class _TopBarState extends State<TopBar> {
       builder: (BuildContext context) {
         return Dialog(
           insetPadding: const EdgeInsets.symmetric(horizontal: 28),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
           child: Padding(
             padding: const EdgeInsets.fromLTRB(24, 24, 24, 20),
             child: Column(
@@ -132,7 +134,8 @@ class _TopBarState extends State<TopBar> {
                 ),
                 const SizedBox(height: 18),
                 const Text('Batalkan entri?',
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
+                    style:
+                        TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
                 const SizedBox(height: 8),
                 const Text(
                   'Data yang belum disimpan akan hilang. Anda yakin ingin keluar dari form ini?',
@@ -270,7 +273,9 @@ class _TopBarState extends State<TopBar> {
                     border: Border.all(color: const Color(0xFFE2E8F0)),
                   ),
                   child: Icon(
-                    sync.isOnline ? Icons.sync_rounded : Icons.cloud_off_rounded,
+                    sync.isOnline
+                        ? Icons.sync_rounded
+                        : Icons.cloud_off_rounded,
                     size: 18,
                     color: sync.pendingCount > 0 || !sync.isOnline
                         ? const Color(0xFFDC2626)
@@ -280,17 +285,21 @@ class _TopBarState extends State<TopBar> {
               ),
               if (sync.pendingCount > 0)
                 Positioned(
-                  right: 4,
-                  top: 4,
+                  right: 2,
+                  top: 2,
                   child: Container(
-                    constraints: const BoxConstraints(minWidth: 16),
-                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                    decoration: const BoxDecoration(
+                    constraints:
+                        const BoxConstraints(minWidth: 18, minHeight: 18),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
                       color: Color(0xFFDC2626),
-                      shape: BoxShape.circle,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.white, width: 1.5),
                     ),
                     child: Text(
-                      '${sync.pendingCount}',
+                      sync.pendingCount > 99 ? '99+' : '${sync.pendingCount}',
                       textAlign: TextAlign.center,
                       style: const TextStyle(
                         color: Colors.white,
@@ -329,14 +338,25 @@ class _TopBarState extends State<TopBar> {
             ),
             if (notif > 0)
               Positioned(
-                right: 6,
-                top: 6,
-                child: CircleAvatar(
-                  radius: 7,
-                  backgroundColor: Colors.red,
+                right: 2,
+                top: 2,
+                child: Container(
+                  constraints:
+                      const BoxConstraints(minWidth: 18, minHeight: 18),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEF4444),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.white, width: 1.5),
+                  ),
                   child: Text(
-                    '$notif',
-                    style: const TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.bold),
+                    notif > 99 ? '99+' : '$notif',
+                    style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 9,
+                        fontWeight: FontWeight.w900),
                   ),
                 ),
               ),

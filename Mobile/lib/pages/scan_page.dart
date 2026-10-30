@@ -415,6 +415,8 @@ class _ScanPageState extends State<ScanPage>
             data: payload,
           );
         } else if (actionType == 'Denied') {
+          // Penolakan akses perlu terasa jelas, tanpa mengganggu proses kamera.
+          _triggerWarningVibration();
           await _showResultDialog(
             isSuccess: false,
             title: 'Otorisasi Terbatas',
@@ -492,6 +494,11 @@ class _ScanPageState extends State<ScanPage>
         final isSimper = actionType == 'Simper';
         final isVehicle = actionType == 'Vehicle';
         final isDenied = actionType == 'Denied';
+
+        // Akses ditolak memiliki sheet khusus yang lebih ringkas dan mudah dipahami.
+        if (isDenied) {
+          return _buildAuthorizationDeniedSheet(ctx, data);
+        }
         final isDuplicate = data?['is_duplicate'] == true;
         final isLate = data?['is_late'] == true;
         final eventName = data?['event_name']?.toString() ?? '';
@@ -1282,6 +1289,174 @@ class _ScanPageState extends State<ScanPage>
     );
   }
 
+  Widget _buildAuthorizationDeniedSheet(
+      BuildContext sheetContext, Map<String, dynamic>? data) {
+    final module = data?['module']?.toString() ?? 'Verifikasi dokumen';
+    final requiredPermission = data?['required_permission']?.toString() ?? '';
+
+    return SafeArea(
+      top: false,
+      child: Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        ),
+        padding: EdgeInsets.fromLTRB(
+          20,
+          12,
+          20,
+          MediaQuery.of(sheetContext).padding.bottom + 20,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 42,
+              height: 4,
+              decoration: BoxDecoration(
+                color: const Color(0xFFE2E8F0),
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            const SizedBox(height: 24),
+            Container(
+              width: 68,
+              height: 68,
+              decoration: const BoxDecoration(
+                color: Color(0xFFFFF7ED),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.lock_person_outlined,
+                  size: 32, color: Color(0xFFEA580C)),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Akses belum diizinkan',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 21,
+                fontWeight: FontWeight.w900,
+                color: Color(0xFF0F172A),
+                letterSpacing: -0.35,
+              ),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Maaf, Anda tidak memiliki otorisasi untuk melakukan pemindaian data ini.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 13,
+                color: Color(0xFF64748B),
+                height: 1.45,
+              ),
+            ),
+            const SizedBox(height: 18),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 34,
+                    height: 34,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFEDD5),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.info_outline_rounded,
+                        size: 19, color: Color(0xFFEA580C)),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(module,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w800,
+                              color: Color(0xFF0F172A),
+                            )),
+                        const SizedBox(height: 3),
+                        const Text(
+                          'Minta Administrator HSE/K3 atau pengawas Anda untuk mengaktifkan hak akses pemindaian akun ini.',
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            color: Color(0xFF64748B),
+                            height: 1.35,
+                          ),
+                        ),
+                        if (requiredPermission.isNotEmpty &&
+                            requiredPermission != '-') ...[
+                          const SizedBox(height: 9),
+                          Text(
+                            'Izin yang diperlukan: $requiredPermission',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 10.5,
+                              color: Color(0xFF475569),
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+            Row(children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () => Navigator.pop(sheetContext),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFF475569),
+                    side: const BorderSide(color: Color(0xFFCBD5E1)),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(13)),
+                  ),
+                  child: const Text('Tutup',
+                      style: TextStyle(fontWeight: FontWeight.w800)),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: () {
+                    Navigator.pop(sheetContext);
+                    _scannerController?.start();
+                  },
+                  style: ElevatedButton.styleFrom(
+                    elevation: 0,
+                    backgroundColor: const Color(0xFF2563EB),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(13)),
+                  ),
+                  icon: const Icon(Icons.qr_code_scanner_rounded, size: 18),
+                  label: const Text('Pindai ulang',
+                      style: TextStyle(fontWeight: FontWeight.w800)),
+                ),
+              ),
+            ]),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildDeniedCard(Map<String, dynamic>? data) {
     final module = data?['module']?.toString() ?? 'Modul K3 Terbatas';
     final perm = data?['required_permission']?.toString() ?? '-';
@@ -1541,26 +1716,44 @@ class _ScanPageState extends State<ScanPage>
         .where((z) => z.isNotEmpty)
         .toList();
 
+    // Hasil scan harus terasa seperti dokumen resmi, bukan panel teknis.
+    return _buildCleanCredentialCard(
+      data: data,
+      credentialType: 'MINE PERMIT',
+      credentialNumber: nomor,
+      name: nama,
+      nik: nik,
+      company: perusahaan,
+      department: departemen,
+      position: jabatan,
+      issuedDate: tanggal,
+      validUntil: masaAktif,
+      status: status,
+      daysLeft: daysLeft,
+      isExpired: isExpired,
+      isWarning: isWarning,
+      zones: zones,
+      units: const [],
+      extraLabel: data['has_simper'] == true
+          ? 'SIMPER ${data['is_simper_active'] == true ? 'aktif' : 'tercatat'}'
+          : null,
+    );
+
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
-        color: const Color(0xFF0F172A),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(22),
         border: Border.all(
           color: isExpired
-              ? const Color(0xFFEF4444)
-              : (isWarning ? const Color(0xFFF59E0B) : const Color(0xFF38BDF8)),
-          width: 1.8,
+              ? const Color(0xFFFECACA)
+              : (isWarning ? const Color(0xFFFDE68A) : const Color(0xFFE2E8F0)),
+          width: 1,
         ),
         boxShadow: [
           BoxShadow(
-            color: (isExpired
-                    ? const Color(0xFFEF4444)
-                    : (isWarning
-                        ? const Color(0xFFF59E0B)
-                        : const Color(0xFF0284C7)))
-                .withValues(alpha: .28),
-            blurRadius: 20,
+            color: const Color(0xFF0F172A).withValues(alpha: .08),
+            blurRadius: 16,
             offset: const Offset(0, 6),
           ),
         ],
@@ -1660,10 +1853,9 @@ class _ScanPageState extends State<ScanPage>
                   padding:
                       const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF1E293B),
+                    color: const Color(0xFFF8FAFC),
                     borderRadius: BorderRadius.circular(12),
-                    border:
-                        Border.all(color: const Color(0xFF0EA5E9), width: 1.5),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
                   ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1671,7 +1863,7 @@ class _ScanPageState extends State<ScanPage>
                       Row(
                         children: [
                           const Icon(Icons.badge_outlined,
-                              size: 19, color: Color(0xFF38BDF8)),
+                              size: 19, color: Color(0xFF2563EB)),
                           const SizedBox(width: 8),
                           Text(
                             nomor.isNotEmpty && nomor != '-'
@@ -1680,7 +1872,7 @@ class _ScanPageState extends State<ScanPage>
                             style: const TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w900,
-                              color: Colors.white,
+                              color: Color(0xFF0F172A),
                               letterSpacing: 0.5,
                             ),
                           ),
@@ -1690,17 +1882,16 @@ class _ScanPageState extends State<ScanPage>
                         padding: const EdgeInsets.symmetric(
                             horizontal: 8, vertical: 3),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF0284C7).withValues(alpha: .3),
+                          color: const Color(0xFFEFF6FF),
                           borderRadius: BorderRadius.circular(6),
-                          border: Border.all(
-                              color: const Color(0xFF38BDF8), width: 1),
+                          border: Border.all(color: const Color(0xFFBFDBFE)),
                         ),
                         child: Text(
                           pengajuan,
                           style: const TextStyle(
                             fontSize: 10.5,
                             fontWeight: FontWeight.w900,
-                            color: Color(0xFF38BDF8),
+                            color: Color(0xFF2563EB),
                           ),
                         ),
                       ),
@@ -2245,6 +2436,26 @@ class _ScanPageState extends State<ScanPage>
       if (u is Map) return Map<String, dynamic>.from(u);
       return <String, dynamic>{};
     }).toList();
+
+    return _buildCleanCredentialCard(
+      data: data,
+      credentialType: 'SIMPER',
+      credentialNumber: nomor,
+      name: nama,
+      nik: nik,
+      company: perusahaan,
+      department: departemen,
+      position: jabatan,
+      issuedDate: expiredDate,
+      validUntil: masaBerlaku,
+      status: status,
+      daysLeft: daysLeft,
+      isExpired: isExpired,
+      isWarning: isWarning,
+      zones: const [],
+      units: units,
+      extraLabel: 'SIM $jenisSim${nomorSim != '-' ? ' • $nomorSim' : ''}',
+    );
 
     return Container(
       width: double.infinity,
@@ -3060,6 +3271,455 @@ class _ScanPageState extends State<ScanPage>
         ],
       ),
     );
+  }
+
+  Widget _buildCleanCredentialCard({
+    required Map<String, dynamic> data,
+    required String credentialType,
+    required String credentialNumber,
+    required String name,
+    required String nik,
+    required String company,
+    required String department,
+    required String position,
+    required String issuedDate,
+    required String validUntil,
+    required String status,
+    required int daysLeft,
+    required bool isExpired,
+    required bool isWarning,
+    required List<String> zones,
+    required List<Map<String, dynamic>> units,
+    String? extraLabel,
+  }) {
+    final Color stateColor = isExpired
+        ? const Color(0xFFDC2626)
+        : (isWarning ? const Color(0xFFD97706) : const Color(0xFF059669));
+    final Color stateBackground = isExpired
+        ? const Color(0xFFFEF2F2)
+        : (isWarning ? const Color(0xFFFFFBEB) : const Color(0xFFECFDF5));
+    final photoUrl = (data['photo_url'] ?? data['foto'] ?? '').toString();
+    final fullPhotoUrl = photoUrl.startsWith('http')
+        ? photoUrl
+        : photoUrl.isNotEmpty
+            ? '${_api.baseUrl}$photoUrl'
+            : '';
+    final phone = data['no_hp']?.toString() ?? '';
+    final email = data['email']?.toString() ?? '';
+
+    Widget infoCell(String label, String value, IconData icon,
+        {Color? valueColor}) {
+      return Expanded(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(children: [
+                Icon(icon, size: 14, color: const Color(0xFF64748B)),
+                const SizedBox(width: 5),
+                Expanded(
+                  child: Text(label,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                          fontSize: 10,
+                          color: Color(0xFF64748B),
+                          fontWeight: FontWeight.w600)),
+                ),
+              ]),
+              const SizedBox(height: 5),
+              Text(value,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                      fontSize: 12,
+                      color: valueColor ?? const Color(0xFF0F172A),
+                      fontWeight: FontWeight.w800)),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: const [
+          BoxShadow(
+              color: Color(0x140F172A), blurRadius: 18, offset: Offset(0, 6)),
+        ],
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
+          decoration: BoxDecoration(
+            color: stateBackground,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(19)),
+            border: Border(
+                bottom: BorderSide(color: stateColor.withValues(alpha: .18))),
+          ),
+          child: Row(children: [
+            Container(
+              width: 34,
+              height: 34,
+              decoration: BoxDecoration(
+                  color: stateColor.withValues(alpha: .12),
+                  shape: BoxShape.circle),
+              child: Icon(
+                  isExpired
+                      ? Icons.error_outline_rounded
+                      : Icons.verified_user_outlined,
+                  color: stateColor,
+                  size: 19),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                  company.isEmpty || company == '-'
+                      ? 'PT INDEXIM COALINDO'
+                      : company,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                      fontSize: 12,
+                      color: Color(0xFF0F172A),
+                      fontWeight: FontWeight.w800)),
+            ),
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+              decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: stateColor.withValues(alpha: .35))),
+              child: Text(
+                  isExpired
+                      ? 'TIDAK AKTIF'
+                      : (isWarning ? 'SEGERA HABIS' : 'AKTIF'),
+                  style: TextStyle(
+                      fontSize: 9.5,
+                      color: stateColor,
+                      fontWeight: FontWeight.w900)),
+            ),
+          ]),
+        ),
+        Padding(
+          padding: const EdgeInsets.all(16),
+          child:
+              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(children: [
+              const Icon(Icons.badge_outlined,
+                  size: 18, color: Color(0xFF2563EB)),
+              const SizedBox(width: 7),
+              Expanded(
+                  child: Text(
+                      credentialNumber.isEmpty || credentialNumber == '-'
+                          ? 'NOMOR BELUM TERDATA'
+                          : credentialNumber,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                          fontSize: 15,
+                          color: Color(0xFF0F172A),
+                          fontWeight: FontWeight.w900))),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                    color: const Color(0xFFEFF6FF),
+                    borderRadius: BorderRadius.circular(7)),
+                child: Text(credentialType,
+                    style: const TextStyle(
+                        fontSize: 9.5,
+                        color: Color(0xFF2563EB),
+                        fontWeight: FontWeight.w900)),
+              ),
+            ]),
+            const SizedBox(height: 16),
+            Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              GestureDetector(
+                onTap: () => _showPhotoPreviewDialog(
+                    context: context,
+                    photoUrl: fullPhotoUrl,
+                    name: name,
+                    nik: nik,
+                    company: company,
+                    job: position),
+                child: Container(
+                  width: 64,
+                  height: 64,
+                  decoration: BoxDecoration(
+                      color: const Color(0xFFEFF6FF),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: const Color(0xFFBFDBFE))),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(15),
+                    child: fullPhotoUrl.isNotEmpty
+                        ? Image.network(fullPhotoUrl,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => Center(
+                                child: Text(
+                                    name.isNotEmpty
+                                        ? name[0].toUpperCase()
+                                        : '?',
+                                    style: const TextStyle(
+                                        fontSize: 24,
+                                        color: Color(0xFF2563EB),
+                                        fontWeight: FontWeight.w800))))
+                        : Center(
+                            child: Text(
+                                name.isNotEmpty ? name[0].toUpperCase() : '?',
+                                style: const TextStyle(
+                                    fontSize: 24,
+                                    color: Color(0xFF2563EB),
+                                    fontWeight: FontWeight.w800))),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                  child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                    Text(
+                        name.isEmpty || name == '-'
+                            ? 'Nama tidak tersedia'
+                            : name,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                            fontSize: 17,
+                            color: Color(0xFF0F172A),
+                            fontWeight: FontWeight.w900)),
+                    const SizedBox(height: 3),
+                    Text('NIK: $nik',
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                            fontSize: 12,
+                            color: Color(0xFF2563EB),
+                            fontWeight: FontWeight.w800)),
+                    if (department.isNotEmpty && department != '-')
+                      Text(department,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                              fontSize: 11.5,
+                              color: Color(0xFF64748B),
+                              fontWeight: FontWeight.w600)),
+                    if (position.isNotEmpty && position != '-')
+                      Text(position,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                              fontSize: 11.5,
+                              color: Color(0xFF475569),
+                              fontWeight: FontWeight.w700)),
+                  ])),
+            ]),
+            if (phone.isNotEmpty || email.isNotEmpty) ...[
+              const SizedBox(height: 14),
+              Container(
+                width: double.infinity,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 11, vertical: 9),
+                decoration: BoxDecoration(
+                    color: const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(11),
+                    border: Border.all(color: const Color(0xFFE2E8F0))),
+                child: Wrap(spacing: 14, runSpacing: 5, children: [
+                  if (phone.isNotEmpty && phone != '-')
+                    _cleanContact(Icons.phone_iphone_rounded, phone),
+                  if (email.isNotEmpty && email != '-')
+                    _cleanContact(Icons.mail_outline_rounded, email),
+                ]),
+              ),
+            ],
+            const SizedBox(height: 14),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+              decoration: BoxDecoration(
+                  color: const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(13),
+                  border: Border.all(color: const Color(0xFFE2E8F0))),
+              child: Row(children: [
+                infoCell('Tanggal terbit', _formatDateOnly(issuedDate),
+                    Icons.event_outlined),
+                Container(width: 1, height: 42, color: const Color(0xFFE2E8F0)),
+                infoCell('Berlaku hingga', _formatDateOnly(validUntil),
+                    Icons.verified_outlined,
+                    valueColor: stateColor),
+              ]),
+            ),
+            const SizedBox(height: 10),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 9),
+              decoration: BoxDecoration(
+                  color: stateBackground,
+                  borderRadius: BorderRadius.circular(10)),
+              child: Row(children: [
+                Icon(isExpired ? Icons.error_outline : Icons.schedule_outlined,
+                    size: 16, color: stateColor),
+                const SizedBox(width: 7),
+                Expanded(
+                    child: Text(
+                        isExpired
+                            ? 'Dokumen sudah kedaluwarsa'
+                            : (isWarning
+                                ? 'Masa berlaku akan segera berakhir'
+                                : 'Sisa masa aktif: $daysLeft hari'),
+                        style: TextStyle(
+                            fontSize: 11.5,
+                            color: stateColor,
+                            fontWeight: FontWeight.w800))),
+                Text(status.toUpperCase(),
+                    style: const TextStyle(
+                        fontSize: 10,
+                        color: Color(0xFF64748B),
+                        fontWeight: FontWeight.w700)),
+              ]),
+            ),
+            if (extraLabel != null) ...[
+              const SizedBox(height: 12),
+              _cleanSection(
+                  label: extraLabel,
+                  icon: Icons.fact_check_outlined,
+                  color: const Color(0xFF2563EB)),
+            ],
+            if (units.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              const Text('Unit yang diizinkan',
+                  style: TextStyle(
+                      fontSize: 13,
+                      color: Color(0xFF0F172A),
+                      fontWeight: FontWeight.w900)),
+              const SizedBox(height: 8),
+              ...units.map((unit) => _cleanUnitTile(unit)),
+            ],
+            if (zones.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              const Text('Akses area operasional',
+                  style: TextStyle(
+                      fontSize: 13,
+                      color: Color(0xFF0F172A),
+                      fontWeight: FontWeight.w900)),
+              const SizedBox(height: 8),
+              Wrap(
+                  spacing: 7,
+                  runSpacing: 7,
+                  children: zones
+                      .map((zone) => Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 7),
+                          decoration: BoxDecoration(
+                              color: const Color(0xFFECFDF5),
+                              borderRadius: BorderRadius.circular(8),
+                              border:
+                                  Border.all(color: const Color(0xFFA7F3D0))),
+                          child: Text(zone,
+                              style: const TextStyle(
+                                  fontSize: 11,
+                                  color: Color(0xFF047857),
+                                  fontWeight: FontWeight.w800))))
+                      .toList()),
+            ],
+          ]),
+        ),
+      ]),
+    );
+  }
+
+  Widget _cleanContact(IconData icon, String text) =>
+      Row(mainAxisSize: MainAxisSize.min, children: [
+        Icon(icon, size: 14, color: const Color(0xFF64748B)),
+        const SizedBox(width: 5),
+        ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 190),
+            child: Text(text,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                    fontSize: 11,
+                    color: Color(0xFF475569),
+                    fontWeight: FontWeight.w600)))
+      ]);
+
+  Widget _cleanSection(
+          {required String label,
+          required IconData icon,
+          required Color color}) =>
+      Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 9),
+          decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: const Color(0xFFE2E8F0))),
+          child: Row(children: [
+            Icon(icon, size: 16, color: color),
+            const SizedBox(width: 7),
+            Expanded(
+                child: Text(label,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                        fontSize: 11.5,
+                        color: Color(0xFF334155),
+                        fontWeight: FontWeight.w800)))
+          ]));
+
+  Widget _cleanUnitTile(Map<String, dynamic> unit) {
+    final unitName = (unit['kendaraan']?.toString() ??
+            unit['unit']?.toString() ??
+            'Unit operasional')
+        .trim();
+    final classification = (unit['equipment_classification']?.toString() ??
+            unit['equipment_type']?.toString() ??
+            '')
+        .trim();
+    final authority = (unit['kewenangan']?.toString() ?? 'Diizinkan').trim();
+    return Container(
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 10),
+        decoration: BoxDecoration(
+            color: const Color(0xFFF8FAFC),
+            borderRadius: BorderRadius.circular(11),
+            border: Border.all(color: const Color(0xFFE2E8F0))),
+        child: Row(children: [
+          Container(
+              width: 34,
+              height: 34,
+              decoration: BoxDecoration(
+                  color: const Color(0xFFEFF6FF),
+                  borderRadius: BorderRadius.circular(9)),
+              child: const Icon(Icons.construction_outlined,
+                  size: 18, color: Color(0xFF2563EB))),
+          const SizedBox(width: 10),
+          Expanded(
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                Text(unitName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                        fontSize: 12,
+                        color: Color(0xFF0F172A),
+                        fontWeight: FontWeight.w800)),
+                if (classification.isNotEmpty)
+                  Text(classification,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                          fontSize: 10.5, color: Color(0xFF64748B)))
+              ])),
+          const SizedBox(width: 8),
+          Text(authority,
+              style: const TextStyle(
+                  fontSize: 9.5,
+                  color: Color(0xFF059669),
+                  fontWeight: FontWeight.w900))
+        ]));
   }
 
   Widget _buildPermitDateItem({
