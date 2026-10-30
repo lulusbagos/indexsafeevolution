@@ -10,7 +10,6 @@ import '../utils/globals.dart' as globals;
 import '../utils/helpers.dart';
 import '../widgets/snackbar_msg.dart';
 import 'home_page.dart';
-import 'login_page.dart';
 
 class SyncPage extends StatefulWidget {
   const SyncPage(this.profile, {super.key});
@@ -46,25 +45,24 @@ class _SyncPageState extends State<SyncPage> {
   ];
 
   final _friendlyNames = {
-    'enum': 'Master Status & Referensi',
-    'bridges': 'Jembatan Referensi',
-    'inspection': 'Format Inspeksi Tambang',
+    'enum': 'Status & Referensi',
+    'bridges': 'Data Jembatan',
+    'inspection': 'Format Inspeksi',
     'hazard': 'Kategori Bahaya & Resiko',
-    'coaching': 'Modul Edukasi & Coaching',
+    'coaching': 'Modul Coaching',
     'k3': 'Standar Keselamatan K3',
-    'observation': 'Pedoman Observasi Lapangan',
+    'observation': 'Pedoman Observasi',
     'p2h': 'Pemeriksaan Harian Unit (P2H)',
     'p5m': 'Topik Keselamatan P5M',
-    'safety': 'Aturan & Regulasi Safety',
-    'employee': 'Otoritas & Pengawas Lapangan (PJA)',
-    'vehicle': 'Daftar Alat Berat & Kendaraan',
+    'safety': 'Aturan & Regulasi K3',
+    'employee': 'Data Karyawan & Pengawas',
+    'vehicle': 'Daftar Kendaraan & Unit',
     'areas': 'Area Utama Tambang',
     'benchmarks': 'Detail Lokasi & Benchmark',
-    'simper': 'Data SIMPER (Siap Scan Offline)',
-    'permit': 'Data Mine Permit (Siap Scan Offline)',
+    'simper': 'Data SIMPER',
+    'permit': 'Data Mine Permit',
   };
 
-  String _name = '';
   String _table = '...';
   int _currentStep = 1;
 
@@ -75,8 +73,6 @@ class _SyncPageState extends State<SyncPage> {
     globals.currentPage = 0;
 
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      setState(
-          () => _name = (widget.profile?.namaLengkap?.split(' ')[0] ?? ''));
       try {
         final sqldb = await _db.database;
         var master = <String, int>{};
@@ -157,8 +153,7 @@ class _SyncPageState extends State<SyncPage> {
                   PreferenceService.setDataSync(master);
                 },
                 (response) async {
-                  final items = response as List<dynamic>;
-                  final count = await _db.saveOfflineSimpers(items);
+                  final count = await _db.saveOfflineSimpers(response);
                   debugPrint('[SyncPage] Saved $count offline SIMPERs');
                   _progress.value = 100;
                   master[name] = 1;
@@ -183,8 +178,7 @@ class _SyncPageState extends State<SyncPage> {
                   PreferenceService.setDataSync(master);
                 },
                 (response) async {
-                  final items = response as List<dynamic>;
-                  final count = await _db.saveOfflinePermits(items);
+                  final count = await _db.saveOfflinePermits(response);
                   debugPrint('[SyncPage] Saved $count offline Mine Permits');
                   _progress.value = 100;
                   master[name] = 1;
@@ -347,9 +341,9 @@ class _SyncPageState extends State<SyncPage> {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF0D5C75).withOpacity(0.08),
+                      color: const Color(0xFF0D5C75).withValues(alpha: 0.08),
                       borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: const Color(0xFF0D5C75).withOpacity(0.2)),
+                      border: Border.all(color: const Color(0xFF0D5C75).withValues(alpha: 0.2)),
                     ),
                     child: const Row(
                       mainAxisSize: MainAxisSize.min,
@@ -378,7 +372,7 @@ class _SyncPageState extends State<SyncPage> {
                 child: Center(
                   child: Container(
                     width: double.infinity,
-                    padding: const EdgeInsets.all(20),
+                    padding: const EdgeInsets.all(24),
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(24),
@@ -391,50 +385,16 @@ class _SyncPageState extends State<SyncPage> {
                         ),
                       ],
                     ),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(16),
-                          child: const Image(
-                            image: AssetImage('assets/images/data-sync.gif'),
-                            width: 200,
-                            height: 160,
-                            fit: BoxFit.contain,
-                          ),
+                    child: const Center(
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.all(Radius.circular(16)),
+                        child: Image(
+                          image: AssetImage('assets/images/data-sync.gif'),
+                          width: 220,
+                          height: 180,
+                          fit: BoxFit.contain,
                         ),
-                        const SizedBox(height: 14),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFF1F5F9),
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Container(
-                                width: 8,
-                                height: 8,
-                                decoration: const BoxDecoration(
-                                  color: Color(0xFF10B981),
-                                  shape: BoxShape.circle,
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              const Text(
-                                'Sinkronisasi Otomatis Database Lokal',
-                                style: TextStyle(
-                                  fontSize: 11.5,
-                                  fontWeight: FontWeight.w600,
-                                  color: Color(0xFF334155),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
+                      ),
                     ),
                   ),
                 ),
@@ -442,60 +402,13 @@ class _SyncPageState extends State<SyncPage> {
 
               const SizedBox(height: 16),
 
-              // 3. User Welcome Card
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: const Color(0xFFE2E8F0)),
-                  boxShadow: const [
-                    BoxShadow(
-                      color: Color(0x06000000),
-                      blurRadius: 16,
-                      offset: Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  children: [
-                    Text(
-                      'Halo ${titleCase(_name)}, Semangat Pagi!',
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        fontSize: 15.5,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF0F172A),
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      (globals.reSync == true)
-                          ? 'Sedang melakukan sinkronisasi ulang seluruh master data tambang...'
-                          : (_dataSync != null && _dataSync!.length < _masters.length)
-                              ? 'Memperbarui master data referensi inspeksi yang belum lengkap...'
-                              : 'Selamat datang di aplikasi MBS SAP! Menyiapkan data operasional tambang & referensi keselamatan kerja.',
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: Color(0xFF475569),
-                        height: 1.4,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 14),
-
-              // 4. Modern Active Progress Card
+              // 3. Progress Card
               ValueListenableBuilder(
                 valueListenable: _progress,
                 builder: (context, value, snapshot) {
                   return Container(
                     width: double.infinity,
-                    padding: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.all(18),
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(20),
@@ -520,7 +433,7 @@ class _SyncPageState extends State<SyncPage> {
                                 Container(
                                   padding: const EdgeInsets.all(6),
                                   decoration: BoxDecoration(
-                                    color: const Color(0xFF0D5C75).withOpacity(0.12),
+                                    color: const Color(0xFF0D5C75).withValues(alpha: 0.12),
                                     borderRadius: BorderRadius.circular(8),
                                   ),
                                   child: const Icon(
@@ -542,7 +455,7 @@ class _SyncPageState extends State<SyncPage> {
                               ],
                             ),
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                               decoration: BoxDecoration(
                                 color: const Color(0xFFF1F5F9),
                                 borderRadius: BorderRadius.circular(12),
@@ -551,7 +464,7 @@ class _SyncPageState extends State<SyncPage> {
                               child: Text(
                                 'Tahap $_currentStep dari ${_masters.length}',
                                 style: const TextStyle(
-                                  fontSize: 10.5,
+                                  fontSize: 11,
                                   fontWeight: FontWeight.bold,
                                   color: Color(0xFF475569),
                                 ),
@@ -560,31 +473,31 @@ class _SyncPageState extends State<SyncPage> {
                           ],
                         ),
 
-                        const SizedBox(height: 12),
+                        const SizedBox(height: 14),
 
                         // Active Table / Module Name
                         Text(
                           _table,
                           style: const TextStyle(
-                            fontSize: 14.5,
+                            fontSize: 15.5,
                             fontWeight: FontWeight.bold,
                             color: Color(0xFF0F172A),
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
-                        const SizedBox(height: 2),
+                        const SizedBox(height: 4),
                         const Text(
-                          'Mengunduh & memvalidasi tabel referensi lokal...',
+                          'Memperbarui data referensi...',
                           style: TextStyle(
-                            fontSize: 11,
+                            fontSize: 11.5,
                             color: Color(0xFF64748B),
                           ),
                         ),
 
                         const SizedBox(height: 14),
 
-                        // Modern Progress Bar
+                        // Progress Bar
                         LinearPercentIndicator(
                           padding: EdgeInsets.zero,
                           barRadius: const Radius.circular(8),
@@ -596,24 +509,24 @@ class _SyncPageState extends State<SyncPage> {
                           ),
                         ),
 
-                        const SizedBox(height: 8),
+                        const SizedBox(height: 10),
 
                         // Percentage & Status
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Text(
-                              '${_progress.value}% Selesai',
+                              '${_progress.value}%',
                               style: const TextStyle(
-                                fontSize: 12.5,
+                                fontSize: 13,
                                 fontWeight: FontWeight.bold,
                                 color: Color(0xFF0F172A),
                               ),
                             ),
                             Text(
-                              _progress.value == 100 ? 'Data Tersinkron' : 'Sedang Memproses...',
+                              _progress.value == 100 ? 'Selesai' : 'Sedang Memproses...',
                               style: TextStyle(
-                                fontSize: 11,
+                                fontSize: 11.5,
                                 fontWeight: FontWeight.w600,
                                 color: _progress.value == 100 ? const Color(0xFF10B981) : const Color(0xFF0D5C75),
                               ),
@@ -626,37 +539,7 @@ class _SyncPageState extends State<SyncPage> {
                 },
               ),
 
-              const SizedBox(height: 14),
-
-              // 5. Offline-Ready Assurance Footer
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFECFDF5),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: const Color(0xFFA7F3D0)),
-                ),
-                child: const Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.offline_pin_rounded, size: 16, color: Color(0xFF059669)),
-                    SizedBox(width: 8),
-                    Flexible(
-                      child: Text(
-                        'Data tersimpan aman di HP untuk mode offline tanpa sinyal.',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          color: Color(0xFF065F46),
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 8),
+              const SizedBox(height: 12),
             ],
           ),
         ),
