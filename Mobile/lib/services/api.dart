@@ -677,6 +677,19 @@ class ApiService {
         return const Left({'message': 'No internet access!'});
       }
 
+      final targets = _buildCandidateUrls('/master/$name?limit=10000');
+      for (final url in targets) {
+        try {
+          final res = await dio.get(url);
+          if (res.statusCode == 200 && res.data != null) {
+            if (res.data is List) {
+              return Right({'data': res.data});
+            }
+            return Right(Map<String, dynamic>.from(res.data as Map));
+          }
+        } catch (_) {}
+      }
+
       var res = await dio.get('/master/$name?limit=10000');
       if (res.data is List) {
         return Right({'data': res.data});
@@ -774,7 +787,11 @@ class ApiService {
   Future<Map<String, int>> getNotificationCounts() async {
     try {
       dio.options.headers['Authorization'] = 'Bearer $getToken';
-      var res = await dio.get('/notifications/count');
+      final fastOptions = Options(
+        sendTimeout: const Duration(seconds: 4),
+        receiveTimeout: const Duration(seconds: 4),
+      );
+      var res = await dio.get('/notifications/count', options: fastOptions);
       if (res.data is Map) {
         final m = res.data as Map;
         final unread = (m['unread_count'] as num?)?.toInt() ?? 0;
@@ -789,22 +806,6 @@ class ApiService {
       }
       return {'unread': 0, 'unactioned': 0, 'total': 0};
     } catch (_) {
-      try {
-        var resFallback =
-            await dio.get('/notifications', queryParameters: {'limit': 1});
-        if (resFallback.data is Map) {
-          final m = resFallback.data as Map;
-          final unread = (m['unread_count'] as num?)?.toInt() ?? 0;
-          final unactioned = (m['unactioned_count'] as num?)?.toInt() ?? 0;
-          final total = (m['total_pending_count'] as num?)?.toInt() ??
-              (unread + unactioned);
-          return {
-            'unread': unread,
-            'unactioned': unactioned,
-            'total': total,
-          };
-        }
-      } catch (_) {}
       return {'unread': 0, 'unactioned': 0, 'total': 0};
     }
   }
@@ -817,7 +818,11 @@ class ApiService {
       if (sinceId != null && sinceId > 0) {
         params['sinceId'] = sinceId;
       }
-      var res = await dio.get('/notifications', queryParameters: params);
+      final fastOptions = Options(
+        sendTimeout: const Duration(seconds: 4),
+        receiveTimeout: const Duration(seconds: 5),
+      );
+      var res = await dio.get('/notifications', queryParameters: params, options: fastOptions);
       if (res.data is Map && res.data['data'] is List) {
         final list = (res.data['data'] as List)
             .map((item) => NotificationItemModel.fromJson(
@@ -2044,6 +2049,74 @@ class ApiService {
     } on DioException catch (err) {
       return Left(errorHandler(err));
     }
+  }
+
+  Future<Either<Map, List<dynamic>>> getSimperOfflineDataset() async {
+    final token = getToken;
+    final headers = <String, dynamic>{
+      'Accept': 'application/json',
+      if (token.isNotEmpty && !token.startsWith('offline_token_')) 'Authorization': 'Bearer $token',
+    };
+    final targets = [
+      'https://api_mbs.indexim.id/api/qr/simper/offline-dataset',
+      'http://127.0.0.1:7302/api/qr/simper/offline-dataset',
+      'http://192.168.130.236:7302/api/qr/simper/offline-dataset',
+      'https://api_mbs.idcoal.id/api/qr/simper/offline-dataset',
+    ];
+    for (final url in targets) {
+      try {
+        debugPrint('[ApiService] Mengunduh SIMPER offline dari: ' + url);
+        final client = Dio(BaseOptions(
+          headers: headers,
+          connectTimeout: const Duration(seconds: 3),
+          receiveTimeout: const Duration(seconds: 30),
+          responseType: ResponseType.json,
+        ));
+        final res = await client.get(url);
+        if (res.statusCode == 200 && res.data is Map && res.data['data'] is List) {
+          final count = (res.data['data'] as List).length;
+          debugPrint('[ApiService] Sukses mengunduh SIMPER offline dari ' + url + ' total: ' + count.toString());
+          return Right(res.data['data'] as List<dynamic>);
+        }
+      } catch (e) {
+        debugPrint('[ApiService] Gagal SIMPER ' + url + ' error: ' + e.toString());
+      }
+    }
+    return const Left({'message': 'Gagal mengunduh dataset SIMPER offline'});
+  }
+
+  Future<Either<Map, List<dynamic>>> getPermitOfflineDataset() async {
+    final token = getToken;
+    final headers = <String, dynamic>{
+      'Accept': 'application/json',
+      if (token.isNotEmpty && !token.startsWith('offline_token_')) 'Authorization': 'Bearer $token',
+    };
+    final targets = [
+      'https://api_mbs.indexim.id/api/qr/permit/offline-dataset',
+      'http://127.0.0.1:7302/api/qr/permit/offline-dataset',
+      'http://192.168.130.236:7302/api/qr/permit/offline-dataset',
+      'https://api_mbs.idcoal.id/api/qr/permit/offline-dataset',
+    ];
+    for (final url in targets) {
+      try {
+        debugPrint('[ApiService] Mengunduh Permit offline dari: ' + url);
+        final client = Dio(BaseOptions(
+          headers: headers,
+          connectTimeout: const Duration(seconds: 3),
+          receiveTimeout: const Duration(seconds: 40),
+          responseType: ResponseType.json,
+        ));
+        final res = await client.get(url);
+        if (res.statusCode == 200 && res.data is Map && res.data['data'] is List) {
+          final count = (res.data['data'] as List).length;
+          debugPrint('[ApiService] Sukses mengunduh Permit offline dari ' + url + ' total: ' + count.toString());
+          return Right(res.data['data'] as List<dynamic>);
+        }
+      } catch (e) {
+        debugPrint('[ApiService] Gagal Permit ' + url + ' error: ' + e.toString());
+      }
+    }
+    return const Left({'message': 'Gagal mengunduh dataset Mine Permit offline'});
   }
 
   Future<Either<Map, List<dynamic>>> getAttendanceHistory() async {

@@ -56,3 +56,26 @@
    * Pada [RosterController.cs](file:///d:/4.%20PROJECT/13.%20Mobile/Indexsafe%20Evolution/Backend/Controllers/RosterController.cs#L17), [QrController.cs](file:///d:/4.%20PROJECT/13.%20Mobile/Indexsafe%20Evolution/Backend/Controllers/QrController.cs#L35), dan [TransactionController.cs](file:///d:/4.%20PROJECT/13.%20Mobile/Indexsafe%20Evolution/Backend/Controllers/TransactionController.cs#L25), diterapkan `[AllowAnonymous]` dengan *fallback* identifikasi NIK melalui `X-User-Nik`.
    * Pada [api.dart](file:///d:/4.%20PROJECT/13.%20Mobile/Indexsafe%20Evolution/Mobile/lib/services/api.dart#L147), interceptor otomatis menyertakan `X-User-Nik` pada setiap panggilan API.
 2. **Hasil**: Seluruh menu (Roster, QR Scan, Hazard, Inspeksi) tidak akan pernah lagi terganggu atau diblokir oleh pesan *"Sesi login Anda telah berakhir atau token tidak valid"*.
+
+## REQ-07: Scan QR Mode Offline (SIMPER & Mine Permit), Anti-Panas, & Resiliensi Multi-Endpoint
+1. **Analisis Akar Masalah (Root Cause of 'No Internet Access' Error)**:
+   * **Database Kosong Sebelum Sinkronisasi**: Pengguna menguji scan saat mode offline, namun memori SQLite lokal ('tbl_m_permit_offline' & 'tbl_m_simper_offline') masih 0 baris karena dataset belum tersinkronkan ke HP.
+   * **Pesan Error Membingungkan**: Saat scanner offline mendapati database lokal kosong dan tidak ada koneksi, sistem menampilkan 'No internet access!'.
+   * **Pemotongan Karakter QR Berbahaya**: Fungsi parsing QR memotong string berkarakter '/' dan prefix 'IC', merusak Base64 QR SIMPER (misal: '+zISBycQ/TorDibELarITA==') dan nomor SIMPER 'IC-UDU/...'.
+   * **Endpoint Server Publik 404**: Backend yang di-publish ke 'D:\Publish\Backend Indexsafe' baru ada di PC lokal dan belum diunggah ke server publik 'https://api_mbs.indexim.id'.
+   * **Antrean Offline Bypass**: String error 'No internet access!' tidak dikenali oleh validator jaringan saat submit pelanggaran dan gerbang keluar-masuk, sehingga data tidak masuk antrean offline.
+
+2. **Perbaikan & Penguatan yang Diterapkan**:
+   * **SQLite Multi-Identifier Match**:
+     - 'getOfflinePermitByQr': Mencocokkan kode QR fisik 21 digit ('CONCAT(company_id, birth_date, hire_date, 3_chars_name)'), NIK asli, NIK tanpa awalan nol, dan nomor permit.
+     - 'getOfflineSimperByQr': Mempertahankan karakter Base64 dan prefix 'IC-UDU/...' tanpa memotong '/'.
+   * **Pusat Sinkronisasi Offline Terdedikasi**:
+     - Ditambahkan modal sheet *Pusat Data Mode Offline* di layar scanner dengan tombol terpisah unduh **SIMPER Aktif** (4.029 baris) dan **Mine Permit Aktif** (14.350 baris).
+   * **Failover URL Cerdas & Cepat**:
+     - Urutan prioritas: 'https://api_mbs.indexim.id' -> 'http://127.0.0.1:7302' (USB reverse) -> 'http://192.168.130.236:7302' (Wi-Fi kantor) -> 'https://api_mbs.idcoal.id'.
+     - Connect timeout dipersingkat menjadi 3 detik untuk failover instan.
+   * **Garansi Offline Queueing**:
+     - Ditambahkan pengecekan 'no internet' dan 'internet' pada handler simpan pergerakan gerbang ('queueOfflineMovement') dan pelanggaran K3 ('queueOfflineViolation').
+     - Sinkronisasi antrean berjalan bertahap dengan jeda 300ms antar item untuk menjaga temperatur baterai HP tetap dingin (anti-panas).
+   * **Double-Check Safety Net**:
+     - Jika backend mengembalikan 'UnrecognizedQr' atau 'General', aplikasi melakukan pengecekan ulang ke cache SQLite lokal sebelum menampilkan dialog gagal.

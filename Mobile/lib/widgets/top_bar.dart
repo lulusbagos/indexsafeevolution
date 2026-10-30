@@ -95,6 +95,11 @@ class _TopBarState extends State<TopBar> {
         }
       }
 
+      try {
+        final offlineNotifs = await _db.getOfflineUnreadNotificationCount(months: 3);
+        if (offlineNotifs > count) count = offlineNotifs;
+      } catch (_) {}
+
       await PreferenceService.setNotif(count);
       if (mounted) setState(() {});
     } catch (_) {

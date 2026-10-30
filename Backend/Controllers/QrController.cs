@@ -799,6 +799,54 @@ namespace Indexsafe.Api.Controllers
         }
 
         /// <summary>
+        /// Endpoint dataset SIMPER aktif & tercetak untuk sinkronisasi mobile scanner mode offline
+        /// GET /api/qr/simper/offline-dataset
+        /// </summary>
+        [HttpGet("simper/offline-dataset")]
+        [AllowAnonymous]
+        public async Task<IActionResult> GetSimperOfflineDataset()
+        {
+            try
+            {
+                var list = await _permitService.GetSimperOfflineDatasetAsync();
+                return Ok(new
+                {
+                    status = true,
+                    count = list.Count,
+                    data = list
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { status = false, message = ex.Message });
+            }
+        }
+
+        /// <summary>
+        /// Endpoint dataset Mine Permit aktif & tercetak (terbaru per NIK) untuk scan offline
+        /// GET /api/qr/permit/offline-dataset
+        /// </summary>
+        [HttpGet("permit/offline-dataset")]
+        [AllowAnonymous]
+        public async Task<IActionResult> GetPermitOfflineDataset()
+        {
+            try
+            {
+                var list = await _permitService.GetPermitOfflineDatasetAsync();
+                return Ok(new
+                {
+                    status = true,
+                    count = list.Count,
+                    data = list
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { status = false, message = ex.Message });
+            }
+        }
+
+        /// <summary>
         /// GET /api/qr/permit/violation-master
         /// Returns Safety criteria (tbl_m_pelanggaran_kriteria) and Safety sanction types (tbl_m_pelanggaran_jenis where jenis='SAFETY')
         /// </summary>

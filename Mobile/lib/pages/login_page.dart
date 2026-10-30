@@ -351,11 +351,7 @@ class _LoginPageState extends State<LoginPage> {
               if (mounted) setState(() => _isLoading = false);
               PreferenceService.setProfile(profile);
 
-              // 1. HAPUS DATABASE LOKAL LAMA AGAR BERSIH & TIDAK ADA DATA MASTER KETINGGALAN
-              await _db.clearDatabase();
-              await PreferenceService.clearDataSync();
-
-              // 2. Masukkan akun ke SQLite employees agar bisa diverifikasi offline
+              // 1. Masukkan akun ke SQLite employees agar bisa diverifikasi offline
               try {
                 await _db.insert('employees', {
                   'id': profile.id,
@@ -367,7 +363,7 @@ class _LoginPageState extends State<LoginPage> {
                 });
               } catch (_) {}
 
-              // 3. Simpan kredensial offline
+              // 2. Simpan kredensial offline
               await PreferenceService.setOfflineCredentials(
                 nik: profile.noNik ?? _userCtrl.text.trim(),
                 password: _pswdCtrl.text,
@@ -376,12 +372,25 @@ class _LoginPageState extends State<LoginPage> {
 
               globals.currentPage = 0;
               if (!mounted) return;
-              // 4. Masuk ke SyncPage untuk mengunduh seluruh data master bersih ke database
-              await Navigator.pushAndRemoveUntil(
-                context,
-                MaterialPageRoute(builder: (context) => SyncPage(profile)),
-                (route) => false,
-              );
+
+              // 3. Cek apakah master data sudah pernah disinkronkan sebelumnya
+              final dataSync = PreferenceService.getDataSync();
+              final isAlreadySynced = dataSync != null && dataSync.length >= 14;
+
+              if (isAlreadySynced) {
+                await Navigator.pushAndRemoveUntil(
+                  context,
+                  MaterialPageRoute(builder: (context) => const HomePage()),
+                  (route) => false,
+                );
+              } else {
+                // Masuk ke SyncPage untuk mengunduh data master yang belum lengkap
+                await Navigator.pushAndRemoveUntil(
+                  context,
+                  MaterialPageRoute(builder: (context) => SyncPage(profile)),
+                  (route) => false,
+                );
+              }
             });
           }).catchError((_) {
             if (mounted) setState(() => _isLoading = false);

@@ -20,11 +20,13 @@ namespace Indexsafe.Api.Controllers
     {
         private readonly AppDbContext _context;
         private readonly CompanyHierarchyService _companyHierarchyService;
+        private readonly PermitService _permitService;
 
-        public MasterController(AppDbContext context, CompanyHierarchyService companyHierarchyService)
+        public MasterController(AppDbContext context, CompanyHierarchyService companyHierarchyService, PermitService permitService)
         {
             _context = context;
             _companyHierarchyService = companyHierarchyService;
+            _permitService = permitService;
         }
 
         private int GetCurrentCompanyId()
@@ -48,6 +50,17 @@ namespace Indexsafe.Api.Controllers
 
             switch (key)
             {
+                case "simper":
+                case "simpers":
+                    var simperList = await _permitService.GetSimperOfflineDatasetAsync();
+                    return Ok(new { data = simperList });
+
+                case "permit":
+                case "permits":
+                case "minepermit":
+                case "minepermits":
+                    var permitList = await _permitService.GetPermitOfflineDatasetAsync();
+                    return Ok(new { data = permitList });
                 case "area":
                 case "areas":
                     var areas = await _context.MasterAreas
