@@ -118,14 +118,16 @@ namespace Indexsafe.Api.Services
     public class PermitService
     {
         private readonly ILogger<PermitService> _logger;
+        private readonly IConfiguration _configuration;
         private readonly string[] _candidateHosts = new[] { "172.16.1.96", "172.16.1.93" };
         private readonly string[] _candidateDbs = new[] { "bima", "BIMA", "db_bima", "sysinteg_bima", "minepermit", "db_permit", "sysinteg_indexsafe2", "postgres" };
         private const string User = "postgres";
         private const string Pass = "index.123";
 
-        public PermitService(ILogger<PermitService> logger)
+        public PermitService(ILogger<PermitService> logger, IConfiguration configuration)
         {
             _logger = logger;
+            _configuration = configuration;
         }
 
         public async Task<PermitSimperDto> GetLatestPermitSimperAsync(string nik)
@@ -1109,6 +1111,40 @@ namespace Indexsafe.Api.Services
             {
                 try
                 {
+                    var qrMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                    try
+                    {
+                        var sqlConnStr = _configuration.GetConnectionString("DefaultConnection");
+                        if (!string.IsNullOrEmpty(sqlConnStr))
+                        {
+                            await using var sqlConn = new Microsoft.Data.SqlClient.SqlConnection(sqlConnStr);
+                            await sqlConn.OpenAsync();
+                            const string sqlQrs = @"
+                                SELECT ttk.no_nik, 
+                                       CONCAT(tmp2.id, FORMAT(tmp.tanggal_lahir , 'yyyyMMdd'), FORMAT(ttk.date_of_hire , 'ddMMyyyy'), left(tmp.nama_lengkap, 3)) as qr_code
+                                FROM [ONE_DB_MITRA].dbo.tbl_m_personal tmp 
+                                JOIN [ONE_DB_MITRA].dbo.tbl_t_karyawan ttk on tmp.id_personal = ttk.id_personal 
+                                JOIN [ONE_DB_MITRA].dbo.tbl_m_perusahaan tmp2 on tmp2.id = ttk.id_perusahaan   
+                                WHERE ttk.status_aktif = 1 AND tmp2.status_aktif = 1 AND ttk.no_nik IS NOT NULL;";
+                            await using var cmdQrs = new Microsoft.Data.SqlClient.SqlCommand(sqlQrs, sqlConn);
+                            cmdQrs.CommandTimeout = 15;
+                            await using var readerQrs = await cmdQrs.ExecuteReaderAsync();
+                            while (await readerQrs.ReadAsync())
+                            {
+                                var n = readerQrs.GetString(0).Trim();
+                                var q = readerQrs.IsDBNull(1) ? n : readerQrs.GetString(1).Trim();
+                                if (!string.IsNullOrEmpty(n) && !string.IsNullOrEmpty(q))
+                                {
+                                    qrMap[n] = q;
+                                }
+                            }
+                        }
+                    }
+                    catch (Exception exSql)
+                    {
+                        _logger.LogWarning(exSql, "[PermitService] Could not preload ONE_DB_MITRA QR mapping: {Msg}", exSql.Message);
+                    }
+
                     const string sqlPermit = @"
                         SELECT DISTINCT ON (TRIM(p.nik))
                             p.id, 
@@ -1155,6 +1191,7 @@ namespace Indexsafe.Api.Services
                             Id = id,
                             Nomor = r.IsDBNull(r.GetOrdinal("nomor")) ? null : r.GetString(r.GetOrdinal("nomor")),
                             Nik = nik,
+                            QrCode = qrMap.TryGetValue(nik, out var qr) ? qr : nik,
                             Nama = r.IsDBNull(r.GetOrdinal("nama")) ? "Karyawan Tambang" : r.GetString(r.GetOrdinal("nama")),
                             Perusahaan = r.IsDBNull(r.GetOrdinal("perusahaan")) ? "PT INDEXIM COALINDO" : r.GetString(r.GetOrdinal("perusahaan")),
                             Departemen = r.IsDBNull(r.GetOrdinal("departemen")) ? "-" : r.GetString(r.GetOrdinal("departemen")),
@@ -1215,6 +1252,9 @@ namespace Indexsafe.Api.Services
 
         [JsonPropertyName("nik")]
         public string Nik { get; set; } = string.Empty;
+
+        [JsonPropertyName("qr_code")]
+        public string? QrCode { get; set; }
 
         [JsonPropertyName("nama")]
         public string? Nama { get; set; }

@@ -527,11 +527,24 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
           return;
         }
 
-        final errMsg = err['message']?.toString() ?? 'QR tidak valid atau server bermasalah.';
+        var errMsg = err['message']?.toString() ?? 'QR tidak valid atau server bermasalah.';
         final isAuth = err['isAuthError'] == true || errMsg.toLowerCase().contains('sesi login') || errMsg.toLowerCase().contains('401');
+        final isNoInternet = errMsg.toLowerCase().contains('no internet') ||
+            errMsg.toLowerCase().contains('koneksi') ||
+            errMsg.toLowerCase().contains('timeout') ||
+            errMsg.toLowerCase().contains('socket');
+
+        if (isNoInternet) {
+          if (_offlineSimperCount == 0 && _offlinePermitCount == 0) {
+            errMsg = 'Mode Offline: Memori database offline di HP ini masih kosong (0 SIMPER & 0 Permit). Harap aktifkan koneksi internet lalu ketuk tombol "Sinkron Offline" di atas untuk mengunduh data persiapan scan offline.';
+          } else {
+            errMsg = 'Mode Offline: Kode QR tidak cocok dengan $_offlineSimperCount SIMPER atau $_offlinePermitCount Mine Permit yang tersimpan di HP ini. Pastikan kartu telah terdaftar atau sinkronkan ulang.';
+          }
+        }
+
         await _showResultDialog(
           isSuccess: false,
-          title: 'Pemindaian Belum Berhasil',
+          title: isNoInternet ? 'Mode Offline: Data Tidak Ditemukan' : 'Pemindaian Belum Berhasil',
           message: errMsg,
           actionType: isAuth ? 'AuthError' : 'Error',
         );

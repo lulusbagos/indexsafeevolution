@@ -677,6 +677,19 @@ class ApiService {
         return const Left({'message': 'No internet access!'});
       }
 
+      final targets = _buildCandidateUrls('/master/$name?limit=10000');
+      for (final url in targets) {
+        try {
+          final res = await dio.get(url);
+          if (res.statusCode == 200 && res.data != null) {
+            if (res.data is List) {
+              return Right({'data': res.data});
+            }
+            return Right(Map<String, dynamic>.from(res.data as Map));
+          }
+        } catch (_) {}
+      }
+
       var res = await dio.get('/master/$name?limit=10000');
       if (res.data is List) {
         return Right({'data': res.data});
@@ -2040,38 +2053,50 @@ class ApiService {
 
   Future<Either<Map, List<dynamic>>> getSimperOfflineDataset() async {
     final token = getToken;
-    if (token.isNotEmpty && !token.startsWith('offline_token_')) {
-      dio.options.headers['Authorization'] = 'Bearer $token';
-    } else {
-      dio.options.headers.remove('Authorization');
+    final headers = <String, dynamic>{
+      'Accept': 'application/json',
+      if (token.isNotEmpty && !token.startsWith('offline_token_')) 'Authorization': 'Bearer $token',
+    };
+    final targets = _buildCandidateUrls('/qr/simper/offline-dataset');
+    for (final url in targets) {
+      try {
+        final client = Dio(BaseOptions(
+          headers: headers,
+          connectTimeout: const Duration(seconds: 4),
+          receiveTimeout: const Duration(seconds: 20),
+          responseType: ResponseType.json,
+        ));
+        final res = await client.get(url);
+        if (res.statusCode == 200 && res.data is Map && res.data['data'] is List) {
+          return Right(res.data['data'] as List<dynamic>);
+        }
+      } catch (_) {}
     }
-    try {
-      var res = await dio.get('/qr/simper/offline-dataset');
-      if (res.statusCode == 200 && res.data is Map && res.data['data'] is List) {
-        return Right(res.data['data'] as List<dynamic>);
-      }
-      return const Left({'message': 'Format dataset SIMPER tidak valid'});
-    } catch (e) {
-      return Left({'message': e.toString()});
-    }
+    return const Left({'message': 'Gagal mengunduh dataset SIMPER offline'});
   }
 
   Future<Either<Map, List<dynamic>>> getPermitOfflineDataset() async {
     final token = getToken;
-    if (token.isNotEmpty && !token.startsWith('offline_token_')) {
-      dio.options.headers['Authorization'] = 'Bearer $token';
-    } else {
-      dio.options.headers.remove('Authorization');
+    final headers = <String, dynamic>{
+      'Accept': 'application/json',
+      if (token.isNotEmpty && !token.startsWith('offline_token_')) 'Authorization': 'Bearer $token',
+    };
+    final targets = _buildCandidateUrls('/qr/permit/offline-dataset');
+    for (final url in targets) {
+      try {
+        final client = Dio(BaseOptions(
+          headers: headers,
+          connectTimeout: const Duration(seconds: 4),
+          receiveTimeout: const Duration(seconds: 25),
+          responseType: ResponseType.json,
+        ));
+        final res = await client.get(url);
+        if (res.statusCode == 200 && res.data is Map && res.data['data'] is List) {
+          return Right(res.data['data'] as List<dynamic>);
+        }
+      } catch (_) {}
     }
-    try {
-      var res = await dio.get('/qr/permit/offline-dataset');
-      if (res.statusCode == 200 && res.data is Map && res.data['data'] is List) {
-        return Right(res.data['data'] as List<dynamic>);
-      }
-      return const Left({'message': 'Format dataset Mine Permit tidak valid'});
-    } catch (e) {
-      return Left({'message': e.toString()});
-    }
+    return const Left({'message': 'Gagal mengunduh dataset Mine Permit offline'});
   }
 
   Future<Either<Map, List<dynamic>>> getAttendanceHistory() async {

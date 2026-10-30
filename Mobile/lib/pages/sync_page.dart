@@ -107,7 +107,7 @@ class _SyncPageState extends State<SyncPage> {
                   debugPrint('[SyncPage] Error $name: ${err['message']}');
                 },
                 (response) async {
-                  final items = (response['data'] as List?) ?? [];
+                  final items = response as List<dynamic>;
                   final batch = sqldb.batch();
                   for (var item in items) {
                     if (name == 'areas') {
@@ -147,13 +147,13 @@ class _SyncPageState extends State<SyncPage> {
 
           if (name == 'simper') {
             try {
-              final res = await _api.getMaster('simper');
+              final res = await _api.getSimperOfflineDataset();
               await res.fold(
                 (err) async {
                   debugPrint('[SyncPage] Error simper: ${err['message']}');
                 },
                 (response) async {
-                  final items = (response['data'] as List?) ?? [];
+                  final items = response as List<dynamic>;
                   final count = await _db.saveOfflineSimpers(items);
                   debugPrint('[SyncPage] Saved $count offline SIMPERs');
                   _progress.value = 100;
@@ -169,13 +169,13 @@ class _SyncPageState extends State<SyncPage> {
 
           if (name == 'permit') {
             try {
-              final res = await _api.getMaster('permit');
+              final res = await _api.getPermitOfflineDataset();
               await res.fold(
                 (err) async {
                   debugPrint('[SyncPage] Error permit: ${err['message']}');
                 },
                 (response) async {
-                  final items = (response['data'] as List?) ?? [];
+                  final items = response as List<dynamic>;
                   final count = await _db.saveOfflinePermits(items);
                   debugPrint('[SyncPage] Saved $count offline Mine Permits');
                   _progress.value = 100;

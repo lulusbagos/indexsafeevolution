@@ -294,8 +294,22 @@ class DatabaseService {
   }
 
   Future<Map<String, dynamic>?> getOfflineSimperByQr(String rawCode) async {
-    final clean = rawCode.trim();
-    if (clean.isEmpty) return null;
+    final rawTrim = rawCode.trim();
+    if (rawTrim.isEmpty) return null;
+    var clean = rawTrim;
+
+    if (clean.contains('/') && !clean.contains('/QrAttendance/Scan/')) {
+      final segs = clean.split('/').where((s) => s.isNotEmpty).toList();
+      if (segs.isNotEmpty) {
+        var last = segs.last.trim();
+        if (last.contains('?')) last = last.substring(0, last.indexOf('?')).trim();
+        if (last.isNotEmpty) clean = last;
+      }
+    }
+    if (clean.contains(':')) clean = clean.split(':').last.trim();
+    if (clean.contains('|')) clean = clean.split('|').last.trim();
+    if (clean.toUpperCase().startsWith('IC')) clean = clean.substring(2).trim();
+
     final cleanNoZero = clean.replaceFirst(RegExp(r'^0+'), '');
 
     final db = await database;
@@ -304,11 +318,14 @@ class DatabaseService {
         'SELECT * FROM tbl_m_simper_offline '
         'WHERE qr_encrypt = ? '
         '   OR qr_decrypt = ? '
+        '   OR qr_encrypt = ? '
+        '   OR qr_decrypt = ? '
+        '   OR nomor = ? '
         '   OR nomor = ? '
         '   OR employee_id = ? '
         '   OR (? != \'\' AND (employee_id = ? OR ltrim(employee_id, \'0\') = ?)) '
         'ORDER BY id DESC LIMIT 1',
-        [clean, clean, clean, clean, cleanNoZero, cleanNoZero, cleanNoZero],
+        [rawTrim, rawTrim, clean, clean, rawTrim, clean, clean, cleanNoZero, cleanNoZero, cleanNoZero],
       );
 
       if (rows.isNotEmpty) {
@@ -408,6 +425,7 @@ class DatabaseService {
           id INTEGER PRIMARY KEY,
           nomor TEXT,
           nik TEXT,
+          qr_code TEXT,
           nama TEXT,
           perusahaan TEXT,
           departemen TEXT,
@@ -425,6 +443,10 @@ class DatabaseService {
           updated_at TEXT
         );
       ''');
+      try {
+        await db.execute('ALTER TABLE tbl_m_permit_offline ADD COLUMN qr_code TEXT;');
+      } catch (_) {}
+      await db.execute('CREATE INDEX IF NOT EXISTS idx_permit_qr ON tbl_m_permit_offline(qr_code);');
       await db.execute('CREATE INDEX IF NOT EXISTS idx_permit_nik ON tbl_m_permit_offline(nik);');
       await db.execute('CREATE INDEX IF NOT EXISTS idx_permit_nomor ON tbl_m_permit_offline(nomor);');
     } catch (e) {
@@ -477,6 +499,7 @@ class DatabaseService {
               'id': id is num ? id.toInt() : int.tryParse(id.toString()) ?? 0,
               'nomor': m['nomor']?.toString(),
               'nik': nik,
+              'qr_code': m['qr_code']?.toString() ?? m['qrCode']?.toString() ?? '',
               'nama': m['nama']?.toString(),
               'perusahaan': m['perusahaan']?.toString(),
               'departemen': m['departemen']?.toString(),
@@ -541,13 +564,17 @@ class DatabaseService {
 
     final db = await database;
     try {
+      final rawTrim = rawCode.trim();
       final rows = await db.rawQuery(
         'SELECT * FROM tbl_m_permit_offline '
-        'WHERE nik = ? '
+        'WHERE qr_code = ? '
+        '   OR qr_code = ? '
+        '   OR nik = ? '
+        '   OR nomor = ? '
         '   OR nomor = ? '
         '   OR (? != \'\' AND (nik = ? OR ltrim(nik, \'0\') = ?)) '
         'ORDER BY id DESC LIMIT 1',
-        [clean, clean, cleanNoZero, cleanNoZero, cleanNoZero],
+        [rawTrim, clean, clean, rawTrim, clean, cleanNoZero, cleanNoZero, cleanNoZero],
       );
 
       if (rows.isNotEmpty) {
