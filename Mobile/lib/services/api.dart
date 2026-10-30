@@ -2057,20 +2057,30 @@ class ApiService {
       'Accept': 'application/json',
       if (token.isNotEmpty && !token.startsWith('offline_token_')) 'Authorization': 'Bearer $token',
     };
-    final targets = _buildCandidateUrls('/qr/simper/offline-dataset');
+    final targets = [
+      'https://api_mbs.indexim.id/api/qr/simper/offline-dataset',
+      'http://127.0.0.1:7302/api/qr/simper/offline-dataset',
+      'http://192.168.130.236:7302/api/qr/simper/offline-dataset',
+      'https://api_mbs.idcoal.id/api/qr/simper/offline-dataset',
+    ];
     for (final url in targets) {
       try {
+        debugPrint('[ApiService] Mengunduh SIMPER offline dari: ' + url);
         final client = Dio(BaseOptions(
           headers: headers,
-          connectTimeout: const Duration(seconds: 4),
-          receiveTimeout: const Duration(seconds: 20),
+          connectTimeout: const Duration(seconds: 3),
+          receiveTimeout: const Duration(seconds: 30),
           responseType: ResponseType.json,
         ));
         final res = await client.get(url);
         if (res.statusCode == 200 && res.data is Map && res.data['data'] is List) {
+          final count = (res.data['data'] as List).length;
+          debugPrint('[ApiService] Sukses mengunduh SIMPER offline dari ' + url + ' total: ' + count.toString());
           return Right(res.data['data'] as List<dynamic>);
         }
-      } catch (_) {}
+      } catch (e) {
+        debugPrint('[ApiService] Gagal SIMPER ' + url + ' error: ' + e.toString());
+      }
     }
     return const Left({'message': 'Gagal mengunduh dataset SIMPER offline'});
   }
@@ -2081,20 +2091,30 @@ class ApiService {
       'Accept': 'application/json',
       if (token.isNotEmpty && !token.startsWith('offline_token_')) 'Authorization': 'Bearer $token',
     };
-    final targets = _buildCandidateUrls('/qr/permit/offline-dataset');
+    final targets = [
+      'https://api_mbs.indexim.id/api/qr/permit/offline-dataset',
+      'http://127.0.0.1:7302/api/qr/permit/offline-dataset',
+      'http://192.168.130.236:7302/api/qr/permit/offline-dataset',
+      'https://api_mbs.idcoal.id/api/qr/permit/offline-dataset',
+    ];
     for (final url in targets) {
       try {
+        debugPrint('[ApiService] Mengunduh Permit offline dari: ' + url);
         final client = Dio(BaseOptions(
           headers: headers,
-          connectTimeout: const Duration(seconds: 4),
-          receiveTimeout: const Duration(seconds: 25),
+          connectTimeout: const Duration(seconds: 3),
+          receiveTimeout: const Duration(seconds: 40),
           responseType: ResponseType.json,
         ));
         final res = await client.get(url);
         if (res.statusCode == 200 && res.data is Map && res.data['data'] is List) {
+          final count = (res.data['data'] as List).length;
+          debugPrint('[ApiService] Sukses mengunduh Permit offline dari ' + url + ' total: ' + count.toString());
           return Right(res.data['data'] as List<dynamic>);
         }
-      } catch (_) {}
+      } catch (e) {
+        debugPrint('[ApiService] Gagal Permit ' + url + ' error: ' + e.toString());
+      }
     }
     return const Left({'message': 'Gagal mengunduh dataset Mine Permit offline'});
   }
