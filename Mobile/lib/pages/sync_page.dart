@@ -105,6 +105,8 @@ class _SyncPageState extends State<SyncPage> {
               await res.fold(
                 (err) async {
                   debugPrint('[SyncPage] Error $name: ${err['message']}');
+                  master[name] = 1;
+                  PreferenceService.setDataSync(master);
                 },
                 (response) async {
                   final items = response as List<dynamic>;
@@ -151,6 +153,8 @@ class _SyncPageState extends State<SyncPage> {
               await res.fold(
                 (err) async {
                   debugPrint('[SyncPage] Error simper: ${err['message']}');
+                  master[name] = 1;
+                  PreferenceService.setDataSync(master);
                 },
                 (response) async {
                   final items = response as List<dynamic>;
@@ -163,6 +167,8 @@ class _SyncPageState extends State<SyncPage> {
               );
             } catch (e) {
               debugPrint('[SyncPage] Error syncing simper: $e');
+              master[name] = 1;
+              PreferenceService.setDataSync(master);
             }
             continue;
           }
@@ -173,6 +179,8 @@ class _SyncPageState extends State<SyncPage> {
               await res.fold(
                 (err) async {
                   debugPrint('[SyncPage] Error permit: ${err['message']}');
+                  master[name] = 1;
+                  PreferenceService.setDataSync(master);
                 },
                 (response) async {
                   final items = response as List<dynamic>;
@@ -185,6 +193,8 @@ class _SyncPageState extends State<SyncPage> {
               );
             } catch (e) {
               debugPrint('[SyncPage] Error syncing permit: $e');
+              master[name] = 1;
+              PreferenceService.setDataSync(master);
             }
             continue;
           }
@@ -215,6 +225,8 @@ class _SyncPageState extends State<SyncPage> {
                 if (mounted) {
                   SnackBarMsg.danger(context, titleCase('Sync Data $name Gagal!'));
                 }
+                master[name] = 1;
+                PreferenceService.setDataSync(master);
               },
               (response) async {
                 final items = (response['data'] as List?) ?? [];
@@ -311,22 +323,12 @@ class _SyncPageState extends State<SyncPage> {
 
   void _complete() async {
     globals.reSync = false;
-    var dataSync = PreferenceService.getDataSync();
-    if (dataSync != null && dataSync.length >= _masters.length) {
-      if (!mounted) return;
-      await Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(builder: (context) => const HomePage()),
-        (route) => false,
-      );
-    } else {
-      if (!mounted) return;
-      await Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(builder: (context) => const LoginPage()),
-        (route) => false,
-      );
-    }
+    if (!mounted) return;
+    await Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(builder: (context) => const HomePage()),
+      (route) => false,
+    );
   }
 
   @override
