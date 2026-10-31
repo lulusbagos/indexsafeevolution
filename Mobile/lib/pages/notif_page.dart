@@ -58,11 +58,37 @@ class _NotifPageState extends State<NotifPage> {
             debugPrint(error['message'].toString());
           }, (response) async {
             const validCols = {
-              'id', 'code', 'title', 'area_id', 'location_id', 'location_detail',
-              'date', 'time', 'remark', 'image', 'video', 'status', 'pja_id', 'pic_id',
-              'plan', 'plan_date', 'overdue', 'reason', 'action', 'action_date',
-              'action_image', 'action_video', 'table', 'category', 'tran_id',
-              'detail_id', 'company_id', 'employee_id', 'created_at', 'updated_at', 'deleted_at'
+              'id',
+              'code',
+              'title',
+              'area_id',
+              'location_id',
+              'location_detail',
+              'date',
+              'time',
+              'remark',
+              'image',
+              'video',
+              'status',
+              'pja_id',
+              'pic_id',
+              'plan',
+              'plan_date',
+              'overdue',
+              'reason',
+              'action',
+              'action_date',
+              'action_image',
+              'action_video',
+              'table',
+              'category',
+              'tran_id',
+              'detail_id',
+              'company_id',
+              'employee_id',
+              'created_at',
+              'updated_at',
+              'deleted_at'
             };
             for (var item in (response['data'] as List).toList()) {
               var row = <String, dynamic>{};
@@ -86,12 +112,18 @@ class _NotifPageState extends State<NotifPage> {
                         (row['employee_id'] as int) == profileId) {
                       status = 'Terkirim';
                     }
-                    if ((row['pja_id'] != null && (row['pja_id'] as int) == profileId) ||
-                        (row['nik_pja'] != null && userNik.isNotEmpty && row['nik_pja'].toString().trim() == userNik)) {
+                    if ((row['pja_id'] != null &&
+                            (row['pja_id'] as int) == profileId) ||
+                        (row['nik_pja'] != null &&
+                            userNik.isNotEmpty &&
+                            row['nik_pja'].toString().trim() == userNik)) {
                       status = 'Ditugaskan ke Anda (PJA)';
                     }
-                    if ((row['pic_id'] != null && (row['pic_id'] as int) == profileId) ||
-                        (row['nik_pic'] != null && userNik.isNotEmpty && row['nik_pic'].toString().trim() == userNik)) {
+                    if ((row['pic_id'] != null &&
+                            (row['pic_id'] as int) == profileId) ||
+                        (row['nik_pic'] != null &&
+                            userNik.isNotEmpty &&
+                            row['nik_pic'].toString().trim() == userNik)) {
                       status = 'Ditugaskan ke Anda (PIC)';
                     }
                     if (status != '') {
@@ -108,8 +140,7 @@ class _NotifPageState extends State<NotifPage> {
                         .update('action_plans', row, row['id'] as int)
                         .then((tot) {
                       if (tot > 0) {
-                        debugPrint(
-                            '--- update action_plans: ${row['id']} ---');
+                        debugPrint('--- update action_plans: ${row['id']} ---');
                         var profileId = _profile?.id;
                         var userNik = _profile?.noNik?.trim() ?? '';
                         var status = '';
@@ -118,8 +149,12 @@ class _NotifPageState extends State<NotifPage> {
                               (row['employee_id'] as int) == profileId) {
                             status = 'Diproses PJA';
                           }
-                          if ((row['pic_id'] != null && (row['pic_id'] as int) == profileId) ||
-                              (row['nik_pic'] != null && userNik.isNotEmpty && row['nik_pic'].toString().trim() == userNik)) {
+                          if ((row['pic_id'] != null &&
+                                  (row['pic_id'] as int) == profileId) ||
+                              (row['nik_pic'] != null &&
+                                  userNik.isNotEmpty &&
+                                  row['nik_pic'].toString().trim() ==
+                                      userNik)) {
                             status = 'Ditugaskan ke Anda (PIC)';
                           }
                         }
@@ -128,8 +163,12 @@ class _NotifPageState extends State<NotifPage> {
                               (row['employee_id'] as int) == profileId) {
                             status = 'Selesai Dikerjakan PIC';
                           }
-                          if ((row['pja_id'] != null && (row['pja_id'] as int) == profileId) ||
-                              (row['nik_pja'] != null && userNik.isNotEmpty && row['nik_pja'].toString().trim() == userNik)) {
+                          if ((row['pja_id'] != null &&
+                                  (row['pja_id'] as int) == profileId) ||
+                              (row['nik_pja'] != null &&
+                                  userNik.isNotEmpty &&
+                                  row['nik_pja'].toString().trim() ==
+                                      userNik)) {
                             status = 'Selesai Dikerjakan PIC';
                           }
                         }
@@ -171,7 +210,8 @@ class _NotifPageState extends State<NotifPage> {
     super.dispose();
   }
 
-  void _processRawNotificationItems(List<NotificationItemModel> notifs, List<Map<String, dynamic>> combined) {
+  void _processRawNotificationItems(
+      List<NotificationItemModel> notifs, List<Map<String, dynamic>> combined) {
     for (var n in notifs) {
       if (n.isActioned ||
           n.notifType.toLowerCase().contains('completed') ||
@@ -201,15 +241,23 @@ class _NotifPageState extends State<NotifPage> {
         if (diffDays >= 7) continue;
       }
 
-      final isViolation = typeLower.contains('violation') ||
-          titleLower.contains('pelanggaran');
+      final isViolation =
+          typeLower.contains('violation') || titleLower.contains('pelanggaran');
 
       final isGateMovement = typeLower.contains('movement') ||
           titleLower.contains('gerbang') ||
           titleLower.contains('gate');
 
-      final isHazard = !isCoaching && !isRoster && !isViolation && !isGateMovement && (typeLower.contains('hazard') || urlLower.contains('hazard'));
-      final isInspect = !isCoaching && !isRoster && !isViolation && !isGateMovement && (typeLower.contains('inspect') || urlLower.contains('inspect'));
+      final isHazard = !isCoaching &&
+          !isRoster &&
+          !isViolation &&
+          !isGateMovement &&
+          (typeLower.contains('hazard') || urlLower.contains('hazard'));
+      final isInspect = !isCoaching &&
+          !isRoster &&
+          !isViolation &&
+          !isGateMovement &&
+          (typeLower.contains('inspect') || urlLower.contains('inspect'));
 
       final String category = isCoaching
           ? 'coaching'
@@ -219,14 +267,18 @@ class _NotifPageState extends State<NotifPage> {
                   ? 'violation'
                   : (isGateMovement
                       ? 'movement'
-                      : (isHazard ? 'hazard' : (isInspect ? 'inspection' : 'general')))));
+                      : (isHazard
+                          ? 'hazard'
+                          : (isInspect ? 'inspection' : 'general')))));
 
       combined.add({
         'id': n.id,
         'is_server_notif': true,
         'title': n.title,
         'remark': n.message,
-        'category': (n.category != null && n.category!.isNotEmpty) ? n.category : category,
+        'category': (n.category != null && n.category!.isNotEmpty)
+            ? n.category
+            : category,
         'notif_type': isCoaching ? 'coaching' : n.notifType,
         'url': n.url,
         'logo': n.logo,
@@ -236,11 +288,20 @@ class _NotifPageState extends State<NotifPage> {
         'action_text': n.actionText,
         'is_read': n.isRead,
         'is_actioned': n.isActioned,
-        'is_action_required': (isCoaching || isRoster || isGateMovement) ? false : (isViolation ? true : n.isActionRequired),
-        'date': n.createdAt != null ? DateFormat('yyyy-MM-dd').format(n.createdAt!) : '',
-        'time': n.createdAt != null ? DateFormat('HH:mm').format(n.createdAt!) : '',
+        'is_action_required': (isCoaching || isRoster || isGateMovement)
+            ? false
+            : (isViolation ? true : n.isActionRequired),
+        'date': n.createdAt != null
+            ? DateFormat('yyyy-MM-dd').format(n.createdAt!)
+            : '',
+        'time':
+            n.createdAt != null ? DateFormat('HH:mm').format(n.createdAt!) : '',
         'created_at_dt': n.createdAt ?? DateTime.now(),
-        'status': isCoaching ? -1 : (isRoster || isGateMovement ? (n.isRead ? 1 : 0) : (isViolation ? 0 : (n.isActioned ? 2 : (n.isRead ? 1 : 0)))),
+        'status': isCoaching
+            ? -1
+            : (isRoster || isGateMovement
+                ? (n.isRead ? 1 : 0)
+                : (isViolation ? 0 : (n.isActioned ? 2 : (n.isRead ? 1 : 0)))),
         'area_name': isCoaching
             ? 'Kinerja & Pembinaan'
             : (isRoster
@@ -254,9 +315,7 @@ class _NotifPageState extends State<NotifPage> {
             ? 'Pengaturan Roster'
             : (isViolation
                 ? 'Area Operasional Tambang'
-                : (isGateMovement
-                    ? 'Pos Security Tambang'
-                    : (n.url ?? ''))),
+                : (isGateMovement ? 'Pos Security Tambang' : (n.url ?? ''))),
       });
     }
   }
@@ -359,7 +418,8 @@ class _NotifPageState extends State<NotifPage> {
                 final aId = aMap['approvalId'] as int? ?? 0;
                 final mod = aMap['module']?.toString() ?? 'Persetujuan';
                 final nomor = aMap['nomor']?.toString() ?? '-';
-                final applicant = aMap['applicantName']?.toString() ?? 'Pemohon';
+                final applicant =
+                    aMap['applicantName']?.toString() ?? 'Pemohon';
                 final comp = aMap['companyName']?.toString() ?? '-';
                 final dept = aMap['department']?.toString() ?? '-';
                 final roleTarget = aMap['roleName']?.toString() ?? 'Approver';
@@ -372,7 +432,8 @@ class _NotifPageState extends State<NotifPage> {
                   'is_server_notif': true,
                   'is_approval_item': true,
                   'title': 'Persetujuan $mod: $nomor',
-                  'remark': 'Permohonan $mod oleh $applicant ($dept • $comp). Menunggu persetujuan Anda ($roleTarget).',
+                  'remark':
+                      'Permohonan $mod oleh $applicant ($dept • $comp). Menunggu persetujuan Anda ($roleTarget).',
                   'category': 'approval',
                   'notif_type': 'approval_request',
                   'url': '/approval_center',
@@ -383,8 +444,12 @@ class _NotifPageState extends State<NotifPage> {
                   'is_read': false,
                   'is_actioned': false,
                   'is_action_required': true,
-                  'date': reqDate != null ? DateFormat('yyyy-MM-dd').format(reqDate) : '',
-                  'time': reqDate != null ? DateFormat('HH:mm').format(reqDate) : '',
+                  'date': reqDate != null
+                      ? DateFormat('yyyy-MM-dd').format(reqDate)
+                      : '',
+                  'time': reqDate != null
+                      ? DateFormat('HH:mm').format(reqDate)
+                      : '',
                   'created_at_dt': reqDate ?? DateTime.now(),
                   'status': 0,
                   'area_name': 'Approval Center',
@@ -404,9 +469,14 @@ class _NotifPageState extends State<NotifPage> {
               for (var sp in list) {
                 final spMap = sp as Map<String, dynamic>;
                 final reqId = spMap['reqId']?.toString() ?? '-';
-                final actType = (spMap['activityType']?.toString() ?? 'Pekerjaan Khusus').replaceAll('_', ' ');
-                final loc = spMap['workLocation']?.toString() ?? 'Area Operasional Tambang';
-                final picName = spMap['applicantName']?.toString() ?? spMap['pjoName']?.toString() ?? 'PIC Tim';
+                final actType =
+                    (spMap['activityType']?.toString() ?? 'Pekerjaan Khusus')
+                        .replaceAll('_', ' ');
+                final loc = spMap['workLocation']?.toString() ??
+                    'Area Operasional Tambang';
+                final picName = spMap['applicantName']?.toString() ??
+                    spMap['pjoName']?.toString() ??
+                    'PIC Tim';
                 final issueTime = spMap['issueTime']?.toString() ?? '';
                 final issueDate = spMap['issueDate']?.toString() ?? '';
 
@@ -416,7 +486,8 @@ class _NotifPageState extends State<NotifPage> {
                   'is_special_permit': true,
                   'raw_permit': spMap,
                   'title': '⚠️ Observasi High Risk: $reqId',
-                  'remark': 'Kegiatan risiko tinggi $actType di $loc. Pengawas/PJO: $picName. Segera lakukan verifikasi & observasi lapangan!',
+                  'remark':
+                      'Kegiatan risiko tinggi $actType di $loc. Pengawas/PJO: $picName. Segera lakukan verifikasi & observasi lapangan!',
                   'category': 'special_permit',
                   'notif_type': 'special_permit_high_risk',
                   'url': 'special_permit_obs',
@@ -427,7 +498,9 @@ class _NotifPageState extends State<NotifPage> {
                   'is_read': false,
                   'is_actioned': false,
                   'is_action_required': true,
-                  'date': issueDate.isNotEmpty ? issueDate.substring(0, 10.clamp(0, issueDate.length)) : '',
+                  'date': issueDate.isNotEmpty
+                      ? issueDate.substring(0, 10.clamp(0, issueDate.length))
+                      : '',
                   'time': issueTime,
                   'created_at_dt': DateTime.now(),
                   'status': 0,
@@ -450,7 +523,10 @@ class _NotifPageState extends State<NotifPage> {
         final p = (item['priority'] ?? '').toString().toLowerCase();
         final isApproval = item['is_approval_item'] == true;
         final isSpecialPermit = item['is_special_permit'] == true;
-        return (isActionReq && (!isRead || status < 2)) || p == 'urgent' || isApproval || isSpecialPermit;
+        return (isActionReq && (!isRead || status < 2)) ||
+            p == 'urgent' ||
+            isApproval ||
+            isSpecialPermit;
       });
       if (hasPicAssignments) {
         NotificationService.vibrateForPicAssignment();
@@ -464,7 +540,8 @@ class _NotifPageState extends State<NotifPage> {
         if (isSuccess) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Berhasil menyinkronkan & mengunduh $downloadedCount notifikasi baru ke penyimpanan lokal HP (Mode Offline Siap).'),
+              content: Text(
+                  'Berhasil menyinkronkan & mengunduh $downloadedCount notifikasi baru ke penyimpanan lokal HP (Mode Offline Siap).'),
               backgroundColor: const Color(0xFF009688),
               behavior: SnackBarBehavior.floating,
               duration: const Duration(seconds: 3),
@@ -473,7 +550,8 @@ class _NotifPageState extends State<NotifPage> {
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Mode Offline: Menggunakan ${_rawData.length} notifikasi yang tersimpan di HP.'),
+              content: Text(
+                  'Mode Offline: Menggunakan ${_rawData.length} notifikasi yang tersimpan di HP.'),
               backgroundColor: const Color(0xFFD97706),
               behavior: SnackBarBehavior.floating,
               duration: const Duration(seconds: 3),
@@ -500,21 +578,27 @@ class _NotifPageState extends State<NotifPage> {
     if (_selectedFilter == 'special_permit') {
       return _rawData.where((item) {
         final cat = (item['category'] ?? '').toString().toLowerCase();
-        return cat.contains('special_permit') || item['is_special_permit'] == true;
+        return cat.contains('special_permit') ||
+            item['is_special_permit'] == true;
       }).toList();
     }
     if (_selectedFilter == 'hazard') {
       return _rawData.where((item) {
         final cat = (item['category'] ?? '').toString().toLowerCase();
         final notifType = (item['notif_type'] ?? '').toString().toLowerCase();
-        return cat.contains('hazard') || cat.contains('action') || notifType.contains('hazard') || notifType.contains('action');
+        return cat.contains('hazard') ||
+            cat.contains('action') ||
+            notifType.contains('hazard') ||
+            notifType.contains('action');
       }).toList();
     }
     if (_selectedFilter == 'inspection') {
       return _rawData.where((item) {
         final cat = (item['category'] ?? '').toString().toLowerCase();
         final notifType = (item['notif_type'] ?? '').toString().toLowerCase();
-        return cat.contains('inspect') || cat.contains('simama') || notifType.contains('inspect');
+        return cat.contains('inspect') ||
+            cat.contains('simama') ||
+            notifType.contains('inspect');
       }).toList();
     }
     if (_selectedFilter == 'coaching') {
@@ -537,21 +621,27 @@ class _NotifPageState extends State<NotifPage> {
     if (type == 'special_permit') {
       return _rawData.where((item) {
         final cat = (item['category'] ?? '').toString().toLowerCase();
-        return cat.contains('special_permit') || item['is_special_permit'] == true;
+        return cat.contains('special_permit') ||
+            item['is_special_permit'] == true;
       }).length;
     }
     if (type == 'hazard') {
       return _rawData.where((item) {
         final cat = (item['category'] ?? '').toString().toLowerCase();
         final notifType = (item['notif_type'] ?? '').toString().toLowerCase();
-        return cat.contains('hazard') || cat.contains('action') || notifType.contains('hazard') || notifType.contains('action');
+        return cat.contains('hazard') ||
+            cat.contains('action') ||
+            notifType.contains('hazard') ||
+            notifType.contains('action');
       }).length;
     }
     if (type == 'inspection') {
       return _rawData.where((item) {
         final cat = (item['category'] ?? '').toString().toLowerCase();
         final notifType = (item['notif_type'] ?? '').toString().toLowerCase();
-        return cat.contains('inspect') || cat.contains('simama') || notifType.contains('inspect');
+        return cat.contains('inspect') ||
+            cat.contains('simama') ||
+            notifType.contains('inspect');
       }).length;
     }
     if (type == 'coaching') {
@@ -572,7 +662,8 @@ class _NotifPageState extends State<NotifPage> {
       final itemDate = DateTime(date.year, date.month, date.day);
       final difference = today.difference(itemDate).inDays;
 
-      final timeStr = (rawTime != null && rawTime.isNotEmpty) ? ' $rawTime' : '';
+      final timeStr =
+          (rawTime != null && rawTime.isNotEmpty) ? ' $rawTime' : '';
 
       if (difference == 0) {
         return 'Hari ini$timeStr';
@@ -641,7 +732,8 @@ class _NotifPageState extends State<NotifPage> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 2),
                           decoration: BoxDecoration(
                             color: const Color(0xFFEDE9FE),
                             borderRadius: BorderRadius.circular(6),
@@ -684,7 +776,8 @@ class _NotifPageState extends State<NotifPage> {
                   children: [
                     Row(
                       children: [
-                        const Icon(Icons.info_outline, size: 14, color: Color(0xFF64748B)),
+                        const Icon(Icons.info_outline,
+                            size: 14, color: Color(0xFF64748B)),
                         const SizedBox(width: 6),
                         Text(
                           'Waktu: $formattedDate',
@@ -711,14 +804,16 @@ class _NotifPageState extends State<NotifPage> {
               ),
               const SizedBox(height: 14),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 decoration: BoxDecoration(
                   color: const Color(0xFFF1F5F9),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.access_time_rounded, size: 14, color: Color(0xFF64748B)),
+                    const Icon(Icons.access_time_rounded,
+                        size: 14, color: Color(0xFF64748B)),
                     const SizedBox(width: 6),
                     Expanded(
                       child: Text(
@@ -772,7 +867,7 @@ class _NotifPageState extends State<NotifPage> {
         _db.updateLocalNotificationRead(notifId, true);
         _api.markNotificationRead(notifId);
       }
-      
+
       // Jika Coaching, tampilkan detail modal informasi
       if (isCoaching) {
         _showCoachingDialog(item);
@@ -782,7 +877,9 @@ class _NotifPageState extends State<NotifPage> {
       final url = (item['url'] ?? '').toString().toLowerCase();
       final notifType = (item['notif_type'] ?? '').toString().toLowerCase();
 
-      if (item['is_approval_item'] == true || cat.contains('approval') || url.contains('approval')) {
+      if (item['is_approval_item'] == true ||
+          cat.contains('approval') ||
+          url.contains('approval')) {
         Navigator.push(
           context,
           MaterialPageRoute(builder: (_) => const ApprovalCenterPage()),
@@ -799,7 +896,8 @@ class _NotifPageState extends State<NotifPage> {
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (_) => SpecialPermitFollowupPage(permit: item['raw_permit'] as Map<String, dynamic>),
+              builder: (_) => SpecialPermitFollowupPage(
+                  permit: item['raw_permit'] as Map<String, dynamic>),
             ),
           ).then((_) => _getData());
           return;
@@ -808,13 +906,26 @@ class _NotifPageState extends State<NotifPage> {
         if (permitId != null && permitId.isNotEmpty) {
           _api.getSpecialPermitDetail(permitId).then((res) {
             res.fold(
-              (_) => Navigator.push(context, MaterialPageRoute(builder: (_) => const SpecialPermitListPage())).then((_) => _getData()),
+              (_) => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (_) => const SpecialPermitListPage()))
+                  .then((_) => _getData()),
               (detailData) {
                 final p = detailData['data'] as Map<String, dynamic>?;
                 if (p != null) {
-                  Navigator.push(context, MaterialPageRoute(builder: (_) => SpecialPermitFollowupPage(permit: p))).then((_) => _getData());
+                  Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) =>
+                                  SpecialPermitFollowupPage(permit: p)))
+                      .then((_) => _getData());
                 } else {
-                  Navigator.push(context, MaterialPageRoute(builder: (_) => const SpecialPermitListPage())).then((_) => _getData());
+                  Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) => const SpecialPermitListPage()))
+                      .then((_) => _getData());
                 }
               },
             );
@@ -829,7 +940,9 @@ class _NotifPageState extends State<NotifPage> {
       }
 
       // Jika Notifikasi Roster / Periode Tugas, buka halaman Pengaturan Roster
-      if (cat.contains('roster') || url.contains('roster') || notifType.contains('roster')) {
+      if (cat.contains('roster') ||
+          url.contains('roster') ||
+          notifType.contains('roster')) {
         Navigator.push(
           context,
           MaterialPageRoute(builder: (_) => const RosterSettingsPage()),
@@ -842,27 +955,36 @@ class _NotifPageState extends State<NotifPage> {
         final t = (item['notif_type'] ?? '').toString().toLowerCase();
         if (t.contains('completed') || t.contains('closed')) {
           targetTab = HazardHubTab.summary;
-        } else if (t.contains('takeup') || t.contains('progress') || t.contains('info')) {
+        } else if (t.contains('takeup') ||
+            t.contains('progress') ||
+            t.contains('info')) {
           targetTab = HazardHubTab.monitoring;
         } else {
           targetTab = HazardHubTab.action;
         }
         Navigator.push(
           context,
-          MaterialPageRoute(builder: (_) => HazardHubPage(initialTab: targetTab)),
+          MaterialPageRoute(
+              builder: (_) => HazardHubPage(initialTab: targetTab)),
         ).then((_) => _getData());
         return;
       }
 
-      if (cat.contains('inspect') || url.contains('inspect') || cat.contains('simama')) {
+      if (cat.contains('inspect') ||
+          url.contains('inspect') ||
+          cat.contains('simama')) {
         Navigator.push(
           context,
-          MaterialPageRoute(builder: (_) => const InspectionHubPage(initialTab: InspectionHubTab.pjaArea)),
+          MaterialPageRoute(
+              builder: (_) => const InspectionHubPage(
+                  initialTab: InspectionHubTab.pjaArea)),
         ).then((_) => _getData());
         return;
       }
 
-      if (cat.contains('action') || url.contains('action') || notifType.contains('action')) {
+      if (cat.contains('action') ||
+          url.contains('action') ||
+          notifType.contains('action')) {
         Navigator.push(
           context,
           MaterialPageRoute(builder: (_) => const ActionTrackerPage()),
@@ -870,7 +992,17 @@ class _NotifPageState extends State<NotifPage> {
         return;
       }
 
-      if (!cat.contains('hazard') && !cat.contains('inspect') && !cat.contains('simama') && !cat.contains('action') && !cat.contains('approval') && !cat.contains('special_permit') && !url.contains('hazard') && !url.contains('inspect') && !url.contains('action') && !url.contains('approval') && !url.contains('special_permit')) {
+      if (!cat.contains('hazard') &&
+          !cat.contains('inspect') &&
+          !cat.contains('simama') &&
+          !cat.contains('action') &&
+          !cat.contains('approval') &&
+          !cat.contains('special_permit') &&
+          !url.contains('hazard') &&
+          !url.contains('inspect') &&
+          !url.contains('action') &&
+          !url.contains('approval') &&
+          !url.contains('special_permit')) {
         _showGeneralNotificationDialog(item);
         return;
       }
@@ -915,7 +1047,7 @@ class _NotifPageState extends State<NotifPage> {
     final filtered = _filteredData;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF6F8FA),
+      backgroundColor: const Color(0xFFF7F9FC),
       appBar: AppBar(
         elevation: 0,
         backgroundColor: Colors.white,
@@ -925,49 +1057,56 @@ class _NotifPageState extends State<NotifPage> {
             Container(
               padding: const EdgeInsets.all(7),
               decoration: BoxDecoration(
-                color: const Color(0xFF009688).withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(10),
+                color: const Color(0xFFEAF2FF),
+                borderRadius: BorderRadius.circular(12),
               ),
               child: const Icon(
                 Icons.notifications_active_rounded,
-                color: Color(0xFF009688),
+                color: Color(0xFF2563EB),
                 size: 20,
               ),
             ),
             const SizedBox(width: 12),
-            const Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Notifikasi Tindak Lanjut',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFF1E293B),
+            const Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'Aktivitas',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF0F172A),
+                    ),
                   ),
-                ),
-                Text(
-                  'Action Plan & Temuan Lapangan',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w400,
-                    color: Color(0xFF64748B),
+                  Text(
+                    'Pemberitahuan & tindak lanjut',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w400,
+                      color: Color(0xFF64748B),
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ],
         ),
         actions: [
           // Status Pill: Mode Offline vs Online
           Container(
-            margin: const EdgeInsets.symmetric(vertical: 14),
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+            margin: const EdgeInsets.symmetric(vertical: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
             decoration: BoxDecoration(
               color: _isOfflineMode
-                  ? const Color(0xFFFEF3C7)
-                  : const Color(0xFFE6F4EA),
-              borderRadius: BorderRadius.circular(12),
+                  ? const Color(0xFFFFF7E8)
+                  : const Color(0xFFF0FDF4),
+              borderRadius: BorderRadius.circular(20),
               border: Border.all(
                 color: _isOfflineMode
                     ? const Color(0xFFF59E0B).withValues(alpha: 0.5)
@@ -1023,10 +1162,10 @@ class _NotifPageState extends State<NotifPage> {
           const SizedBox(width: 6),
         ],
         bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(56),
+          preferredSize: const Size.fromHeight(54),
           child: Container(
             color: Colors.white,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 7),
             child: SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               physics: const BouncingScrollPhysics(),
@@ -1034,15 +1173,19 @@ class _NotifPageState extends State<NotifPage> {
                 children: [
                   _buildFilterChip('all', 'Semua', _countFor('all')),
                   const SizedBox(width: 8),
-                  _buildFilterChip('approval', 'Approval', _countFor('approval')),
+                  _buildFilterChip(
+                      'approval', 'Approval', _countFor('approval')),
                   const SizedBox(width: 8),
-                  _buildFilterChip('special_permit', 'Special Permit', _countFor('special_permit')),
+                  _buildFilterChip('special_permit', 'Special Permit',
+                      _countFor('special_permit')),
                   const SizedBox(width: 8),
                   _buildFilterChip('hazard', 'Hazard', _countFor('hazard')),
                   const SizedBox(width: 8),
-                  _buildFilterChip('inspection', 'Inspeksi', _countFor('inspection')),
+                  _buildFilterChip(
+                      'inspection', 'Inspeksi', _countFor('inspection')),
                   const SizedBox(width: 8),
-                  _buildFilterChip('coaching', 'Coaching', _countFor('coaching')),
+                  _buildFilterChip(
+                      'coaching', 'Coaching', _countFor('coaching')),
                 ],
               ),
             ),
@@ -1057,11 +1200,13 @@ class _NotifPageState extends State<NotifPage> {
         },
         child: Column(
           children: [
+            _buildActivitySummary(filtered.length),
             if (_isOfflineMode)
               Container(
                 width: double.infinity,
                 margin: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                 decoration: BoxDecoration(
                   color: const Color(0xFFFFFBEB),
                   borderRadius: BorderRadius.circular(10),
@@ -1069,7 +1214,8 @@ class _NotifPageState extends State<NotifPage> {
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.offline_bolt_rounded, size: 16, color: Color(0xFFD97706)),
+                    const Icon(Icons.offline_bolt_rounded,
+                        size: 16, color: Color(0xFFD97706)),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
@@ -1125,10 +1271,11 @@ class _NotifPageState extends State<NotifPage> {
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFF009688) : const Color(0xFFF1F5F9),
-          borderRadius: BorderRadius.circular(20),
+          color: isSelected ? const Color(0xFF0F3D6E) : Colors.white,
+          borderRadius: BorderRadius.circular(18),
           border: Border.all(
-            color: isSelected ? const Color(0xFF009688) : const Color(0xFFE2E8F0),
+            color:
+                isSelected ? const Color(0xFF0F3D6E) : const Color(0xFFE2E8F0),
             width: 1,
           ),
         ),
@@ -1169,6 +1316,84 @@ class _NotifPageState extends State<NotifPage> {
     );
   }
 
+  Widget _buildActivitySummary(int visibleCount) {
+    final urgentCount = _rawData.where((item) {
+      final priority = (item['priority'] ?? '').toString().toLowerCase();
+      return priority == 'urgent' ||
+          item['is_approval_item'] == true ||
+          item['is_special_permit'] == true;
+    }).length;
+    final syncLabel = _isOfflineMode
+        ? 'Tersimpan di perangkat'
+        : (_lastSyncTime == null
+            ? 'Memperbarui aktivitas'
+            : 'Diperbarui ${DateFormat('HH:mm').format(_lastSyncTime!)}');
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 14, 16, 6),
+      padding: const EdgeInsets.fromLTRB(16, 14, 14, 14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFE8EDF4)),
+        boxShadow: const [
+          BoxShadow(
+              color: Color(0x0A0F172A), blurRadius: 14, offset: Offset(0, 5)),
+        ],
+      ),
+      child: Row(children: [
+        Container(
+          width: 42,
+          height: 42,
+          decoration: BoxDecoration(
+            color: urgentCount > 0
+                ? const Color(0xFFFFF1F2)
+                : const Color(0xFFEFF6FF),
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Icon(
+            urgentCount > 0
+                ? Icons.priority_high_rounded
+                : Icons.notifications_none_rounded,
+            color: urgentCount > 0
+                ? const Color(0xFFE11D48)
+                : const Color(0xFF2563EB),
+            size: 22,
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(
+            visibleCount == 0
+                ? 'Tidak ada aktivitas baru'
+                : '$visibleCount aktivitas untuk Anda',
+            style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w800,
+                color: Color(0xFF0F172A)),
+          ),
+          const SizedBox(height: 3),
+          Text(syncLabel,
+              style: const TextStyle(fontSize: 11.5, color: Color(0xFF64748B))),
+        ])),
+        if (urgentCount > 0)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
+            decoration: BoxDecoration(
+                color: const Color(0xFFFFF1F2),
+                borderRadius: BorderRadius.circular(10)),
+            child: Text('$urgentCount perlu atensi',
+                style: const TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFFE11D48))),
+          ),
+      ]),
+    );
+  }
+
   Widget _buildNotifLogo(String? logo, Color fallbackColor) {
     if (logo == null || logo.trim().isEmpty) return const SizedBox.shrink();
     final clean = logo.trim();
@@ -1193,12 +1418,17 @@ class _NotifPageState extends State<NotifPage> {
           child: Image.network(
             clean,
             fit: BoxFit.cover,
-            errorBuilder: (_, __, ___) => Icon(Icons.notifications_active_rounded, size: 16, color: fallbackColor),
+            errorBuilder: (_, __, ___) => Icon(
+                Icons.notifications_active_rounded,
+                size: 16,
+                color: fallbackColor),
           ),
         ),
       );
     } else if (clean.startsWith('/') || clean.startsWith('uploads/')) {
-      final fullUrl = clean.startsWith('/') ? '${_api.baseUrl}$clean' : '${_api.baseUrl}/$clean';
+      final fullUrl = clean.startsWith('/')
+          ? '${_api.baseUrl}$clean'
+          : '${_api.baseUrl}/$clean';
       return Container(
         width: 32,
         height: 32,
@@ -1219,7 +1449,10 @@ class _NotifPageState extends State<NotifPage> {
           child: Image.network(
             fullUrl,
             fit: BoxFit.cover,
-            errorBuilder: (_, __, ___) => Icon(Icons.notifications_active_rounded, size: 16, color: fallbackColor),
+            errorBuilder: (_, __, ___) => Icon(
+                Icons.notifications_active_rounded,
+                size: 16,
+                color: fallbackColor),
           ),
         ),
       );
@@ -1247,7 +1480,9 @@ class _NotifPageState extends State<NotifPage> {
       } else if (clean.contains('trophy') || clean.contains('reward')) {
         iconData = Icons.emoji_events_rounded;
         iconColor = const Color(0xFFEAB308);
-      } else if (clean.contains('broadcast') || clean.contains('announcement') || clean.contains('info')) {
+      } else if (clean.contains('broadcast') ||
+          clean.contains('announcement') ||
+          clean.contains('info')) {
         iconData = Icons.campaign_rounded;
         iconColor = const Color(0xFF6366F1);
       }
@@ -1270,89 +1505,163 @@ class _NotifPageState extends State<NotifPage> {
     final message = item['remark']?.toString() ?? '';
     final sender = item['sender_name']?.toString() ?? '';
     final priority = item['priority']?.toString().toLowerCase() ?? 'normal';
-    final logo = item['logo']?.toString();
     final url = item['url']?.toString() ?? '';
     final actionText = item['action_text']?.toString() ?? 'Buka Tautan';
 
-    showDialog(
+    final isUrgent = priority == 'urgent';
+    final accent = isUrgent ? const Color(0xFFE11D48) : const Color(0xFF2563EB);
+    final background =
+        isUrgent ? const Color(0xFFFFF1F2) : const Color(0xFFEFF6FF);
+    showModalBottomSheet<void>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        titlePadding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
-        contentPadding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-        title: Row(
-          children: [
-            _buildNotifLogo(logo, const Color(0xFF0D9488)),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
-                  ),
-                  if (sender.isNotEmpty) ...[
-                    const SizedBox(height: 2),
-                    Text(
-                      'Dari: $sender',
-                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF0D9488)),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-            if (priority == 'urgent')
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFEE2E2),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: const Text('URGENT', style: TextStyle(color: Color(0xFFDC2626), fontSize: 9.5, fontWeight: FontWeight.bold)),
-              ),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Divider(height: 16),
-            Text(
-              message,
-              style: const TextStyle(fontSize: 13, height: 1.45, color: Color(0xFF334155)),
-            ),
-            const SizedBox(height: 16),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => SafeArea(
+        top: false,
+        child: Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+          ),
+          padding: EdgeInsets.fromLTRB(
+              20, 12, 20, MediaQuery.of(ctx).padding.bottom + 20),
+          child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                TextButton(
-                  onPressed: () => Navigator.pop(ctx),
-                  child: const Text('Tutup', style: TextStyle(color: Color(0xFF64748B))),
-                ),
-                if (url.isNotEmpty) ...[
-                  const SizedBox(width: 8),
-                  ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF0D9488),
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    ),
-                    onPressed: () {
-                      Navigator.pop(ctx);
-                      NotificationService.navigateToUrl(url);
-                    },
-                    child: Text(actionText),
+                Center(
+                    child: Container(
+                        width: 42,
+                        height: 4,
+                        decoration: BoxDecoration(
+                            color: const Color(0xFFE2E8F0),
+                            borderRadius: BorderRadius.circular(8)))),
+                const SizedBox(height: 20),
+                Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                        color: background,
+                        borderRadius: BorderRadius.circular(15)),
+                    child: Icon(
+                        isUrgent
+                            ? Icons.priority_high_rounded
+                            : Icons.notifications_outlined,
+                        color: accent,
+                        size: 25),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                      child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                        Row(children: [
+                          Text(isUrgent ? 'PERLU ATENSI' : 'PEMBERITAHUAN',
+                              style: TextStyle(
+                                  fontSize: 10,
+                                  letterSpacing: .8,
+                                  fontWeight: FontWeight.w900,
+                                  color: accent)),
+                          if (isUrgent) ...[
+                            const SizedBox(width: 7),
+                            Container(
+                                width: 6,
+                                height: 6,
+                                decoration: BoxDecoration(
+                                    color: accent, shape: BoxShape.circle))
+                          ],
+                        ]),
+                        const SizedBox(height: 4),
+                        Text(title,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                                fontSize: 19,
+                                height: 1.15,
+                                fontWeight: FontWeight.w900,
+                                color: Color(0xFF0F172A))),
+                      ])),
+                  IconButton(
+                      onPressed: () => Navigator.pop(ctx),
+                      icon: const Icon(Icons.close_rounded,
+                          color: Color(0xFF64748B)),
+                      tooltip: 'Tutup'),
+                ]),
+                if (sender.isNotEmpty) ...[
+                  const SizedBox(height: 16),
+                  Container(
+                    width: double.infinity,
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 11, vertical: 9),
+                    decoration: BoxDecoration(
+                        color: const Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(11)),
+                    child: Row(children: [
+                      Icon(Icons.person_outline_rounded,
+                          size: 16, color: accent),
+                      const SizedBox(width: 7),
+                      Expanded(
+                        child: Text(sender,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFF334155))),
+                      ),
+                    ]),
                   ),
                 ],
-              ],
-            ),
-          ],
+                const SizedBox(height: 18),
+                Text(message,
+                    style: const TextStyle(
+                        fontSize: 14, height: 1.55, color: Color(0xFF334155))),
+                const SizedBox(height: 24),
+                Row(children: [
+                  Expanded(
+                      child: OutlinedButton(
+                          onPressed: () => Navigator.pop(ctx),
+                          style: OutlinedButton.styleFrom(
+                              foregroundColor: const Color(0xFF475569),
+                              side: const BorderSide(color: Color(0xFFCBD5E1)),
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(13))),
+                          child: const Text('Tutup',
+                              style: TextStyle(fontWeight: FontWeight.w800)))),
+                  if (url.isNotEmpty) ...[
+                    const SizedBox(width: 10),
+                    Expanded(
+                        child: ElevatedButton(
+                            onPressed: () {
+                              Navigator.pop(ctx);
+                              NotificationService.navigateToUrl(url);
+                            },
+                            style: ElevatedButton.styleFrom(
+                                backgroundColor: accent,
+                                foregroundColor: Colors.white,
+                                elevation: 0,
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 14),
+                                shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(13))),
+                            child: Text(actionText,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.w800)))),
+                  ],
+                ]),
+              ]),
         ),
       ),
     );
   }
 
   Widget _buildNotificationCard(Map<String, dynamic> item) {
+    // Satu renderer ringkas untuk semua sumber notifikasi. Ini mencegah kartu
+    // lama yang terlalu bercabang gagal terpaint di beberapa perangkat Android.
+    return _buildProfessionalNotificationCard(item);
+
     final category = (item['category'] ?? '').toString().toLowerCase();
     final isCoaching = category.contains('coaching') ||
         (item['title'] ?? '').toString().toLowerCase().contains('coaching') ||
@@ -1361,19 +1670,30 @@ class _NotifPageState extends State<NotifPage> {
         (item['remark'] ?? '').toString().toLowerCase().contains('pembinaan');
 
     final isRoster = category.contains('roster') ||
-        (item['notif_type'] ?? '').toString().toLowerCase().contains('roster') ||
+        (item['notif_type'] ?? '')
+            .toString()
+            .toLowerCase()
+            .contains('roster') ||
         (item['url'] ?? '').toString().toLowerCase().contains('roster');
 
-    final isHazard = !isCoaching && !isRoster && (category.contains('hazard') || category.contains('action'));
-    final isInspection = !isCoaching && !isRoster && (category.contains('inspect') || category.contains('simama'));
+    final isHazard = !isCoaching &&
+        !isRoster &&
+        (category.contains('hazard') || category.contains('action'));
+    final isInspection = !isCoaching &&
+        !isRoster &&
+        (category.contains('inspect') || category.contains('simama'));
 
     final notifType = (item['notif_type'] ?? '').toString().toLowerCase();
     final itemTitleLower = (item['title'] ?? '').toString().toLowerCase();
-    final isPjaTag = notifType.contains('pja') || itemTitleLower.contains('pja');
-    final isPicTag = notifType.contains('pic') || itemTitleLower.contains('pic');
+    final isPjaTag =
+        notifType.contains('pja') || itemTitleLower.contains('pja');
+    final isPicTag =
+        notifType.contains('pic') || itemTitleLower.contains('pic');
 
-    final isApproval = item['is_approval_item'] == true || category.contains('approval');
-    final isSpecialPermit = item['is_special_permit'] == true || category.contains('special_permit');
+    final isApproval =
+        item['is_approval_item'] == true || category.contains('approval');
+    final isSpecialPermit = item['is_special_permit'] == true ||
+        category.contains('special_permit');
 
     final isViolation = category.contains('violation') ||
         notifType.contains('violation') ||
@@ -1399,7 +1719,9 @@ class _NotifPageState extends State<NotifPage> {
                             : (isPicTag
                                 ? const Color(0xFF2563EB)
                                 : (isPjaTag
-                                    ? (isInspection ? const Color(0xFF0F766E) : const Color(0xFFEA580C))
+                                    ? (isInspection
+                                        ? const Color(0xFF0F766E)
+                                        : const Color(0xFFEA580C))
                                     : (isHazard
                                         ? const Color(0xFFE65100)
                                         : (isInspection
@@ -1421,7 +1743,9 @@ class _NotifPageState extends State<NotifPage> {
                             : (isPicTag
                                 ? const Color(0xFFEFF6FF)
                                 : (isPjaTag
-                                    ? (isInspection ? const Color(0xFFF0FDF4) : const Color(0xFFFFF7ED))
+                                    ? (isInspection
+                                        ? const Color(0xFFF0FDF4)
+                                        : const Color(0xFFFFF7ED))
                                     : (isHazard
                                         ? const Color(0xFFFFF3E0)
                                         : (isInspection
@@ -1429,14 +1753,17 @@ class _NotifPageState extends State<NotifPage> {
                                             : const Color(0xFFE0F2F1))))))))));
 
     final statusInt = (item['status'] as int?) ?? (isCoaching ? -1 : 0);
-    final String statusText = (statusInt >= 0 && statusInt < globals.status.length)
-        ? (globals.status[statusInt] ?? 'Status $statusInt')
-        : 'Status $statusInt';
-    final Color statusColor = (statusInt >= 0 && statusInt < globals.statusColor.length)
-        ? (globals.statusColor[statusInt] ?? Colors.grey)
-        : Colors.grey;
+    final String statusText =
+        (statusInt >= 0 && statusInt < globals.status.length)
+            ? (globals.status[statusInt] ?? 'Status $statusInt')
+            : 'Status $statusInt';
+    final Color statusColor =
+        (statusInt >= 0 && statusInt < globals.statusColor.length)
+            ? (globals.statusColor[statusInt] ?? Colors.grey)
+            : Colors.grey;
 
-    final dateStr = _formatDisplayDate(item['date']?.toString(), item['time']?.toString());
+    final dateStr =
+        _formatDisplayDate(item['date']?.toString(), item['time']?.toString());
     final title = titleCase(item['title']?.toString() ?? 'Tindak Lanjut');
     final remark = item['remark']?.toString() ?? '';
     final areaName = titleCase(item['area_name']?.toString() ?? '-');
@@ -1454,11 +1781,13 @@ class _NotifPageState extends State<NotifPage> {
     } else if (isCoaching) {
       moduleBadge = 'COACHING';
     } else if (isRoster) {
-      moduleBadge = notifType.contains('tugas') ? 'PERIODE TUGAS' : 'ROSTER KERJA';
+      moduleBadge =
+          notifType.contains('tugas') ? 'PERIODE TUGAS' : 'ROSTER KERJA';
     } else if (isPicTag) {
       moduleBadge = 'PENUGASAN PIC';
     } else if (isPjaTag) {
-      moduleBadge = isInspection ? 'PENUGASAN PJA INSPEKSI' : 'PENUGASAN PJA HAZARD';
+      moduleBadge =
+          isInspection ? 'PENUGASAN PJA INSPEKSI' : 'PENUGASAN PJA HAZARD';
     } else if (isHazard) {
       moduleBadge = 'HAZARD';
     } else if (category.contains('simama')) {
@@ -1470,29 +1799,31 @@ class _NotifPageState extends State<NotifPage> {
     }
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(18),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 10,
-            offset: const Offset(0, 3),
+            color: const Color(0xFF0F172A).withValues(alpha: 0.045),
+            blurRadius: 14,
+            offset: const Offset(0, 5),
           ),
         ],
-        border: Border.all(
-          color: const Color(0xFFF1F5F9),
-          width: 1.2,
+        border: Border(
+          left: BorderSide(color: primaryTheme, width: 4),
+          top: const BorderSide(color: Color(0xFFE8EDF4)),
+          right: const BorderSide(color: Color(0xFFE8EDF4)),
+          bottom: const BorderSide(color: Color(0xFFE8EDF4)),
         ),
       ),
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(18),
           onTap: () => _openDetail(item),
           child: Padding(
-            padding: const EdgeInsets.all(14),
+            padding: const EdgeInsets.fromLTRB(14, 14, 14, 13),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -1501,7 +1832,8 @@ class _NotifPageState extends State<NotifPage> {
                   children: [
                     _buildNotifLogo(item['logo']?.toString(), primaryTheme),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
                         color: bgTheme,
                         borderRadius: BorderRadius.circular(8),
@@ -1521,16 +1853,26 @@ class _NotifPageState extends State<NotifPage> {
                                             : (isCoaching
                                                 ? Icons.psychology_outlined
                                                 : (isRoster
-                                                    ? (item['notif_type']?.toString().contains('tugas') == true
-                                                        ? Icons.flight_takeoff_rounded
-                                                        : Icons.calendar_month_rounded)
+                                                    ? (item['notif_type']
+                                                                ?.toString()
+                                                                .contains(
+                                                                    'tugas') ==
+                                                            true
+                                                        ? Icons
+                                                            .flight_takeoff_rounded
+                                                        : Icons
+                                                            .calendar_month_rounded)
                                                     : (isPicTag
-                                                        ? Icons.assignment_ind_rounded
+                                                        ? Icons
+                                                            .assignment_ind_rounded
                                                         : (isPjaTag
-                                                            ? Icons.shield_rounded
+                                                            ? Icons
+                                                                .shield_rounded
                                                             : (isHazard
-                                                                ? Icons.warning_amber_rounded
-                                                                : Icons.fact_check_outlined)))))))),
+                                                                ? Icons
+                                                                    .warning_amber_rounded
+                                                                : Icons
+                                                                    .fact_check_outlined)))))))),
                             size: 13,
                             color: primaryTheme,
                           ),
@@ -1547,10 +1889,12 @@ class _NotifPageState extends State<NotifPage> {
                         ],
                       ),
                     ),
-                    if (item['priority']?.toString().toLowerCase() == 'urgent') ...[
+                    if (item['priority']?.toString().toLowerCase() ==
+                        'urgent') ...[
                       const SizedBox(width: 6),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 3),
                         decoration: BoxDecoration(
                           color: const Color(0xFFFEE2E2),
                           borderRadius: BorderRadius.circular(6),
@@ -1558,9 +1902,14 @@ class _NotifPageState extends State<NotifPage> {
                         child: const Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(Icons.bolt_rounded, size: 11, color: Color(0xFFDC2626)),
+                            Icon(Icons.bolt_rounded,
+                                size: 11, color: Color(0xFFDC2626)),
                             SizedBox(width: 2),
-                            Text('URGENT', style: TextStyle(color: Color(0xFFDC2626), fontSize: 9.5, fontWeight: FontWeight.bold)),
+                            Text('URGENT',
+                                style: TextStyle(
+                                    color: Color(0xFFDC2626),
+                                    fontSize: 9.5,
+                                    fontWeight: FontWeight.bold)),
                           ],
                         ),
                       ),
@@ -1586,11 +1935,15 @@ class _NotifPageState extends State<NotifPage> {
                     ),
                   ],
                 ),
-                if (item['sender_name'] != null && item['sender_name'].toString().isNotEmpty) ...[
+                if (item['sender_name'] != null &&
+                    item['sender_name'].toString().isNotEmpty) ...[
                   const SizedBox(height: 6),
                   Text(
                     'Pengirim: ${item['sender_name']}',
-                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF0D9488)),
+                    style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF0D9488)),
                   ),
                 ],
                 const SizedBox(height: 10),
@@ -1613,7 +1966,8 @@ class _NotifPageState extends State<NotifPage> {
                   const SizedBox(height: 8),
                   Container(
                     width: double.infinity,
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
                     decoration: BoxDecoration(
                       color: const Color(0xFFF8FAFC),
                       borderRadius: BorderRadius.circular(8),
@@ -1645,7 +1999,8 @@ class _NotifPageState extends State<NotifPage> {
                   runSpacing: 4,
                   children: [
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 3),
                       decoration: BoxDecoration(
                         color: const Color(0xFFF1F5F9),
                         borderRadius: BorderRadius.circular(6),
@@ -1669,7 +2024,8 @@ class _NotifPageState extends State<NotifPage> {
                     ),
                     if (locName != '-' && locName.isNotEmpty)
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 3),
                         decoration: BoxDecoration(
                           color: const Color(0xFFF1F5F9),
                           borderRadius: BorderRadius.circular(6),
@@ -1694,7 +2050,8 @@ class _NotifPageState extends State<NotifPage> {
                   ],
                 ),
 
-                const Divider(height: 20, thickness: 0.8, color: Color(0xFFF1F5F9)),
+                const Divider(
+                    height: 20, thickness: 0.8, color: Color(0xFFF1F5F9)),
 
                 // Bottom row: Status badge + Action link
                 Row(
@@ -1702,7 +2059,8 @@ class _NotifPageState extends State<NotifPage> {
                     if (isCoaching || statusInt < 0) ...[
                       // Coaching is purely informational: "ini hanya menampilkan saya dapat coacing dari PIC nya dan tidak ada statusnya"
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(
                           color: const Color(0xFFEDE9FE),
                           borderRadius: BorderRadius.circular(6),
@@ -1750,7 +2108,8 @@ class _NotifPageState extends State<NotifPage> {
                     ] else ...[
                       // Status Badge
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(
                           color: statusColor.withValues(alpha: 0.12),
                           borderRadius: BorderRadius.circular(6),
@@ -1785,18 +2144,24 @@ class _NotifPageState extends State<NotifPage> {
                             backgroundColor: const Color(0xFF0D9488),
                             foregroundColor: Colors.white,
                             elevation: 0,
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 10, vertical: 4),
                             minimumSize: const Size(64, 28),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8)),
                           ),
                           onPressed: () {
                             Navigator.push(
                               context,
-                              MaterialPageRoute(builder: (_) => const ApprovalCenterPage()),
+                              MaterialPageRoute(
+                                  builder: (_) => const ApprovalCenterPage()),
                             ).then((_) => _getData());
                           },
-                          icon: const Icon(Icons.check_circle_outline_rounded, size: 13),
-                          label: const Text('Tinjau Persetujuan', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                          icon: const Icon(Icons.check_circle_outline_rounded,
+                              size: 13),
+                          label: const Text('Tinjau Persetujuan',
+                              style: TextStyle(
+                                  fontSize: 11, fontWeight: FontWeight.bold)),
                         ),
                       ] else if (isSpecialPermit) ...[
                         ElevatedButton.icon(
@@ -1804,62 +2169,82 @@ class _NotifPageState extends State<NotifPage> {
                             backgroundColor: const Color(0xFFDC2626),
                             foregroundColor: Colors.white,
                             elevation: 0,
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 10, vertical: 4),
                             minimumSize: const Size(64, 28),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8)),
                           ),
                           onPressed: () {
                             Navigator.push(
                               context,
-                              MaterialPageRoute(builder: (_) => const SpecialPermitListPage()),
+                              MaterialPageRoute(
+                                  builder: (_) =>
+                                      const SpecialPermitListPage()),
                             ).then((_) => _getData());
                           },
-                          icon: const Icon(Icons.assignment_turned_in_rounded, size: 13),
-                          label: const Text('Inspeksi Lapangan', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                          icon: const Icon(Icons.assignment_turned_in_rounded,
+                              size: 13),
+                          label: const Text('Inspeksi Lapangan',
+                              style: TextStyle(
+                                  fontSize: 11, fontWeight: FontWeight.bold)),
                         ),
                       ] else if (item['is_server_notif'] == true &&
-                          (item['notif_type'] == 'hazard_assigned' || item['notif_type'] == 'hazard_new' || item['notif_type'] == 'hazard_reassigned') &&
+                          (item['notif_type'] == 'hazard_assigned' ||
+                              item['notif_type'] == 'hazard_new' ||
+                              item['notif_type'] == 'hazard_reassigned') &&
                           item['is_actioned'] != true) ...[
                         ElevatedButton.icon(
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFF0284C7),
                             foregroundColor: Colors.white,
                             elevation: 0,
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 3),
                             minimumSize: const Size(54, 28),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8)),
                           ),
                           onPressed: () {
                             final notifId = item['id'] as int? ?? 0;
                             if (notifId > 0) {
-                              _db.updateLocalNotificationActioned(notifId, true);
+                              _db.updateLocalNotificationActioned(
+                                  notifId, true);
                               _db.updateLocalNotificationRead(notifId, true);
                               _api.markNotificationActioned(notifId);
                             }
                             Navigator.push(
                               context,
-                              MaterialPageRoute(builder: (_) => const HazardHubPage()),
+                              MaterialPageRoute(
+                                  builder: (_) => const HazardHubPage()),
                             ).then((_) => _getData());
                           },
                           icon: const Icon(Icons.touch_app_rounded, size: 12),
-                          label: const Text('Take Up', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold)),
+                          label: const Text('Take Up',
+                              style: TextStyle(
+                                  fontSize: 10.5, fontWeight: FontWeight.bold)),
                         ),
                         const SizedBox(width: 6),
                         OutlinedButton(
                           style: OutlinedButton.styleFrom(
                             foregroundColor: const Color(0xFFD97706),
                             side: const BorderSide(color: Color(0xFFFDE68A)),
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 3),
                             minimumSize: const Size(48, 28),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8)),
                           ),
                           onPressed: () {
                             Navigator.push(
                               context,
-                              MaterialPageRoute(builder: (_) => const HazardHubPage()),
+                              MaterialPageRoute(
+                                  builder: (_) => const HazardHubPage()),
                             ).then((_) => _getData());
                           },
-                          child: const Text('Alihkan', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold)),
+                          child: const Text('Alihkan',
+                              style: TextStyle(
+                                  fontSize: 10.5, fontWeight: FontWeight.bold)),
                         ),
                       ] else if (item['is_server_notif'] == true &&
                           (item['notif_type'] == 'inspection_assigned') &&
@@ -1869,9 +2254,11 @@ class _NotifPageState extends State<NotifPage> {
                             backgroundColor: const Color(0xFF0F766E),
                             foregroundColor: Colors.white,
                             elevation: 0,
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 10, vertical: 3),
                             minimumSize: const Size(60, 28),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8)),
                           ),
                           onPressed: () {
                             final notifId = item['id'] as int? ?? 0;
@@ -1881,23 +2268,31 @@ class _NotifPageState extends State<NotifPage> {
                             }
                             Navigator.push(
                               context,
-                              MaterialPageRoute(builder: (_) => const InspectionHubPage(initialTab: InspectionHubTab.pjaArea)),
+                              MaterialPageRoute(
+                                  builder: (_) => const InspectionHubPage(
+                                      initialTab: InspectionHubTab.pjaArea)),
                             ).then((_) => _getData());
                           },
                           icon: const Icon(Icons.shield_rounded, size: 12),
-                          label: const Text('Area PJA', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold)),
+                          label: const Text('Area PJA',
+                              style: TextStyle(
+                                  fontSize: 10.5, fontWeight: FontWeight.bold)),
                         ),
                       ] else if (item['is_server_notif'] == true &&
-                          (item['notif_type'] == 'actionplan_assigned' || item['notif_type'] == 'actionplan_pja_assigned') &&
+                          (item['notif_type'] == 'actionplan_assigned' ||
+                              item['notif_type'] ==
+                                  'actionplan_pja_assigned') &&
                           item['is_actioned'] != true) ...[
                         ElevatedButton.icon(
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFF2563EB),
                             foregroundColor: Colors.white,
                             elevation: 0,
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 10, vertical: 3),
                             minimumSize: const Size(60, 28),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8)),
                           ),
                           onPressed: () {
                             final notifId = item['id'] as int? ?? 0;
@@ -1907,13 +2302,18 @@ class _NotifPageState extends State<NotifPage> {
                             }
                             Navigator.push(
                               context,
-                              MaterialPageRoute(builder: (_) => const ActionTrackerPage()),
+                              MaterialPageRoute(
+                                  builder: (_) => const ActionTrackerPage()),
                             ).then((_) => _getData());
                           },
-                          icon: const Icon(Icons.assignment_ind_rounded, size: 12),
+                          icon: const Icon(Icons.assignment_ind_rounded,
+                              size: 12),
                           label: Text(
-                            item['notif_type'] == 'actionplan_assigned' ? 'Perbaiki' : 'Pilih PIC',
-                            style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold),
+                            item['notif_type'] == 'actionplan_assigned'
+                                ? 'Perbaiki'
+                                : 'Pilih PIC',
+                            style: const TextStyle(
+                                fontSize: 10.5, fontWeight: FontWeight.bold),
                           ),
                         ),
                       ] else ...[
@@ -1944,6 +2344,153 @@ class _NotifPageState extends State<NotifPage> {
                 ),
               ],
             ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildProfessionalNotificationCard(Map<String, dynamic> item) {
+    final category = (item['category'] ?? '').toString().toLowerCase();
+    final title = titleCase(item['title']?.toString() ?? 'Pemberitahuan');
+    final message = item['remark']?.toString() ?? '';
+    final sender = item['sender_name']?.toString() ?? '';
+    final time =
+        _formatDisplayDate(item['date']?.toString(), item['time']?.toString());
+    final urgent =
+        (item['priority'] ?? '').toString().toLowerCase() == 'urgent' ||
+            item['is_special_permit'] == true;
+    final approval =
+        item['is_approval_item'] == true || category.contains('approval');
+    final hazard = category.contains('hazard') || category.contains('action');
+    final inspection =
+        category.contains('inspect') || category.contains('simama');
+
+    final Color color = urgent
+        ? const Color(0xFFE11D48)
+        : approval
+            ? const Color(0xFF0F766E)
+            : hazard
+                ? const Color(0xFFEA580C)
+                : inspection
+                    ? const Color(0xFF2563EB)
+                    : const Color(0xFF6366F1);
+    final IconData icon = urgent
+        ? Icons.priority_high_rounded
+        : approval
+            ? Icons.approval_outlined
+            : hazard
+                ? Icons.warning_amber_rounded
+                : inspection
+                    ? Icons.fact_check_outlined
+                    : Icons.notifications_none_rounded;
+    final String label = urgent
+        ? 'PERLU ATENSI'
+        : approval
+            ? 'PERSETUJUAN'
+            : hazard
+                ? 'HAZARD'
+                : inspection
+                    ? 'INSPEKSI'
+                    : 'INFORMASI';
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFE8EDF4)),
+        boxShadow: const [
+          BoxShadow(
+              color: Color(0x0A0F172A), blurRadius: 14, offset: Offset(0, 5)),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(18),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(18),
+          onTap: () => _openDetail(item),
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: .10),
+                  borderRadius: BorderRadius.circular(13),
+                ),
+                child: Icon(icon, size: 21, color: color),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                  child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                    Row(children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 7, vertical: 3),
+                        decoration: BoxDecoration(
+                            color: color.withValues(alpha: .09),
+                            borderRadius: BorderRadius.circular(6)),
+                        child: Text(label,
+                            style: TextStyle(
+                                fontSize: 9.5,
+                                letterSpacing: .45,
+                                fontWeight: FontWeight.w900,
+                                color: color)),
+                      ),
+                      const Spacer(),
+                      Text(time,
+                          style: const TextStyle(
+                              fontSize: 10.5,
+                              color: Color(0xFF94A3B8),
+                              fontWeight: FontWeight.w600)),
+                    ]),
+                    const SizedBox(height: 7),
+                    Text(title,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                            fontSize: 14,
+                            height: 1.25,
+                            fontWeight: FontWeight.w800,
+                            color: Color(0xFF0F172A))),
+                    if (message.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text(message,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                              fontSize: 11.5,
+                              height: 1.35,
+                              color: Color(0xFF64748B))),
+                    ],
+                    if (sender.isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      Row(children: [
+                        Icon(Icons.person_outline_rounded,
+                            size: 13, color: color),
+                        const SizedBox(width: 4),
+                        Expanded(
+                            child: Text(sender,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                    fontSize: 10.5,
+                                    color: color,
+                                    fontWeight: FontWeight.w700)))
+                      ])
+                    ],
+                  ])),
+              const SizedBox(width: 4),
+              const Padding(
+                  padding: EdgeInsets.only(top: 25),
+                  child: Icon(Icons.chevron_right_rounded,
+                      size: 19, color: Color(0xFF94A3B8))),
+            ]),
           ),
         ),
       ),
@@ -2005,7 +2552,8 @@ class _NotifPageState extends State<NotifPage> {
                 backgroundColor: const Color(0xFF009688),
                 foregroundColor: Colors.white,
                 elevation: 0,
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 11),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 11),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),

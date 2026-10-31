@@ -34,8 +34,8 @@ class _HomeWeatherWidgetState extends State<HomeWeatherWidget> {
     }
 
     try {
-      final fresh = await WeatherService.fetchCurrentWeather(
-          forceRefresh: forceRefresh);
+      final fresh =
+          await WeatherService.fetchCurrentWeather(forceRefresh: forceRefresh);
       if (mounted) {
         setState(() {
           _weather = fresh;
@@ -92,17 +92,16 @@ class _HomeWeatherWidgetState extends State<HomeWeatherWidget> {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(10),
         onTap: () => _showDetailBottomSheet(context, weather),
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           decoration: BoxDecoration(
-            color: const Color(0xFFF8FAFC),
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(
-              color: const Color(0xFFE2E8F0),
-              width: 1,
-            ),
+            // The header photo remains visible through this small weather cue;
+            // it is intentionally a glass tint, not a separate white card.
+            color: Colors.white.withValues(alpha: .22),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: Colors.white.withValues(alpha: .20)),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
@@ -165,9 +164,8 @@ class _HomeWeatherWidgetState extends State<HomeWeatherWidget> {
       width: 95,
       height: 24,
       decoration: BoxDecoration(
-        color: const Color(0xFFF1F5F9),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        color: Colors.white.withValues(alpha: .18),
+        borderRadius: BorderRadius.circular(10),
       ),
     );
   }
@@ -274,72 +272,107 @@ class _WeatherDetailSheet extends StatelessWidget {
 
             const SizedBox(height: 18),
 
-            // Big Temperature Card
+            // Hero bergaya weather Android: terang, berlapis, dan terasa hidup.
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.all(16),
+              height: 174,
+              clipBehavior: Clip.antiAlias,
               decoration: BoxDecoration(
                 gradient: const LinearGradient(
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                   colors: [
-                    Color(0xFF1E3A8A),
-                    Color(0xFF0284C7),
+                    Color(0xFFEFF7FF),
+                    Color(0xFFDCEEFF),
+                    Color(0xFFC8E4FF)
                   ],
                 ),
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(color: const Color(0xFFFFFFFF)),
+                boxShadow: const [
                   BoxShadow(
-                    color: const Color(0xFF1E3A8A).withValues(alpha: 0.2),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
-                  ),
+                      color: Color(0x1A2563EB),
+                      blurRadius: 18,
+                      offset: Offset(0, 8)),
                 ],
               ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Column(
+              child: Stack(children: [
+                Positioned(
+                  right: -22,
+                  top: -36,
+                  child: Container(
+                    width: 154,
+                    height: 154,
+                    decoration: const BoxDecoration(
+                        color: Color(0x52FFFFFF), shape: BoxShape.circle),
+                  ),
+                ),
+                Positioned(
+                  right: 30,
+                  bottom: -48,
+                  child: Container(
+                    width: 190,
+                    height: 90,
+                    decoration: BoxDecoration(
+                      color: const Color(0x70FFFFFF),
+                      borderRadius: BorderRadius.circular(100),
+                    ),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.all(18),
+                  child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          weather.conditionText,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 17,
-                            fontWeight: FontWeight.w700,
+                        Row(children: [
+                          Container(
+                            padding: const EdgeInsets.all(7),
+                            decoration: const BoxDecoration(
+                                color: Color(0xCCFFFFFF),
+                                shape: BoxShape.circle),
+                            child: Icon(weather.iconData,
+                                size: 22, color: weather.iconColor),
                           ),
-                        ),
-                        const SizedBox(height: 4),
+                          const SizedBox(width: 8),
+                          Text('CUACA SAAT INI',
+                              style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: 1.1,
+                                  color: const Color(0xFF2563EB)
+                                      .withValues(alpha: .8))),
+                        ]),
+                        const Spacer(),
+                        Text(weather.conditionText,
+                            style: const TextStyle(
+                                fontSize: 19,
+                                fontWeight: FontWeight.w900,
+                                color: Color(0xFF102A56))),
+                        const SizedBox(height: 3),
                         Text(
-                          'Terasa seperti ${weather.apparentTemperature.toStringAsFixed(0)}°C',
-                          style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.8),
-                            fontSize: 12.5,
-                          ),
-                        ),
+                            'Terasa seperti ${weather.apparentTemperature.toStringAsFixed(0)}°C  •  ${weather.isDay ? 'Siang hari' : 'Malam hari'}',
+                            style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFF52709B))),
                         const SizedBox(height: 8),
-                        Text(
-                          'Koordinat: ${weather.latitude.toStringAsFixed(3)}, ${weather.longitude.toStringAsFixed(3)}',
-                          style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.6),
-                            fontSize: 10.5,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Text(
-                    '${weather.temperature.toStringAsFixed(0)}°',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 44,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: -1.5,
-                    ),
-                  ),
-                ],
-              ),
+                        Text('Diperbarui $timeStr WITA',
+                            style: const TextStyle(
+                                fontSize: 10.5, color: Color(0xFF6B85A9))),
+                      ]),
+                ),
+                Positioned(
+                  right: 19,
+                  bottom: 14,
+                  child: Text('${weather.temperature.toStringAsFixed(0)}°',
+                      style: const TextStyle(
+                          fontSize: 58,
+                          height: 1,
+                          fontWeight: FontWeight.w300,
+                          letterSpacing: -3,
+                          color: Color(0xFF0B4BA8))),
+                ),
+              ]),
             ),
 
             const SizedBox(height: 14),

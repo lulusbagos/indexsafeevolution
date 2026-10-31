@@ -578,13 +578,7 @@ class _SplashPageState extends State<SplashPage>
                             height: 6,
                             decoration: BoxDecoration(
                               borderRadius: BorderRadius.circular(3),
-                              gradient: const LinearGradient(
-                                colors: [
-                                  Color(0xFF0D9488),
-                                  Color(0xFF2563EB),
-                                  Color(0xFFF59E0B),
-                                ],
-                              ),
+                              color: const Color(0xFF2563EB),
                               boxShadow: [
                                 BoxShadow(
                                   color: const Color(0xFF0D9488)

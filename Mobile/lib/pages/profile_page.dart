@@ -1,8 +1,10 @@
 import 'dart:io';
+import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:image_cropper/image_cropper.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -103,15 +105,35 @@ class _ProfilePageState extends State<ProfilePage> {
     try {
       final file = await pickImage(source: source);
       if (file != null && _profile != null) {
+        final cropped = await ImageCropper().cropImage(
+          sourcePath: file.path,
+          aspectRatio: const CropAspectRatio(ratioX: 1, ratioY: 1),
+          compressFormat: ImageCompressFormat.jpg,
+          compressQuality: 92,
+          uiSettings: [
+            AndroidUiSettings(
+              toolbarTitle: 'Atur Foto Profil',
+              toolbarColor: const Color(0xFF0F172A),
+              toolbarWidgetColor: Colors.white,
+              activeControlsWidgetColor: const Color(0xFF2563EB),
+              hideBottomControls: false,
+              lockAspectRatio: true,
+              cropStyle: CropStyle.circle,
+            ),
+            IOSUiSettings(title: 'Atur Foto Profil'),
+          ],
+        );
+        if (cropped == null) return;
+        final croppedFile = File(cropped.path);
         setState(() {
           _isUploading = true;
-          _image = MemoryImage(file.readAsBytesSync());
+          _image = MemoryImage(croppedFile.readAsBytesSync());
         });
 
-        _profile!.foto = file.path;
+        _profile!.foto = croppedFile.path;
         await PreferenceService.setProfile(_profile!);
 
-        final res = await _api.changeProfile(file);
+        final res = await _api.changeProfile(croppedFile);
         if (!mounted) return;
         res.fold((error) {
           SnackBarMsg.danger(context, error['message'].toString());
@@ -292,41 +314,32 @@ class _ProfilePageState extends State<ProfilePage> {
   void _confirmLogout() {
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Row(
-          children: [
-            Icon(Icons.logout_rounded, color: Color(0xFFDC2626)),
-            SizedBox(width: 10),
-            Text(
-              'Konfirmasi Keluar',
-              style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 28),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(26),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+            child: Container(
+              padding: const EdgeInsets.all(22),
+              decoration: BoxDecoration(color: const Color(0xFFF8FBFF).withValues(alpha: .76), borderRadius: BorderRadius.circular(26), border: Border.all(color: Colors.white.withValues(alpha: .88), width: 1.2), boxShadow: [BoxShadow(color: const Color(0xFF0F172A).withValues(alpha: .16), blurRadius: 32, offset: const Offset(0, 14))]),
+              child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Container(width: 44, height: 44, decoration: BoxDecoration(color: const Color(0xFFFFE9EA), borderRadius: BorderRadius.circular(14)), child: const Icon(Icons.logout_rounded, color: Color(0xFFE11D48))),
+                const SizedBox(height: 16),
+                const Text('Keluar dari akun?', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: Color(0xFF0F172A))),
+                const SizedBox(height: 8),
+                const Text('Anda akan keluar dari sesi Indexsafe Evolution pada perangkat ini.', style: TextStyle(fontSize: 13, height: 1.45, color: Color(0xFF64748B))),
+                const SizedBox(height: 22),
+                Row(children: [
+                  Expanded(child: TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Batal', style: TextStyle(fontWeight: FontWeight.w700, color: Color(0xFF64748B))))),
+                  const SizedBox(width: 10),
+                  Expanded(child: FilledButton(onPressed: () { Navigator.pop(ctx); _performLogout(); }, style: FilledButton.styleFrom(backgroundColor: const Color(0xFFE11D48), padding: const EdgeInsets.symmetric(vertical: 14), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))), child: const Text('Ya, Keluar', style: TextStyle(fontWeight: FontWeight.w800)))),
+                ]),
+              ]),
             ),
-          ],
-        ),
-        content: const Text(
-          'Apakah Anda yakin ingin keluar dari sesi Indexsafe Evolution pada perangkat ini?',
-          style: TextStyle(fontSize: 13, height: 1.4, color: Color(0xFF475569)),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Batal', style: TextStyle(color: Color(0xFF64748B))),
           ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFDC2626),
-              foregroundColor: Colors.white,
-              elevation: 0,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            ),
-            onPressed: () {
-              Navigator.pop(ctx);
-              _performLogout();
-            },
-            child: const Text('Ya, Keluar'),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -435,46 +448,87 @@ class _ProfilePageState extends State<ProfilePage> {
           controller: _scrollCtrl,
         child: Column(
           children: [
-            // Card Foto Profil & NIK dengan Gradien Modern
-            SafeArea(
+            _buildReferenceProfileHero(
+              nama: nama,
+              posisi: posisi,
+              jabatan: jabatan,
+              nik: nik,
+              company: company,
+              depart: depart,
+              permitNomor: permitNomor,
+              masaAktifPermit: masaAktifPermit,
+              isPermitExpiringSoon: isPermitExpiringSoon,
+              isPermitExpired: isPermitExpired,
+            ),
+            if (false)
+              // Legacy hero retained temporarily while the new composition is validated.
+              SafeArea(
               bottom: false,
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                padding: EdgeInsets.zero,
                 child: Container(
                   width: double.infinity,
                   clipBehavior: Clip.antiAlias,
-                  padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 18),
                   decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(24),
-                    gradient: const LinearGradient(
-                      colors: [
-                        Color(0xFFC2410C), // Deep Rust Orange
-                        Color(0xFFEA580C), // Vibrant Safety Orange
-                        Color(0xFFF97316), // Radiant Tangerine Orange
-                      ],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
+                    borderRadius: const BorderRadius.vertical(
+                      bottom: Radius.circular(28),
                     ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: const Color(0xFFEA580C).withValues(alpha: 0.35),
-                        blurRadius: 18,
-                        offset: const Offset(0, 8),
+                    image: const DecorationImage(
+                      image: AssetImage('assets/images/profile-mine-sunset.png'),
+                      fit: BoxFit.cover,
+                      alignment: Alignment.center,
+                    ),
+                    border: Border(
+                      bottom: BorderSide(
+                        color: Color(0xFFFFEDD5),
+                        width: 1,
                       ),
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.12),
-                        blurRadius: 8,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                    border: Border.all(
-                      color: Colors.white.withValues(alpha: 0.22),
-                      width: 1.2,
                     ),
                   ),
                   child: Stack(
                     clipBehavior: Clip.none,
                     children: [
+                      Positioned.fill(
+                        child: IgnorePointer(
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [
+                                  Color(0xFF431407).withValues(alpha: .30),
+                                  Color(0xFF431407).withValues(alpha: .58),
+                                ],
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      Positioned(
+                        left: -58,
+                        bottom: -48,
+                        child: Transform.rotate(
+                          angle: -0.42,
+                          child: Container(
+                            width: 265,
+                            height: 98,
+                            color: const Color(0xFFC2410C).withValues(alpha: .78),
+                          ),
+                        ),
+                      ),
+                      Positioned(
+                        right: -76,
+                        bottom: -44,
+                        child: Transform.rotate(
+                          angle: 0.42,
+                          child: Container(
+                            width: 255,
+                            height: 90,
+                            color: const Color(0xFF431407).withValues(alpha: .56),
+                          ),
+                        ),
+                      ),
                       // Unsur Kuning - Pendar Cahaya Hangat di Kanan Atas (Seamless Feathering)
                       Positioned(
                         top: -60,
@@ -656,7 +710,7 @@ class _ProfilePageState extends State<ProfilePage> {
                             ],
                           ),
 
-                          const SizedBox(height: 12),
+                          const SizedBox(height: 16),
 
                           // Profil Horizontal: Foto di Kiri, Detail di Kanan
                           Row(
@@ -857,17 +911,17 @@ class _ProfilePageState extends State<ProfilePage> {
                               isPermitExpired: isPermitExpired,
                               qrCode: _profile?.qrCode,
                             ),
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(18),
                             child: Container(
                               width: double.infinity,
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7.5),
+                              padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 11),
                               decoration: BoxDecoration(
-                                color: Colors.black.withValues(alpha: 0.28),
-                                borderRadius: BorderRadius.circular(12),
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(18),
                                 border: Border.all(
                                   color: isPermitExpiringSoon
-                                      ? const Color(0xFFF87171).withValues(alpha: 0.6)
-                                      : Colors.white.withValues(alpha: 0.14),
+                                      ? const Color(0xFFFECACA)
+                                      : const Color(0xFFE2E8F0),
                                   width: 1,
                                 ),
                               ),
@@ -887,8 +941,8 @@ class _ProfilePageState extends State<ProfilePage> {
                                           : Icons.verified_user_rounded,
                                       size: 15,
                                       color: isPermitExpiringSoon
-                                          ? const Color(0xFFFCA5A5)
-                                          : const Color(0xFF34D399),
+                                          ? const Color(0xFFDC2626)
+                                          : const Color(0xFF059669),
                                     ),
                                   ),
                                   const SizedBox(width: 8),
@@ -904,7 +958,7 @@ class _ProfilePageState extends State<ProfilePage> {
                                             fontSize: 12,
                                             fontWeight: FontWeight.w800,
                                             letterSpacing: 0.4,
-                                            color: isPermitExpiringSoon ? const Color(0xFFFCA5A5) : Colors.white,
+                                            color: isPermitExpiringSoon ? const Color(0xFFB91C1C) : const Color(0xFF0F172A),
                                           ),
                                         ),
                                         Text(
@@ -913,8 +967,8 @@ class _ProfilePageState extends State<ProfilePage> {
                                             fontSize: 9.5,
                                             fontWeight: FontWeight.w600,
                                             color: isPermitExpiringSoon
-                                                ? const Color(0xFFFCA5A5)
-                                                : const Color(0xFFE2E8F0),
+                                                ? const Color(0xFFB91C1C)
+                                                : const Color(0xFF64748B),
                                           ),
                                         ),
                                       ],
@@ -926,19 +980,11 @@ class _ProfilePageState extends State<ProfilePage> {
                                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
                                     decoration: BoxDecoration(
                                       color: isPermitExpired
-                                          ? const Color(0xFFEF4444).withValues(alpha: 0.3)
+                                          ? const Color(0xFFEF4444)
                                           : (isPermitExpiringSoon
-                                              ? const Color(0xFFF59E0B).withValues(alpha: 0.3)
-                                              : const Color(0xFF059669).withValues(alpha: 0.35)),
-                                      borderRadius: BorderRadius.circular(7),
-                                      border: Border.all(
-                                        color: isPermitExpired
-                                            ? const Color(0xFFF87171).withValues(alpha: 0.7)
-                                            : (isPermitExpiringSoon
-                                                ? const Color(0xFFFCD34D).withValues(alpha: 0.7)
-                                                : const Color(0xFF34D399).withValues(alpha: 0.7)),
-                                        width: 1,
-                                      ),
+                                              ? const Color(0xFFF59E0B)
+                                              : const Color(0xFF059669)),
+                                      borderRadius: BorderRadius.circular(20),
                                     ),
                                     child: Text(
                                       isPermitExpired
@@ -951,10 +997,8 @@ class _ProfilePageState extends State<ProfilePage> {
                                         fontWeight: FontWeight.w800,
                                         letterSpacing: 0.3,
                                         color: isPermitExpired
-                                            ? const Color(0xFFFCA5A5)
-                                            : (isPermitExpiringSoon
-                                                ? const Color(0xFFFDE68A)
-                                                : const Color(0xFF6EE7B7)),
+                                            ? Colors.white
+                                            : Colors.white,
                                       ),
                                     ),
                                   ),
@@ -1207,6 +1251,208 @@ class _ProfilePageState extends State<ProfilePage> {
           ],
         ),
       ),
+      ),
+    );
+  }
+
+  Widget _buildReferenceProfileHero({
+    required String nama,
+    required String posisi,
+    required String jabatan,
+    required String nik,
+    required String company,
+    required String depart,
+    required String permitNomor,
+    required String masaAktifPermit,
+    required bool isPermitExpiringSoon,
+    required bool isPermitExpired,
+  }) {
+    final statusColor = isPermitExpired
+        ? const Color(0xFFDC2626)
+        : isPermitExpiringSoon
+            ? const Color(0xFFF59E0B)
+            : const Color(0xFF059669);
+    final statusText = isPermitExpired
+        ? 'KEDALUWARSA'
+        : isPermitExpiringSoon
+            ? 'MAU HABIS'
+            : 'AKTIF';
+
+    return SizedBox(
+      height: 302,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Container(
+            height: 244,
+            width: double.infinity,
+            decoration: BoxDecoration(
+              borderRadius: const BorderRadius.vertical(bottom: Radius.circular(24)),
+              image: const DecorationImage(
+                image: AssetImage('assets/images/profile-mine-sunset.png'),
+                fit: BoxFit.cover,
+                alignment: Alignment.center,
+              ),
+            ),
+            child: Stack(
+              children: [
+                Positioned.fill(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          const Color(0xFF0F172A).withValues(alpha: .30),
+                          const Color(0xFF431407).withValues(alpha: .42),
+                          const Color(0xFF431407).withValues(alpha: .72),
+                        ],
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                      ),
+                    ),
+                  ),
+                ),
+                Positioned(
+                  left: -52,
+                  bottom: -45,
+                  child: Transform.rotate(
+                    angle: -0.42,
+                    child: Container(
+                      width: 230,
+                      height: 88,
+                      color: const Color(0xFFC2410C).withValues(alpha: .82),
+                    ),
+                  ),
+                ),
+                Positioned(
+                  right: -62,
+                  bottom: -38,
+                  child: Transform.rotate(
+                    angle: 0.42,
+                    child: Container(
+                      width: 240,
+                      height: 82,
+                      color: const Color(0xFF7C2D12).withValues(alpha: .62),
+                    ),
+                  ),
+                ),
+                SafeArea(
+                  bottom: false,
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(24, 13, 16, 0),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(company.toUpperCase(), maxLines: 1, overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w900)),
+                              Text(depart.toUpperCase(), maxLines: 1, overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(color: Color(0xFFFFEDD5), fontSize: 6.8, fontWeight: FontWeight.w700, letterSpacing: .35)),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                Positioned(
+                  top: 79,
+                  left: 24,
+                  child: GestureDetector(
+                    onTap: _showPhotoOptions,
+                    child: Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(3),
+                          decoration: const BoxDecoration(shape: BoxShape.circle, color: Colors.white),
+                          child: CircleAvatar(
+                            radius: 43,
+                            backgroundColor: const Color(0xFF334155),
+                            backgroundImage: _image,
+                            child: _image == null ? const Icon(Icons.person_rounded, color: Color(0xFFCBD5E1), size: 48) : null,
+                          ),
+                        ),
+                        Positioned(
+                          right: -3,
+                          bottom: 2,
+                          child: Container(
+                            padding: const EdgeInsets.all(6),
+                            decoration: BoxDecoration(shape: BoxShape.circle, color: const Color(0xFFEA580C), border: Border.all(color: Colors.white, width: 2)),
+                            child: const Icon(Icons.camera_alt_rounded, size: 14, color: Colors.white),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                Positioned(
+                  top: 82,
+                  left: 130,
+                  right: 18,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Selamat datang,', style: TextStyle(color: Color(0xFFFFEDD5), fontSize: 10, fontWeight: FontWeight.w600)),
+                      Text(nama, maxLines: 2, overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(color: Colors.white, fontSize: 14, height: 1.1, fontWeight: FontWeight.w900)),
+                      Text(posisi, maxLines: 2, overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(color: Color(0xFFFFEDD5), fontSize: 9, height: 1.15, fontWeight: FontWeight.w500)),
+                      const SizedBox(height: 7),
+                      if (jabatan.isNotEmpty)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                          decoration: BoxDecoration(color: const Color(0xFFB45309).withValues(alpha: .82), borderRadius: BorderRadius.circular(10)),
+                          child: Text(jabatan.toUpperCase(), maxLines: 1, overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(color: Color(0xFFFFEDD5), fontSize: 8, fontWeight: FontWeight.w900)),
+                        ),
+                      const SizedBox(height: 6),
+                      InkWell(
+                        onTap: () => _showNikQrModal(context: context, nik: nik, nama: nama, posisi: posisi, jabatan: jabatan, company: company, depart: depart, permitNomor: permitNomor, masaAktif: masaAktifPermit, isPermitExpiringSoon: isPermitExpiringSoon, isPermitExpired: isPermitExpired, qrCode: _profile?.qrCode),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                          decoration: BoxDecoration(color: Colors.black.withValues(alpha: .35), borderRadius: BorderRadius.circular(8)),
+                          child: Row(mainAxisSize: MainAxisSize.min, children: [
+                            const Icon(Icons.badge_outlined, color: Color(0xFFE2E8F0), size: 13),
+                            const SizedBox(width: 5),
+                            Text(nik, style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w700)),
+                            const SizedBox(width: 8),
+                            const Icon(Icons.qr_code_rounded, color: Color(0xFFE2E8F0), size: 13),
+                          ]),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Positioned(
+            top: 211,
+            left: 16,
+            right: 16,
+            child: InkWell(
+              onTap: () => _showNikQrModal(context: context, nik: nik, nama: nama, posisi: posisi, jabatan: jabatan, company: company, depart: depart, permitNomor: permitNomor, masaAktif: masaAktifPermit, isPermitExpiringSoon: isPermitExpiringSoon, isPermitExpired: isPermitExpired, qrCode: _profile?.qrCode),
+              borderRadius: BorderRadius.circular(18),
+              child: Container(
+                padding: const EdgeInsets.fromLTRB(14, 12, 12, 12),
+                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(18), boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: .12), blurRadius: 14, offset: const Offset(0, 5))]),
+                child: Row(children: [
+                  Container(width: 42, height: 42, decoration: BoxDecoration(color: const Color(0xFFECFDF5), borderRadius: BorderRadius.circular(12)), child: const Icon(Icons.verified_user_rounded, color: Color(0xFF059669), size: 23)),
+                  const SizedBox(width: 11),
+                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(permitNomor.isEmpty ? 'TIDAK ADA PERMIT' : permitNomor, style: const TextStyle(color: Color(0xFF1E293B), fontSize: 14, fontWeight: FontWeight.w900)),
+                    const SizedBox(height: 2),
+                    Text(masaAktifPermit.isEmpty ? 'Masa Berlaku: -' : 'Masa Berlaku: $masaAktifPermit', style: const TextStyle(color: Color(0xFF64748B), fontSize: 9.5, fontWeight: FontWeight.w600)),
+                  ])),
+                  Container(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7), decoration: BoxDecoration(color: statusColor, borderRadius: BorderRadius.circular(18)), child: Row(mainAxisSize: MainAxisSize.min, children: [Text(statusText, style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w900)), const SizedBox(width: 4), const Icon(Icons.keyboard_arrow_down_rounded, color: Colors.white, size: 14)])),
+                ]),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

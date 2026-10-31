@@ -131,7 +131,7 @@ class _HomeNotificationButton extends StatelessWidget {
       label: count > 0 ? 'Notifikasi, $count belum dibaca' : 'Notifikasi',
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(12),
         child: SizedBox(
           width: 48,
           height: 48,
@@ -143,9 +143,9 @@ class _HomeNotificationButton extends StatelessWidget {
                 width: 44,
                 height: 44,
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF1F5FF),
-                  borderRadius: BorderRadius.circular(13),
-                  border: Border.all(color: const Color(0xFFDCE6FF)),
+                  color: Colors.white.withValues(alpha: .18),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.white.withValues(alpha: .24)),
                 ),
                 child: const Icon(
                   Icons.notifications_none_rounded,
@@ -259,15 +259,21 @@ class MapHazardItem {
     } catch (_) {}
 
     return MapHazardItem(
-      id: json['id'] is int ? json['id'] as int : int.tryParse(json['id']?.toString() ?? '0') ?? 0,
+      id: json['id'] is int
+          ? json['id'] as int
+          : int.tryParse(json['id']?.toString() ?? '0') ?? 0,
       title: json['title']?.toString() ?? 'Temuan Hazard',
       area: json['area']?.toString() ?? 'Area Tambang',
       level: json['level']?.toString() ?? 'Sedang',
       color: json['color']?.toString() ?? '#f59e0b',
       status: json['status']?.toString() ?? 'Open',
       statusColor: json['statusColor']?.toString() ?? '#ef4444',
-      lat: (json['lat'] is num) ? (json['lat'] as num).toDouble() : double.tryParse(json['lat']?.toString() ?? '0') ?? 0.0,
-      lng: (json['lng'] is num) ? (json['lng'] as num).toDouble() : double.tryParse(json['lng']?.toString() ?? '0') ?? 0.0,
+      lat: (json['lat'] is num)
+          ? (json['lat'] as num).toDouble()
+          : double.tryParse(json['lat']?.toString() ?? '0') ?? 0.0,
+      lng: (json['lng'] is num)
+          ? (json['lng'] as num).toDouble()
+          : double.tryParse(json['lng']?.toString() ?? '0') ?? 0.0,
       photo: json['photo']?.toString() ?? '',
       notes: json['notes']?.toString() ?? '',
       date: parsedDate,
@@ -380,7 +386,8 @@ class _FullscreenHazardMapPageState extends State<_FullscreenHazardMapPage>
         try {
           final decoded = jsonDecode(cachedJson) as List;
           _liveHazards = decoded
-              .map((item) => MapHazardItem.fromJson(item as Map<String, dynamic>))
+              .map((item) =>
+                  MapHazardItem.fromJson(item as Map<String, dynamic>))
               .toList();
         } catch (_) {}
       }
@@ -410,6 +417,12 @@ class _FullscreenHazardMapPageState extends State<_FullscreenHazardMapPage>
                 : int.tryParse(data['id']?.toString() ?? '0') ?? 0;
             if (action == 'detail') {
               widget.onShowDetail(context, id);
+            } else if (action == 'navigate') {
+              final lat = double.tryParse(data['lat']?.toString() ?? '');
+              final lng = double.tryParse(data['lng']?.toString() ?? '');
+              if (lat != null && lng != null) {
+                _confirmMapNavigation(lat, lng);
+              }
             } else if (action == 'close') {
               widget.onCloseHazard(context, id);
             } else if (action == 'select') {
@@ -448,6 +461,24 @@ class _FullscreenHazardMapPageState extends State<_FullscreenHazardMapPage>
     });
 
     _startRealtimeTimer();
+  }
+
+  Future<void> _confirmMapNavigation(double lat, double lng) async {
+    final proceed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        title: const Text('Navigasi ke titik ini?'),
+        content: const Text('Rute pratinjau sudah ditampilkan di peta. Lanjutkan dengan Google Maps?'),
+        actions: [
+          TextButton(onPressed: () { Navigator.pop(ctx, false); _controller.runJavaScript('if(window.clearPreviewRoute) window.clearPreviewRoute();'); }, child: const Text('Batal')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Lanjutkan')),
+        ],
+      ),
+    );
+    if (proceed == true) {
+      await launchUrl(Uri.parse('google.navigation:q=$lat,$lng&mode=d'), mode: LaunchMode.externalApplication);
+    }
   }
 
   void _startRealtimeTimer() {
@@ -574,8 +605,8 @@ class _FullscreenHazardMapPageState extends State<_FullscreenHazardMapPage>
               date: tgl,
               pelapor: p['nama']?.toString() ?? 'Pelapor Lapangan',
               pja: p['pja']?.toString() ?? 'Foreman Area',
-              kategori: p['kategoriBahaya']?.toString() ??
-                  'Kondisi Tidak Aman (KTA)',
+              kategori:
+                  p['kategoriBahaya']?.toString() ?? 'Kondisi Tidak Aman (KTA)',
             ));
           }
 
@@ -608,7 +639,8 @@ class _FullscreenHazardMapPageState extends State<_FullscreenHazardMapPage>
               _updateMapGuide();
               if (!silent) HapticFeedback.mediumImpact();
             } else {
-              debugPrint('[HazardHunter] Data temuan sama. Melewati redraw DOM (hemat daya).');
+              debugPrint(
+                  '[HazardHunter] Data temuan sama. Melewati redraw DOM (hemat daya).');
             }
           }
         },
@@ -1237,8 +1269,8 @@ class _FullscreenHazardMapPageState extends State<_FullscreenHazardMapPage>
     _flyToTarget(target);
 
     final navUri = Uri.parse('google.navigation:q=$lat,$lng&mode=d');
-    final mapsWebUri =
-        Uri.parse('https://www.google.com/maps/dir/?api=1&destination=$lat,$lng');
+    final mapsWebUri = Uri.parse(
+        'https://www.google.com/maps/dir/?api=1&destination=$lat,$lng');
 
     try {
       if (await canLaunchUrl(navUri)) {
@@ -1327,8 +1359,7 @@ class _FullscreenHazardMapPageState extends State<_FullscreenHazardMapPage>
                           fontSize: 12,
                           fontWeight: FontWeight.w700)),
                   const SizedBox(height: 3),
-                  Text(
-                      'Lokasi: ${target.area}',
+                  Text('Lokasi: ${target.area}',
                       style: const TextStyle(
                           color: Color(0xFF38BDF8), fontSize: 11)),
                 ],
@@ -1458,11 +1489,13 @@ class _FullscreenHazardMapPageState extends State<_FullscreenHazardMapPage>
                   ].map((r) {
                     final isSel = selectedReason == r;
                     return ChoiceChip(
-                      label: Text(r, style: TextStyle(
-                        fontSize: 11.5,
-                        fontWeight: isSel ? FontWeight.w800 : FontWeight.w500,
-                        color: isSel ? Colors.white : Colors.black87,
-                      )),
+                      label: Text(r,
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            fontWeight:
+                                isSel ? FontWeight.w800 : FontWeight.w500,
+                            color: isSel ? Colors.white : Colors.black87,
+                          )),
                       selected: isSel,
                       selectedColor: const Color(0xFFEF4444),
                       backgroundColor: Colors.grey.shade100,
@@ -1482,7 +1515,8 @@ class _FullscreenHazardMapPageState extends State<_FullscreenHazardMapPage>
                     controller: reasonController,
                     maxLines: 2,
                     decoration: InputDecoration(
-                      hintText: 'Tuliskan alasan lengkap mengapa temuan ini fiktif...',
+                      hintText:
+                          'Tuliskan alasan lengkap mengapa temuan ini fiktif...',
                       hintStyle: const TextStyle(fontSize: 12),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
@@ -1518,7 +1552,9 @@ class _FullscreenHazardMapPageState extends State<_FullscreenHazardMapPage>
                     height: 80,
                     width: double.infinity,
                     decoration: BoxDecoration(
-                      border: Border.all(color: Colors.grey.shade300, style: BorderStyle.solid),
+                      border: Border.all(
+                          color: Colors.grey.shade300,
+                          style: BorderStyle.solid),
                       borderRadius: BorderRadius.circular(12),
                       color: Colors.grey.shade50,
                     ),
@@ -1556,7 +1592,8 @@ class _FullscreenHazardMapPageState extends State<_FullscreenHazardMapPage>
                         : const Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Icon(Icons.camera_alt_outlined, color: Colors.black45),
+                              Icon(Icons.camera_alt_outlined,
+                                  color: Colors.black45),
                               SizedBox(width: 8),
                               Text('Ambil Foto Kondisi Lapangan Saat Ini',
                                   style: TextStyle(
@@ -1636,8 +1673,10 @@ class _FullscreenHazardMapPageState extends State<_FullscreenHazardMapPage>
 
                             // Remove from local lists and update map
                             setState(() {
-                              _liveHazards.removeWhere((h) => h.id == target.id);
-                              widget.unclosedHazards.removeWhere((h) => h.id == target.id);
+                              _liveHazards
+                                  .removeWhere((h) => h.id == target.id);
+                              widget.unclosedHazards
+                                  .removeWhere((h) => h.id == target.id);
                               if (_currentTargetIndex >= _liveHazards.length &&
                                   _liveHazards.isNotEmpty) {
                                 _currentTargetIndex = _liveHazards.length - 1;
@@ -1646,7 +1685,7 @@ class _FullscreenHazardMapPageState extends State<_FullscreenHazardMapPage>
 
                             try {
                               _controller.runJavaScript(
-                                'if (typeof removeHazardMarker === "function") removeHazardMarker(${target.id});');
+                                  'if (typeof removeHazardMarker === "function") removeHazardMarker(${target.id});');
                             } catch (_) {}
 
                             ScaffoldMessenger.of(context).showSnackBar(
@@ -1687,7 +1726,8 @@ class _FullscreenHazardMapPageState extends State<_FullscreenHazardMapPage>
     );
   }
 
-  void _showImageZoomDialog(BuildContext context, String imageUrl, String title) {
+  void _showImageZoomDialog(
+      BuildContext context, String imageUrl, String title) {
     showDialog(
       context: context,
       builder: (ctx) => Dialog(
@@ -1796,9 +1836,14 @@ class _FullscreenHazardMapPageState extends State<_FullscreenHazardMapPage>
               child: buildSafeMapWebView(_controller),
             ),
           ),
+          Positioned(top: 16, left: 16, right: 16, child: SafeArea(child: Row(children: [
+            Material(color: Colors.white, shape: const CircleBorder(), elevation: 3, child: InkWell(customBorder: const CircleBorder(), onTap: () => Navigator.pop(context), child: const SizedBox(width: 44, height: 44, child: Icon(Icons.arrow_back_rounded, color: Color(0xFF0F172A))))),
+            const SizedBox(width: 10),
+            Expanded(child: Container(height: 44, padding: const EdgeInsets.symmetric(horizontal: 14), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(22), boxShadow: const [BoxShadow(color: Color(0x33000000), blurRadius: 8)]), child: Row(children: [const Icon(Icons.map_outlined, color: Color(0xFF2563EB), size: 19), const SizedBox(width: 8), const Text('Safe Map', style: TextStyle(fontWeight: FontWeight.w800, color: Color(0xFF0F172A))), const Spacer(), PopupMenuButton<String>(color: Colors.white, surfaceTintColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)), padding: EdgeInsets.zero, icon: const Icon(Icons.tune_rounded, color: Color(0xFF64748B), size: 19), onSelected: _onSelectMode, itemBuilder: (_) => const [PopupMenuItem(value: 'heatmap', child: Text('Heatmap')), PopupMenuItem(value: 'points', child: Text('Titik laporan')), PopupMenuItem(value: 'off', child: Text('Sembunyikan layer'))])]))),
+          ]))),
 
-          // TOP HUD: Futuristic Obsidian Radar Deck
-          Positioned(
+          // Clean header replaces the legacy tactical HUD.
+          if (false) Positioned(
             top: 10,
             left: 8,
             right: 8,
@@ -1875,7 +1920,7 @@ class _FullscreenHazardMapPageState extends State<_FullscreenHazardMapPage>
                                   children: [
                                     const Flexible(
                                       child: Text(
-                                        'HAZARD HUNTER',
+                                        'Safe Map',
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
                                         style: TextStyle(
@@ -1886,7 +1931,6 @@ class _FullscreenHazardMapPageState extends State<_FullscreenHazardMapPage>
                                         ),
                                       ),
                                     ),
-
                                   ],
                                 ),
                                 const SizedBox(height: 1),
@@ -1908,7 +1952,7 @@ class _FullscreenHazardMapPageState extends State<_FullscreenHazardMapPage>
                                       child: Text(
                                         _isScanningRealtime
                                             ? 'MEMINDAI...'
-                                            : 'REALTIME • ${sorted.length} TARGET',
+                                            : '${sorted.length} laporan aktif',
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
                                         style: const TextStyle(
@@ -1960,7 +2004,7 @@ class _FullscreenHazardMapPageState extends State<_FullscreenHazardMapPage>
                               ),
                               const SizedBox(width: 3),
                               Text(
-                                _isScanningRealtime ? 'SCAN' : 'PING',
+                                _isScanningRealtime ? 'Memuat' : 'Segarkan',
                                 style: TextStyle(
                                   color: _isScanningRealtime
                                       ? const Color(0xFFF59E0B)
@@ -1976,7 +2020,7 @@ class _FullscreenHazardMapPageState extends State<_FullscreenHazardMapPage>
                     ),
                     const SizedBox(width: 4),
 
-                    // Mode Switcher (Heatmap | Titik | Off)
+                    // Tampilan peta ringkas
                     Container(
                       padding: const EdgeInsets.all(2),
                       decoration: BoxDecoration(
@@ -1999,8 +2043,7 @@ class _FullscreenHazardMapPageState extends State<_FullscreenHazardMapPage>
             ),
           ),
 
-          // TACTICAL QUICK FILTER BAR (Semua, Sekitar <1km, Risiko Tinggi)
-          Positioned(
+          if (false) Positioned(
             top: 72,
             left: 12,
             right: 12,
@@ -2021,7 +2064,7 @@ class _FullscreenHazardMapPageState extends State<_FullscreenHazardMapPage>
           ),
 
           // FLOATING TACTICAL COMPASS / GUIDANCE HUD
-          if (_isHunterMode && target != null && _mapMode != 'off')
+          if (false && _isHunterMode && target != null && _mapMode != 'off')
             Positioned(
               top: 114,
               left: 14,
@@ -2029,8 +2072,8 @@ class _FullscreenHazardMapPageState extends State<_FullscreenHazardMapPage>
               child: SafeArea(
                 child: Center(
                   child: Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 14, vertical: 8),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                     decoration: BoxDecoration(
                       color: const Color(0xFF070B14).withOpacity(0.95),
                       borderRadius: BorderRadius.circular(22),
@@ -2099,8 +2142,8 @@ class _FullscreenHazardMapPageState extends State<_FullscreenHazardMapPage>
                           children: [
                             Text(
                               isWithin50Meters
-                                  ? '🎯 RADIUS VERIFIKASI < 50M • SIAP DIAMANKAN!'
-                                  : '🧭 IKUTI ARAH • TARGET #${(_currentTargetIndex % sorted.length) + 1}',
+                                  ? 'Lokasi sudah terverifikasi'
+                                  : 'Petunjuk menuju laporan terdekat',
                               style: TextStyle(
                                 color: isWithin50Meters
                                     ? const Color(0xFF86EFAC)
@@ -2112,8 +2155,8 @@ class _FullscreenHazardMapPageState extends State<_FullscreenHazardMapPage>
                             ),
                             Text(
                               isWithin50Meters
-                                  ? '${distance.round()} METER • SIAP CLOSING'
-                                  : '${distance.round()} METER • KE ${dirName.toUpperCase()}',
+                                  ? '${distance.round()} meter dari lokasi'
+                                  : '${distance.round()} meter • arah ${dirName.toLowerCase()}',
                               style: TextStyle(
                                 color: isWithin50Meters
                                     ? const Color(0xFF4ADE80)
@@ -2209,7 +2252,7 @@ class _FullscreenHazardMapPageState extends State<_FullscreenHazardMapPage>
             ),
           ),
 
-          // BOTTOM ENCOUNTER DECK (Futuristic Hazard Hunter Encounter Card)
+          // Clean report bottom sheet.
           if (_isHunterMode && target != null && _mapMode != 'off')
             Positioned(
               bottom: 12,
@@ -2217,31 +2260,7 @@ class _FullscreenHazardMapPageState extends State<_FullscreenHazardMapPage>
               right: 12,
               child: SafeArea(
                 child: Container(
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF070B14), Color(0xFF111A2D)],
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                    ),
-                    borderRadius: BorderRadius.circular(22),
-                    border: Border.all(
-                      color: isWithin50Meters
-                          ? const Color(0xFF10B981)
-                          : targetColor.withOpacity(0.85),
-                      width: 1.8,
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: (isWithin50Meters
-                                ? const Color(0xFF10B981)
-                                : targetColor)
-                            .withOpacity(0.35),
-                        blurRadius: 22,
-                        spreadRadius: 1,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
+                  decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(22), boxShadow: const [BoxShadow(color: Color(0x260F172A), blurRadius: 18, offset: Offset(0, 4))]),
                   padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
@@ -2256,16 +2275,15 @@ class _FullscreenHazardMapPageState extends State<_FullscreenHazardMapPage>
                                 padding: const EdgeInsets.symmetric(
                                     horizontal: 8, vertical: 3.5),
                                 decoration: BoxDecoration(
-                                  color:
-                                      const Color(0xFF0284C7).withOpacity(0.25),
+                                  color: const Color(0xFFE8EFFA),
                                   borderRadius: BorderRadius.circular(6),
                                   border: Border.all(
-                                      color: const Color(0xFF00E5FF)),
+                                      color: const Color(0xFF1E3A5F)),
                                 ),
                                 child: Text(
                                   '🎯 TARGET #${(_currentTargetIndex % sorted.length) + 1}/${sorted.length}${_currentTargetIndex == 0 ? ' (TERDEKAT)' : ''}',
                                   style: const TextStyle(
-                                    color: Color(0xFF00E5FF),
+                                    color: Color(0xFF1E3A5F),
                                     fontSize: 10,
                                     fontWeight: FontWeight.w900,
                                   ),
@@ -2406,7 +2424,7 @@ class _FullscreenHazardMapPageState extends State<_FullscreenHazardMapPage>
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                   style: const TextStyle(
-                                    color: Colors.white,
+                                    color: Color(0xFF0F172A),
                                     fontWeight: FontWeight.w900,
                                     fontSize: 13.5,
                                   ),
@@ -2417,7 +2435,7 @@ class _FullscreenHazardMapPageState extends State<_FullscreenHazardMapPage>
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                   style: const TextStyle(
-                                    color: Color(0xFF94A3B8),
+                                    color: Color(0xFF64748B),
                                     fontSize: 11,
                                   ),
                                 ),
@@ -2430,12 +2448,12 @@ class _FullscreenHazardMapPageState extends State<_FullscreenHazardMapPage>
                                         borderRadius: BorderRadius.circular(3),
                                         child: LinearProgressIndicator(
                                           value: (1.0 -
-                                                  ((distance - 50.0).clamp(
-                                                          0.0, 450.0) /
+                                                  ((distance - 50.0)
+                                                          .clamp(0.0, 450.0) /
                                                       450.0))
                                               .clamp(0.05, 1.0),
                                           minHeight: 4,
-                                          backgroundColor: Colors.white12,
+                                          backgroundColor: Color(0xFFE2E8F0),
                                           valueColor:
                                               AlwaysStoppedAnimation<Color>(
                                             isWithin50Meters
@@ -2526,31 +2544,6 @@ class _FullscreenHazardMapPageState extends State<_FullscreenHazardMapPage>
                           ),
                           const SizedBox(width: 6),
 
-                          // Navigation to Google Maps
-                          Material(
-                            color: const Color(0xFF00E5FF).withOpacity(0.15),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              side: BorderSide(
-                                color: const Color(0xFF00E5FF).withOpacity(0.5),
-                                width: 1,
-                              ),
-                            ),
-                            child: InkWell(
-                              onTap: () {
-                                HapticFeedback.selectionClick();
-                                _openGoogleMapsNavigation(target);
-                              },
-                              borderRadius: BorderRadius.circular(12),
-                              child: const Padding(
-                                padding: EdgeInsets.all(10),
-                                child: Icon(Icons.near_me_rounded,
-                                    color: Color(0xFF00E5FF), size: 20),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 6),
-
                           // Detail Button
                           Material(
                             color: Colors.white.withOpacity(0.1),
@@ -2620,7 +2613,8 @@ class _FullscreenHazardMapPageState extends State<_FullscreenHazardMapPage>
           style: TextStyle(
             fontSize: 10,
             fontWeight: isSelected ? FontWeight.w900 : FontWeight.w600,
-            color: isSelected ? const Color(0xFF00E5FF) : const Color(0xFF94A3B8),
+            color:
+                isSelected ? const Color(0xFF00E5FF) : const Color(0xFF94A3B8),
             letterSpacing: 0.3,
           ),
         ),
@@ -2661,7 +2655,8 @@ class DashboardPage extends StatefulWidget {
   State<DashboardPage> createState() => _DashboardPageState();
 }
 
-class _DashboardPageState extends State<DashboardPage> with WidgetsBindingObserver {
+class _DashboardPageState extends State<DashboardPage>
+    with WidgetsBindingObserver {
   final _profile = PreferenceService.getProfile();
   final _api = ApiService();
   final _hazardMapCtrl = WebViewController();
@@ -2675,7 +2670,8 @@ class _DashboardPageState extends State<DashboardPage> with WidgetsBindingObserv
   String _searchText = '';
 
   // Banner State
-  static List<IncidentNewsModel> _cachedBanners = PreferenceService.getCachedHomeBanners();
+  static List<IncidentNewsModel> _cachedBanners =
+      PreferenceService.getCachedHomeBanners();
   List<IncidentNewsModel> _homeBanners = List.from(_cachedBanners);
   bool _isLoadingBanners = _cachedBanners.isEmpty;
   int _currentBannerIndex = 0;
@@ -2798,9 +2794,17 @@ class _DashboardPageState extends State<DashboardPage> with WidgetsBindingObserv
           onPageFinished: (url) {
             debugPrint('[SafeMap] Page finished: $url');
             _injectCurrentPosition(_hazardMapCtrl);
+            // Leaflet may start before the embedded WebView receives its final
+            // size inside the dashboard card. Recalculate once it is laid out.
+            Future.delayed(const Duration(milliseconds: 350), () {
+              _hazardMapCtrl.runJavaScript(
+                'if (window.map) { window.map.invalidateSize(true); }',
+              );
+            });
           },
           onWebResourceError: (error) {
-            debugPrint('[SafeMap] Resource error: code=${error.errorCode}, desc=${error.description}, url=${error.url}');
+            debugPrint(
+                '[SafeMap] Resource error: code=${error.errorCode}, desc=${error.description}, url=${error.url}');
           },
         ),
       )
@@ -2823,6 +2827,20 @@ class _DashboardPageState extends State<DashboardPage> with WidgetsBindingObserv
       _checkSpecialPermitHighRiskAlerts();
       _initLocationAndProximity();
       _fetchHazardPointsFromApi();
+
+      // The dashboard map sits inside a clipped, scrollable card. On some
+      // Android WebViews the first load happens while that surface is still
+      // 0x0, leaving Leaflet blank until a fullscreen route recreates it.
+      // Reload once the card has a real, laid-out surface.
+      Future.delayed(const Duration(milliseconds: 650), () {
+        if (!mounted) return;
+        _hazardMapCtrl.loadHtmlString(
+          _hazardMapHtml(
+            mapMode: _hazardMapMode,
+            userPosition: _lastUserPosition,
+          ),
+        );
+      });
     });
   }
 
@@ -2860,24 +2878,43 @@ class _DashboardPageState extends State<DashboardPage> with WidgetsBindingObserv
 
             // VALIDASI KETAT NIK: Pastikan permit ini benar-benar ditugaskan ke NIK login!
             final profile = PreferenceService.getProfile();
-            final rawUserNik = (profile?.noNik ?? PreferenceService.getUser() ?? PreferenceService.getOfflineNik() ?? '').trim();
+            final rawUserNik = (profile?.noNik ??
+                    PreferenceService.getUser() ??
+                    PreferenceService.getOfflineNik() ??
+                    '')
+                .trim();
             final cleanUserNik = rawUserNik.replaceAll(RegExp(r'[^0-9]'), '');
 
-            final pjoNik = (first['pjoNik'] ?? first['pjo_nik'] ?? '').toString().trim().replaceAll(RegExp(r'[^0-9]'), '');
-            final inspectorNik = (first['inspectorNik'] ?? first['inspector_nik'] ?? '').toString().trim().replaceAll(RegExp(r'[^0-9]'), '');
+            final pjoNik = (first['pjoNik'] ?? first['pjo_nik'] ?? '')
+                .toString()
+                .trim()
+                .replaceAll(RegExp(r'[^0-9]'), '');
+            final inspectorNik =
+                (first['inspectorNik'] ?? first['inspector_nik'] ?? '')
+                    .toString()
+                    .trim()
+                    .replaceAll(RegExp(r'[^0-9]'), '');
 
-            final isAssigned = cleanUserNik.isNotEmpty && (
-              (pjoNik.isNotEmpty && (cleanUserNik == pjoNik || cleanUserNik.endsWith(pjoNik) || pjoNik.endsWith(cleanUserNik))) ||
-              (inspectorNik.isNotEmpty && (cleanUserNik == inspectorNik || cleanUserNik.endsWith(inspectorNik) || inspectorNik.endsWith(cleanUserNik)))
-            );
+            final isAssigned = cleanUserNik.isNotEmpty &&
+                ((pjoNik.isNotEmpty &&
+                        (cleanUserNik == pjoNik ||
+                            cleanUserNik.endsWith(pjoNik) ||
+                            pjoNik.endsWith(cleanUserNik))) ||
+                    (inspectorNik.isNotEmpty &&
+                        (cleanUserNik == inspectorNik ||
+                            cleanUserNik.endsWith(inspectorNik) ||
+                            inspectorNik.endsWith(cleanUserNik))));
 
             // Jika NIK login bukan PJO atau Inspector yang ditugaskan, lewati dan jangan tampilkan apa pun
             if (!isAssigned) return;
 
-            final actType = (first['activityType'] ?? 'Pekerjaan Khusus').toString().replaceAll('_', ' ');
+            final actType = (first['activityType'] ?? 'Pekerjaan Khusus')
+                .toString()
+                .replaceAll('_', ' ');
             final loc = first['workLocation'] ?? 'Area Operasional';
             final permitId = first['id']?.toString() ?? '';
-            final hasFollowup = first['hasFollowup'] == true || first['has_followup'] == true;
+            final hasFollowup =
+                first['hasFollowup'] == true || first['has_followup'] == true;
 
             // Jika sudah ada follow-up/inspeksi, jangan tampilkan notifikasi lagi
             if (hasFollowup) return;
@@ -2889,7 +2926,8 @@ class _DashboardPageState extends State<DashboardPage> with WidgetsBindingObserv
             final nowMillis = DateTime.now().millisecondsSinceEpoch;
 
             const oneHourMillis = 60 * 60 * 1000;
-            if (lastAlertMillis > 0 && (nowMillis - lastAlertMillis) < oneHourMillis) {
+            if (lastAlertMillis > 0 &&
+                (nowMillis - lastAlertMillis) < oneHourMillis) {
               return;
             }
 
@@ -2904,7 +2942,8 @@ class _DashboardPageState extends State<DashboardPage> with WidgetsBindingObserv
             // Tanpa modal dialog Flutter yang mengganggu tampilan dashboard/login
             await NotificationService.display(
               title: '⚠️ Peringatan Kegiatan High Risk!',
-              body: 'Kegiatan $actType di $loc aktif untuk NIK Anda. Lakukan inspeksi lapangan.',
+              body:
+                  'Kegiatan $actType di $loc aktif untuk NIK Anda. Lakukan inspeksi lapangan.',
               payload: 'special_permit_id:$permitId',
               priority: 'urgent',
               notifType: 'special_permit',
@@ -2915,15 +2954,21 @@ class _DashboardPageState extends State<DashboardPage> with WidgetsBindingObserv
     } catch (_) {}
   }
 
-  void _showSpecialPermitHighRiskObservationDialog(Map<String, dynamic> permit, int totalAlerts) {
+  void _showSpecialPermitHighRiskObservationDialog(
+      Map<String, dynamic> permit, int totalAlerts) {
     if (!mounted) return;
     _isShowingSpecialPermitModal = true;
     _lastAlertedSpecialPermitId = permit['id']?.toString() ?? '';
 
-    final actType = (permit['activityType'] ?? 'Pekerjaan Khusus').toString().replaceAll('_', ' ').toUpperCase();
+    final actType = (permit['activityType'] ?? 'Pekerjaan Khusus')
+        .toString()
+        .replaceAll('_', ' ')
+        .toUpperCase();
     final reqId = permit['reqId']?.toString() ?? '-';
     final loc = permit['workLocation']?.toString() ?? 'Area Operasional';
-    final company = permit['companyName']?.toString() ?? permit['implementingContractor']?.toString() ?? '-';
+    final company = permit['companyName']?.toString() ??
+        permit['implementingContractor']?.toString() ??
+        '-';
     final pjoName = permit['pjoName']?.toString() ?? '-';
     final inspectorName = permit['inspectorName']?.toString() ?? '-';
 
@@ -2992,7 +3037,8 @@ class _DashboardPageState extends State<DashboardPage> with WidgetsBindingObserv
                       Row(
                         children: [
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 7, vertical: 2),
                             decoration: BoxDecoration(
                               color: const Color(0xFFDC2626),
                               borderRadius: BorderRadius.circular(6),
@@ -3010,7 +3056,8 @@ class _DashboardPageState extends State<DashboardPage> with WidgetsBindingObserv
                           if (totalAlerts > 1) ...[
                             const SizedBox(width: 6),
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 6, vertical: 2),
                               decoration: BoxDecoration(
                                 color: const Color(0xFFFEF3C7),
                                 borderRadius: BorderRadius.circular(6),
@@ -3066,13 +3113,15 @@ class _DashboardPageState extends State<DashboardPage> with WidgetsBindingObserv
                         ),
                       ),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 2),
                         decoration: BoxDecoration(
                           color: const Color(0xFFEFF6FF),
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: Text(
-                          permit['status']?.toString().toUpperCase() ?? 'APPROVED',
+                          permit['status']?.toString().toUpperCase() ??
+                              'APPROVED',
                           style: const TextStyle(
                             fontSize: 10,
                             fontWeight: FontWeight.w800,
@@ -3096,7 +3145,8 @@ class _DashboardPageState extends State<DashboardPage> with WidgetsBindingObserv
                   const SizedBox(height: 10),
                   _buildPermitInfoRow(Icons.place_rounded, 'Lokasi', loc),
                   const SizedBox(height: 6),
-                  _buildPermitInfoRow(Icons.business_rounded, 'Perusahaan', company),
+                  _buildPermitInfoRow(
+                      Icons.business_rounded, 'Perusahaan', company),
                   if (pjoName != '-' || inspectorName != '-') ...[
                     const SizedBox(height: 6),
                     _buildPermitInfoRow(
@@ -3121,7 +3171,8 @@ class _DashboardPageState extends State<DashboardPage> with WidgetsBindingObserv
               child: const Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(Icons.info_outline_rounded, color: Color(0xFFD97706), size: 18),
+                  Icon(Icons.info_outline_rounded,
+                      color: Color(0xFFD97706), size: 18),
                   SizedBox(width: 8),
                   Expanded(
                     child: Text(
@@ -3156,7 +3207,8 @@ class _DashboardPageState extends State<DashboardPage> with WidgetsBindingObserv
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => SpecialPermitFollowupPage(permit: permit),
+                      builder: (context) =>
+                          SpecialPermitFollowupPage(permit: permit),
                     ),
                   ).then((_) {
                     _checkSpecialPermitHighRiskAlerts();
@@ -3216,12 +3268,18 @@ class _DashboardPageState extends State<DashboardPage> with WidgetsBindingObserv
         const SizedBox(width: 6),
         Text(
           '$label: ',
-          style: const TextStyle(fontSize: 12, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
+          style: const TextStyle(
+              fontSize: 12,
+              color: Color(0xFF64748B),
+              fontWeight: FontWeight.w500),
         ),
         Expanded(
           child: Text(
             value,
-            style: const TextStyle(fontSize: 12, color: Color(0xFF1E293B), fontWeight: FontWeight.w700),
+            style: const TextStyle(
+                fontSize: 12,
+                color: Color(0xFF1E293B),
+                fontWeight: FontWeight.w700),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
@@ -3255,13 +3313,15 @@ class _DashboardPageState extends State<DashboardPage> with WidgetsBindingObserv
     super.dispose();
   }
 
-  Future<void> _fetchHazardPointsFromApi({Position? pos, bool force = false}) async {
+  Future<void> _fetchHazardPointsFromApi(
+      {Position? pos, bool force = false}) async {
     final todayStr = DateTime.now().toIso8601String().substring(0, 10);
     final lastFetchDate = PreferenceService.getHazardMapLastFetchDate();
 
     // Jika sudah pernah load hari ini dan cache tersedia, lewati panggilan API (1 hari sekali)
     if (!force && lastFetchDate == todayStr && _unclosedHazards.isNotEmpty) {
-      debugPrint('[SafeMap] Menggunakan cache Safe Map hari ini ($todayStr), melewati panggilan network.');
+      debugPrint(
+          '[SafeMap] Menggunakan cache Safe Map hari ini ($todayStr), melewati panggilan network.');
       _reloadMap();
       return;
     }
@@ -3269,7 +3329,8 @@ class _DashboardPageState extends State<DashboardPage> with WidgetsBindingObserv
     if (_isFetchingHazards) return;
     _isFetchingHazards = true;
     try {
-      debugPrint('[SafeMap] Memuat titik Safe Map dari API (1x sehari / reload)...');
+      debugPrint(
+          '[SafeMap] Memuat titik Safe Map dari API (1x sehari / reload)...');
       final res = await _api.getSafeMapHazardPoints(
         days: 30,
         onlyOpen: true,
@@ -3372,7 +3433,8 @@ class _DashboardPageState extends State<DashboardPage> with WidgetsBindingObserv
               });
               _reloadMap();
             } else {
-              debugPrint('[SafeMap Dashboard] Data temuan tidak berubah, lewati reload map.');
+              debugPrint(
+                  '[SafeMap Dashboard] Data temuan tidak berubah, lewati reload map.');
             }
           }
         },
@@ -3405,7 +3467,8 @@ class _DashboardPageState extends State<DashboardPage> with WidgetsBindingObserv
       _positionStreamSub = Geolocator.getPositionStream(
         locationSettings: const LocationSettings(
           accuracy: LocationAccuracy.medium, // Hemat baterai & suhu dingin
-          distanceFilter: 15, // Hanya update jika berpindah 15 meter (tidak jitter di meja)
+          distanceFilter:
+              15, // Hanya update jika berpindah 15 meter (tidak jitter di meja)
         ),
       ).listen((pos) {
         _onUserPositionUpdated(pos);
@@ -3421,7 +3484,9 @@ class _DashboardPageState extends State<DashboardPage> with WidgetsBindingObserv
 
     final now = DateTime.now();
     // Throttle JS bridge update to at most once every 3 seconds to save GPU/CPU
-    if (isFirstLoc || _lastPosJsUpdateTime == null || now.difference(_lastPosJsUpdateTime!).inSeconds >= 3) {
+    if (isFirstLoc ||
+        _lastPosJsUpdateTime == null ||
+        now.difference(_lastPosJsUpdateTime!).inSeconds >= 3) {
       _lastPosJsUpdateTime = now;
       _hazardMapCtrl.runJavaScript(
         'if(window.setUserLocation) window.setUserLocation(${pos.latitude}, ${pos.longitude}, ${pos.accuracy});',
@@ -3499,7 +3564,8 @@ class _DashboardPageState extends State<DashboardPage> with WidgetsBindingObserv
 
   void _reloadMap() {
     print('===> DASHBOARD RELOAD MAP: length=${_unclosedHazards.length} <===');
-    final jsonStr = jsonEncode(_unclosedHazards.map((e) => e.toJson()).toList());
+    final jsonStr =
+        jsonEncode(_unclosedHazards.map((e) => e.toJson()).toList());
     _hazardMapCtrl.runJavaScript(
       'if(window.renderHazardPoints) { window.renderHazardPoints($jsonStr); } else { location.reload(); }',
     );
@@ -4323,9 +4389,12 @@ class _DashboardPageState extends State<DashboardPage> with WidgetsBindingObserv
       int count = 0;
       final counts = await _api.getNotificationCounts();
       count = counts['total'] ?? counts['unread'] ?? 0;
-      final activeHazardCount = (counts['active_hazard_count'] as num?)?.toInt() ?? 0;
-      final activeActionPlanCount = (counts['active_action_plan_count'] as num?)?.toInt() ?? 0;
-      final unactionedCount = (counts['unactioned_count'] as num?)?.toInt() ?? 0;
+      final activeHazardCount =
+          (counts['active_hazard_count'] as num?)?.toInt() ?? 0;
+      final activeActionPlanCount =
+          (counts['active_action_plan_count'] as num?)?.toInt() ?? 0;
+      final unactionedCount =
+          (counts['unactioned_count'] as num?)?.toInt() ?? 0;
 
       // Juga periksa apakah ada action_plans lokal di SQLite yang mengarah ke user
       int localCnt = 0;
@@ -4367,7 +4436,12 @@ class _DashboardPageState extends State<DashboardPage> with WidgetsBindingObserv
       } catch (_) {}
 
       // GETARAN FISIK: Jika user dijadikan PIC / PJA temuan K3, ada Approval Menunggu, atau Special Permit High Risk
-      if (activeHazardCount > 0 || activeActionPlanCount > 0 || localCnt > 0 || unactionedCount > 0 || _pendingApprovalCount > 0 || spAlertCount > 0) {
+      if (activeHazardCount > 0 ||
+          activeActionPlanCount > 0 ||
+          localCnt > 0 ||
+          unactionedCount > 0 ||
+          _pendingApprovalCount > 0 ||
+          spAlertCount > 0) {
         NotificationService.vibrateForPicAssignment();
       }
 
@@ -4767,9 +4841,9 @@ class _DashboardPageState extends State<DashboardPage> with WidgetsBindingObserv
   Widget _buildProfessionalSearchBar() {
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFFF8FAFC),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        color: Colors.white.withValues(alpha: .94),
+        borderRadius: BorderRadius.circular(13),
+        border: Border.all(color: Colors.white.withValues(alpha: .85)),
         boxShadow: [
           BoxShadow(
             color: const Color(0xFF1E3A8A).withValues(alpha: 0.04),
@@ -4780,7 +4854,7 @@ class _DashboardPageState extends State<DashboardPage> with WidgetsBindingObserv
       ),
       child: Material(
         color: Colors.transparent,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(13),
         child: InkWell(
           onTap: () {
             HapticFeedback.lightImpact();
@@ -4789,14 +4863,14 @@ class _DashboardPageState extends State<DashboardPage> with WidgetsBindingObserv
               MaterialPageRoute(builder: (_) => const GlobalSearchPage()),
             );
           },
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(13),
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
             child: Row(
               children: [
                 Container(
-                  width: 32,
-                  height: 32,
+                  width: 30,
+                  height: 30,
                   decoration: BoxDecoration(
                     color: const Color(0xFFEFF6FF),
                     borderRadius: BorderRadius.circular(9),
@@ -4807,49 +4881,127 @@ class _DashboardPageState extends State<DashboardPage> with WidgetsBindingObserv
                     size: 19,
                   ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 10),
                 const Expanded(
                   child: Text(
                     'Cari modul, inspeksi, hazard, p2h...',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      fontSize: 13.5,
+                      fontSize: 12,
                       fontWeight: FontWeight.w400,
                       color: Color(0xFF94A3B8),
                     ),
                   ),
                 ),
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 9, vertical: 4.5),
+                  width: 32,
+                  height: 32,
                   decoration: BoxDecoration(
                     color: const Color(0xFFEFF6FF),
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(color: const Color(0xFFDBEAFE)),
                   ),
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.tune_rounded,
-                          size: 12, color: Color(0xFF2563EB)),
-                      SizedBox(width: 4),
-                      Text(
-                        'Cari',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          color: Color(0xFF2563EB),
-                        ),
-                      ),
-                    ],
-                  ),
+                  child: const Icon(Icons.tune_rounded,
+                      size: 17, color: Color(0xFF2563EB)),
                 ),
               ],
             ),
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildDashboardHero() {
+    final name = _formatName(_profile?.namaLengkap ?? 'Karyawan');
+    final position = _formatName(_profile?.posisi ?? 'Staff');
+    final company = _formatCompany(_profile?.company);
+    return SizedBox(
+      height: 228,
+      child: Stack(children: [
+        Positioned(
+          top: 0, left: 0, right: 0,
+          child: Container(
+            height: 196,
+            decoration: BoxDecoration(
+              image: const DecorationImage(image: AssetImage('assets/images/dashboard-excavator-hero.png'), fit: BoxFit.cover, alignment: Alignment.centerRight),
+            ),
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(colors: [const Color(0xFFF4F9FF).withValues(alpha: .98), const Color(0xFFDCEEFF).withValues(alpha: .84), const Color(0xFFB8D8FF).withValues(alpha: .48)], stops: const [0, .54, 1]),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(26, 24, 18, 0),
+                child: Stack(children: [
+                  Positioned(
+                    // This is a reserved text column.  The weather and bell
+                    // never share its space, even for a long employee name.
+                    left: 0, right: 154, top: 7,
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      const Text('SELAMAT DATANG', style: TextStyle(fontSize: 9, letterSpacing: 1.2, fontWeight: FontWeight.w900, color: Color(0xFF64748B))),
+                      const SizedBox(height: 4),
+                      _adaptiveHeroText(name, fontSize: 17, minimumFontSize: 10, maxLines: 2, weight: FontWeight.w900, color: const Color(0xFF0F172A)),
+                      const SizedBox(height: 6),
+                      _adaptiveHeroText(position, fontSize: 11, minimumFontSize: 8, maxLines: 2, weight: FontWeight.w800, color: const Color(0xFF2563EB)),
+                      const SizedBox(height: 2),
+                      _adaptiveHeroText(company, fontSize: 10.5, minimumFontSize: 8, maxLines: 2, weight: FontWeight.w600, color: const Color(0xFF64748B)),
+                    ]),
+                  ),
+                  Positioned(right: 48, top: 13, child: const HomeWeatherWidget()),
+                  Positioned(right: 0, top: 13, child: _HomeNotificationButton(count: _notifCount, onTap: () async {
+                    await Navigator.of(context).push(MaterialPageRoute(builder: (_) => const NotifPage()));
+                    _fetchNotifCount();
+                  })),
+                ]),
+              ),
+            ),
+          ),
+        ),
+        Positioned(left: 20, right: 20, bottom: 0, child: _buildProfessionalSearchBar()),
+      ]),
+    );
+  }
+
+  /// Keeps account data legible in the narrow header column without silently
+  /// truncating it. The font only scales down when the supplied profile text
+  /// genuinely needs the room.
+  Widget _adaptiveHeroText(
+    String value, {
+    required double fontSize,
+    required double minimumFontSize,
+    required Color color,
+    required FontWeight weight,
+    int maxLines = 2,
+  }) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        var resolvedSize = fontSize;
+        while (resolvedSize > minimumFontSize) {
+          final painter = TextPainter(
+            text: TextSpan(
+              text: value,
+              style: TextStyle(fontSize: resolvedSize, height: 1.1, fontWeight: weight),
+            ),
+            textDirection: TextDirection.ltr,
+            maxLines: maxLines,
+          )..layout(maxWidth: constraints.maxWidth);
+          if (!painter.didExceedMaxLines) break;
+          resolvedSize -= .5;
+        }
+        return Text(
+          value,
+          maxLines: maxLines,
+          softWrap: true,
+          overflow: TextOverflow.clip,
+          style: TextStyle(
+            fontSize: resolvedSize,
+            height: 1.1,
+            fontWeight: weight,
+            color: color,
+          ),
+        );
+      },
     );
   }
 
@@ -4862,7 +5014,9 @@ class _DashboardPageState extends State<DashboardPage> with WidgetsBindingObserv
             mainAxisAlignment: MainAxisAlignment.start,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Padding(
+              _buildDashboardHero(),
+              if (false)
+                Padding(
                 padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -5008,8 +5162,7 @@ class _DashboardPageState extends State<DashboardPage> with WidgetsBindingObserv
                 ),
               ),
               // Quick Action Card: Approval Center (khusus user terdaftar di Bima)
-              if (_isApprovalRegistered)
-                _buildApprovalQuickCard(),
+              if (_isApprovalRegistered) _buildApprovalQuickCard(),
               Padding(
                 padding:
                     const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
@@ -5095,14 +5248,7 @@ class _DashboardPageState extends State<DashboardPage> with WidgetsBindingObserv
                         child: Stack(
                           children: [
                             Positioned.fill(
-                              child: WebViewWidget(
-                                controller: _hazardMapCtrl,
-                                gestureRecognizers: {
-                                  Factory<OneSequenceGestureRecognizer>(
-                                    () => EagerGestureRecognizer(),
-                                  ),
-                                },
-                              ),
+                              child: buildSafeMapWebView(_hazardMapCtrl),
                             ),
                             // Tombol Cepat Masuk Mode Hazard Hunter
                             Positioned(
@@ -5298,11 +5444,13 @@ class _DashboardPageState extends State<DashboardPage> with WidgetsBindingObserv
         child: InkWell(
           borderRadius: BorderRadius.circular(18),
           onTap: () {
-            Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (context) => const ApprovalCenterPage(),
-              ),
-            ).then((_) => _checkApprovalAccess());
+            Navigator.of(context)
+                .push(
+                  MaterialPageRoute(
+                    builder: (context) => const ApprovalCenterPage(),
+                  ),
+                )
+                .then((_) => _checkApprovalAccess());
           },
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
@@ -5356,7 +5504,9 @@ class _DashboardPageState extends State<DashboardPage> with WidgetsBindingObserv
                     borderRadius: BorderRadius.circular(13),
                     boxShadow: [
                       BoxShadow(
-                        color: (hasPending ? const Color(0xFFEF4444) : const Color(0xFF0D9488))
+                        color: (hasPending
+                                ? const Color(0xFFEF4444)
+                                : const Color(0xFF0D9488))
                             .withValues(alpha: 0.35),
                         blurRadius: 8,
                         offset: const Offset(0, 3),
@@ -5364,7 +5514,9 @@ class _DashboardPageState extends State<DashboardPage> with WidgetsBindingObserv
                     ],
                   ),
                   child: Icon(
-                    hasPending ? Icons.pending_actions_rounded : Icons.fact_check_rounded,
+                    hasPending
+                        ? Icons.pending_actions_rounded
+                        : Icons.fact_check_rounded,
                     color: Colors.white,
                     size: 24,
                   ),
@@ -5383,13 +5535,16 @@ class _DashboardPageState extends State<DashboardPage> with WidgetsBindingObserv
                             style: TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w800,
-                              color: hasPending ? Colors.white : const Color(0xFF0F2628),
+                              color: hasPending
+                                  ? Colors.white
+                                  : const Color(0xFF0F2628),
                             ),
                           ),
                           if (hasPending) ...[
                             const SizedBox(width: 8),
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 7, vertical: 2),
                               decoration: BoxDecoration(
                                 color: const Color(0xFFEF4444),
                                 borderRadius: BorderRadius.circular(12),
@@ -5427,7 +5582,9 @@ class _DashboardPageState extends State<DashboardPage> with WidgetsBindingObserv
                 Icon(
                   Icons.arrow_forward_ios_rounded,
                   size: 15,
-                  color: hasPending ? const Color(0xFF2DD4BF) : const Color(0xFF94A3B8),
+                  color: hasPending
+                      ? const Color(0xFF2DD4BF)
+                      : const Color(0xFF94A3B8),
                 ),
               ],
             ),
@@ -5499,12 +5656,8 @@ String buildHazardMapHtml({
       }
       .leaflet-control-attribution { display: none !important; }
       .leaflet-control-zoom { display: none !important; }
-      .leaflet-popup-content-wrapper {
-        border-radius: 14px;
-        box-shadow: 0 12px 30px rgba(15, 23, 42, .22);
-        padding: 4px;
-      }
-      .leaflet-popup { transition: opacity .14s ease-out; }
+      /* Flutter renders the one clean report sheet; do not duplicate it. */
+      .leaflet-popup { display: none !important; }
       .hazard-popup { width: 200px; padding: 2px; }
       .hazard-popup img {
         width: 100%;
@@ -6084,6 +6237,19 @@ String buildHazardMapHtml({
           zoomDelta: .5,
           wheelPxPerZoomLevel: 90
         });
+        // Long press anywhere on the map opens Google Maps navigation.
+        window.previewRoute = null;
+        window.clearPreviewRoute = function() { if (window.previewRoute) { map.removeLayer(window.previewRoute); window.previewRoute = null; } };
+        map.on('contextmenu', function(e) {
+          window.clearPreviewRoute();
+          window.previewRoute = L.polyline([map.getCenter(), e.latlng], {color:'#2563EB', weight:4, dashArray:'8 8'}).addTo(map);
+          HazardBridge.postMessage(JSON.stringify({action:'navigate', lat:e.latlng.lat, lng:e.latlng.lng}));
+        });
+        // Explicitly restore native touch handling after fullscreen overlays.
+        map.dragging.enable();
+        map.touchZoom.enable();
+        map.doubleClickZoom.enable();
+        document.getElementById('map').style.touchAction = 'pan-x pan-y pinch-zoom';
 
         googleSat.on('tileerror', function() {
           if (!map.hasLayer(esriSat)) map.addLayer(esriSat);
