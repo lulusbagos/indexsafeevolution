@@ -54,7 +54,8 @@ class OfflineSyncState {
 
 class PendingSyncItem {
   final int id;
-  final String tableKey; // 'hazard', 'inspection', 'observation', 'safety', 'coaching', 'p5m', 'p2h'
+  final String
+      tableKey; // 'hazard', 'inspection', 'observation', 'safety', 'coaching', 'p5m', 'p2h'
   final String moduleTitle;
   final String title;
   final String date;
@@ -206,7 +207,8 @@ class OfflineSyncService {
       (await _jobs())
           .any((job) => job.feature == feature && job.localId == localId);
 
-  Future<void> discard({required String feature, required String localId}) async {
+  Future<void> discard(
+      {required String feature, required String localId}) async {
     try {
       final db = await _db.database;
       await db.delete(
@@ -254,8 +256,10 @@ class OfflineSyncService {
           map['foto'] = await MultipartFile.fromFile(photoPath);
         }
         final photoTindakanPath = job.payload['photoTindakanPath']?.toString();
-        if (photoTindakanPath != null && await File(photoTindakanPath).exists()) {
-          map['foto_tindakan'] = await MultipartFile.fromFile(photoTindakanPath);
+        if (photoTindakanPath != null &&
+            await File(photoTindakanPath).exists()) {
+          map['foto_tindakan'] =
+              await MultipartFile.fromFile(photoTindakanPath);
         }
         final formData = FormData.fromMap(map);
         final res = await _api.saveFciReport(formData);
@@ -435,6 +439,7 @@ class OfflineSyncService {
 
   Future<void> refresh() async {
     int pending = (await _jobs()).length;
+    pending += (await _db.getPendingOfflineViolations()).length;
     for (final name in const [
       'inspection',
       'hazard',
@@ -446,8 +451,8 @@ class OfflineSyncService {
       'safety'
     ]) {
       try {
-        final rows = await _db
-            .rawQuery('select id from ${name}_trans where deleted_at is null and sync_id is null');
+        final rows = await _db.rawQuery(
+            'select id from ${name}_trans where deleted_at is null and sync_id is null');
         pending += rows.length;
       } catch (_) {}
     }
@@ -484,8 +489,8 @@ class OfflineSyncService {
         'safety'
       ]) {
         try {
-          final rows = await _db
-              .rawQuery('select id from ${name}_trans where deleted_at is null and sync_id is null');
+          final rows = await _db.rawQuery(
+              'select id from ${name}_trans where deleted_at is null and sync_id is null');
           for (final row in rows) {
             await syncTran(_db, _api, name, row['id'] as int);
           }
@@ -499,12 +504,51 @@ class OfflineSyncService {
       await syncSpiPending();
       await syncGciPending();
       await syncFakeHazardPending();
-
+      await syncPermitViolationQueue();
     } finally {
       _syncing = false;
       isSyncingNotifier.value = false;
       await refresh();
     }
+  }
+
+  /// Mengirim laporan pelanggaran yang dibuat tanpa jaringan. Server tetap
+  /// memeriksa otorisasi akun saat laporan ini diterima.
+  Future<({int success, int failed})> syncPermitViolationQueue() async {
+    if (!state.value.isOnline) return (success: 0, failed: 0);
+    var success = 0;
+    var failed = 0;
+    for (final row in await _db.getPendingOfflineViolations()) {
+      try {
+        final id = (row['id'] as num).toInt();
+        final decoded = jsonDecode(row['payload']?.toString() ?? '{}');
+        if (decoded is! Map) {
+          failed++;
+          continue;
+        }
+        final payload = Map<String, dynamic>.from(decoded)
+          ..remove('localReceiptPath');
+        final result = await _api.recordPermitViolation(
+          payload,
+          queueWhenOffline: false,
+        );
+        var delivered = false;
+        result.fold(
+          (_) {},
+          (data) => delivered = data['status'] != false,
+        );
+        if (delivered) {
+          await _db.markOfflineViolationSynced(id);
+          success++;
+        } else {
+          failed++;
+        }
+      } catch (_) {
+        failed++;
+      }
+    }
+    if (success > 0) await refresh();
+    return (success: success, failed: failed);
   }
 
   /// Inisialisasi listener deteksi koneksi jaringan untuk auto-sync
@@ -527,7 +571,8 @@ class OfflineSyncService {
         if (isOnline) {
           final count = await getPendingCount();
           if (count > 0 && !_isAutoSyncing) {
-            debugPrint('[OfflineSyncService] Startup online: $count data tertinggal. Menjalankan sinkron otomatis...');
+            debugPrint(
+                '[OfflineSyncService] Startup online: $count data tertinggal. Menjalankan sinkron otomatis...');
             await autoSyncPending();
           }
         }
@@ -538,7 +583,8 @@ class OfflineSyncService {
   }
 
   /// Sinkronisasi otomatis ke server di background ketika mendeteksi koneksi jaringan
-  Future<({int success, int failed})> autoSyncPending({bool force = false}) async {
+  Future<({int success, int failed})> autoSyncPending(
+      {bool force = false}) async {
     if (_isAutoSyncing && !force) return (success: 0, failed: 0);
     _isAutoSyncing = true;
     isSyncingNotifier.value = true;
@@ -546,7 +592,10 @@ class OfflineSyncService {
     try {
       if (_api.getToken.isEmpty || _api.getToken.startsWith('offline_token_')) {
         final auth = PreferenceService.getAuth();
-        if (auth != null && auth.token != null && auth.token!.isNotEmpty && !auth.token!.startsWith('offline_token_')) {
+        if (auth != null &&
+            auth.token != null &&
+            auth.token!.isNotEmpty &&
+            !auth.token!.startsWith('offline_token_')) {
           _api.setToken = auth.token!;
         } else {
           final bg = PreferenceService.getBgToken();
@@ -557,13 +606,15 @@ class OfflineSyncService {
       }
 
       final result = await syncAll();
-      debugPrint('[OfflineSyncService] Auto-sync selesai: ${result.success} sukses, ${result.failed} gagal');
+      debugPrint(
+          '[OfflineSyncService] Auto-sync selesai: ${result.success} sukses, ${result.failed} gagal');
 
       if (result.success > 0) {
         try {
           NotificationService.display(
             title: 'Sinkronisasi Otomatis Berhasil',
-            body: '${result.success} data laporan lokal berhasil terkirim ke server pusat saat online.',
+            body:
+                '${result.success} data laporan lokal berhasil terkirim ke server pusat saat online.',
             payload: '/pending_sync',
           );
         } catch (e) {
@@ -732,7 +783,8 @@ class OfflineSyncService {
           id: row['id'] as int,
           tableKey: 'p2h',
           moduleTitle: 'P2H Kendaraan',
-          title: (row['no_lambung'] != null && row['no_lambung'].toString().isNotEmpty)
+          title: (row['no_lambung'] != null &&
+                  row['no_lambung'].toString().isNotEmpty)
               ? 'P2H Unit ${row['no_lambung']}'
               : 'P2H Kendaraan',
           date: row['date']?.toString() ?? '',
@@ -748,7 +800,8 @@ class OfflineSyncService {
       final jobs = await _jobs();
       for (final job in jobs) {
         if (job.feature == 'bbs') {
-          final form = Map<String, dynamic>.from(job.payload['form'] as Map? ?? {});
+          final form =
+              Map<String, dynamic>.from(job.payload['form'] as Map? ?? {});
           items.add(PendingSyncItem(
             id: job.id.hashCode,
             tableKey: 'bbs',
@@ -763,12 +816,14 @@ class OfflineSyncService {
             rawData: job.payload,
           ));
         } else if (job.feature == 'fci') {
-          final map = Map<String, dynamic>.from(job.payload['map'] as Map? ?? {});
+          final map =
+              Map<String, dynamic>.from(job.payload['map'] as Map? ?? {});
           items.add(PendingSyncItem(
             id: job.id.hashCode,
             tableKey: 'fci',
             moduleTitle: 'Front Condition Index (FCI)',
-            title: 'FCI - ${map['nama_front'] ?? map['pit'] ?? 'Front Tambang'}',
+            title:
+                'FCI - ${map['nama_front'] ?? map['pit'] ?? 'Front Tambang'}',
             date: map['tanggal']?.toString() ?? '',
             time: map['waktu']?.toString() ?? '',
             location: '${map['area'] ?? ''} ${map['pit'] ?? ''}',
@@ -779,12 +834,14 @@ class OfflineSyncService {
             rawData: map,
           ));
         } else if (job.feature == 'rci') {
-          final map = Map<String, dynamic>.from(job.payload['map'] as Map? ?? {});
+          final map =
+              Map<String, dynamic>.from(job.payload['map'] as Map? ?? {});
           items.add(PendingSyncItem(
             id: job.id.hashCode,
             tableKey: 'rci',
             moduleTitle: 'Road Condition Index (RCI)',
-            title: 'RCI - ${map['segmen_jalan'] ?? map['area'] ?? 'Jalur Tambang'}',
+            title:
+                'RCI - ${map['segmen_jalan'] ?? map['area'] ?? 'Jalur Tambang'}',
             date: map['tanggal']?.toString() ?? '',
             time: map['waktu']?.toString() ?? '',
             location: '${map['area'] ?? ''} ${map['segmen_jalan'] ?? ''}',
@@ -795,12 +852,14 @@ class OfflineSyncService {
             rawData: map,
           ));
         } else if (job.feature == 'dci') {
-          final map = Map<String, dynamic>.from(job.payload['map'] as Map? ?? {});
+          final map =
+              Map<String, dynamic>.from(job.payload['map'] as Map? ?? {});
           items.add(PendingSyncItem(
             id: job.id.hashCode,
             tableKey: 'dci',
             moduleTitle: 'Disposal Condition Index (DCI)',
-            title: 'DCI - ${map['disposal'] ?? map['nama_dump'] ?? map['area'] ?? 'Disposal Tambang'}',
+            title:
+                'DCI - ${map['disposal'] ?? map['nama_dump'] ?? map['area'] ?? 'Disposal Tambang'}',
             date: map['tanggal']?.toString() ?? '',
             time: map['waktu']?.toString() ?? '',
             location: '${map['area'] ?? ''} ${map['disposal'] ?? ''}',
@@ -811,12 +870,14 @@ class OfflineSyncService {
             rawData: map,
           ));
         } else if (job.feature == 'spi') {
-          final map = Map<String, dynamic>.from(job.payload['map'] as Map? ?? {});
+          final map =
+              Map<String, dynamic>.from(job.payload['map'] as Map? ?? {});
           items.add(PendingSyncItem(
             id: job.id.hashCode,
             tableKey: 'spi',
             moduleTitle: 'Sediment Pond Index (SPI)',
-            title: 'SPI - ${map['nama_kolam'] ?? map['lokasi'] ?? 'Kolam Sedimen'}',
+            title:
+                'SPI - ${map['nama_kolam'] ?? map['lokasi'] ?? 'Kolam Sedimen'}',
             date: map['tanggal']?.toString() ?? '',
             time: map['waktu']?.toString() ?? '',
             location: '${map['area'] ?? ''} ${map['nama_kolam'] ?? ''}',
@@ -827,12 +888,14 @@ class OfflineSyncService {
             rawData: map,
           ));
         } else if (job.feature == 'gci') {
-          final map = Map<String, dynamic>.from(job.payload['map'] as Map? ?? {});
+          final map =
+              Map<String, dynamic>.from(job.payload['map'] as Map? ?? {});
           items.add(PendingSyncItem(
             id: job.id.hashCode,
             tableKey: 'gci',
             moduleTitle: 'Geotechnical Condition Index (GCI)',
-            title: 'GCI - ${map['judul_temuan'] ?? map['nama_lereng'] ?? map['pit'] ?? 'Lereng Geoteknik'}',
+            title:
+                'GCI - ${map['judul_temuan'] ?? map['nama_lereng'] ?? map['pit'] ?? 'Lereng Geoteknik'}',
             date: map['tanggal']?.toString() ?? '',
             time: map['waktu']?.toString() ?? '',
             location: '${map['pit'] ?? ''} ${map['nama_lereng'] ?? ''}',
@@ -875,6 +938,7 @@ class OfflineSyncService {
       }
 
       total += (await _jobs()).length;
+      total += (await _db.getPendingOfflineViolations()).length;
     } catch (e) {
       debugPrint('[OfflineSyncService] Error getPendingCount: $e');
     }
@@ -906,7 +970,10 @@ class OfflineSyncService {
 
       if (_api.getToken.isEmpty || _api.getToken.startsWith('offline_token_')) {
         final auth = PreferenceService.getAuth();
-        if (auth != null && auth.token != null && auth.token!.isNotEmpty && !auth.token!.startsWith('offline_token_')) {
+        if (auth != null &&
+            auth.token != null &&
+            auth.token!.isNotEmpty &&
+            !auth.token!.startsWith('offline_token_')) {
           _api.setToken = auth.token!;
         } else {
           final bg = PreferenceService.getBgToken();
@@ -921,7 +988,8 @@ class OfflineSyncService {
       }
       return ok;
     } catch (e) {
-      debugPrint('[OfflineSyncService] Error syncItem ${item.tableKey}:${item.id} -> $e');
+      debugPrint(
+          '[OfflineSyncService] Error syncItem ${item.tableKey}:${item.id} -> $e');
       return false;
     }
   }
@@ -934,7 +1002,10 @@ class OfflineSyncService {
 
     if (_api.getToken.isEmpty || _api.getToken.startsWith('offline_token_')) {
       final auth = PreferenceService.getAuth();
-      if (auth != null && auth.token != null && auth.token!.isNotEmpty && !auth.token!.startsWith('offline_token_')) {
+      if (auth != null &&
+          auth.token != null &&
+          auth.token!.isNotEmpty &&
+          !auth.token!.startsWith('offline_token_')) {
         _api.setToken = auth.token!;
       } else {
         final bg = PreferenceService.getBgToken();
@@ -977,6 +1048,10 @@ class OfflineSyncService {
     final gciResult = await syncGciPending();
     success += gciResult.success;
     failed += gciResult.failed;
+
+    final violationResult = await syncPermitViolationQueue();
+    success += violationResult.success;
+    failed += violationResult.failed;
 
     await refreshPendingCount();
     return (success: success, failed: failed);

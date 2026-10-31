@@ -59,13 +59,20 @@ class _AchievementSapPageState extends State<AchievementSapPage>
       'ptsKualitas': 25.00,
       'ptsCapaian': 32.17,
       'ptsBeban': 1.54,
-      'hazardActual': 94, 'hazardTarget': 104,
-      'inspeksiActual': 46, 'inspeksiTarget': 51,
-      'safetyTalkActual': 197, 'safetyTalkTarget': 210,
-      'observasiActual': 42, 'observasiTarget': 45,
-      'coachingActual': 28, 'coachingTarget': 30,
-      'p5mActual': 80, 'p5mTarget': 80,
-      'apTotal': 15, 'apClosed': 15,
+      'hazardActual': 94,
+      'hazardTarget': 104,
+      'inspeksiActual': 46,
+      'inspeksiTarget': 51,
+      'safetyTalkActual': 197,
+      'safetyTalkTarget': 210,
+      'observasiActual': 42,
+      'observasiTarget': 45,
+      'coachingActual': 28,
+      'coachingTarget': 30,
+      'p5mActual': 80,
+      'p5mTarget': 80,
+      'apTotal': 15,
+      'apClosed': 15,
     },
     {
       'rank': 2,
@@ -86,13 +93,20 @@ class _AchievementSapPageState extends State<AchievementSapPage>
       'ptsKualitas': 25.00,
       'ptsCapaian': 28.98,
       'ptsBeban': 2.51,
-      'hazardActual': 79, 'hazardTarget': 97,
-      'inspeksiActual': 39, 'inspeksiTarget': 48,
-      'safetyTalkActual': 163, 'safetyTalkTarget': 200,
-      'observasiActual': 35, 'observasiTarget': 40,
-      'coachingActual': 22, 'coachingTarget': 28,
-      'p5mActual': 59, 'p5mTarget': 67,
-      'apTotal': 8, 'apClosed': 8,
+      'hazardActual': 79,
+      'hazardTarget': 97,
+      'inspeksiActual': 39,
+      'inspeksiTarget': 48,
+      'safetyTalkActual': 163,
+      'safetyTalkTarget': 200,
+      'observasiActual': 35,
+      'observasiTarget': 40,
+      'coachingActual': 22,
+      'coachingTarget': 28,
+      'p5mActual': 59,
+      'p5mTarget': 67,
+      'apTotal': 8,
+      'apClosed': 8,
     },
     {
       'rank': 3,
@@ -113,13 +127,20 @@ class _AchievementSapPageState extends State<AchievementSapPage>
       'ptsKualitas': 25.00,
       'ptsCapaian': 26.60,
       'ptsBeban': 3.43,
-      'hazardActual': 80, 'hazardTarget': 96,
-      'inspeksiActual': 32, 'inspeksiTarget': 43,
-      'safetyTalkActual': 145, 'safetyTalkTarget': 203,
-      'observasiActual': 27, 'observasiTarget': 39,
-      'coachingActual': 20, 'coachingTarget': 22,
-      'p5mActual': 72, 'p5mTarget': 92,
-      'apTotal': 12, 'apClosed': 12,
+      'hazardActual': 80,
+      'hazardTarget': 96,
+      'inspeksiActual': 32,
+      'inspeksiTarget': 43,
+      'safetyTalkActual': 145,
+      'safetyTalkTarget': 203,
+      'observasiActual': 27,
+      'observasiTarget': 39,
+      'coachingActual': 20,
+      'coachingTarget': 22,
+      'p5mActual': 72,
+      'p5mTarget': 92,
+      'apTotal': 12,
+      'apClosed': 12,
     },
     {
       'rank': 4,
@@ -140,13 +161,20 @@ class _AchievementSapPageState extends State<AchievementSapPage>
       'ptsKualitas': 25.00,
       'ptsCapaian': 25.17,
       'ptsBeban': 5.18,
-      'hazardActual': 419, 'hazardTarget': 550,
-      'inspeksiActual': 179, 'inspeksiTarget': 276,
-      'safetyTalkActual': 741, 'safetyTalkTarget': 1080,
-      'observasiActual': 164, 'observasiTarget': 234,
-      'coachingActual': 108, 'coachingTarget': 116,
-      'p5mActual': 294, 'p5mTarget': 394,
-      'apTotal': 36, 'apClosed': 35,
+      'hazardActual': 419,
+      'hazardTarget': 550,
+      'inspeksiActual': 179,
+      'inspeksiTarget': 276,
+      'safetyTalkActual': 741,
+      'safetyTalkTarget': 1080,
+      'observasiActual': 164,
+      'observasiTarget': 234,
+      'coachingActual': 108,
+      'coachingTarget': 116,
+      'p5mActual': 294,
+      'p5mTarget': 394,
+      'apTotal': 36,
+      'apClosed': 35,
     },
     {
       'rank': 5,
@@ -167,13 +195,20 @@ class _AchievementSapPageState extends State<AchievementSapPage>
       'ptsKualitas': 25.00,
       'ptsCapaian': 24.08,
       'ptsBeban': 4.34,
-      'hazardActual': 26, 'hazardTarget': 52,
-      'inspeksiActual': 13, 'inspeksiTarget': 26,
-      'safetyTalkActual': 81, 'safetyTalkTarget': 108,
-      'observasiActual': 14, 'observasiTarget': 20,
-      'coachingActual': 12, 'coachingTarget': 12,
-      'p5mActual': 40, 'p5mTarget': 52,
-      'apTotal': 6, 'apClosed': 6,
+      'hazardActual': 26,
+      'hazardTarget': 52,
+      'inspeksiActual': 13,
+      'inspeksiTarget': 26,
+      'safetyTalkActual': 81,
+      'safetyTalkTarget': 108,
+      'observasiActual': 14,
+      'observasiTarget': 20,
+      'coachingActual': 12,
+      'coachingTarget': 12,
+      'p5mActual': 40,
+      'p5mTarget': 52,
+      'apTotal': 6,
+      'apClosed': 6,
     },
     {
       'rank': 6,
@@ -194,13 +229,20 @@ class _AchievementSapPageState extends State<AchievementSapPage>
       'ptsKualitas': 25.00,
       'ptsCapaian': 26.64,
       'ptsBeban': 1.45,
-      'hazardActual': 54, 'hazardTarget': 90,
-      'inspeksiActual': 33, 'inspeksiTarget': 44,
-      'safetyTalkActual': 126, 'safetyTalkTarget': 181,
-      'observasiActual': 33, 'observasiTarget': 36,
-      'coachingActual': 18, 'coachingTarget': 20,
-      'p5mActual': 78, 'p5mTarget': 79,
-      'apTotal': 5, 'apClosed': 5,
+      'hazardActual': 54,
+      'hazardTarget': 90,
+      'inspeksiActual': 33,
+      'inspeksiTarget': 44,
+      'safetyTalkActual': 126,
+      'safetyTalkTarget': 181,
+      'observasiActual': 33,
+      'observasiTarget': 36,
+      'coachingActual': 18,
+      'coachingTarget': 20,
+      'p5mActual': 78,
+      'p5mTarget': 79,
+      'apTotal': 5,
+      'apClosed': 5,
     },
     {
       'rank': 7,
@@ -221,13 +263,20 @@ class _AchievementSapPageState extends State<AchievementSapPage>
       'ptsKualitas': 25.00,
       'ptsCapaian': 27.55,
       'ptsBeban': 3.78,
-      'hazardActual': 152, 'hazardTarget': 209,
-      'inspeksiActual': 95, 'inspeksiTarget': 104,
-      'safetyTalkActual': 318, 'safetyTalkTarget': 434,
-      'observasiActual': 70, 'observasiTarget': 92,
-      'coachingActual': 38, 'coachingTarget': 46,
-      'p5mActual': 177, 'p5mTarget': 195,
-      'apTotal': 33, 'apClosed': 28,
+      'hazardActual': 152,
+      'hazardTarget': 209,
+      'inspeksiActual': 95,
+      'inspeksiTarget': 104,
+      'safetyTalkActual': 318,
+      'safetyTalkTarget': 434,
+      'observasiActual': 70,
+      'observasiTarget': 92,
+      'coachingActual': 38,
+      'coachingTarget': 46,
+      'p5mActual': 177,
+      'p5mTarget': 195,
+      'apTotal': 33,
+      'apClosed': 28,
     },
     {
       'rank': 8,
@@ -248,13 +297,20 @@ class _AchievementSapPageState extends State<AchievementSapPage>
       'ptsKualitas': 25.00,
       'ptsCapaian': 28.21,
       'ptsBeban': 2.70,
-      'hazardActual': 67, 'hazardTarget': 74,
-      'inspeksiActual': 25, 'inspeksiTarget': 36,
-      'safetyTalkActual': 119, 'safetyTalkTarget': 144,
-      'observasiActual': 25, 'observasiTarget': 32,
-      'coachingActual': 14, 'coachingTarget': 16,
-      'p5mActual': 40, 'p5mTarget': 58,
-      'apTotal': 31, 'apClosed': 26,
+      'hazardActual': 67,
+      'hazardTarget': 74,
+      'inspeksiActual': 25,
+      'inspeksiTarget': 36,
+      'safetyTalkActual': 119,
+      'safetyTalkTarget': 144,
+      'observasiActual': 25,
+      'observasiTarget': 32,
+      'coachingActual': 14,
+      'coachingTarget': 16,
+      'p5mActual': 40,
+      'p5mTarget': 58,
+      'apTotal': 31,
+      'apClosed': 26,
     },
     {
       'rank': 9,
@@ -275,13 +331,20 @@ class _AchievementSapPageState extends State<AchievementSapPage>
       'ptsKualitas': 25.00,
       'ptsCapaian': 24.43,
       'ptsBeban': 5.42,
-      'hazardActual': 395, 'hazardTarget': 650,
-      'inspeksiActual': 242, 'inspeksiTarget': 324,
-      'safetyTalkActual': 801, 'safetyTalkTarget': 1290,
-      'observasiActual': 215, 'observasiTarget': 280,
-      'coachingActual': 116, 'coachingTarget': 140,
-      'p5mActual': 431, 'p5mTarget': 466,
-      'apTotal': 87, 'apClosed': 76,
+      'hazardActual': 395,
+      'hazardTarget': 650,
+      'inspeksiActual': 242,
+      'inspeksiTarget': 324,
+      'safetyTalkActual': 801,
+      'safetyTalkTarget': 1290,
+      'observasiActual': 215,
+      'observasiTarget': 280,
+      'coachingActual': 116,
+      'coachingTarget': 140,
+      'p5mActual': 431,
+      'p5mTarget': 466,
+      'apTotal': 87,
+      'apClosed': 76,
     },
     {
       'rank': 10,
@@ -302,13 +365,20 @@ class _AchievementSapPageState extends State<AchievementSapPage>
       'ptsKualitas': 25.00,
       'ptsCapaian': 24.36,
       'ptsBeban': 0.45,
-      'hazardActual': 36, 'hazardTarget': 54,
-      'inspeksiActual': 15, 'inspeksiTarget': 27,
-      'safetyTalkActual': 77, 'safetyTalkTarget': 112,
-      'observasiActual': 14, 'observasiTarget': 18,
-      'coachingActual': 10, 'coachingTarget': 12,
-      'p5mActual': 36, 'p5mTarget': 47,
-      'apTotal': 4, 'apClosed': 4,
+      'hazardActual': 36,
+      'hazardTarget': 54,
+      'inspeksiActual': 15,
+      'inspeksiTarget': 27,
+      'safetyTalkActual': 77,
+      'safetyTalkTarget': 112,
+      'observasiActual': 14,
+      'observasiTarget': 18,
+      'coachingActual': 10,
+      'coachingTarget': 12,
+      'p5mActual': 36,
+      'p5mTarget': 47,
+      'apTotal': 4,
+      'apClosed': 4,
     },
     {
       'rank': 11,
@@ -329,13 +399,20 @@ class _AchievementSapPageState extends State<AchievementSapPage>
       'ptsKualitas': 25.00,
       'ptsCapaian': 26.99,
       'ptsBeban': 4.01,
-      'hazardActual': 189, 'hazardTarget': 243,
-      'inspeksiActual': 89, 'inspeksiTarget': 121,
-      'safetyTalkActual': 366, 'safetyTalkTarget': 486,
-      'observasiActual': 85, 'observasiTarget': 111,
-      'coachingActual': 48, 'coachingTarget': 52,
-      'p5mActual': 160, 'p5mTarget': 202,
-      'apTotal': 28, 'apClosed': 20,
+      'hazardActual': 189,
+      'hazardTarget': 243,
+      'inspeksiActual': 89,
+      'inspeksiTarget': 121,
+      'safetyTalkActual': 366,
+      'safetyTalkTarget': 486,
+      'observasiActual': 85,
+      'observasiTarget': 111,
+      'coachingActual': 48,
+      'coachingTarget': 52,
+      'p5mActual': 160,
+      'p5mTarget': 202,
+      'apTotal': 28,
+      'apClosed': 20,
     },
     {
       'rank': 12,
@@ -356,13 +433,20 @@ class _AchievementSapPageState extends State<AchievementSapPage>
       'ptsKualitas': 25.00,
       'ptsCapaian': 18.83,
       'ptsBeban': 1.45,
-      'hazardActual': 31, 'hazardTarget': 144,
-      'inspeksiActual': 51, 'inspeksiTarget': 73,
-      'safetyTalkActual': 201, 'safetyTalkTarget': 288,
-      'observasiActual': 31, 'observasiTarget': 64,
-      'coachingActual': 18, 'coachingTarget': 28,
-      'p5mActual': 55, 'p5mTarget': 123,
-      'apTotal': 14, 'apClosed': 14,
+      'hazardActual': 31,
+      'hazardTarget': 144,
+      'inspeksiActual': 51,
+      'inspeksiTarget': 73,
+      'safetyTalkActual': 201,
+      'safetyTalkTarget': 288,
+      'observasiActual': 31,
+      'observasiTarget': 64,
+      'coachingActual': 18,
+      'coachingTarget': 28,
+      'p5mActual': 55,
+      'p5mTarget': 123,
+      'apTotal': 14,
+      'apClosed': 14,
     },
     {
       'rank': 13,
@@ -383,13 +467,20 @@ class _AchievementSapPageState extends State<AchievementSapPage>
       'ptsKualitas': 25.00,
       'ptsCapaian': 22.79,
       'ptsBeban': 1.04,
-      'hazardActual': 70, 'hazardTarget': 126,
-      'inspeksiActual': 42, 'inspeksiTarget': 63,
-      'safetyTalkActual': 154, 'safetyTalkTarget': 252,
-      'observasiActual': 39, 'observasiTarget': 54,
-      'coachingActual': 22, 'coachingTarget': 28,
-      'p5mActual': 83, 'p5mTarget': 107,
-      'apTotal': 43, 'apClosed': 34,
+      'hazardActual': 70,
+      'hazardTarget': 126,
+      'inspeksiActual': 42,
+      'inspeksiTarget': 63,
+      'safetyTalkActual': 154,
+      'safetyTalkTarget': 252,
+      'observasiActual': 39,
+      'observasiTarget': 54,
+      'coachingActual': 22,
+      'coachingTarget': 28,
+      'p5mActual': 83,
+      'p5mTarget': 107,
+      'apTotal': 43,
+      'apClosed': 34,
     },
     {
       'rank': 14,
@@ -410,13 +501,20 @@ class _AchievementSapPageState extends State<AchievementSapPage>
       'ptsKualitas': 25.00,
       'ptsCapaian': 29.16,
       'ptsBeban': 2.75,
-      'hazardActual': 89, 'hazardTarget': 117,
-      'inspeksiActual': 52, 'inspeksiTarget': 59,
-      'safetyTalkActual': 193, 'safetyTalkTarget': 234,
-      'observasiActual': 43, 'observasiTarget': 52,
-      'coachingActual': 24, 'coachingTarget': 26,
-      'p5mActual': 86, 'p5mTarget': 97,
-      'apTotal': 6, 'apClosed': 3,
+      'hazardActual': 89,
+      'hazardTarget': 117,
+      'inspeksiActual': 52,
+      'inspeksiTarget': 59,
+      'safetyTalkActual': 193,
+      'safetyTalkTarget': 234,
+      'observasiActual': 43,
+      'observasiTarget': 52,
+      'coachingActual': 24,
+      'coachingTarget': 26,
+      'p5mActual': 86,
+      'p5mTarget': 97,
+      'apTotal': 6,
+      'apClosed': 3,
     },
     {
       'rank': 15,
@@ -437,13 +535,20 @@ class _AchievementSapPageState extends State<AchievementSapPage>
       'ptsKualitas': 25.00,
       'ptsCapaian': 25.94,
       'ptsBeban': 4.02,
-      'hazardActual': 239, 'hazardTarget': 333,
-      'inspeksiActual': 117, 'inspeksiTarget': 166,
-      'safetyTalkActual': 456, 'safetyTalkTarget': 666,
-      'observasiActual': 121, 'observasiTarget': 148,
-      'coachingActual': 61, 'coachingTarget': 74,
-      'p5mActual': 240, 'p5mTarget': 278,
-      'apTotal': 17, 'apClosed': 8,
+      'hazardActual': 239,
+      'hazardTarget': 333,
+      'inspeksiActual': 117,
+      'inspeksiTarget': 166,
+      'safetyTalkActual': 456,
+      'safetyTalkTarget': 666,
+      'observasiActual': 121,
+      'observasiTarget': 148,
+      'coachingActual': 61,
+      'coachingTarget': 74,
+      'p5mActual': 240,
+      'p5mTarget': 278,
+      'apTotal': 17,
+      'apClosed': 8,
     },
     {
       'rank': 16,
@@ -464,13 +569,20 @@ class _AchievementSapPageState extends State<AchievementSapPage>
       'ptsKualitas': 25.00,
       'ptsCapaian': 28.11,
       'ptsBeban': -0.02,
-      'hazardActual': 89, 'hazardTarget': 99,
-      'inspeksiActual': 39, 'inspeksiTarget': 50,
-      'safetyTalkActual': 149, 'safetyTalkTarget': 198,
-      'observasiActual': 34, 'observasiTarget': 43,
-      'coachingActual': 20, 'coachingTarget': 22,
-      'p5mActual': 66, 'p5mTarget': 83,
-      'apTotal': 4, 'apClosed': 2,
+      'hazardActual': 89,
+      'hazardTarget': 99,
+      'inspeksiActual': 39,
+      'inspeksiTarget': 50,
+      'safetyTalkActual': 149,
+      'safetyTalkTarget': 198,
+      'observasiActual': 34,
+      'observasiTarget': 43,
+      'coachingActual': 20,
+      'coachingTarget': 22,
+      'p5mActual': 66,
+      'p5mTarget': 83,
+      'apTotal': 4,
+      'apClosed': 2,
     },
     {
       'rank': 17,
@@ -491,13 +603,20 @@ class _AchievementSapPageState extends State<AchievementSapPage>
       'ptsKualitas': 25.00,
       'ptsCapaian': 29.02,
       'ptsBeban': 1.06,
-      'hazardActual': 171, 'hazardTarget': 171,
-      'inspeksiActual': 76, 'inspeksiTarget': 85,
-      'safetyTalkActual': 232, 'safetyTalkTarget': 342,
-      'observasiActual': 71, 'observasiTarget': 76,
-      'coachingActual': 33, 'coachingTarget': 37,
-      'p5mActual': 126, 'p5mTarget': 144,
-      'apTotal': 7, 'apClosed': 3,
+      'hazardActual': 171,
+      'hazardTarget': 171,
+      'inspeksiActual': 76,
+      'inspeksiTarget': 85,
+      'safetyTalkActual': 232,
+      'safetyTalkTarget': 342,
+      'observasiActual': 71,
+      'observasiTarget': 76,
+      'coachingActual': 33,
+      'coachingTarget': 37,
+      'p5mActual': 126,
+      'p5mTarget': 144,
+      'apTotal': 7,
+      'apClosed': 3,
     },
     {
       'rank': 18,
@@ -518,13 +637,20 @@ class _AchievementSapPageState extends State<AchievementSapPage>
       'ptsKualitas': 25.00,
       'ptsCapaian': 27.69,
       'ptsBeban': 3.54,
-      'hazardActual': 132, 'hazardTarget': 180,
-      'inspeksiActual': 74, 'inspeksiTarget': 90,
-      'safetyTalkActual': 251, 'safetyTalkTarget': 360,
-      'observasiActual': 70, 'observasiTarget': 80,
-      'coachingActual': 36, 'coachingTarget': 40,
-      'p5mActual': 149, 'p5mTarget': 150,
-      'apTotal': 13, 'apClosed': 5,
+      'hazardActual': 132,
+      'hazardTarget': 180,
+      'inspeksiActual': 74,
+      'inspeksiTarget': 90,
+      'safetyTalkActual': 251,
+      'safetyTalkTarget': 360,
+      'observasiActual': 70,
+      'observasiTarget': 80,
+      'coachingActual': 36,
+      'coachingTarget': 40,
+      'p5mActual': 149,
+      'p5mTarget': 150,
+      'apTotal': 13,
+      'apClosed': 5,
     },
     {
       'rank': 19,
@@ -545,13 +671,20 @@ class _AchievementSapPageState extends State<AchievementSapPage>
       'ptsKualitas': 25.00,
       'ptsCapaian': 24.15,
       'ptsBeban': 0.60,
-      'hazardActual': 197, 'hazardTarget': 288,
-      'inspeksiActual': 104, 'inspeksiTarget': 144,
-      'safetyTalkActual': 389, 'safetyTalkTarget': 576,
-      'observasiActual': 91, 'observasiTarget': 128,
-      'coachingActual': 50, 'coachingTarget': 64,
-      'p5mActual': 163, 'p5mTarget': 240,
-      'apTotal': 78, 'apClosed': 46,
+      'hazardActual': 197,
+      'hazardTarget': 288,
+      'inspeksiActual': 104,
+      'inspeksiTarget': 144,
+      'safetyTalkActual': 389,
+      'safetyTalkTarget': 576,
+      'observasiActual': 91,
+      'observasiTarget': 128,
+      'coachingActual': 50,
+      'coachingTarget': 64,
+      'p5mActual': 163,
+      'p5mTarget': 240,
+      'apTotal': 78,
+      'apClosed': 46,
     },
     {
       'rank': 20,
@@ -572,13 +705,20 @@ class _AchievementSapPageState extends State<AchievementSapPage>
       'ptsKualitas': 25.00,
       'ptsCapaian': 23.10,
       'ptsBeban': 1.50,
-      'hazardActual': 121, 'hazardTarget': 189,
-      'inspeksiActual': 65, 'inspeksiTarget': 95,
-      'safetyTalkActual': 235, 'safetyTalkTarget': 378,
-      'observasiActual': 59, 'observasiTarget': 84,
-      'coachingActual': 31, 'coachingTarget': 42,
-      'p5mActual': 113, 'p5mTarget': 157,
-      'apTotal': 27, 'apClosed': 14,
+      'hazardActual': 121,
+      'hazardTarget': 189,
+      'inspeksiActual': 65,
+      'inspeksiTarget': 95,
+      'safetyTalkActual': 235,
+      'safetyTalkTarget': 378,
+      'observasiActual': 59,
+      'observasiTarget': 84,
+      'coachingActual': 31,
+      'coachingTarget': 42,
+      'p5mActual': 113,
+      'p5mTarget': 157,
+      'apTotal': 27,
+      'apClosed': 14,
     },
     {
       'rank': 21,
@@ -599,13 +739,20 @@ class _AchievementSapPageState extends State<AchievementSapPage>
       'ptsKualitas': 25.00,
       'ptsCapaian': 22.05,
       'ptsBeban': 3.10,
-      'hazardActual': 77, 'hazardTarget': 126,
-      'inspeksiActual': 41, 'inspeksiTarget': 63,
-      'safetyTalkActual': 152, 'safetyTalkTarget': 252,
-      'observasiActual': 37, 'observasiTarget': 56,
-      'coachingActual': 20, 'coachingTarget': 28,
-      'p5mActual': 70, 'p5mTarget': 105,
-      'apTotal': 5, 'apClosed': 2,
+      'hazardActual': 77,
+      'hazardTarget': 126,
+      'inspeksiActual': 41,
+      'inspeksiTarget': 63,
+      'safetyTalkActual': 152,
+      'safetyTalkTarget': 252,
+      'observasiActual': 37,
+      'observasiTarget': 56,
+      'coachingActual': 20,
+      'coachingTarget': 28,
+      'p5mActual': 70,
+      'p5mTarget': 105,
+      'apTotal': 5,
+      'apClosed': 2,
     },
     {
       'rank': 22,
@@ -626,13 +773,20 @@ class _AchievementSapPageState extends State<AchievementSapPage>
       'ptsKualitas': 25.00,
       'ptsCapaian': 20.30,
       'ptsBeban': 1.05,
-      'hazardActual': 45, 'hazardTarget': 81,
-      'inspeksiActual': 24, 'inspeksiTarget': 40,
-      'safetyTalkActual': 91, 'safetyTalkTarget': 162,
-      'observasiActual': 22, 'observasiTarget': 36,
-      'coachingActual': 12, 'coachingTarget': 18,
-      'p5mActual': 41, 'p5mTarget': 68,
-      'apTotal': 24, 'apClosed': 11,
+      'hazardActual': 45,
+      'hazardTarget': 81,
+      'inspeksiActual': 24,
+      'inspeksiTarget': 40,
+      'safetyTalkActual': 91,
+      'safetyTalkTarget': 162,
+      'observasiActual': 22,
+      'observasiTarget': 36,
+      'coachingActual': 12,
+      'coachingTarget': 18,
+      'p5mActual': 41,
+      'p5mTarget': 68,
+      'apTotal': 24,
+      'apClosed': 11,
     },
     {
       'rank': 23,
@@ -653,13 +807,20 @@ class _AchievementSapPageState extends State<AchievementSapPage>
       'ptsKualitas': 25.00,
       'ptsCapaian': 16.80,
       'ptsBeban': 0.52,
-      'hazardActual': 15, 'hazardTarget': 25,
-      'inspeksiActual': 13, 'inspeksiTarget': 26,
-      'safetyTalkActual': 8, 'safetyTalkTarget': 16,
-      'observasiActual': 10, 'observasiTarget': 26,
-      'coachingActual': 2, 'coachingTarget': 7,
-      'p5mActual': 12, 'p5mTarget': 30,
-      'apTotal': 2, 'apClosed': 1,
+      'hazardActual': 15,
+      'hazardTarget': 25,
+      'inspeksiActual': 13,
+      'inspeksiTarget': 26,
+      'safetyTalkActual': 8,
+      'safetyTalkTarget': 16,
+      'observasiActual': 10,
+      'observasiTarget': 26,
+      'coachingActual': 2,
+      'coachingTarget': 7,
+      'p5mActual': 12,
+      'p5mTarget': 30,
+      'apTotal': 2,
+      'apClosed': 1,
     },
   ];
 
@@ -698,7 +859,8 @@ class _AchievementSapPageState extends State<AchievementSapPage>
     try {
       final res = await _api.getProfile();
       res.fold((error) {
-        debugPrint('Error fetching profile for AchievementSapPage: ${error['message']}');
+        debugPrint(
+            'Error fetching profile for AchievementSapPage: ${error['message']}');
       }, (profile) async {
         await PreferenceService.setProfile(profile);
         if (mounted) {
@@ -728,7 +890,8 @@ class _AchievementSapPageState extends State<AchievementSapPage>
     try {
       final now = DateTime.now();
       final compId = _profile?.companyId ?? 1;
-      final res = await _api.getDepartmentLeague(year: now.year, month: now.month, companyId: compId);
+      final res = await _api.getDepartmentLeague(
+          year: now.year, month: now.month, companyId: compId);
       res.fold((err) {
         debugPrint('Error fetching department league: ${err['message']}');
         _fallbackToCuratedLeague();
@@ -739,9 +902,12 @@ class _AchievementSapPageState extends State<AchievementSapPage>
           if (list is List && list.isNotEmpty) {
             if (mounted) {
               setState(() {
-                _departments = list.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+                _departments = list
+                    .map((e) => Map<String, dynamic>.from(e as Map))
+                    .toList();
                 _leaguePeriod = rawData['period']?.toString() ?? 'Oktober 2026';
-                if (rawData['companyName'] != null && rawData['companyName'].toString().isNotEmpty) {
+                if (rawData['companyName'] != null &&
+                    rawData['companyName'].toString().isNotEmpty) {
                   _companyName = rawData['companyName'].toString();
                 }
                 _totalClubs = (rawData['totalClubs'] is int)
@@ -776,7 +942,8 @@ class _AchievementSapPageState extends State<AchievementSapPage>
   String _getDeptInitials(String name) {
     if (name.isEmpty) return 'GEN';
     final clean = name.replaceAll(RegExp(r'[^a-zA-Z0-9\s]'), '').trim();
-    final words = clean.split(RegExp(r'\s+')).where((w) => w.isNotEmpty).toList();
+    final words =
+        clean.split(RegExp(r'\s+')).where((w) => w.isNotEmpty).toList();
     if (words.length >= 2) {
       return (words[0][0] + words[1][0]).toUpperCase();
     }
@@ -848,8 +1015,10 @@ class _AchievementSapPageState extends State<AchievementSapPage>
                 indicatorSize: TabBarIndicatorSize.tab,
                 labelColor: Colors.white,
                 unselectedLabelColor: const Color(0xFF64748B),
-                labelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800),
-                unselectedLabelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                labelStyle:
+                    const TextStyle(fontSize: 13, fontWeight: FontWeight.w800),
+                unselectedLabelStyle:
+                    const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
                 tabs: const [
                   Tab(
                     child: Row(
@@ -898,8 +1067,19 @@ class _AchievementSapPageState extends State<AchievementSapPage>
     final now = DateTime.now();
     final lastDay = DateTime(now.year, now.month + 1, 0).day;
     const months = [
-      '', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
-      'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+      '',
+      'Januari',
+      'Februari',
+      'Maret',
+      'April',
+      'Mei',
+      'Juni',
+      'Juli',
+      'Agustus',
+      'September',
+      'Oktober',
+      'November',
+      'Desember'
     ];
     final periodStr = '1 - $lastDay ${months[now.month]} ${now.year}';
 
@@ -932,27 +1112,44 @@ class _AchievementSapPageState extends State<AchievementSapPage>
     final int actualP5m = _profile?.myP5ms ?? 0;
 
     final int totalTarget = _profile?.totalTarget ??
-        (targetHazard + targetInspeksi + targetSafetyTalk + targetObservasi + targetCoaching + targetP5m);
+        (targetHazard +
+            targetInspeksi +
+            targetSafetyTalk +
+            targetObservasi +
+            targetCoaching +
+            targetP5m);
 
-    final int totalActualCapped =
-        (actualHazard > targetHazard ? targetHazard : actualHazard) +
+    final int totalActualCapped = (actualHazard > targetHazard
+            ? targetHazard
+            : actualHazard) +
         (actualInspeksi > targetInspeksi ? targetInspeksi : actualInspeksi) +
-        (actualSafetyTalk > targetSafetyTalk ? targetSafetyTalk : actualSafetyTalk) +
-        (actualObservasi > targetObservasi ? targetObservasi : actualObservasi) +
+        (actualSafetyTalk > targetSafetyTalk
+            ? targetSafetyTalk
+            : actualSafetyTalk) +
+        (actualObservasi > targetObservasi
+            ? targetObservasi
+            : actualObservasi) +
         (actualCoaching > targetCoaching ? targetCoaching : actualCoaching) +
         (actualP5m > targetP5m ? targetP5m : actualP5m);
 
-    final int totalSubmissions =
-        actualHazard + actualInspeksi + actualSafetyTalk + actualObservasi + actualCoaching + actualP5m;
+    final int totalSubmissions = actualHazard +
+        actualInspeksi +
+        actualSafetyTalk +
+        actualObservasi +
+        actualCoaching +
+        actualP5m;
 
-    final double complianceRate = _profile?.complianceRate != null && _profile!.complianceRate! > 0
+    final double complianceRate = _profile?.complianceRate != null &&
+            _profile!.complianceRate! > 0
         ? _profile!.complianceRate!
         : (totalTarget > 0 ? ((totalActualCapped / totalTarget) * 100) : 100.0);
 
     final bool isCompliant = complianceRate >= 100;
     final Color statusColor = isCompliant
         ? const Color(0xFF10B981)
-        : (complianceRate >= 75 ? const Color(0xFF009688) : const Color(0xFFF59E0B));
+        : (complianceRate >= 75
+            ? const Color(0xFF009688)
+            : const Color(0xFFF59E0B));
 
     final int sisaTarget = (totalTarget - totalActualCapped).clamp(0, 999);
 
@@ -988,7 +1185,8 @@ class _AchievementSapPageState extends State<AchievementSapPage>
                       color: const Color(0xFF0F172A).withValues(alpha: 0.07),
                       borderRadius: BorderRadius.circular(10),
                     ),
-                    child: const Icon(Icons.corporate_fare_rounded, size: 18, color: Color(0xFF0F172A)),
+                    child: const Icon(Icons.corporate_fare_rounded,
+                        size: 18, color: Color(0xFF0F172A)),
                   ),
                   const SizedBox(width: 10),
                   Expanded(
@@ -1021,7 +1219,8 @@ class _AchievementSapPageState extends State<AchievementSapPage>
                     ),
                   ),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
                       color: const Color(0xFFF8FAFC),
                       borderRadius: BorderRadius.circular(8),
@@ -1030,7 +1229,8 @@ class _AchievementSapPageState extends State<AchievementSapPage>
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(Icons.calendar_today_rounded, size: 11, color: Color(0xFF64748B)),
+                        const Icon(Icons.calendar_today_rounded,
+                            size: 11, color: Color(0xFF64748B)),
                         const SizedBox(width: 4),
                         Text(
                           periodStr,
@@ -1083,10 +1283,15 @@ class _AchievementSapPageState extends State<AchievementSapPage>
                             width: 78,
                             height: 78,
                             child: CircularProgressIndicator(
-                              value: totalTarget > 0 ? (totalActualCapped / totalTarget).clamp(0.0, 1.0) : 1.0,
+                              value: totalTarget > 0
+                                  ? (totalActualCapped / totalTarget)
+                                      .clamp(0.0, 1.0)
+                                  : 1.0,
                               strokeWidth: 8,
-                              backgroundColor: Colors.white.withValues(alpha: 0.12),
-                              valueColor: AlwaysStoppedAnimation<Color>(statusColor),
+                              backgroundColor:
+                                  Colors.white.withValues(alpha: 0.12),
+                              valueColor:
+                                  AlwaysStoppedAnimation<Color>(statusColor),
                             ),
                           ),
                           Column(
@@ -1120,14 +1325,18 @@ class _AchievementSapPageState extends State<AchievementSapPage>
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 3.5),
                               decoration: BoxDecoration(
                                 color: statusColor.withValues(alpha: 0.22),
                                 borderRadius: BorderRadius.circular(8),
-                                border: Border.all(color: statusColor.withValues(alpha: 0.45)),
+                                border: Border.all(
+                                    color: statusColor.withValues(alpha: 0.45)),
                               ),
                               child: Text(
-                                isCompliant ? 'TARGET TERPENUHI ✓' : 'SEDANG BERJALAN',
+                                isCompliant
+                                    ? 'TARGET TERPENUHI ✓'
+                                    : 'SEDANG BERJALAN',
                                 style: TextStyle(
                                   fontSize: 10,
                                   fontWeight: FontWeight.w800,
@@ -1166,7 +1375,9 @@ class _AchievementSapPageState extends State<AchievementSapPage>
                   ClipRRect(
                     borderRadius: BorderRadius.circular(6),
                     child: LinearProgressIndicator(
-                      value: totalTarget > 0 ? (totalActualCapped / totalTarget).clamp(0.0, 1.0) : 1.0,
+                      value: totalTarget > 0
+                          ? (totalActualCapped / totalTarget).clamp(0.0, 1.0)
+                          : 1.0,
                       minHeight: 7,
                       backgroundColor: Colors.white.withValues(alpha: 0.1),
                       valueColor: AlwaysStoppedAnimation<Color>(statusColor),
@@ -1203,7 +1414,9 @@ class _AchievementSapPageState extends State<AchievementSapPage>
                           label: 'Sisa Target',
                           value: '$sisaTarget',
                           unit: 'SAP',
-                          color: sisaTarget == 0 ? const Color(0xFF34D399) : const Color(0xFFFBBF24),
+                          color: sisaTarget == 0
+                              ? const Color(0xFF34D399)
+                              : const Color(0xFFFBBF24),
                           icon: Icons.hourglass_bottom_rounded,
                         ),
                       ),
@@ -1241,9 +1454,11 @@ class _AchievementSapPageState extends State<AchievementSapPage>
                                   color: Color(0xFF10B981),
                                   shape: BoxShape.circle,
                                 ),
-                                child: const Icon(Icons.emoji_events_rounded, color: Colors.white, size: 14),
+                                child: const Icon(Icons.emoji_events_rounded,
+                                    color: Colors.white, size: 14),
                               ),
-                              const Icon(Icons.arrow_forward_rounded, color: Color(0xFF059669), size: 14),
+                              const Icon(Icons.arrow_forward_rounded,
+                                  color: Color(0xFF059669), size: 14),
                             ],
                           ),
                           const SizedBox(height: 8),
@@ -1258,7 +1473,8 @@ class _AchievementSapPageState extends State<AchievementSapPage>
                           const SizedBox(height: 2),
                           Text(
                             'Urutan ${_totalClubs > 0 ? _totalClubs : _departments.length} Divisi',
-                            style: const TextStyle(fontSize: 10, color: Color(0xFF047857)),
+                            style: const TextStyle(
+                                fontSize: 10, color: Color(0xFF047857)),
                           ),
                         ],
                       ),
@@ -1296,9 +1512,11 @@ class _AchievementSapPageState extends State<AchievementSapPage>
                                   color: Color(0xFF0284C7),
                                   shape: BoxShape.circle,
                                 ),
-                                child: const Icon(Icons.groups_rounded, color: Colors.white, size: 14),
+                                child: const Icon(Icons.groups_rounded,
+                                    color: Colors.white, size: 14),
                               ),
-                              const Icon(Icons.arrow_forward_rounded, color: Color(0xFF0284C7), size: 14),
+                              const Icon(Icons.arrow_forward_rounded,
+                                  color: Color(0xFF0284C7), size: 14),
                             ],
                           ),
                           const SizedBox(height: 8),
@@ -1313,7 +1531,8 @@ class _AchievementSapPageState extends State<AchievementSapPage>
                           const SizedBox(height: 2),
                           const Text(
                             'Skor & Audit Skuad',
-                            style: TextStyle(fontSize: 10, color: Color(0xFF0284C7)),
+                            style: TextStyle(
+                                fontSize: 10, color: Color(0xFF0284C7)),
                           ),
                         ],
                       ),
@@ -1330,7 +1549,8 @@ class _AchievementSapPageState extends State<AchievementSapPage>
               onTap: () => routePage(context, '/sap_action_plan'),
               borderRadius: BorderRadius.circular(14),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                 decoration: BoxDecoration(
                   color: const Color(0xFFFFFBEB),
                   borderRadius: BorderRadius.circular(14),
@@ -1344,7 +1564,8 @@ class _AchievementSapPageState extends State<AchievementSapPage>
                         color: const Color(0xFFF59E0B).withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(10),
                       ),
-                      child: const Icon(Icons.assignment_turned_in_rounded, color: Color(0xFFD97706), size: 18),
+                      child: const Icon(Icons.assignment_turned_in_rounded,
+                          color: Color(0xFFD97706), size: 18),
                     ),
                     const SizedBox(width: 10),
                     const Expanded(
@@ -1362,12 +1583,14 @@ class _AchievementSapPageState extends State<AchievementSapPage>
                           SizedBox(height: 1),
                           Text(
                             '50% sisi Pelapor SAP + 50% sisi PIC Tugas • Pantau di Action Tracker',
-                            style: TextStyle(fontSize: 10, color: Color(0xFFB45309)),
+                            style: TextStyle(
+                                fontSize: 10, color: Color(0xFFB45309)),
                           ),
                         ],
                       ),
                     ),
-                    const Icon(Icons.chevron_right_rounded, color: Color(0xFFD97706), size: 18),
+                    const Icon(Icons.chevron_right_rounded,
+                        color: Color(0xFFD97706), size: 18),
                   ],
                 ),
               ),
@@ -1469,7 +1692,8 @@ class _AchievementSapPageState extends State<AchievementSapPage>
             _buildSapModuleCard(
               context: context,
               label: 'P5M (Pertemuan 5 Menit)',
-              description: 'Pemeriksaan kesiapan kerja dan kesehatan kru harian',
+              description:
+                  'Pemeriksaan kesiapan kerja dan kesehatan kru harian',
               actual: actualP5m,
               target: targetP5m,
               color: const Color(0xFF10B981),
@@ -1491,7 +1715,8 @@ class _AchievementSapPageState extends State<AchievementSapPage>
               child: const Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(Icons.info_outline_rounded, size: 16, color: Color(0xFF64748B)),
+                  Icon(Icons.info_outline_rounded,
+                      size: 16, color: Color(0xFF64748B)),
                   SizedBox(width: 8),
                   Expanded(
                     child: Text(
@@ -1530,10 +1755,17 @@ class _AchievementSapPageState extends State<AchievementSapPage>
     Map<String, dynamic>? myDeptData;
     int myDeptRank = 0;
     for (int i = 0; i < _departments.length; i++) {
-      final name = (_departments[i]['departmentName'] ?? '').toString().trim().toUpperCase();
-      if (userDeptName.isNotEmpty && (name == userDeptName || name.contains(userDeptName) || userDeptName.contains(name))) {
+      final name = (_departments[i]['departmentName'] ?? '')
+          .toString()
+          .trim()
+          .toUpperCase();
+      if (userDeptName.isNotEmpty &&
+          (name == userDeptName ||
+              name.contains(userDeptName) ||
+              userDeptName.contains(name))) {
         myDeptData = _departments[i];
-        myDeptRank = (myDeptData['rank'] is int) ? myDeptData['rank'] as int : (i + 1);
+        myDeptRank =
+            (myDeptData['rank'] is int) ? myDeptData['rank'] as int : (i + 1);
         break;
       }
     }
@@ -1557,7 +1789,8 @@ class _AchievementSapPageState extends State<AchievementSapPage>
             if (myDeptData != null && _searchQuery.isEmpty) ...[
               Container(
                 width: double.infinity,
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                 decoration: BoxDecoration(
                   gradient: const LinearGradient(
                     colors: [Color(0xFF064E3B), Color(0xFF065F46)],
@@ -1581,7 +1814,8 @@ class _AchievementSapPageState extends State<AchievementSapPage>
                       decoration: BoxDecoration(
                         color: Colors.white.withValues(alpha: 0.15),
                         shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
+                        border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.3)),
                       ),
                       child: Center(
                         child: Text(
@@ -1602,7 +1836,8 @@ class _AchievementSapPageState extends State<AchievementSapPage>
                           Row(
                             children: [
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 6, vertical: 2),
                                 decoration: BoxDecoration(
                                   color: const Color(0xFF34D399),
                                   borderRadius: BorderRadius.circular(6),
@@ -1620,7 +1855,9 @@ class _AchievementSapPageState extends State<AchievementSapPage>
                           ),
                           const SizedBox(height: 3),
                           Text(
-                            (myDeptData['departmentName'] ?? userDeptName).toString().toUpperCase(),
+                            (myDeptData['departmentName'] ?? userDeptName)
+                                .toString()
+                                .toUpperCase(),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
@@ -1641,7 +1878,8 @@ class _AchievementSapPageState extends State<AchievementSapPage>
                         ],
                       ),
                     ),
-                    const Icon(Icons.verified_rounded, color: Color(0xFF34D399), size: 22),
+                    const Icon(Icons.verified_rounded,
+                        color: Color(0xFF34D399), size: 22),
                   ],
                 ),
               ),
@@ -1668,8 +1906,10 @@ class _AchievementSapPageState extends State<AchievementSapPage>
                       style: const TextStyle(fontSize: 13),
                       decoration: const InputDecoration(
                         hintText: 'Cari departemen...',
-                        hintStyle: TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
-                        prefixIcon: Icon(Icons.search_rounded, size: 18, color: Color(0xFF64748B)),
+                        hintStyle:
+                            TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
+                        prefixIcon: Icon(Icons.search_rounded,
+                            size: 18, color: Color(0xFF64748B)),
                         border: InputBorder.none,
                         contentPadding: EdgeInsets.symmetric(vertical: 10),
                       ),
@@ -1678,7 +1918,8 @@ class _AchievementSapPageState extends State<AchievementSapPage>
                 ),
                 const SizedBox(width: 10),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                   decoration: BoxDecoration(
                     color: const Color(0xFF1E293B),
                     borderRadius: BorderRadius.circular(10),
@@ -1711,14 +1952,20 @@ class _AchievementSapPageState extends State<AchievementSapPage>
                     child: Text(
                       'POS',
                       textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: Color(0xFF475569)),
+                      style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF475569)),
                     ),
                   ),
                   SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       'DEPARTEMEN',
-                      style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: Color(0xFF475569)),
+                      style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF475569)),
                     ),
                   ),
                   SizedBox(
@@ -1726,7 +1973,10 @@ class _AchievementSapPageState extends State<AchievementSapPage>
                     child: Text(
                       'SKOR',
                       textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: Color(0xFF475569)),
+                      style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF475569)),
                     ),
                   ),
                   SizedBox(width: 8),
@@ -1735,7 +1985,10 @@ class _AchievementSapPageState extends State<AchievementSapPage>
                     child: Text(
                       'CAPAIAN',
                       textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: Color(0xFF475569)),
+                      style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF475569)),
                     ),
                   ),
                   SizedBox(width: 6),
@@ -1744,7 +1997,10 @@ class _AchievementSapPageState extends State<AchievementSapPage>
                     child: Text(
                       'FORM',
                       textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: Color(0xFF475569)),
+                      style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF475569)),
                     ),
                   ),
                 ],
@@ -1760,11 +2016,15 @@ class _AchievementSapPageState extends State<AchievementSapPage>
                 padding: const EdgeInsets.symmetric(vertical: 40),
                 child: const Column(
                   children: [
-                    Icon(Icons.search_off_rounded, size: 40, color: Color(0xFF94A3B8)),
+                    Icon(Icons.search_off_rounded,
+                        size: 40, color: Color(0xFF94A3B8)),
                     SizedBox(height: 8),
                     Text(
                       'Departemen tidak ditemukan',
-                      style: TextStyle(fontSize: 13, color: Color(0xFF64748B), fontWeight: FontWeight.w600),
+                      style: TextStyle(
+                          fontSize: 13,
+                          color: Color(0xFF64748B),
+                          fontWeight: FontWeight.w600),
                     ),
                   ],
                 ),
@@ -1806,9 +2066,11 @@ class _AchievementSapPageState extends State<AchievementSapPage>
                     children: [
                       _buildDotPill('W', const Color(0xFF10B981), 'Win (≥80%)'),
                       const SizedBox(width: 10),
-                      _buildDotPill('D', const Color(0xFFF59E0B), 'Draw (40-79%)'),
+                      _buildDotPill(
+                          'D', const Color(0xFFF59E0B), 'Draw (40-79%)'),
                       const SizedBox(width: 10),
-                      _buildDotPill('L', const Color(0xFFEF4444), 'Loss (<40%)'),
+                      _buildDotPill(
+                          'L', const Color(0xFFEF4444), 'Loss (<40%)'),
                     ],
                   ),
                   const SizedBox(height: 6),
@@ -1856,11 +2118,13 @@ class _AchievementSapPageState extends State<AchievementSapPage>
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(Icons.workspace_premium_rounded, color: Color(0xFFFBBF24), size: 18),
+              const Icon(Icons.workspace_premium_rounded,
+                  color: Color(0xFFFBBF24), size: 18),
               const SizedBox(width: 6),
               Flexible(
                 child: Text(
-                  'CHAMPIONS ZONE • $_companyName • $_leaguePeriod'.toUpperCase(),
+                  'CHAMPIONS ZONE • $_companyName • $_leaguePeriod'
+                      .toUpperCase(),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
@@ -2036,26 +2300,45 @@ class _AchievementSapPageState extends State<AchievementSapPage>
   // ==========================================
   // DEPARTMENT LEAGUE ROW & EXPANDABLE DETAILS
   // ==========================================
-  Widget _buildDepartmentRow(Map<String, dynamic> d, int idx, String userDeptName) {
+  Widget _buildDepartmentRow(
+      Map<String, dynamic> d, int idx, String userDeptName) {
     final rank = d['rank'] ?? (idx + 1);
     final name = (d['departmentName'] ?? '').toString();
     final initials = (d['initials'] ?? _getDeptInitials(name)).toString();
     final shieldColor = _getDeptColor(name);
     final empCount = d['employeeCount'] ?? 0;
-    final totalScore = (d['totalScore'] is num) ? (d['totalScore'] as num).toDouble() : 0.0;
-    final rate = (d['mtdAchievementRate'] is num) ? (d['mtdAchievementRate'] as num).toDouble() : 0.0;
+    final totalScore =
+        (d['totalScore'] is num) ? (d['totalScore'] as num).toDouble() : 0.0;
+    final rate = (d['mtdAchievementRate'] is num)
+        ? (d['mtdAchievementRate'] as num).toDouble()
+        : 0.0;
 
-    final hRate = (d['mtdHazardRate'] is num) ? (d['mtdHazardRate'] as num).toDouble() : 100.0;
-    final iRate = (d['mtdInspeksiRate'] is num) ? (d['mtdInspeksiRate'] as num).toDouble() : 100.0;
-    final stRate = (d['mtdSafetyTalkRate'] is num) ? (d['mtdSafetyTalkRate'] as num).toDouble() : 100.0;
-    final oRate = (d['mtdObservasiRate'] is num) ? (d['mtdObservasiRate'] as num).toDouble() : 100.0;
-    final cRate = (d['mtdCoachingRate'] is num) ? (d['mtdCoachingRate'] as num).toDouble() : 100.0;
+    final hRate = (d['mtdHazardRate'] is num)
+        ? (d['mtdHazardRate'] as num).toDouble()
+        : 100.0;
+    final iRate = (d['mtdInspeksiRate'] is num)
+        ? (d['mtdInspeksiRate'] as num).toDouble()
+        : 100.0;
+    final stRate = (d['mtdSafetyTalkRate'] is num)
+        ? (d['mtdSafetyTalkRate'] as num).toDouble()
+        : 100.0;
+    final oRate = (d['mtdObservasiRate'] is num)
+        ? (d['mtdObservasiRate'] as num).toDouble()
+        : 100.0;
+    final cRate = (d['mtdCoachingRate'] is num)
+        ? (d['mtdCoachingRate'] as num).toDouble()
+        : 100.0;
 
     final isMyDept = userDeptName.isNotEmpty &&
-        (name.toUpperCase() == userDeptName || name.toUpperCase().contains(userDeptName) || userDeptName.contains(name.toUpperCase()));
+        (name.toUpperCase() == userDeptName ||
+            name.toUpperCase().contains(userDeptName) ||
+            userDeptName.contains(name.toUpperCase()));
 
     final bool isTop3 = (rank is int && rank <= 3);
-    final bool isRelegation = (rank is int && rank >= _departments.length - 1 && _departments.length > 5) || (rate == 0);
+    final bool isRelegation = (rank is int &&
+            rank >= _departments.length - 1 &&
+            _departments.length > 5) ||
+        (rate == 0);
 
     final isExpanded = _expandedDepts.contains(name);
 
@@ -2069,7 +2352,9 @@ class _AchievementSapPageState extends State<AchievementSapPage>
               ? const Color(0xFF10B981)
               : (isTop3
                   ? const Color(0xFFFDE68A)
-                  : (isRelegation ? const Color(0xFFFECACA) : const Color(0xFFE2E8F0))),
+                  : (isRelegation
+                      ? const Color(0xFFFECACA)
+                      : const Color(0xFFE2E8F0))),
           width: isMyDept ? 1.8 : 1.0,
         ),
         boxShadow: [
@@ -2102,29 +2387,42 @@ class _AchievementSapPageState extends State<AchievementSapPage>
                     width: 38,
                     child: Center(
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 3),
                         decoration: BoxDecoration(
                           color: isTop3
                               ? (rank == 1
                                   ? const Color(0xFFFEF3C7)
-                                  : (rank == 2 ? const Color(0xFFF1F5F9) : const Color(0xFFFFEDD5)))
-                              : (isRelegation ? const Color(0xFFFEE2E2) : const Color(0xFFF8FAFC)),
+                                  : (rank == 2
+                                      ? const Color(0xFFF1F5F9)
+                                      : const Color(0xFFFFEDD5)))
+                              : (isRelegation
+                                  ? const Color(0xFFFEE2E2)
+                                  : const Color(0xFFF8FAFC)),
                           borderRadius: BorderRadius.circular(6),
                           border: Border.all(
                             color: isTop3
                                 ? const Color(0xFFF59E0B)
-                                : (isRelegation ? const Color(0xFFEF4444) : const Color(0xFFCBD5E1)),
+                                : (isRelegation
+                                    ? const Color(0xFFEF4444)
+                                    : const Color(0xFFCBD5E1)),
                             width: 0.8,
                           ),
                         ),
                         child: Text(
-                          isTop3 ? (rank == 1 ? '🥇 1' : (rank == 2 ? '🥈 2' : '🥉 3')) : '#$rank',
+                          isTop3
+                              ? (rank == 1
+                                  ? '🥇 1'
+                                  : (rank == 2 ? '🥈 2' : '🥉 3'))
+                              : '#$rank',
                           style: TextStyle(
                             fontSize: 10,
                             fontWeight: FontWeight.w900,
                             color: isTop3
                                 ? const Color(0xFF92400E)
-                                : (isRelegation ? const Color(0xFFB91C1C) : const Color(0xFF334155)),
+                                : (isRelegation
+                                    ? const Color(0xFFB91C1C)
+                                    : const Color(0xFF334155)),
                           ),
                         ),
                       ),
@@ -2170,14 +2468,17 @@ class _AchievementSapPageState extends State<AchievementSapPage>
                                       style: TextStyle(
                                         fontSize: 12,
                                         fontWeight: FontWeight.w800,
-                                        color: isMyDept ? const Color(0xFF065F46) : const Color(0xFF1E293B),
+                                        color: isMyDept
+                                            ? const Color(0xFF065F46)
+                                            : const Color(0xFF1E293B),
                                       ),
                                     ),
                                   ),
                                   if (isMyDept) ...[
                                     const SizedBox(width: 4),
                                     Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 4, vertical: 1),
                                       decoration: BoxDecoration(
                                         color: const Color(0xFF10B981),
                                         borderRadius: BorderRadius.circular(4),
@@ -2196,7 +2497,8 @@ class _AchievementSapPageState extends State<AchievementSapPage>
                               ),
                               Text(
                                 '$empCount Skuad',
-                                style: const TextStyle(fontSize: 10, color: Color(0xFF64748B)),
+                                style: const TextStyle(
+                                    fontSize: 10, color: Color(0xFF64748B)),
                               ),
                             ],
                           ),
@@ -2210,9 +2512,12 @@ class _AchievementSapPageState extends State<AchievementSapPage>
                     width: 44,
                     child: Center(
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2.5),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 5, vertical: 2.5),
                         decoration: BoxDecoration(
-                          color: isTop3 ? const Color(0xFF1E3A8A) : const Color(0xFF0F172A),
+                          color: isTop3
+                              ? const Color(0xFF1E3A8A)
+                              : const Color(0xFF0F172A),
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: Text(
@@ -2282,12 +2587,19 @@ class _AchievementSapPageState extends State<AchievementSapPage>
 
   Widget _buildDepartmentExpandedDetails(Map<String, dynamic> d) {
     final deptName = (d['departmentName'] ?? 'Departemen').toString();
-    final ptsClose = (d['ptsClose'] is num) ? (d['ptsClose'] as num).toDouble() : 0.0;
-    final ptsKualitas = (d['ptsKualitas'] is num) ? (d['ptsKualitas'] as num).toDouble() : 0.0;
-    final ptsCapaian = (d['ptsCapaian'] is num) ? (d['ptsCapaian'] as num).toDouble() : 0.0;
-    final ptsBeban = (d['ptsBeban'] is num) ? (d['ptsBeban'] as num).toDouble() : 0.0;
-    final totalScore = (d['totalScore'] is num) ? (d['totalScore'] as num).toDouble() : 0.0;
-    final closeRate = (d['mtdCloseRate'] is num) ? (d['mtdCloseRate'] as num).toDouble() : 100.0;
+    final ptsClose =
+        (d['ptsClose'] is num) ? (d['ptsClose'] as num).toDouble() : 0.0;
+    final ptsKualitas =
+        (d['ptsKualitas'] is num) ? (d['ptsKualitas'] as num).toDouble() : 0.0;
+    final ptsCapaian =
+        (d['ptsCapaian'] is num) ? (d['ptsCapaian'] as num).toDouble() : 0.0;
+    final ptsBeban =
+        (d['ptsBeban'] is num) ? (d['ptsBeban'] as num).toDouble() : 0.0;
+    final totalScore =
+        (d['totalScore'] is num) ? (d['totalScore'] as num).toDouble() : 0.0;
+    final closeRate = (d['mtdCloseRate'] is num)
+        ? (d['mtdCloseRate'] as num).toDouble()
+        : 100.0;
 
     final hAct = d['hazardActual'] ?? 0;
     final hTgt = d['hazardTarget'] ?? 0;
@@ -2321,28 +2633,50 @@ class _AchievementSapPageState extends State<AchievementSapPage>
                 children: [
                   const Text(
                     'Evaluasi Kinerja 4 Pilar PTS:',
-                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Color(0xFF1E293B)),
+                    style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF1E293B)),
                   ),
                   Text(
                     'Total: ${totalScore.toStringAsFixed(2)} PTS',
-                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: Color(0xFF1E3A8A)),
+                    style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w900,
+                        color: Color(0xFF1E3A8A)),
                   ),
                 ],
               ),
               const SizedBox(height: 8),
               Row(
                 children: [
-                  Expanded(child: _buildPtsItem('Capaian SAP (35%)', '+${ptsCapaian.toStringAsFixed(2)}', const Color(0xFF3B82F6))),
+                  Expanded(
+                      child: _buildPtsItem(
+                          'Capaian SAP (35%)',
+                          '+${ptsCapaian.toStringAsFixed(2)}',
+                          const Color(0xFF3B82F6))),
                   const SizedBox(width: 6),
-                  Expanded(child: _buildPtsItem('Action Plan (30%)', '+${ptsClose.toStringAsFixed(2)}', const Color(0xFF10B981))),
+                  Expanded(
+                      child: _buildPtsItem(
+                          'Action Plan (30%)',
+                          '+${ptsClose.toStringAsFixed(2)}',
+                          const Color(0xFF10B981))),
                 ],
               ),
               const SizedBox(height: 6),
               Row(
                 children: [
-                  Expanded(child: _buildPtsItem('Kualitas AI (25%)', '+${ptsKualitas.toStringAsFixed(2)}', const Color(0xFFF59E0B))),
+                  Expanded(
+                      child: _buildPtsItem(
+                          'Kualitas AI (25%)',
+                          '+${ptsKualitas.toStringAsFixed(2)}',
+                          const Color(0xFFF59E0B))),
                   const SizedBox(width: 6),
-                  Expanded(child: _buildPtsItem('Beban Target (10%)', '+${ptsBeban.toStringAsFixed(2)}', const Color(0xFF8B5CF6))),
+                  Expanded(
+                      child: _buildPtsItem(
+                          'Beban Target (10%)',
+                          '+${ptsBeban.toStringAsFixed(2)}',
+                          const Color(0xFF8B5CF6))),
                 ],
               ),
             ],
@@ -2354,26 +2688,41 @@ class _AchievementSapPageState extends State<AchievementSapPage>
         // Grid Rincian Realisasi 6 Modul
         const Text(
           'Realisasi vs Target Modul SAP:',
-          style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: Color(0xFF475569)),
+          style: TextStyle(
+              fontSize: 10.5,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF475569)),
         ),
         const SizedBox(height: 6),
         Row(
           children: [
-            Expanded(child: _buildModuleMiniStat('Hazard', '$hAct/$hTgt', const Color(0xFFF59E0B))),
+            Expanded(
+                child: _buildModuleMiniStat(
+                    'Hazard', '$hAct/$hTgt', const Color(0xFFF59E0B))),
             const SizedBox(width: 4),
-            Expanded(child: _buildModuleMiniStat('Inspeksi', '$iAct/$iTgt', const Color(0xFF009688))),
+            Expanded(
+                child: _buildModuleMiniStat(
+                    'Inspeksi', '$iAct/$iTgt', const Color(0xFF009688))),
             const SizedBox(width: 4),
-            Expanded(child: _buildModuleMiniStat('Safety Talk', '$stAct/$stTgt', const Color(0xFF6366F1))),
+            Expanded(
+                child: _buildModuleMiniStat(
+                    'Safety Talk', '$stAct/$stTgt', const Color(0xFF6366F1))),
           ],
         ),
         const SizedBox(height: 4),
         Row(
           children: [
-            Expanded(child: _buildModuleMiniStat('Observasi', '$oAct/$oTgt', const Color(0xFF8B5CF6))),
+            Expanded(
+                child: _buildModuleMiniStat(
+                    'Observasi', '$oAct/$oTgt', const Color(0xFF8B5CF6))),
             const SizedBox(width: 4),
-            Expanded(child: _buildModuleMiniStat('Coaching', '$cAct/$cTgt', const Color(0xFF0284C7))),
+            Expanded(
+                child: _buildModuleMiniStat(
+                    'Coaching', '$cAct/$cTgt', const Color(0xFF0284C7))),
             const SizedBox(width: 4),
-            Expanded(child: _buildModuleMiniStat('P5M', '$pAct/$pTgt', const Color(0xFF10B981))),
+            Expanded(
+                child: _buildModuleMiniStat(
+                    'P5M', '$pAct/$pTgt', const Color(0xFF10B981))),
           ],
         ),
         const SizedBox(height: 6),
@@ -2386,10 +2735,14 @@ class _AchievementSapPageState extends State<AchievementSapPage>
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('Close Rate Action Plan:', style: TextStyle(fontSize: 10, color: Color(0xFF065F46))),
+              const Text('Close Rate Action Plan:',
+                  style: TextStyle(fontSize: 10, color: Color(0xFF065F46))),
               Text(
                 '${closeRate.toStringAsFixed(1)}% (${d['apClosed'] ?? 0}/${d['apTotal'] ?? 0} Closed)',
-                style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: Color(0xFF047857)),
+                style: const TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF047857)),
               ),
             ],
           ),
@@ -2411,12 +2764,14 @@ class _AchievementSapPageState extends State<AchievementSapPage>
             decoration: BoxDecoration(
               color: const Color(0xFF0284C7).withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: const Color(0xFF0284C7).withValues(alpha: 0.25)),
+              border: Border.all(
+                  color: const Color(0xFF0284C7).withValues(alpha: 0.25)),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(Icons.groups_rounded, size: 15, color: Color(0xFF0284C7)),
+                const Icon(Icons.groups_rounded,
+                    size: 15, color: Color(0xFF0284C7)),
                 const SizedBox(width: 6),
                 Flexible(
                   child: Text(
@@ -2431,7 +2786,8 @@ class _AchievementSapPageState extends State<AchievementSapPage>
                   ),
                 ),
                 const SizedBox(width: 4),
-                const Icon(Icons.arrow_forward_rounded, size: 13, color: Color(0xFF0284C7)),
+                const Icon(Icons.arrow_forward_rounded,
+                    size: 13, color: Color(0xFF0284C7)),
               ],
             ),
           ),
@@ -2456,12 +2812,16 @@ class _AchievementSapPageState extends State<AchievementSapPage>
               label,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontSize: 9.5, color: Color(0xFF334155), fontWeight: FontWeight.w600),
+              style: const TextStyle(
+                  fontSize: 9.5,
+                  color: Color(0xFF334155),
+                  fontWeight: FontWeight.w600),
             ),
           ),
           Text(
             value,
-            style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: color),
+            style: TextStyle(
+                fontSize: 10, fontWeight: FontWeight.w900, color: color),
           ),
         ],
       ),
@@ -2478,9 +2838,17 @@ class _AchievementSapPageState extends State<AchievementSapPage>
       ),
       child: Column(
         children: [
-          Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 8.5, color: color, fontWeight: FontWeight.w800)),
+          Text(name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                  fontSize: 8.5, color: color, fontWeight: FontWeight.w800)),
           const SizedBox(height: 1),
-          Text(stat, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: Color(0xFF1E293B))),
+          Text(stat,
+              style: const TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFF1E293B))),
         ],
       ),
     );
@@ -2510,7 +2878,8 @@ class _AchievementSapPageState extends State<AchievementSapPage>
       child: Center(
         child: Text(
           letter,
-          style: const TextStyle(fontSize: 7, fontWeight: FontWeight.w900, color: Colors.white),
+          style: const TextStyle(
+              fontSize: 7, fontWeight: FontWeight.w900, color: Colors.white),
         ),
       ),
     );
@@ -2525,11 +2894,19 @@ class _AchievementSapPageState extends State<AchievementSapPage>
           height: 14,
           decoration: BoxDecoration(color: color, shape: BoxShape.circle),
           child: Center(
-            child: Text(letter, style: const TextStyle(fontSize: 8, fontWeight: FontWeight.w900, color: Colors.white)),
+            child: Text(letter,
+                style: const TextStyle(
+                    fontSize: 8,
+                    fontWeight: FontWeight.w900,
+                    color: Colors.white)),
           ),
         ),
         const SizedBox(width: 4),
-        Text(text, style: const TextStyle(fontSize: 10, color: Color(0xFF334155), fontWeight: FontWeight.w600)),
+        Text(text,
+            style: const TextStyle(
+                fontSize: 10,
+                color: Color(0xFF334155),
+                fontWeight: FontWeight.w600)),
       ],
     );
   }
@@ -2605,7 +2982,8 @@ class _AchievementSapPageState extends State<AchievementSapPage>
     required String route,
   }) {
     final bool isDone = target == 0 || actual >= target;
-    final double progress = target > 0 ? (actual / target).clamp(0.0, 1.0) : 1.0;
+    final double progress =
+        target > 0 ? (actual / target).clamp(0.0, 1.0) : 1.0;
     final int kurang = target > actual ? target - actual : 0;
 
     return Container(
@@ -2613,7 +2991,8 @@ class _AchievementSapPageState extends State<AchievementSapPage>
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: isDone ? color.withValues(alpha: 0.35) : const Color(0xFFE2E8F0),
+          color:
+              isDone ? color.withValues(alpha: 0.35) : const Color(0xFFE2E8F0),
           width: 1.2,
         ),
         boxShadow: [
@@ -2675,7 +3054,8 @@ class _AchievementSapPageState extends State<AchievementSapPage>
                     ),
                     const SizedBox(width: 8),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
                         color: isDone
                             ? const Color(0xFF10B981).withValues(alpha: 0.12)
@@ -2692,7 +3072,9 @@ class _AchievementSapPageState extends State<AchievementSapPage>
                         style: TextStyle(
                           fontSize: 10,
                           fontWeight: FontWeight.w800,
-                          color: isDone ? const Color(0xFF059669) : const Color(0xFFD97706),
+                          color: isDone
+                              ? const Color(0xFF059669)
+                              : const Color(0xFFD97706),
                         ),
                       ),
                     ),
@@ -3429,7 +3811,7 @@ class _DriverPerformanceAssessmentPageState
             color: Color(0xFF16A34A), size: 52),
         title: const Text('Penilaian Tersimpan'),
         content: Text(
-          'Penilaian $driverName berhasil disimpan dengan nilai $score/100. Data ini masih tersimpan sebagai mockup dan siap disambungkan ke database.',
+          'Penilaian $driverName berhasil disimpan dengan nilai $score/100.',
           textAlign: TextAlign.center,
         ),
         actionsAlignment: MainAxisAlignment.center,

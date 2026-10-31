@@ -15,6 +15,7 @@ import '../models/profile_model.dart';
 import '../utils/globals.dart' as globals;
 import 'database.dart';
 import 'preference.dart';
+import 'violation_receipt_pdf_service.dart';
 
 class ApiService {
   // Production Public API & Fallbacks
@@ -136,7 +137,8 @@ class ApiService {
     dio.httpClientAdapter = IOHttpClientAdapter(
       createHttpClient: () {
         final client = HttpClient();
-        client.badCertificateCallback = (X509Certificate cert, String host, int port) => true;
+        client.badCertificateCallback =
+            (X509Certificate cert, String host, int port) => true;
         return client;
       },
     );
@@ -149,7 +151,10 @@ class ApiService {
           if (token.isNotEmpty && !token.startsWith('offline_token_')) {
             options.headers['Authorization'] = 'Bearer $token';
           }
-          final nik = (PreferenceService.getUser() ?? PreferenceService.getOfflineNik() ?? '').trim();
+          final nik = (PreferenceService.getUser() ??
+                  PreferenceService.getOfflineNik() ??
+                  '')
+              .trim();
           if (nik.isNotEmpty) {
             options.headers['X-User-Nik'] = nik;
           }
@@ -157,9 +162,16 @@ class ApiService {
         },
         onError: (DioException err, ErrorInterceptorHandler handler) async {
           // 1. Silent Auto Re-login jika sesi kedaluwarsa (HTTP 401)
-          if (err.response?.statusCode == 401 && !err.requestOptions.path.contains('/login')) {
-            final savedNik = (PreferenceService.getUser() ?? PreferenceService.getOfflineNik() ?? '').trim();
-            final savedPass = (PreferenceService.getPassword() ?? PreferenceService.getOfflinePassword() ?? '').trim();
+          if (err.response?.statusCode == 401 &&
+              !err.requestOptions.path.contains('/login')) {
+            final savedNik = (PreferenceService.getUser() ??
+                    PreferenceService.getOfflineNik() ??
+                    '')
+                .trim();
+            final savedPass = (PreferenceService.getPassword() ??
+                    PreferenceService.getOfflinePassword() ??
+                    '')
+                .trim();
 
             if (savedNik.isNotEmpty && savedPass.isNotEmpty) {
               try {
@@ -171,7 +183,8 @@ class ApiService {
                 loginDio.httpClientAdapter = IOHttpClientAdapter(
                   createHttpClient: () {
                     final client = HttpClient();
-                    client.badCertificateCallback = (X509Certificate cert, String host, int port) => true;
+                    client.badCertificateCallback =
+                        (X509Certificate cert, String host, int port) => true;
                     return client;
                   },
                 );
@@ -179,20 +192,25 @@ class ApiService {
                   'email': savedNik,
                   'nik': savedNik,
                   'password': savedPass,
-                  'app_version': (globals.version.isNotEmpty) ? globals.version : '1.0.1',
+                  'app_version':
+                      (globals.version.isNotEmpty) ? globals.version : '1.0.1',
                 };
-                final loginRes = await loginDio.post('/login', data: json.encode(loginPayload));
+                final loginRes = await loginDio.post('/login',
+                    data: json.encode(loginPayload));
                 if (loginRes.statusCode == 200 && loginRes.data is Map) {
                   final newToken = loginRes.data['token']?.toString();
                   if (newToken != null && newToken.isNotEmpty) {
                     _token = newToken;
-                    await PreferenceService.setAuth(AuthModel.fromJson(Map<String, dynamic>.from(loginRes.data as Map)));
-                    debugPrint('[ApiService] Silent auto re-login sukses! Token sesi berhasil diperbarui otomatis.');
+                    await PreferenceService.setAuth(AuthModel.fromJson(
+                        Map<String, dynamic>.from(loginRes.data as Map)));
+                    debugPrint(
+                        '[ApiService] Silent auto re-login sukses! Token sesi berhasil diperbarui otomatis.');
 
                     // Retry request yang tadi gagal dengan token baru
                     final retryOptions = Options(
                       method: err.requestOptions.method,
-                      headers: Map<String, dynamic>.from(err.requestOptions.headers),
+                      headers:
+                          Map<String, dynamic>.from(err.requestOptions.headers),
                       contentType: err.requestOptions.contentType,
                       responseType: err.requestOptions.responseType,
                     );
@@ -207,24 +225,26 @@ class ApiService {
                   }
                 }
               } catch (silentErr) {
-                debugPrint('[ApiService] Silent auto re-login gagal: $silentErr');
+                debugPrint(
+                    '[ApiService] Silent auto re-login gagal: $silentErr');
               }
             }
           }
-          final isFailoverError = err.type == DioExceptionType.connectionError ||
-              err.type == DioExceptionType.connectionTimeout ||
-              err.type == DioExceptionType.sendTimeout ||
-              err.type == DioExceptionType.receiveTimeout ||
-              (err.type == DioExceptionType.badResponse &&
-                  (err.response?.statusCode == 500 ||
-                   err.response?.statusCode == 502 ||
-                   err.response?.statusCode == 503 ||
-                   err.response?.statusCode == 504)) ||
-              (err.error != null &&
-                  (err.error is SocketException ||
-                   err.error is HandshakeException ||
-                   err.error.toString().contains('CERTIFICATE') ||
-                   err.error.toString().contains('Handshake')));
+          final isFailoverError =
+              err.type == DioExceptionType.connectionError ||
+                  err.type == DioExceptionType.connectionTimeout ||
+                  err.type == DioExceptionType.sendTimeout ||
+                  err.type == DioExceptionType.receiveTimeout ||
+                  (err.type == DioExceptionType.badResponse &&
+                      (err.response?.statusCode == 500 ||
+                          err.response?.statusCode == 502 ||
+                          err.response?.statusCode == 503 ||
+                          err.response?.statusCode == 504)) ||
+                  (err.error != null &&
+                      (err.error is SocketException ||
+                          err.error is HandshakeException ||
+                          err.error.toString().contains('CERTIFICATE') ||
+                          err.error.toString().contains('Handshake')));
 
           if (isFailoverError) {
             for (final candidate in _candidateUrls) {
@@ -239,8 +259,10 @@ class ApiService {
                   sendTimeout: const Duration(seconds: 5),
                 );
                 String pathOnly = err.requestOptions.path;
-                if (pathOnly.startsWith('http://') || pathOnly.startsWith('https://')) {
-                  pathOnly = pathOnly.replaceFirst(RegExp(r'^https?://[^/]+(/api)?'), '');
+                if (pathOnly.startsWith('http://') ||
+                    pathOnly.startsWith('https://')) {
+                  pathOnly = pathOnly.replaceFirst(
+                      RegExp(r'^https?://[^/]+(/api)?'), '');
                 }
                 if (!pathOnly.startsWith('/')) pathOnly = '/$pathOnly';
                 final newUrl = '$candidate/api$pathOnly';
@@ -256,7 +278,8 @@ class ApiService {
                 );
                 _activeBaseUrl = candidate;
                 dio.options.baseUrl = '$_activeBaseUrl/api';
-                debugPrint('[ApiService] Failover sukses! BaseUrl beralih ke: $_activeBaseUrl');
+                debugPrint(
+                    '[ApiService] Failover sukses! BaseUrl beralih ke: $_activeBaseUrl');
                 return handler.resolve(res);
               } catch (_) {}
             }
@@ -340,7 +363,8 @@ class ApiService {
         ),
       );
       if (res.data != null && res.data is Map) {
-        return PopupAdModel.fromJson(Map<String, dynamic>.from(res.data as Map));
+        return PopupAdModel.fromJson(
+            Map<String, dynamic>.from(res.data as Map));
       }
     } catch (e) {
       debugPrint('[ApiService] getActivePopupAd error: $e');
@@ -389,7 +413,8 @@ class ApiService {
           : userStr;
 
       final fcmToken = PreferenceService.getFcmToken();
-      final appVersion = (globals.version.isNotEmpty) ? globals.version : '1.0.1';
+      final appVersion =
+          (globals.version.isNotEmpty) ? globals.version : '1.0.1';
       final loginPayload = <String, dynamic>{
         'email': emailParam,
         'nik': nikParam,
@@ -411,16 +436,17 @@ class ApiService {
         res = await loginDio.post('/login', data: json.encode(loginPayload));
       } on DioException catch (dioErr) {
         // If primary domain is unreachable, automatically fall back to secondary domain or candidates
-        final isFailoverError = dioErr.type == DioExceptionType.connectionTimeout ||
-            dioErr.type == DioExceptionType.connectionError ||
-            dioErr.type == DioExceptionType.sendTimeout ||
-            dioErr.type == DioExceptionType.receiveTimeout ||
-            (dioErr.type == DioExceptionType.badResponse &&
-                (dioErr.response?.statusCode == 500 ||
-                 dioErr.response?.statusCode == 502 ||
-                 dioErr.response?.statusCode == 503 ||
-                 dioErr.response?.statusCode == 504)) ||
-            dioErr.type == DioExceptionType.unknown;
+        final isFailoverError =
+            dioErr.type == DioExceptionType.connectionTimeout ||
+                dioErr.type == DioExceptionType.connectionError ||
+                dioErr.type == DioExceptionType.sendTimeout ||
+                dioErr.type == DioExceptionType.receiveTimeout ||
+                (dioErr.type == DioExceptionType.badResponse &&
+                    (dioErr.response?.statusCode == 500 ||
+                        dioErr.response?.statusCode == 502 ||
+                        dioErr.response?.statusCode == 503 ||
+                        dioErr.response?.statusCode == 504)) ||
+                dioErr.type == DioExceptionType.unknown;
 
         if (isFailoverError) {
           bool succeeded = false;
@@ -434,10 +460,12 @@ class ApiService {
                 connectTimeout: const Duration(seconds: 4),
                 receiveTimeout: const Duration(seconds: 6),
               ));
-              res = await fallbackDio.post('/login', data: json.encode(loginPayload));
+              res = await fallbackDio.post('/login',
+                  data: json.encode(loginPayload));
               _activeBaseUrl = candidate;
               dio.options.baseUrl = '$_activeBaseUrl/api';
-              debugPrint('[ApiService] Login failover sukses! BaseUrl beralih ke: $_activeBaseUrl');
+              debugPrint(
+                  '[ApiService] Login failover sukses! BaseUrl beralih ke: $_activeBaseUrl');
               succeeded = true;
               break;
             } catch (_) {}
@@ -461,7 +489,8 @@ class ApiService {
 
   Future<bool> updateFcmToken(String fcmToken) async {
     try {
-      final appVersion = (globals.version.isNotEmpty) ? globals.version : '1.0.1';
+      final appVersion =
+          (globals.version.isNotEmpty) ? globals.version : '1.0.1';
       final res = await dio.post(
         '/auth/fcm-token',
         data: {
@@ -563,7 +592,9 @@ class ApiService {
           queryParameters: queryParams,
         );
 
-        if (res.statusCode != null && res.statusCode! >= 200 && res.statusCode! < 300) {
+        if (res.statusCode != null &&
+            res.statusCode! >= 200 &&
+            res.statusCode! < 300) {
           if (res.data != null && res.data is Map) {
             _updateActiveBaseUrlFromTarget(targetUrl);
             return Right(Map<String, dynamic>.from(res.data as Map));
@@ -573,7 +604,8 @@ class ApiService {
         continue;
       }
     }
-    return const Left({'message': 'Tidak dapat menghubungi server web campaign'});
+    return const Left(
+        {'message': 'Tidak dapat menghubungi server web campaign'});
   }
 
   Future<Either<Map, Map>> logout() async {
@@ -664,9 +696,9 @@ class ApiService {
   Future<Either<Map, Map>> getMaster(name) async {
     if (getToken.isNotEmpty && !getToken.startsWith('offline_token_')) {
       final token = getToken;
-    if (token.isNotEmpty) {
-      dio.options.headers['Authorization'] = 'Bearer $token';
-    }
+      if (token.isNotEmpty) {
+        dio.options.headers['Authorization'] = 'Bearer $token';
+      }
     } else {
       dio.options.headers.remove('Authorization');
     }
@@ -677,7 +709,14 @@ class ApiService {
         return const Left({'message': 'No internet access!'});
       }
 
-      final targets = _buildCandidateUrls('/master/$name?limit=10000');
+      // The offline scanner keeps the whole employee directory (metadata and
+      // QR only). Employee records already exceed 10,000.
+      final masterLimit =
+          (name.toString().toLowerCase() == 'employee' ||
+                  name.toString().toLowerCase() == 'employees')
+              ? 30000
+              : 10000;
+      final targets = _buildCandidateUrls('/master/$name?limit=$masterLimit');
       for (final url in targets) {
         try {
           final res = await dio.get(url);
@@ -690,7 +729,7 @@ class ApiService {
         } catch (_) {}
       }
 
-      var res = await dio.get('/master/$name?limit=10000');
+      var res = await dio.get('/master/$name?limit=$masterLimit');
       if (res.data is List) {
         return Right({'data': res.data});
       }
@@ -822,7 +861,8 @@ class ApiService {
         sendTimeout: const Duration(seconds: 4),
         receiveTimeout: const Duration(seconds: 5),
       );
-      var res = await dio.get('/notifications', queryParameters: params, options: fastOptions);
+      var res = await dio.get('/notifications',
+          queryParameters: params, options: fastOptions);
       if (res.data is Map && res.data['data'] is List) {
         final list = (res.data['data'] as List)
             .map((item) => NotificationItemModel.fromJson(
@@ -1066,7 +1106,10 @@ class ApiService {
 
   Future<Either<Map, Map<String, dynamic>>> getRosterInfo() async {
     try {
-      final nik = (PreferenceService.getUser() ?? PreferenceService.getOfflineNik() ?? '').trim();
+      final nik = (PreferenceService.getUser() ??
+              PreferenceService.getOfflineNik() ??
+              '')
+          .trim();
       if (getToken.isNotEmpty) {
         dio.options.headers['Authorization'] = 'Bearer $getToken';
       }
@@ -1190,9 +1233,8 @@ class ApiService {
             dioErr.type == DioExceptionType.connectionError ||
             dioErr.type == DioExceptionType.unknown ||
             dioErr.response?.statusCode == 404) {
-          final fallbackHost = baseUrl.contains('192.168.')
-              ? 'http://127.0.0.1:7302'
-              : baseUrl;
+          final fallbackHost =
+              baseUrl.contains('192.168.') ? 'http://127.0.0.1:7302' : baseUrl;
           final fallbackDio = Dio(BaseOptions(
             baseUrl: '$fallbackHost/api',
             headers: dio.options.headers,
@@ -1227,27 +1269,29 @@ class ApiService {
       Response res;
       final qParams = <String, dynamic>{
         if (nik != null && nik.isNotEmpty) 'nik': nik,
-        if (departmentName != null && departmentName.isNotEmpty) 'departmentName': departmentName,
+        if (departmentName != null && departmentName.isNotEmpty)
+          'departmentName': departmentName,
         if (month != null) 'month': month,
         if (year != null) 'year': year,
         if (companyId != null) 'companyId': companyId,
       };
       try {
-        res = await dio.get('/performance/department-squad', queryParameters: qParams);
+        res = await dio.get('/performance/department-squad',
+            queryParameters: qParams);
       } on DioException catch (dioErr) {
         if (dioErr.type == DioExceptionType.connectionTimeout ||
             dioErr.type == DioExceptionType.connectionError ||
             dioErr.type == DioExceptionType.unknown ||
             dioErr.response?.statusCode == 404) {
-          final fallbackHost = baseUrl.contains('192.168.')
-              ? 'http://127.0.0.1:7302'
-              : baseUrl;
+          final fallbackHost =
+              baseUrl.contains('192.168.') ? 'http://127.0.0.1:7302' : baseUrl;
           final fallbackDio = Dio(BaseOptions(
             baseUrl: '$fallbackHost/api',
             headers: dio.options.headers,
             connectTimeout: const Duration(seconds: 6),
           ));
-          res = await fallbackDio.get('/performance/department-squad', queryParameters: qParams);
+          res = await fallbackDio.get('/performance/department-squad',
+              queryParameters: qParams);
         } else {
           rethrow;
         }
@@ -1284,21 +1328,22 @@ class ApiService {
         'limit': limit,
       };
       try {
-        res = await dio.get('/performance/action-tracker', queryParameters: qParams);
+        res = await dio.get('/performance/action-tracker',
+            queryParameters: qParams);
       } on DioException catch (dioErr) {
         if (dioErr.type == DioExceptionType.connectionTimeout ||
             dioErr.type == DioExceptionType.connectionError ||
             dioErr.type == DioExceptionType.unknown ||
             dioErr.response?.statusCode == 404) {
-          final fallbackHost = baseUrl.contains('192.168.')
-              ? 'http://127.0.0.1:7302'
-              : baseUrl;
+          final fallbackHost =
+              baseUrl.contains('192.168.') ? 'http://127.0.0.1:7302' : baseUrl;
           final fallbackDio = Dio(BaseOptions(
             baseUrl: '$fallbackHost/api',
             headers: dio.options.headers,
             connectTimeout: const Duration(seconds: 6),
           ));
-          res = await fallbackDio.get('/performance/action-tracker', queryParameters: qParams);
+          res = await fallbackDio.get('/performance/action-tracker',
+              queryParameters: qParams);
         } else {
           rethrow;
         }
@@ -1362,9 +1407,8 @@ class ApiService {
             dioErr.type == DioExceptionType.connectionError ||
             dioErr.type == DioExceptionType.unknown ||
             dioErr.response?.statusCode == 404) {
-          final fallbackHost = baseUrl.contains('192.168.')
-              ? 'http://127.0.0.1:7302'
-              : baseUrl;
+          final fallbackHost =
+              baseUrl.contains('192.168.') ? 'http://127.0.0.1:7302' : baseUrl;
           final fallbackDio = Dio(BaseOptions(
             baseUrl: '$fallbackHost/api',
             headers: {
@@ -1391,7 +1435,8 @@ class ApiService {
       }
       return const Right({});
     } on DioException catch (err) {
-      debugPrint('[ApiService] updateActionPlan DioException: ${err.message}, code=${err.response?.statusCode}, data=${err.response?.data}');
+      debugPrint(
+          '[ApiService] updateActionPlan DioException: ${err.message}, code=${err.response?.statusCode}, data=${err.response?.data}');
       return Left(errorHandler(err));
     } catch (e) {
       debugPrint('[ApiService] updateActionPlan Exception: $e');
@@ -1432,9 +1477,8 @@ class ApiService {
             dioErr.type == DioExceptionType.connectionError ||
             dioErr.type == DioExceptionType.unknown ||
             dioErr.response?.statusCode == 404) {
-          final fallbackHost = baseUrl.contains('192.168.')
-              ? 'http://127.0.0.1:7302'
-              : baseUrl;
+          final fallbackHost =
+              baseUrl.contains('192.168.') ? 'http://127.0.0.1:7302' : baseUrl;
           final fallbackDio = Dio(BaseOptions(
             baseUrl: '$fallbackHost/api',
             headers: {
@@ -1454,7 +1498,8 @@ class ApiService {
       }
       return const Right({});
     } on DioException catch (err) {
-      debugPrint('[ApiService] reassignActionPlan DioException: ${err.message}, code=${err.response?.statusCode}, data=${err.response?.data}');
+      debugPrint(
+          '[ApiService] reassignActionPlan DioException: ${err.message}, code=${err.response?.statusCode}, data=${err.response?.data}');
       return Left(errorHandler(err));
     } catch (e) {
       debugPrint('[ApiService] reassignActionPlan Exception: $e');
@@ -2029,8 +2074,9 @@ class ApiService {
       var con = await Connectivity().checkConnectivity();
       if (con.contains(ConnectivityResult.wifi) == false &&
           con.contains(ConnectivityResult.mobile) == false &&
-          con.contains(ConnectivityResult.ethernet) == false) {
-        return const Left({'message': 'No internet access!'});
+          con.contains(ConnectivityResult.ethernet) == false &&
+          con.contains(ConnectivityResult.vpn) == false) {
+        return _scanQrFromOfflineCache(code, scanType);
       }
 
       final payload = <String, dynamic>{
@@ -2047,7 +2093,138 @@ class ApiService {
       }
       return const Right({});
     } on DioException catch (err) {
+      // Koneksi bisa putus di lapangan setelah dataset lokal sudah tersedia.
+      // Jangan menghalangi scan Mine Permit/SIMPER hanya karena API tidak aktif.
+      final offline = await _scanQrFromOfflineCache(code, scanType);
+      if (offline.isRight()) return offline;
       return Left(errorHandler(err));
+    }
+  }
+
+  Future<Either<Map, Map<String, dynamic>>> _scanQrFromOfflineCache(
+      String code, String? scanType) async {
+    try {
+      final db = DatabaseService();
+      // Offline tidak pernah menjadi jalur bypass. Tanpa keputusan hak akses
+      // dari server untuk akun yang sama, data lokal tidak boleh dibuka.
+      final permissions = PreferenceService.getScanPermissions();
+      if (permissions == null) {
+        return const Right({
+          'status': false,
+          'actionType': 'Denied',
+          'data': {'module': 'Pemindaian offline'},
+          'message':
+              'Akses pemindaian belum diverifikasi untuk akun ini. Sambungkan internet lalu masuk kembali.',
+        });
+      }
+      final target = (scanType ?? '').toLowerCase();
+      final wantsSimper = target.contains('simper');
+      final wantsPermit = target.contains('permit') || target.contains('mine');
+      final canScanPermit = permissions['can_scan_minepermit'] == true;
+      final canScanSimper = permissions['can_scan_simper'] == true;
+
+      Map<String, dynamic>? permit;
+      Map<String, dynamic>? simper;
+      if (!wantsSimper) permit = await db.getOfflinePermitByQr(code);
+      if (!wantsPermit && permit == null) {
+        simper = await db.getOfflineSimperByQr(code);
+      }
+      if (wantsSimper) simper = await db.getOfflineSimperByQr(code);
+      if (wantsPermit) permit = await db.getOfflinePermitByQr(code);
+
+      if (permit != null) {
+        if (permit['is_employee_directory_only'] == true) {
+          if (!canScanPermit && !canScanSimper) {
+            return const Right({
+              'status': false,
+              'actionType': 'Denied',
+              'data': {
+                'module': 'Pemindaian data karyawan',
+                'required_permission': 'Hak scan Mine Permit atau SIMPER',
+              },
+              'message':
+                  'Anda tidak memiliki otorisasi untuk memindai data karyawan.',
+            });
+          }
+          return Right({
+            'status': true,
+            'message': 'Data karyawan ditemukan dari master offline perangkat.',
+            'actionType': 'EmployeeOffline',
+            'data': permit,
+          });
+        }
+        if (!canScanPermit) {
+          return const Right({
+            'status': false,
+            'actionType': 'Denied',
+            'data': {
+              'module': 'Mine Permit',
+              'required_permission': 'Hak scan Mine Permit',
+            },
+            'message':
+                'Anda tidak memiliki otorisasi untuk memindai Mine Permit.',
+          });
+        }
+        return Right({
+          'status': true,
+          'message': 'Mine Permit diverifikasi dari data offline perangkat.',
+          'actionType': 'MinePermit',
+          'data': permit,
+        });
+      }
+      if (simper != null) {
+        if (!canScanSimper) {
+          return const Right({
+            'status': false,
+            'actionType': 'Denied',
+            'data': {
+              'module': 'SIMPER',
+              'required_permission': 'Hak scan SIMPER',
+            },
+            'message': 'Anda tidak memiliki otorisasi untuk memindai SIMPER.',
+          });
+        }
+        return Right({
+          'status': true,
+          'message': 'SIMPER diverifikasi dari data offline perangkat.',
+          'actionType': 'Simper',
+          'data': simper,
+        });
+      }
+
+      final employee = await db.getOfflineEmployeeByQr(code);
+      if (employee != null) {
+        if (!canScanPermit && !canScanSimper) {
+          return const Right({
+            'status': false,
+            'actionType': 'Denied',
+            'message':
+                'Anda tidak memiliki otorisasi untuk pemindaian data karyawan.',
+          });
+        }
+        return Right({
+          'status': true,
+          'message': 'Data karyawan ditemukan dari master offline perangkat.',
+          'actionType': 'EmployeeOffline',
+          'data': employee,
+        });
+      }
+
+      final permitCount = await db.getOfflinePermitCount();
+      final simperCount = await db.getOfflineSimperCount();
+      final hasCache = permitCount > 0 || simperCount > 0;
+      return Left({
+        'isOffline': true,
+        'message': hasCache
+            ? 'Kode tidak ditemukan pada data offline perangkat.'
+            : 'Data offline Mine Permit/SIMPER belum tersimpan. Sambungkan internet lalu buka Sinkronisasi Data sekali untuk mengunduh data scan offline.',
+      });
+    } catch (e) {
+      return const Left({
+        'isOffline': true,
+        'message':
+            'Data offline belum siap. Sambungkan internet lalu lakukan Sinkronisasi Data.',
+      });
     }
   }
 
@@ -2055,14 +2232,13 @@ class ApiService {
     final token = getToken;
     final headers = <String, dynamic>{
       'Accept': 'application/json',
-      if (token.isNotEmpty && !token.startsWith('offline_token_')) 'Authorization': 'Bearer $token',
+      if (token.isNotEmpty && !token.startsWith('offline_token_'))
+        'Authorization': 'Bearer $token',
     };
-    final targets = [
-      'https://api_mbs.indexim.id/api/qr/simper/offline-dataset',
-      'http://127.0.0.1:7302/api/qr/simper/offline-dataset',
-      'http://192.168.130.236:7302/api/qr/simper/offline-dataset',
-      'https://api_mbs.idcoal.id/api/qr/simper/offline-dataset',
-    ];
+    // Ikuti endpoint aktif. Saat debug dengan API_BASE_URL lokal, dataset
+    // wajib diambil dari backend lokal tersebut, bukan diam-diam dari
+    // production. Release tanpa dart-define tetap memprioritaskan production.
+    final targets = _buildCandidateUrls('/qr/simper/offline-dataset');
     for (final url in targets) {
       try {
         debugPrint('[ApiService] Mengunduh SIMPER offline dari: ' + url);
@@ -2073,13 +2249,19 @@ class ApiService {
           responseType: ResponseType.json,
         ));
         final res = await client.get(url);
-        if (res.statusCode == 200 && res.data is Map && res.data['data'] is List) {
+        if (res.statusCode == 200 &&
+            res.data is Map &&
+            res.data['data'] is List) {
           final count = (res.data['data'] as List).length;
-          debugPrint('[ApiService] Sukses mengunduh SIMPER offline dari ' + url + ' total: ' + count.toString());
+          debugPrint('[ApiService] Sukses mengunduh SIMPER offline dari ' +
+              url +
+              ' total: ' +
+              count.toString());
           return Right(res.data['data'] as List<dynamic>);
         }
       } catch (e) {
-        debugPrint('[ApiService] Gagal SIMPER ' + url + ' error: ' + e.toString());
+        debugPrint(
+            '[ApiService] Gagal SIMPER ' + url + ' error: ' + e.toString());
       }
     }
     return const Left({'message': 'Gagal mengunduh dataset SIMPER offline'});
@@ -2089,14 +2271,11 @@ class ApiService {
     final token = getToken;
     final headers = <String, dynamic>{
       'Accept': 'application/json',
-      if (token.isNotEmpty && !token.startsWith('offline_token_')) 'Authorization': 'Bearer $token',
+      if (token.isNotEmpty && !token.startsWith('offline_token_'))
+        'Authorization': 'Bearer $token',
     };
-    final targets = [
-      'https://api_mbs.indexim.id/api/qr/permit/offline-dataset',
-      'http://127.0.0.1:7302/api/qr/permit/offline-dataset',
-      'http://192.168.130.236:7302/api/qr/permit/offline-dataset',
-      'https://api_mbs.idcoal.id/api/qr/permit/offline-dataset',
-    ];
+    // Sama dengan SIMPER: hormati API_BASE_URL yang dipakai build debug.
+    final targets = _buildCandidateUrls('/qr/permit/offline-dataset');
     for (final url in targets) {
       try {
         debugPrint('[ApiService] Mengunduh Permit offline dari: ' + url);
@@ -2107,16 +2286,23 @@ class ApiService {
           responseType: ResponseType.json,
         ));
         final res = await client.get(url);
-        if (res.statusCode == 200 && res.data is Map && res.data['data'] is List) {
+        if (res.statusCode == 200 &&
+            res.data is Map &&
+            res.data['data'] is List) {
           final count = (res.data['data'] as List).length;
-          debugPrint('[ApiService] Sukses mengunduh Permit offline dari ' + url + ' total: ' + count.toString());
+          debugPrint('[ApiService] Sukses mengunduh Permit offline dari ' +
+              url +
+              ' total: ' +
+              count.toString());
           return Right(res.data['data'] as List<dynamic>);
         }
       } catch (e) {
-        debugPrint('[ApiService] Gagal Permit ' + url + ' error: ' + e.toString());
+        debugPrint(
+            '[ApiService] Gagal Permit ' + url + ' error: ' + e.toString());
       }
     }
-    return const Left({'message': 'Gagal mengunduh dataset Mine Permit offline'});
+    return const Left(
+        {'message': 'Gagal mengunduh dataset Mine Permit offline'});
   }
 
   Future<Either<Map, List<dynamic>>> getAttendanceHistory() async {
@@ -2157,7 +2343,9 @@ class ApiService {
 
       var res = await dio.get('/qr/my-permissions');
       if (res.data is Map && res.data['data'] is Map) {
-        return Right(Map<String, dynamic>.from(res.data['data'] as Map));
+        final permissions = Map<String, dynamic>.from(res.data['data'] as Map);
+        await PreferenceService.setScanPermissions(permissions);
+        return Right(permissions);
       }
       return const Right({});
     } on DioException catch (err) {
@@ -2189,7 +2377,9 @@ class ApiService {
   }
 
   Future<Either<Map, Map<String, dynamic>>> recordPermitViolation(
-      Map<String, dynamic> payload) async {
+    Map<String, dynamic> payload, {
+    bool queueWhenOffline = true,
+  }) async {
     final token = getToken;
     if (token.isNotEmpty) {
       dio.options.headers['Authorization'] = 'Bearer $token';
@@ -2198,8 +2388,12 @@ class ApiService {
       var con = await Connectivity().checkConnectivity();
       if (con.contains(ConnectivityResult.wifi) == false &&
           con.contains(ConnectivityResult.mobile) == false &&
-          con.contains(ConnectivityResult.ethernet) == false) {
-        return const Left({'message': 'No internet access!'});
+          con.contains(ConnectivityResult.ethernet) == false &&
+          con.contains(ConnectivityResult.vpn) == false) {
+        if (queueWhenOffline) {
+          return _queueOfflinePermitViolation(payload);
+        }
+        return const Left({'message': 'Jaringan belum tersedia.'});
       }
 
       var res =
@@ -2209,8 +2403,35 @@ class ApiService {
       }
       return const Right({});
     } on DioException catch (err) {
+      // Hanya gangguan jaringan yang boleh masuk antrean. Penolakan server
+      // (403/401/validasi) harus tetap langsung ditampilkan ke pengguna.
+      if (queueWhenOffline && err.response == null) {
+        return _queueOfflinePermitViolation(payload);
+      }
       return Left(errorHandler(err));
     }
+  }
+
+  Future<Either<Map, Map<String, dynamic>>> _queueOfflinePermitViolation(
+      Map<String, dynamic> payload) async {
+    final offlinePayload = Map<String, dynamic>.from(payload);
+    try {
+      offlinePayload['localReceiptPath'] =
+          await ViolationReceiptPdfService.create(offlinePayload);
+    } catch (_) {
+      // Laporan tetap tidak boleh hilang hanya karena pembuatan PDF gagal.
+    }
+    final id = await DatabaseService().queueOfflineViolation(offlinePayload);
+    if (id <= 0) {
+      return const Left(
+          {'message': 'Laporan belum dapat disimpan di perangkat. Coba lagi.'});
+    }
+    return Right({
+      'status': true,
+      'queuedOffline': true,
+      'message':
+          'Laporan tersimpan di perangkat dan akan dikirim otomatis saat jaringan tersedia.',
+    });
   }
 
   Future<Either<Map, Map<String, dynamic>>> recordPermitMovement(
@@ -2602,7 +2823,8 @@ class ApiService {
     // 3. Fallback: Query Web MBS
     try {
       final client = _mbsDio();
-      final res = await client.get<String>('/Observation/GetDepartmentsByCompany',
+      final res = await client.get<String>(
+          '/Observation/GetDepartmentsByCompany',
           queryParameters: {'companyId': companyId});
       if (res.statusCode == 200 && res.data != null) {
         final decoded = _decodeMbsJson(res.data);
@@ -2870,9 +3092,9 @@ class ApiService {
       _restoreStoredToken();
       if (getToken.isNotEmpty && !getToken.startsWith('offline_token_')) {
         final token = getToken;
-    if (token.isNotEmpty) {
-      dio.options.headers['Authorization'] = 'Bearer $token';
-    }
+        if (token.isNotEmpty) {
+          dio.options.headers['Authorization'] = 'Bearer $token';
+        }
       }
       final res = await dio.get('/master/benchmarks', queryParameters: {
         'areaUtama': areaUtama,
@@ -3031,8 +3253,7 @@ class ApiService {
         return const [];
       }
 
-      final areas =
-          readVariable(html, ['globalAreasList'], label: 'namaArea');
+      final areas = readVariable(html, ['globalAreasList'], label: 'namaArea');
       final companies =
           readVariable(html, ['globalCompaniesList'], label: 'Nama');
       final coachingPage = await _mbsGetWithSession('/Coaching/Index');
@@ -3331,7 +3552,9 @@ class ApiService {
   Future<List<Map<String, dynamic>>> getCompanies() async {
     try {
       final res = await dio.get('/companies');
-      if (res.statusCode == 200 && res.data is Map && res.data['data'] is List) {
+      if (res.statusCode == 200 &&
+          res.data is Map &&
+          res.data['data'] is List) {
         return (res.data['data'] as List)
             .whereType<Map>()
             .map((e) => Map<String, dynamic>.from(e))
@@ -3439,7 +3662,8 @@ class ApiService {
             .toList();
       }
     } catch (e) {
-      debugPrint('[ApiService] Backend /bbs/workers error, fallback to MBS: $e');
+      debugPrint(
+          '[ApiService] Backend /bbs/workers error, fallback to MBS: $e');
     }
 
     // 2. Fallback to Web MBS /Bbs/SearchWorker
@@ -3554,7 +3778,8 @@ class ApiService {
       final statusCode = err.response?.statusCode;
       if (statusCode == 401) {
         try {
-          var res = Map<String, dynamic>.from(jsonDecode(err.response.toString()));
+          var res =
+              Map<String, dynamic>.from(jsonDecode(err.response.toString()));
           if ((res['message'] ?? '') != '') {
             return <String, dynamic>{
               'message': res['message'],
@@ -3563,7 +3788,8 @@ class ApiService {
           }
         } catch (_) {}
         return <String, dynamic>{
-          'message': 'Sesi login Anda telah berakhir (401 Unauthorized). Silakan logout dan login kembali.',
+          'message':
+              'Sesi login Anda telah berakhir (401 Unauthorized). Silakan logout dan login kembali.',
           'isAuthError': true,
         };
       }
@@ -3606,7 +3832,8 @@ class ApiService {
     }
   }
 
-  Future<Either<Map<String, dynamic>, Map<String, dynamic>>> getSapQualityDashboard({
+  Future<Either<Map<String, dynamic>, Map<String, dynamic>>>
+      getSapQualityDashboard({
     String? nik,
     int? year,
     int? month,
@@ -3617,7 +3844,8 @@ class ApiService {
       if (year != null) query['year'] = year;
       if (month != null) query['month'] = month;
 
-      final res = await dio.get('/performance/sap-quality-dashboard', queryParameters: query);
+      final res = await dio.get('/performance/sap-quality-dashboard',
+          queryParameters: query);
       if (res.statusCode == 200 && res.data != null) {
         return Right(Map<String, dynamic>.from(res.data));
       }
@@ -3649,7 +3877,8 @@ class ApiService {
             'Accept': 'application/json',
             'Connection': 'Keep-Alive',
             'company': company,
-            if (getToken.isNotEmpty && !getToken.startsWith('offline_token_')) 'Authorization': 'Bearer $_token',
+            if (getToken.isNotEmpty && !getToken.startsWith('offline_token_'))
+              'Authorization': 'Bearer $_token',
           },
           contentType: Headers.jsonContentType,
           responseType: ResponseType.json,
@@ -3664,7 +3893,9 @@ class ApiService {
           options: Options(method: method),
         );
 
-        if (res.statusCode != null && res.statusCode! >= 200 && res.statusCode! < 300) {
+        if (res.statusCode != null &&
+            res.statusCode! >= 200 &&
+            res.statusCode! < 300) {
           _updateActiveBaseUrlFromTarget(targetUrl);
           return res;
         }
@@ -3712,13 +3943,15 @@ class ApiService {
     }
   }
 
-  Future<Either<Map<String, dynamic>, Map<String, dynamic>>> getDpaDetail(int id) async {
+  Future<Either<Map<String, dynamic>, Map<String, dynamic>>> getDpaDetail(
+      int id) async {
     try {
       final res = await _dpaRequest('/dpa/$id');
       if (res.data is Map) {
         return Right(Map<String, dynamic>.from(res.data as Map));
       }
-      return const Left({'message': 'Gagal mengambil detail penilaian driver.'});
+      return const Left(
+          {'message': 'Gagal mengambil detail penilaian driver.'});
     } on DioException catch (e) {
       return Left(errorHandler(e) as Map<String, dynamic>);
     } catch (e) {
@@ -3726,9 +3959,11 @@ class ApiService {
     }
   }
 
-  Future<Either<Map<String, dynamic>, List<dynamic>>> searchDpaDriver(String query) async {
+  Future<Either<Map<String, dynamic>, List<dynamic>>> searchDpaDriver(
+      String query) async {
     try {
-      final res = await _dpaRequest('/dpa/search-driver', queryParameters: {'query': query});
+      final res = await _dpaRequest('/dpa/search-driver',
+          queryParameters: {'query': query});
       if (res.data is List) {
         return Right(List<dynamic>.from(res.data as List));
       }
@@ -3740,7 +3975,9 @@ class ApiService {
     }
   }
 
-  Future<Either<Map<String, dynamic>, Map<String, dynamic>>> addDpaDriver(String driverNama, {String? createdByNik}) async {
+  Future<Either<Map<String, dynamic>, Map<String, dynamic>>> addDpaDriver(
+      String driverNama,
+      {String? createdByNik}) async {
     try {
       final res = await _dpaRequest('/dpa/add-driver', method: 'POST', data: {
         'driverNama': driverNama,
@@ -3757,7 +3994,8 @@ class ApiService {
     }
   }
 
-  Future<Either<Map<String, dynamic>, Map<String, dynamic>>> saveDpaReport(Map<String, dynamic> data) async {
+  Future<Either<Map<String, dynamic>, Map<String, dynamic>>> saveDpaReport(
+      Map<String, dynamic> data) async {
     try {
       final res = await _dpaRequest('/dpa', method: 'POST', data: data);
       if (res.data is Map) {
@@ -3771,7 +4009,8 @@ class ApiService {
     }
   }
 
-  Future<Either<Map<String, dynamic>, Map<String, dynamic>>> deleteDpaReport(int id) async {
+  Future<Either<Map<String, dynamic>, Map<String, dynamic>>> deleteDpaReport(
+      int id) async {
     try {
       final res = await _dpaRequest('/dpa/$id', method: 'DELETE');
       if (res.data is Map) {
@@ -3805,9 +4044,12 @@ class ApiService {
             'Accept': 'application/json',
             'Connection': 'Keep-Alive',
             'company': company,
-            if (getToken.isNotEmpty && !getToken.startsWith('offline_token_')) 'Authorization': 'Bearer $_token',
+            if (getToken.isNotEmpty && !getToken.startsWith('offline_token_'))
+              'Authorization': 'Bearer $_token',
           },
-          contentType: data is FormData ? 'multipart/form-data' : Headers.jsonContentType,
+          contentType: data is FormData
+              ? 'multipart/form-data'
+              : Headers.jsonContentType,
           responseType: ResponseType.json,
           connectTimeout: const Duration(seconds: 4),
           receiveTimeout: const Duration(seconds: 10),
@@ -3820,7 +4062,9 @@ class ApiService {
           options: Options(method: method),
         );
 
-        if (res.statusCode != null && res.statusCode! >= 200 && res.statusCode! < 300) {
+        if (res.statusCode != null &&
+            res.statusCode! >= 200 &&
+            res.statusCode! < 300) {
           _updateActiveBaseUrlFromTarget(targetUrl);
           return res;
         }
@@ -3864,7 +4108,8 @@ class ApiService {
       if (userNik != null && userNik.isNotEmpty) query['userNik'] = userNik;
       if (userNama != null && userNama.isNotEmpty) query['userNama'] = userNama;
       if (companyId != null && companyId > 0) query['companyId'] = companyId;
-      if (companyName != null && companyName.isNotEmpty) query['companyName'] = companyName;
+      if (companyName != null && companyName.isNotEmpty)
+        query['companyName'] = companyName;
       if (scope != null && scope.isNotEmpty) query['scope'] = scope;
       if (search != null && search.isNotEmpty) query['search'] = search;
       if (pit != null && pit.isNotEmpty) query['pit'] = pit;
@@ -3884,7 +4129,8 @@ class ApiService {
     }
   }
 
-  Future<Either<Map<String, dynamic>, Map<String, dynamic>>> getFciDetail(int id) async {
+  Future<Either<Map<String, dynamic>, Map<String, dynamic>>> getFciDetail(
+      int id) async {
     try {
       final res = await _fciRequest('/fci/$id');
       if (res.data is Map) {
@@ -3898,7 +4144,8 @@ class ApiService {
     }
   }
 
-  Future<Either<Map<String, dynamic>, Map<String, dynamic>>> saveFciReport(FormData data) async {
+  Future<Either<Map<String, dynamic>, Map<String, dynamic>>> saveFciReport(
+      FormData data) async {
     try {
       final res = await _fciRequest('/fci', method: 'POST', data: data);
       if (res.data is Map) {
@@ -3912,7 +4159,8 @@ class ApiService {
     }
   }
 
-  Future<Either<Map<String, dynamic>, Map<String, dynamic>>> deleteFciReport(int id) async {
+  Future<Either<Map<String, dynamic>, Map<String, dynamic>>> deleteFciReport(
+      int id) async {
     try {
       final res = await _fciRequest('/fci/$id', method: 'DELETE');
       if (res.data is Map) {
@@ -3946,9 +4194,12 @@ class ApiService {
             'Accept': 'application/json',
             'Connection': 'Keep-Alive',
             'company': company,
-            if (getToken.isNotEmpty && !getToken.startsWith('offline_token_')) 'Authorization': 'Bearer $_token',
+            if (getToken.isNotEmpty && !getToken.startsWith('offline_token_'))
+              'Authorization': 'Bearer $_token',
           },
-          contentType: data is FormData ? 'multipart/form-data' : Headers.jsonContentType,
+          contentType: data is FormData
+              ? 'multipart/form-data'
+              : Headers.jsonContentType,
           responseType: ResponseType.json,
           connectTimeout: const Duration(seconds: 4),
           receiveTimeout: const Duration(seconds: 10),
@@ -3961,7 +4212,9 @@ class ApiService {
           options: Options(method: method),
         );
 
-        if (res.statusCode != null && res.statusCode! >= 200 && res.statusCode! < 300) {
+        if (res.statusCode != null &&
+            res.statusCode! >= 200 &&
+            res.statusCode! < 300) {
           _updateActiveBaseUrlFromTarget(targetUrl);
           return res;
         }
@@ -4006,12 +4259,15 @@ class ApiService {
       if (userNik != null && userNik.isNotEmpty) query['userNik'] = userNik;
       if (userNama != null && userNama.isNotEmpty) query['userNama'] = userNama;
       if (companyId != null && companyId > 0) query['companyId'] = companyId;
-      if (companyName != null && companyName.isNotEmpty) query['companyName'] = companyName;
+      if (companyName != null && companyName.isNotEmpty)
+        query['companyName'] = companyName;
       if (scope != null && scope.isNotEmpty) query['scope'] = scope;
       if (search != null && search.isNotEmpty) query['search'] = search;
-      if (namaJalan != null && namaJalan.isNotEmpty) query['namaJalan'] = namaJalan;
+      if (namaJalan != null && namaJalan.isNotEmpty)
+        query['namaJalan'] = namaJalan;
       if (kategori != null && kategori.isNotEmpty) query['kategori'] = kategori;
-      if (statusFilter != null && statusFilter.isNotEmpty) query['statusFilter'] = statusFilter;
+      if (statusFilter != null && statusFilter.isNotEmpty)
+        query['statusFilter'] = statusFilter;
       if (startDate != null) query['startDate'] = startDate.toIso8601String();
       if (endDate != null) query['endDate'] = endDate.toIso8601String();
 
@@ -4027,7 +4283,8 @@ class ApiService {
     }
   }
 
-  Future<Either<Map<String, dynamic>, Map<String, dynamic>>> getRciDetail(int id) async {
+  Future<Either<Map<String, dynamic>, Map<String, dynamic>>> getRciDetail(
+      int id) async {
     try {
       final res = await _rciRequest('/rci/$id');
       if (res.data is Map) {
@@ -4041,7 +4298,8 @@ class ApiService {
     }
   }
 
-  Future<Either<Map<String, dynamic>, Map<String, dynamic>>> saveRciReport(FormData data) async {
+  Future<Either<Map<String, dynamic>, Map<String, dynamic>>> saveRciReport(
+      FormData data) async {
     try {
       final res = await _rciRequest('/rci', method: 'POST', data: data);
       if (res.data is Map) {
@@ -4071,7 +4329,8 @@ class ApiService {
         'status': status,
         if (notes != null && notes.isNotEmpty) 'notes': notes,
       };
-      final res = await _rciRequest('/rci/$id/approve', method: 'POST', data: body);
+      final res =
+          await _rciRequest('/rci/$id/approve', method: 'POST', data: body);
       if (res.data is Map) {
         return Right(Map<String, dynamic>.from(res.data as Map));
       }
@@ -4083,7 +4342,8 @@ class ApiService {
     }
   }
 
-  Future<Either<Map<String, dynamic>, Map<String, dynamic>>> deleteRciReport(int id) async {
+  Future<Either<Map<String, dynamic>, Map<String, dynamic>>> deleteRciReport(
+      int id) async {
     try {
       final res = await _rciRequest('/rci/$id', method: 'DELETE');
       if (res.data is Map) {
@@ -4107,7 +4367,8 @@ class ApiService {
       final res = await _rciRequest('/rci/search-employees', queryParameters: {
         if (q.trim().isNotEmpty) 'q': q.trim(),
         if (companyId != null && companyId > 0) 'companyId': companyId,
-        if (companyName != null && companyName.isNotEmpty) 'companyName': companyName,
+        if (companyName != null && companyName.isNotEmpty)
+          'companyName': companyName,
         'limit': limit,
       });
       if (res.data is Map && res.data['data'] is List) {
@@ -4133,7 +4394,8 @@ class ApiService {
         queryParameters: {
           if (query.trim().isNotEmpty) 'query': query.trim(),
           if (companyId != null && companyId > 0) 'companyId': companyId,
-          if (companyName != null && companyName.isNotEmpty) 'companyName': companyName,
+          if (companyName != null && companyName.isNotEmpty)
+            'companyName': companyName,
           'limit': limit,
         },
       );
@@ -4149,7 +4411,6 @@ class ApiService {
       return null;
     }
   }
-
 
   // ==================== DCI (Disposal Condition Index) ====================
   Future<Response> _dciRequest(
@@ -4171,9 +4432,12 @@ class ApiService {
             'Accept': 'application/json',
             'Connection': 'Keep-Alive',
             'company': company,
-            if (getToken.isNotEmpty && !getToken.startsWith('offline_token_')) 'Authorization': 'Bearer $_token',
+            if (getToken.isNotEmpty && !getToken.startsWith('offline_token_'))
+              'Authorization': 'Bearer $_token',
           },
-          contentType: data is FormData ? 'multipart/form-data' : Headers.jsonContentType,
+          contentType: data is FormData
+              ? 'multipart/form-data'
+              : Headers.jsonContentType,
           responseType: ResponseType.json,
           connectTimeout: const Duration(seconds: 4),
           receiveTimeout: const Duration(seconds: 10),
@@ -4186,7 +4450,9 @@ class ApiService {
           options: Options(method: method),
         );
 
-        if (res.statusCode != null && res.statusCode! >= 200 && res.statusCode! < 300) {
+        if (res.statusCode != null &&
+            res.statusCode! >= 200 &&
+            res.statusCode! < 300) {
           _updateActiveBaseUrlFromTarget(targetUrl);
           return res;
         }
@@ -4230,7 +4496,8 @@ class ApiService {
       if (userNik != null && userNik.isNotEmpty) query['userNik'] = userNik;
       if (userNama != null && userNama.isNotEmpty) query['userNama'] = userNama;
       if (companyId != null && companyId > 0) query['companyId'] = companyId;
-      if (companyName != null && companyName.isNotEmpty) query['companyName'] = companyName;
+      if (companyName != null && companyName.isNotEmpty)
+        query['companyName'] = companyName;
       if (scope != null && scope.isNotEmpty) query['scope'] = scope;
       if (search != null && search.isNotEmpty) query['search'] = search;
       if (disposal != null && disposal.isNotEmpty) query['disposal'] = disposal;
@@ -4250,7 +4517,8 @@ class ApiService {
     }
   }
 
-  Future<Either<Map<String, dynamic>, Map<String, dynamic>>> getDciDetail(int id) async {
+  Future<Either<Map<String, dynamic>, Map<String, dynamic>>> getDciDetail(
+      int id) async {
     try {
       final res = await _dciRequest('/dci/$id');
       if (res.data is Map) {
@@ -4264,7 +4532,8 @@ class ApiService {
     }
   }
 
-  Future<Either<Map<String, dynamic>, Map<String, dynamic>>> saveDciReport(FormData data) async {
+  Future<Either<Map<String, dynamic>, Map<String, dynamic>>> saveDciReport(
+      FormData data) async {
     try {
       final res = await _dciRequest('/dci', method: 'POST', data: data);
       if (res.data is Map) {
@@ -4278,7 +4547,8 @@ class ApiService {
     }
   }
 
-  Future<Either<Map<String, dynamic>, Map<String, dynamic>>> deleteDciReport(int id) async {
+  Future<Either<Map<String, dynamic>, Map<String, dynamic>>> deleteDciReport(
+      int id) async {
     try {
       final res = await _dciRequest('/dci/$id', method: 'DELETE');
       if (res.data is Map) {
@@ -4292,7 +4562,8 @@ class ApiService {
     }
   }
 
-  Future<Either<Map<String, dynamic>, Map<String, dynamic>>> getDciSuggestions({String? disposal}) async {
+  Future<Either<Map<String, dynamic>, Map<String, dynamic>>> getDciSuggestions(
+      {String? disposal}) async {
     try {
       final query = <String, dynamic>{};
       if (disposal != null && disposal.isNotEmpty) query['disposal'] = disposal;
@@ -4318,7 +4589,8 @@ class ApiService {
       final res = await _dciRequest('/dci/search-employees', queryParameters: {
         if (q.trim().isNotEmpty) 'q': q.trim(),
         if (companyId != null && companyId > 0) 'companyId': companyId,
-        if (companyName != null && companyName.isNotEmpty) 'companyName': companyName,
+        if (companyName != null && companyName.isNotEmpty)
+          'companyName': companyName,
         'limit': limit,
       });
       if (res.data is Map && res.data['data'] is List) {
@@ -4337,7 +4609,9 @@ class ApiService {
     String method = 'GET',
     dynamic data,
     Map<String, dynamic>? queryParameters,
-  }) => _dciRequest(path.startsWith('/spi') ? path : '/spi$path', method: method, data: data, queryParameters: queryParameters);
+  }) =>
+      _dciRequest(path.startsWith('/spi') ? path : '/spi$path',
+          method: method, data: data, queryParameters: queryParameters);
 
   Future<Either<Map<String, dynamic>, Map<String, dynamic>>> getSpiList({
     String? userNik,
@@ -4361,7 +4635,8 @@ class ApiService {
       if (userNik != null && userNik.isNotEmpty) query['userNik'] = userNik;
       if (userNama != null && userNama.isNotEmpty) query['userNama'] = userNama;
       if (companyId != null && companyId > 0) query['companyId'] = companyId;
-      if (companyName != null && companyName.isNotEmpty) query['companyName'] = companyName;
+      if (companyName != null && companyName.isNotEmpty)
+        query['companyName'] = companyName;
       if (scope != null && scope.isNotEmpty) query['scope'] = scope;
       if (search != null && search.isNotEmpty) query['search'] = search;
       if (kolam != null && kolam.isNotEmpty) query['kolam'] = kolam;
@@ -4381,7 +4656,8 @@ class ApiService {
     }
   }
 
-  Future<Either<Map<String, dynamic>, Map<String, dynamic>>> getSpiDetail(int id) async {
+  Future<Either<Map<String, dynamic>, Map<String, dynamic>>> getSpiDetail(
+      int id) async {
     try {
       final res = await _spiRequest('/spi/$id');
       if (res.data is Map) {
@@ -4395,7 +4671,8 @@ class ApiService {
     }
   }
 
-  Future<Either<Map<String, dynamic>, Map<String, dynamic>>> saveSpiReport(FormData data) async {
+  Future<Either<Map<String, dynamic>, Map<String, dynamic>>> saveSpiReport(
+      FormData data) async {
     try {
       final res = await _spiRequest('/spi', method: 'POST', data: data);
       if (res.data is Map) {
@@ -4409,7 +4686,8 @@ class ApiService {
     }
   }
 
-  Future<Either<Map<String, dynamic>, Map<String, dynamic>>> deleteSpiReport(int id) async {
+  Future<Either<Map<String, dynamic>, Map<String, dynamic>>> deleteSpiReport(
+      int id) async {
     try {
       final res = await _spiRequest('/spi/$id', method: 'DELETE');
       if (res.data is Map) {
@@ -4423,7 +4701,8 @@ class ApiService {
     }
   }
 
-  Future<Either<Map<String, dynamic>, Map<String, dynamic>>> getSpiSuggestions() async {
+  Future<Either<Map<String, dynamic>, Map<String, dynamic>>>
+      getSpiSuggestions() async {
     try {
       final res = await _spiRequest('/spi/suggestions');
       if (res.data is Map) {
@@ -4443,7 +4722,9 @@ class ApiService {
     String method = 'GET',
     dynamic data,
     Map<String, dynamic>? queryParameters,
-  }) => _dciRequest(path.startsWith('/gci') ? path : '/gci$path', method: method, data: data, queryParameters: queryParameters);
+  }) =>
+      _dciRequest(path.startsWith('/gci') ? path : '/gci$path',
+          method: method, data: data, queryParameters: queryParameters);
 
   Future<Either<Map<String, dynamic>, Map<String, dynamic>>> getGciList({
     String? userNik,
@@ -4469,13 +4750,15 @@ class ApiService {
       if (userNik != null && userNik.isNotEmpty) query['userNik'] = userNik;
       if (userNama != null && userNama.isNotEmpty) query['userNama'] = userNama;
       if (companyId != null && companyId > 0) query['companyId'] = companyId;
-      if (companyName != null && companyName.isNotEmpty) query['companyName'] = companyName;
+      if (companyName != null && companyName.isNotEmpty)
+        query['companyName'] = companyName;
       if (scope != null && scope.isNotEmpty) query['scope'] = scope;
       if (search != null && search.isNotEmpty) query['search'] = search;
       if (pit != null && pit.isNotEmpty) query['pit'] = pit;
       if (areaType != null && areaType.isNotEmpty) query['areaType'] = areaType;
       if (kategori != null && kategori.isNotEmpty) query['kategori'] = kategori;
-      if (tarpLevel != null && tarpLevel.isNotEmpty) query['tarpLevel'] = tarpLevel;
+      if (tarpLevel != null && tarpLevel.isNotEmpty)
+        query['tarpLevel'] = tarpLevel;
       if (startDate != null) query['startDate'] = startDate.toIso8601String();
       if (endDate != null) query['endDate'] = endDate.toIso8601String();
 
@@ -4491,7 +4774,8 @@ class ApiService {
     }
   }
 
-  Future<Either<Map<String, dynamic>, Map<String, dynamic>>> getGciDetail(int id) async {
+  Future<Either<Map<String, dynamic>, Map<String, dynamic>>> getGciDetail(
+      int id) async {
     try {
       final res = await _gciRequest('/gci/$id');
       if (res.data is Map) {
@@ -4505,7 +4789,8 @@ class ApiService {
     }
   }
 
-  Future<Either<Map<String, dynamic>, Map<String, dynamic>>> saveGciReport(FormData data) async {
+  Future<Either<Map<String, dynamic>, Map<String, dynamic>>> saveGciReport(
+      FormData data) async {
     try {
       final res = await _gciRequest('/gci', method: 'POST', data: data);
       if (res.data is Map) {
@@ -4519,7 +4804,8 @@ class ApiService {
     }
   }
 
-  Future<Either<Map<String, dynamic>, Map<String, dynamic>>> deleteGciReport(int id) async {
+  Future<Either<Map<String, dynamic>, Map<String, dynamic>>> deleteGciReport(
+      int id) async {
     try {
       final res = await _gciRequest('/gci/$id', method: 'DELETE');
       if (res.data is Map) {
@@ -4533,7 +4819,8 @@ class ApiService {
     }
   }
 
-  Future<Either<Map<String, dynamic>, Map<String, dynamic>>> getGciSuggestions() async {
+  Future<Either<Map<String, dynamic>, Map<String, dynamic>>>
+      getGciSuggestions() async {
     try {
       final res = await _gciRequest('/gci/suggestions');
       if (res.data is Map) {
@@ -4551,10 +4838,17 @@ class ApiService {
   // APPROVAL CENTER (BIMA - OHS)
   // ==========================================
 
-  Future<Either<Map<String, dynamic>, Map<String, dynamic>>> checkApprovalCenterStatus({String? nik}) async {
+  Future<Either<Map<String, dynamic>, Map<String, dynamic>>>
+      checkApprovalCenterStatus({String? nik}) async {
     try {
-      final activeNik = (nik ?? PreferenceService.getUser() ?? PreferenceService.getProfile()?.noNik ?? PreferenceService.getOfflineNik() ?? '').trim();
-      final targets = _buildSpecialPermitCandidateUrls('/approval-center/status?nik=$activeNik');
+      final activeNik = (nik ??
+              PreferenceService.getUser() ??
+              PreferenceService.getProfile()?.noNik ??
+              PreferenceService.getOfflineNik() ??
+              '')
+          .trim();
+      final targets = _buildSpecialPermitCandidateUrls(
+          '/approval-center/status?nik=$activeNik');
 
       Response? lastResponse;
       DioException? lastDioError;
@@ -4585,16 +4879,24 @@ class ApiService {
     }
   }
 
-  Future<Either<Map<String, dynamic>, Map<String, dynamic>>> getPendingApprovals({
+  Future<Either<Map<String, dynamic>, Map<String, dynamic>>>
+      getPendingApprovals({
     String? nik,
     String? module,
     int page = 1,
     int pageSize = 50,
   }) async {
     try {
-      final activeNik = (nik ?? PreferenceService.getUser() ?? PreferenceService.getProfile()?.noNik ?? PreferenceService.getOfflineNik() ?? '').trim();
-      final query = 'nik=$activeNik&module=${module ?? 'ALL'}&page=$page&pageSize=$pageSize';
-      final targets = _buildSpecialPermitCandidateUrls('/approval-center/pending?$query');
+      final activeNik = (nik ??
+              PreferenceService.getUser() ??
+              PreferenceService.getProfile()?.noNik ??
+              PreferenceService.getOfflineNik() ??
+              '')
+          .trim();
+      final query =
+          'nik=$activeNik&module=${module ?? 'ALL'}&page=$page&pageSize=$pageSize';
+      final targets =
+          _buildSpecialPermitCandidateUrls('/approval-center/pending?$query');
 
       Response? lastResponse;
       DioException? lastDioError;
@@ -4632,9 +4934,16 @@ class ApiService {
     int pageSize = 50,
   }) async {
     try {
-      final activeNik = (nik ?? PreferenceService.getUser() ?? PreferenceService.getProfile()?.noNik ?? PreferenceService.getOfflineNik() ?? '').trim();
-      final query = 'nik=$activeNik&module=${module ?? 'ALL'}&page=$page&pageSize=$pageSize';
-      final targets = _buildSpecialPermitCandidateUrls('/approval-center/submissions?$query');
+      final activeNik = (nik ??
+              PreferenceService.getUser() ??
+              PreferenceService.getProfile()?.noNik ??
+              PreferenceService.getOfflineNik() ??
+              '')
+          .trim();
+      final query =
+          'nik=$activeNik&module=${module ?? 'ALL'}&page=$page&pageSize=$pageSize';
+      final targets = _buildSpecialPermitCandidateUrls(
+          '/approval-center/submissions?$query');
 
       Response? lastResponse;
       DioException? lastDioError;
@@ -4665,10 +4974,18 @@ class ApiService {
     }
   }
 
-  Future<Either<Map<String, dynamic>, Map<String, dynamic>>> getApprovalDetail(int approvalId, {String? nik}) async {
+  Future<Either<Map<String, dynamic>, Map<String, dynamic>>> getApprovalDetail(
+      int approvalId,
+      {String? nik}) async {
     try {
-      final activeNik = (nik ?? PreferenceService.getUser() ?? PreferenceService.getProfile()?.noNik ?? PreferenceService.getOfflineNik() ?? '').trim();
-      final targets = _buildSpecialPermitCandidateUrls('/approval-center/detail/$approvalId?nik=$activeNik');
+      final activeNik = (nik ??
+              PreferenceService.getUser() ??
+              PreferenceService.getProfile()?.noNik ??
+              PreferenceService.getOfflineNik() ??
+              '')
+          .trim();
+      final targets = _buildSpecialPermitCandidateUrls(
+          '/approval-center/detail/$approvalId?nik=$activeNik');
       Response? lastResponse;
       DioException? lastDioError;
       final fastOptions = Options(
@@ -4698,7 +5015,8 @@ class ApiService {
     }
   }
 
-  Future<Either<Map<String, dynamic>, Map<String, dynamic>>> postApprovalAction({
+  Future<Either<Map<String, dynamic>, Map<String, dynamic>>>
+      postApprovalAction({
     required int approvalId,
     required String action,
     String? notes,
@@ -4706,8 +5024,16 @@ class ApiService {
     String? userName,
   }) async {
     try {
-      final activeNik = (userNik ?? PreferenceService.getUser() ?? PreferenceService.getProfile()?.noNik ?? PreferenceService.getOfflineNik() ?? '').trim();
-      final activeName = userName ?? PreferenceService.getProfile()?.namaLengkap ?? PreferenceService.getAuth()?.user?.name ?? '';
+      final activeNik = (userNik ??
+              PreferenceService.getUser() ??
+              PreferenceService.getProfile()?.noNik ??
+              PreferenceService.getOfflineNik() ??
+              '')
+          .trim();
+      final activeName = userName ??
+          PreferenceService.getProfile()?.namaLengkap ??
+          PreferenceService.getAuth()?.user?.name ??
+          '';
       final payload = {
         'approvalId': approvalId,
         'action': action,
@@ -4716,7 +5042,8 @@ class ApiService {
         'userName': activeName,
       };
 
-      final targets = _buildSpecialPermitCandidateUrls('/approval-center/action');
+      final targets =
+          _buildSpecialPermitCandidateUrls('/approval-center/action');
       Response? lastResponse;
       DioException? lastDioError;
       final fastOptions = Options(
@@ -4746,7 +5073,8 @@ class ApiService {
     }
   }
 
-  Future<Either<Map<String, dynamic>, Map<String, dynamic>>> processBatchApprovalAction({
+  Future<Either<Map<String, dynamic>, Map<String, dynamic>>>
+      processBatchApprovalAction({
     required List<int> approvalIds,
     required String action,
     String? notes,
@@ -4754,7 +5082,9 @@ class ApiService {
     try {
       final user = PreferenceService.getUser();
       final profile = PreferenceService.getProfile();
-      final activeNik = (user ?? profile?.noNik ?? PreferenceService.getOfflineNik() ?? '').trim();
+      final activeNik =
+          (user ?? profile?.noNik ?? PreferenceService.getOfflineNik() ?? '')
+              .trim();
       final activeName = profile?.namaLengkap ?? '';
 
       final payload = {
@@ -4765,7 +5095,8 @@ class ApiService {
         'userName': activeName,
       };
 
-      final targets = _buildSpecialPermitCandidateUrls('/approval-center/batch-action');
+      final targets =
+          _buildSpecialPermitCandidateUrls('/approval-center/batch-action');
       Response? lastResponse;
       DioException? lastDioError;
       final fastOptions = Options(
@@ -4806,15 +5137,20 @@ class ApiService {
     try {
       final profile = PreferenceService.getProfile();
       final user = PreferenceService.getUser();
-      final activeNik = (user ?? profile?.noNik ?? PreferenceService.getOfflineNik() ?? '').trim();
+      final activeNik =
+          (user ?? profile?.noNik ?? PreferenceService.getOfflineNik() ?? '')
+              .trim();
 
       final queryParams = <String>[];
       if (activeNik.isNotEmpty) queryParams.add('nik=$activeNik');
-      if (status != null && status.isNotEmpty) queryParams.add('status=${Uri.encodeComponent(status)}');
-      if (search != null && search.isNotEmpty) queryParams.add('search=${Uri.encodeComponent(search)}');
+      if (status != null && status.isNotEmpty)
+        queryParams.add('status=${Uri.encodeComponent(status)}');
+      if (search != null && search.isNotEmpty)
+        queryParams.add('search=${Uri.encodeComponent(search)}');
       final query = queryParams.isNotEmpty ? '?${queryParams.join('&')}' : '';
 
-      final targets = _buildSpecialPermitCandidateUrls('/special-permit/list$query');
+      final targets =
+          _buildSpecialPermitCandidateUrls('/special-permit/list$query');
       Response? lastResponse;
       DioException? lastDioError;
       final fastOptions = Options(
@@ -4844,9 +5180,11 @@ class ApiService {
     }
   }
 
-  Future<Either<Map<String, dynamic>, Map<String, dynamic>>> getSpecialPermitDetail(String permitId) async {
+  Future<Either<Map<String, dynamic>, Map<String, dynamic>>>
+      getSpecialPermitDetail(String permitId) async {
     try {
-      final targets = _buildSpecialPermitCandidateUrls('/special-permit/detail/$permitId');
+      final targets =
+          _buildSpecialPermitCandidateUrls('/special-permit/detail/$permitId');
       Response? lastResponse;
       DioException? lastDioError;
       final fastOptions = Options(
@@ -4876,23 +5214,31 @@ class ApiService {
     }
   }
 
-  Future<Either<Map<String, dynamic>, Map<String, dynamic>>> createSpecialPermitFollowup(
+  Future<Either<Map<String, dynamic>, Map<String, dynamic>>>
+      createSpecialPermitFollowup(
     Map<String, dynamic> payload,
   ) async {
     try {
       final user = PreferenceService.getUser();
       final profile = PreferenceService.getProfile();
-      final activeNik = (user ?? profile?.noNik ?? PreferenceService.getOfflineNik() ?? '').trim();
+      final activeNik =
+          (user ?? profile?.noNik ?? PreferenceService.getOfflineNik() ?? '')
+              .trim();
       final activeName = profile?.namaLengkap ?? '';
 
-      if ((payload['inspectorNik'] == null || payload['inspectorNik'].toString().isEmpty) && activeNik.isNotEmpty) {
+      if ((payload['inspectorNik'] == null ||
+              payload['inspectorNik'].toString().isEmpty) &&
+          activeNik.isNotEmpty) {
         payload['inspectorNik'] = activeNik;
       }
-      if ((payload['inspectorName'] == null || payload['inspectorName'].toString().isEmpty) && activeName.isNotEmpty) {
+      if ((payload['inspectorName'] == null ||
+              payload['inspectorName'].toString().isEmpty) &&
+          activeName.isNotEmpty) {
         payload['inspectorName'] = activeName;
       }
 
-      final targets = _buildSpecialPermitCandidateUrls('/special-permit/followup');
+      final targets =
+          _buildSpecialPermitCandidateUrls('/special-permit/followup');
       Response? lastResponse;
       DioException? lastDioError;
       final fastOptions = Options(
@@ -4916,19 +5262,24 @@ class ApiService {
       if (lastDioError != null) {
         return Left(errorHandler(lastDioError) as Map<String, dynamic>);
       }
-      return const Left({'message': 'Gagal menyimpan follow-up special permit'});
+      return const Left(
+          {'message': 'Gagal menyimpan follow-up special permit'});
     } catch (e) {
       return Left({'message': e.toString()});
     }
   }
 
-  Future<Either<Map<String, dynamic>, Map<String, dynamic>>> getSpecialPermitAlerts() async {
+  Future<Either<Map<String, dynamic>, Map<String, dynamic>>>
+      getSpecialPermitAlerts() async {
     try {
       final profile = PreferenceService.getProfile();
       final user = PreferenceService.getUser();
-      final activeNik = (user ?? profile?.noNik ?? PreferenceService.getOfflineNik() ?? '').trim();
+      final activeNik =
+          (user ?? profile?.noNik ?? PreferenceService.getOfflineNik() ?? '')
+              .trim();
 
-      final targets = _buildSpecialPermitCandidateUrls('/special-permit/alerts?nik=$activeNik');
+      final targets = _buildSpecialPermitCandidateUrls(
+          '/special-permit/alerts?nik=$activeNik');
       Response? lastResponse;
       DioException? lastDioError;
       final fastOptions = Options(
@@ -4958,7 +5309,8 @@ class ApiService {
     }
   }
 
-  Future<Either<Map<String, dynamic>, Map<String, dynamic>>> reassignSpecialPermitInspector({
+  Future<Either<Map<String, dynamic>, Map<String, dynamic>>>
+      reassignSpecialPermitInspector({
     required String permitId,
     required String newInspectorNik,
     required String newInspectorName,
@@ -4972,7 +5324,8 @@ class ApiService {
         'reason': reason ?? 'Dialihkan oleh PJO',
       };
 
-      final targets = _buildSpecialPermitCandidateUrls('/special-permit/reassign');
+      final targets =
+          _buildSpecialPermitCandidateUrls('/special-permit/reassign');
       Response? lastResponse;
       DioException? lastDioError;
       final fastOptions = Options(
@@ -5004,14 +5357,19 @@ class ApiService {
 
   Future<List<Map<String, dynamic>>> searchMasterEmployees(String query) async {
     try {
-      final targets = _buildCandidateUrls('/master/employees?query=${Uri.encodeComponent(query)}&limit=30');
+      final targets = _buildCandidateUrls(
+          '/master/employees?query=${Uri.encodeComponent(query)}&limit=30');
       for (final url in targets) {
         try {
           final res = await dio.get(url);
           if (res.statusCode == 200 && res.data != null) {
-            final raw = res.data is Map ? (res.data['data'] as List<dynamic>?) : (res.data as List<dynamic>?);
+            final raw = res.data is Map
+                ? (res.data['data'] as List<dynamic>?)
+                : (res.data as List<dynamic>?);
             if (raw != null) {
-              return raw.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+              return raw
+                  .map((e) => Map<String, dynamic>.from(e as Map))
+                  .toList();
             }
           }
         } catch (_) {}
@@ -5022,7 +5380,8 @@ class ApiService {
 
   Future<List<Map<String, dynamic>>> searchInspectors(String query) async {
     try {
-      final targets = _buildSpecialPermitCandidateUrls('/special-permit/inspectors?query=${Uri.encodeComponent(query)}');
+      final targets = _buildSpecialPermitCandidateUrls(
+          '/special-permit/inspectors?query=${Uri.encodeComponent(query)}');
       final fastOptions = Options(
         sendTimeout: const Duration(seconds: 4),
         receiveTimeout: const Duration(seconds: 4),
@@ -5031,9 +5390,13 @@ class ApiService {
         try {
           final res = await dio.get(url, options: fastOptions);
           if (res.statusCode == 200 && res.data != null) {
-            final raw = res.data is Map ? (res.data['data'] as List<dynamic>?) : (res.data as List<dynamic>?);
+            final raw = res.data is Map
+                ? (res.data['data'] as List<dynamic>?)
+                : (res.data as List<dynamic>?);
             if (raw != null) {
-              return raw.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+              return raw
+                  .map((e) => Map<String, dynamic>.from(e as Map))
+                  .toList();
             }
           }
         } catch (_) {}
@@ -5042,7 +5405,3 @@ class ApiService {
     return [];
   }
 }
-
-
-
-

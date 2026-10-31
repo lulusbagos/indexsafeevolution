@@ -203,18 +203,21 @@ class _P2HFormPageState extends State<P2HFormPage> {
 
       // 2. Also check if p2h_vehicles table has extra entries & last_km
       try {
-        final p2hVehs = await _db.rawQuery('SELECT no_lambung, merek, jenis_kendaraan, last_km FROM p2h_vehicles');
+        final p2hVehs = await _db.rawQuery(
+            'SELECT no_lambung, merek, jenis_kendaraan, last_km FROM p2h_vehicles');
         for (var row in p2hVehs) {
           final nl = row['no_lambung']?.toString() ?? '';
           final km = double.tryParse(row['last_km']?.toString() ?? '0') ?? 0.0;
-          final idx = list.indexWhere((x) => x['noLambung'].toString().toLowerCase() == nl.toLowerCase());
+          final idx = list.indexWhere((x) =>
+              x['noLambung'].toString().toLowerCase() == nl.toLowerCase());
           if (idx >= 0) {
             list[idx]['lastKm'] = km;
           } else if (nl.isNotEmpty) {
             list.add({
               'noLambung': nl,
               'merek': row['merek']?.toString() ?? '',
-              'jenisKendaraan': row['jenis_kendaraan']?.toString() ?? 'LIGHT VEHICLE',
+              'jenisKendaraan':
+                  row['jenis_kendaraan']?.toString() ?? 'LIGHT VEHICLE',
               'lastKm': km,
             });
           }
@@ -241,10 +244,14 @@ class _P2HFormPageState extends State<P2HFormPage> {
         final onlineList = res.data['data'] as List;
         for (var item in onlineList) {
           if (item is Map) {
-            final nl = item['noLambung']?.toString().replaceAll("'", "''") ?? '';
+            final nl =
+                item['noLambung']?.toString().replaceAll("'", "''") ?? '';
             final mrk = item['merek']?.toString().replaceAll("'", "''") ?? '';
-            final jns = item['jenisKendaraan']?.toString().replaceAll("'", "''") ?? 'LIGHT VEHICLE';
-            final km = double.tryParse(item['lastKm']?.toString() ?? '0') ?? 0.0;
+            final jns =
+                item['jenisKendaraan']?.toString().replaceAll("'", "''") ??
+                    'LIGHT VEHICLE';
+            final km =
+                double.tryParse(item['lastKm']?.toString() ?? '0') ?? 0.0;
 
             if (nl.isNotEmpty) {
               await _db.execute('''
@@ -288,7 +295,8 @@ class _P2HFormPageState extends State<P2HFormPage> {
     // 2. Check cached in _availableVehicles
     double cachedKm = 0.0;
     for (var v in _availableVehicles) {
-      if (v['noLambung'].toString().toLowerCase() == cleanNl && v['lastKm'] != null) {
+      if (v['noLambung'].toString().toLowerCase() == cleanNl &&
+          v['lastKm'] != null) {
         cachedKm = double.tryParse(v['lastKm'].toString()) ?? 0.0;
         break;
       }
@@ -298,7 +306,8 @@ class _P2HFormPageState extends State<P2HFormPage> {
 
     // 3. Online fetch from /p2h/last-km
     try {
-      final res = await _api.dio.get('/p2h/last-km', queryParameters: {'noLambung': cleanNl});
+      final res = await _api.dio
+          .get('/p2h/last-km', queryParameters: {'noLambung': cleanNl});
       if (res.data != null && res.data['lastKm'] != null) {
         final onlineKm = double.tryParse(res.data['lastKm'].toString()) ?? 0.0;
         if (onlineKm > 0) {
@@ -322,7 +331,8 @@ class _P2HFormPageState extends State<P2HFormPage> {
       _noLambungCtrl.text = veh['noLambung']?.toString() ?? '';
       _merekCtrl.text = veh['merek']?.toString() ?? '';
 
-      final jns = veh['jenisKendaraan']?.toString().toUpperCase() ?? 'LIGHT VEHICLE';
+      final jns =
+          veh['jenisKendaraan']?.toString().toUpperCase() ?? 'LIGHT VEHICLE';
       if (_vehicleTypes.contains(jns)) {
         _jenisKendaraan = jns;
       } else {
@@ -366,7 +376,8 @@ class _P2HFormPageState extends State<P2HFormPage> {
                     return nl.contains(query) || mrk.contains(query);
                   }).toList();
 
-            final isExactMatch = _availableVehicles.any((v) => v['noLambung'].toString().toLowerCase() == query);
+            final isExactMatch = _availableVehicles
+                .any((v) => v['noLambung'].toString().toLowerCase() == query);
 
             return Container(
               height: MediaQuery.of(context).size.height * 0.75,
@@ -398,7 +409,8 @@ class _P2HFormPageState extends State<P2HFormPage> {
                             color: const Color(0xFFE0F2FE),
                             borderRadius: BorderRadius.circular(8),
                           ),
-                          child: const Icon(Icons.directions_car_rounded, color: Color(0xFF0284C7), size: 20),
+                          child: const Icon(Icons.directions_car_rounded,
+                              color: Color(0xFF0284C7), size: 20),
                         ),
                         const SizedBox(width: 10),
                         const Column(
@@ -406,11 +418,15 @@ class _P2HFormPageState extends State<P2HFormPage> {
                           children: [
                             Text(
                               'Pilih Kendaraan',
-                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
+                              style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF1E293B)),
                             ),
                             Text(
                               'Cari dari master atau tambah unit baru',
-                              style: TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                              style: TextStyle(
+                                  fontSize: 11, color: Color(0xFF64748B)),
                             ),
                           ],
                         ),
@@ -423,13 +439,15 @@ class _P2HFormPageState extends State<P2HFormPage> {
                     ),
                   ),
                   Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                     child: TextField(
                       controller: searchCtrl,
                       textCapitalization: TextCapitalization.characters,
                       decoration: InputDecoration(
                         hintText: 'Cari No. Lambung / Merek...',
-                        prefixIcon: const Icon(Icons.search, color: Color(0xFF0284C7), size: 20),
+                        prefixIcon: const Icon(Icons.search,
+                            color: Color(0xFF0284C7), size: 20),
                         suffixIcon: searchCtrl.text.isNotEmpty
                             ? IconButton(
                                 icon: const Icon(Icons.clear, size: 18),
@@ -442,7 +460,8 @@ class _P2HFormPageState extends State<P2HFormPage> {
                             : null,
                         filled: true,
                         fillColor: const Color(0xFFF1F5F9),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 10),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(10),
                           borderSide: BorderSide.none,
@@ -456,12 +475,14 @@ class _P2HFormPageState extends State<P2HFormPage> {
                       padding: const EdgeInsets.fromLTRB(16, 6, 16, 4),
                       child: InkWell(
                         onTap: () {
-                          final customVal = searchCtrl.text.trim().toUpperCase();
+                          final customVal =
+                              searchCtrl.text.trim().toUpperCase();
                           _onSelectNewUnit(customVal);
                           Navigator.pop(modalCtx);
                         },
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 10),
                           decoration: BoxDecoration(
                             color: const Color(0xFFFEF3C7),
                             borderRadius: BorderRadius.circular(8),
@@ -469,7 +490,8 @@ class _P2HFormPageState extends State<P2HFormPage> {
                           ),
                           child: Row(
                             children: [
-                              const Icon(Icons.add_circle, color: Color(0xFFD97706), size: 18),
+                              const Icon(Icons.add_circle,
+                                  color: Color(0xFFD97706), size: 18),
                               const SizedBox(width: 8),
                               Expanded(
                                 child: Text(
@@ -493,18 +515,22 @@ class _P2HFormPageState extends State<P2HFormPage> {
                             child: Column(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Icon(Icons.search_off_rounded, size: 40, color: Colors.grey.shade400),
+                                Icon(Icons.search_off_rounded,
+                                    size: 40, color: Colors.grey.shade400),
                                 const SizedBox(height: 8),
                                 Text(
                                   'Tidak ada kendaraan yang cocok.',
-                                  style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
+                                  style: TextStyle(
+                                      color: Colors.grey.shade600,
+                                      fontSize: 13),
                                 ),
                               ],
                             ),
                           )
                         : ListView.separated(
                             itemCount: filtered.length,
-                            separatorBuilder: (_, __) => const Divider(height: 1),
+                            separatorBuilder: (_, __) =>
+                                const Divider(height: 1),
                             itemBuilder: (ctx, i) {
                               final v = filtered[i];
                               final km = (v['lastKm'] ?? 0) as num;
@@ -515,29 +541,42 @@ class _P2HFormPageState extends State<P2HFormPage> {
                                     color: const Color(0xFFE0F2FE),
                                     borderRadius: BorderRadius.circular(8),
                                   ),
-                                  child: const Icon(Icons.local_shipping_outlined, color: Color(0xFF0284C7), size: 20),
+                                  child: const Icon(
+                                      Icons.local_shipping_outlined,
+                                      color: Color(0xFF0284C7),
+                                      size: 20),
                                 ),
                                 title: Text(
                                   v['noLambung']?.toString() ?? '',
-                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 13),
                                 ),
                                 subtitle: Text(
                                   '${v['merek']} • ${v['jenisKendaraan']}',
-                                  style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                                  style: TextStyle(
+                                      fontSize: 11,
+                                      color: Colors.grey.shade600),
                                 ),
                                 trailing: km > 0
                                     ? Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 8, vertical: 3),
                                         decoration: BoxDecoration(
                                           color: const Color(0xFFE0F2FE),
-                                          borderRadius: BorderRadius.circular(6),
+                                          borderRadius:
+                                              BorderRadius.circular(6),
                                         ),
                                         child: Text(
                                           '${NumberFormat("#,##0", "id_ID").format(km)} KM',
-                                          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF0284C7)),
+                                          style: const TextStyle(
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.bold,
+                                              color: Color(0xFF0284C7)),
                                         ),
                                       )
-                                    : const Icon(Icons.chevron_right, size: 18, color: Colors.grey),
+                                    : const Icon(Icons.chevron_right,
+                                        size: 18, color: Colors.grey),
                                 onTap: () {
                                   _selectVehicle(v);
                                   Navigator.pop(modalCtx);
@@ -589,7 +628,8 @@ class _P2HFormPageState extends State<P2HFormPage> {
     }
   }
 
-  Future<void> _pickDefectImage(P2HChecklistItem item, ImageSource source) async {
+  Future<void> _pickDefectImage(
+      P2HChecklistItem item, ImageSource source) async {
     try {
       final picked = await _picker.pickImage(
         source: source,
@@ -602,7 +642,8 @@ class _P2HFormPageState extends State<P2HFormPage> {
         });
       }
     } catch (e) {
-      if (mounted) SnackBarMsg.danger(context, 'Gagal mengambil foto kerusakan: $e');
+      if (mounted)
+        SnackBarMsg.danger(context, 'Gagal mengambil foto kerusakan: $e');
     }
   }
 
@@ -612,8 +653,10 @@ class _P2HFormPageState extends State<P2HFormPage> {
     final today = DateTime(now.year, now.month, now.day);
     final reportDate = DateTime(_tanggal.year, _tanggal.month, _tanggal.day);
     if (reportDate.isBefore(today)) {
-      SnackBarMsg.danger(context, 'Pengisian P2H tidak boleh back-date (tanggal lampau). Silakan pilih tanggal hari ini.');
-      _scrollCtrl.animateTo(0, duration: const Duration(milliseconds: 300), curve: Curves.easeOut);
+      SnackBarMsg.danger(context,
+          'Pengisian P2H tidak boleh back-date (tanggal lampau). Silakan pilih tanggal hari ini.');
+      _scrollCtrl.animateTo(0,
+          duration: const Duration(milliseconds: 300), curve: Curves.easeOut);
       return;
     }
 
@@ -621,21 +664,25 @@ class _P2HFormPageState extends State<P2HFormPage> {
     final noLambung = _noLambungCtrl.text.trim().toUpperCase();
     if (noLambung.isEmpty) {
       SnackBarMsg.danger(context, 'No. Lambung Kendaraan wajib diisi.');
-      _scrollCtrl.animateTo(0, duration: const Duration(milliseconds: 300), curve: Curves.easeOut);
+      _scrollCtrl.animateTo(0,
+          duration: const Duration(milliseconds: 300), curve: Curves.easeOut);
       return;
     }
 
     final merek = _merekCtrl.text.trim();
     if (merek.isEmpty) {
       SnackBarMsg.danger(context, 'Merek / Tipe Kendaraan wajib diisi.');
-      _scrollCtrl.animateTo(100, duration: const Duration(milliseconds: 300), curve: Curves.easeOut);
+      _scrollCtrl.animateTo(100,
+          duration: const Duration(milliseconds: 300), curve: Curves.easeOut);
       return;
     }
 
     final kmVal = double.tryParse(_kmCtrl.text.replaceAll(',', '.')) ?? 0;
     if (_kmCtrl.text.trim().isEmpty || kmVal <= 0) {
-      SnackBarMsg.danger(context, 'Odometer / Kilometer harus diisi dengan angka valid.');
-      _scrollCtrl.animateTo(180, duration: const Duration(milliseconds: 300), curve: Curves.easeOut);
+      SnackBarMsg.danger(
+          context, 'Odometer / Kilometer harus diisi dengan angka valid.');
+      _scrollCtrl.animateTo(180,
+          duration: const Duration(milliseconds: 300), curve: Curves.easeOut);
       return;
     }
 
@@ -645,37 +692,55 @@ class _P2HFormPageState extends State<P2HFormPage> {
         context,
         'Odometer baru (${NumberFormat("#,##0", "id_ID").format(kmVal)} KM) harus lebih besar dari KM sebelumnya (${NumberFormat("#,##0", "id_ID").format(_lastRecordedKm)} KM). Pastikan angka kilometer tidak salah!',
       );
-      _scrollCtrl.animateTo(180, duration: const Duration(milliseconds: 300), curve: Curves.easeOut);
+      _scrollCtrl.animateTo(180,
+          duration: const Duration(milliseconds: 300), curve: Curves.easeOut);
       return;
     }
 
-    final speedoExists = _fotoSpeedometer != null && await _fotoSpeedometer!.exists();
+    final speedoExists =
+        _fotoSpeedometer != null && await _fotoSpeedometer!.exists();
     if (!mounted) return;
     if (!speedoExists) {
       SnackBarMsg.danger(context, 'Foto Speedometer WAJIB dilampirkan.');
-      _scrollCtrl.animateTo(250, duration: const Duration(milliseconds: 300), curve: Curves.easeOut);
+      _scrollCtrl.animateTo(250,
+          duration: const Duration(milliseconds: 300), curve: Curves.easeOut);
       return;
     }
 
     // 2. Validate Defect Photos (Mandatory for any item with status NOT_GOOD)
-    final missingPhotoA = _golAItems.where((x) => x.status == 'NOT_GOOD' && (x.localPhotoPath == null || x.localPhotoPath!.isEmpty)).toList();
+    final missingPhotoA = _golAItems
+        .where((x) =>
+            x.status == 'NOT_GOOD' &&
+            (x.localPhotoPath == null || x.localPhotoPath!.isEmpty))
+        .toList();
     if (missingPhotoA.isNotEmpty) {
       setState(() => _isGolAExpanded = true);
-      SnackBarMsg.danger(context, 'GOLONGAN A: Foto kerusakan wajib untuk "${missingPhotoA.first.name}".');
+      SnackBarMsg.danger(context,
+          'GOLONGAN A: Foto kerusakan wajib untuk "${missingPhotoA.first.name}".');
       return;
     }
 
-    final missingPhotoB = _golBItems.where((x) => x.status == 'NOT_GOOD' && (x.localPhotoPath == null || x.localPhotoPath!.isEmpty)).toList();
+    final missingPhotoB = _golBItems
+        .where((x) =>
+            x.status == 'NOT_GOOD' &&
+            (x.localPhotoPath == null || x.localPhotoPath!.isEmpty))
+        .toList();
     if (missingPhotoB.isNotEmpty) {
       setState(() => _isGolBExpanded = true);
-      SnackBarMsg.danger(context, 'GOLONGAN B: Foto kerusakan wajib untuk "${missingPhotoB.first.name}".');
+      SnackBarMsg.danger(context,
+          'GOLONGAN B: Foto kerusakan wajib untuk "${missingPhotoB.first.name}".');
       return;
     }
 
-    final missingPhotoC = _golCItems.where((x) => x.status == 'NOT_GOOD' && (x.localPhotoPath == null || x.localPhotoPath!.isEmpty)).toList();
+    final missingPhotoC = _golCItems
+        .where((x) =>
+            x.status == 'NOT_GOOD' &&
+            (x.localPhotoPath == null || x.localPhotoPath!.isEmpty))
+        .toList();
     if (missingPhotoC.isNotEmpty) {
       setState(() => _isGolCExpanded = true);
-      SnackBarMsg.danger(context, 'GOLONGAN C: Foto kerusakan wajib untuk "${missingPhotoC.first.name}".');
+      SnackBarMsg.danger(context,
+          'GOLONGAN C: Foto kerusakan wajib untuk "${missingPhotoC.first.name}".');
       return;
     }
 
@@ -698,7 +763,8 @@ class _P2HFormPageState extends State<P2HFormPage> {
         if (item.status == 'NOT_GOOD' && item.localPhotoPath != null) {
           final orig = File(item.localPhotoPath!);
           if (await orig.exists()) {
-            final targetPath = '${p2hDir.path}/${item.group}_${item.id}_$timestamp.jpg';
+            final targetPath =
+                '${p2hDir.path}/${item.group}_${item.id}_$timestamp.jpg';
             await orig.copy(targetPath);
             item.localPhotoPath = targetPath;
           }
@@ -706,7 +772,8 @@ class _P2HFormPageState extends State<P2HFormPage> {
       }
 
       final dateStr = DateFormat('yyyy-MM-dd').format(_tanggal);
-      final timeStr = '${_waktu.hour.toString().padLeft(2, '0')}:${_waktu.minute.toString().padLeft(2, '0')}';
+      final timeStr =
+          '${_waktu.hour.toString().padLeft(2, '0')}:${_waktu.minute.toString().padLeft(2, '0')}';
       final jsonA = jsonEncode(_golAItems.map((e) => e.toJson()).toList());
       final jsonB = jsonEncode(_golBItems.map((e) => e.toJson()).toList());
       final jsonC = jsonEncode(_golCItems.map((e) => e.toJson()).toList());
@@ -754,16 +821,28 @@ class _P2HFormPageState extends State<P2HFormPage> {
           await showProfessionalSuccessSheet(
             context: context,
             title: 'Laporan P2H Sukses Dikirim!',
-            subtitle: 'Pemeriksaan harian sarana unit telah resmi tercatat di database pusat IndexSafe.',
-            referenceNumber: 'P2H-${DateTime.now().millisecondsSinceEpoch.toString().substring(5)}',
+            subtitle: 'Pemeriksaan harian sarana unit telah berhasil tercatat.',
+            referenceNumber:
+                'P2H-${DateTime.now().millisecondsSinceEpoch.toString().substring(5)}',
             accentColor: const Color(0xFF0284C7),
             icon: Icons.car_repair_rounded,
-            statusBadgeText: 'DATABASE PUSAT (ONLINE)',
+            statusBadgeText: 'BERHASIL TERSIMPAN',
             receiptItems: [
-              SuccessReceiptItem(label: 'Nomor Lambung', value: noLambung, isHighlight: true),
+              SuccessReceiptItem(
+                  label: 'Nomor Lambung', value: noLambung, isHighlight: true),
               SuccessReceiptItem(label: 'Merek / Tipe', value: merek),
-              SuccessReceiptItem(label: 'Odometer (KM)', value: '${NumberFormat("#,##0", "id_ID").format(kmVal)} KM'),
-              SuccessReceiptItem(label: 'Kelayakan Unit', value: isUnitSiap ? 'SIAP PAKAI (LAYAK)' : 'STOP OPERASI (RUSAK)', highlightColor: isUnitSiap ? const Color(0xFF10B981) : const Color(0xFFDC2626), isHighlight: true),
+              SuccessReceiptItem(
+                  label: 'Odometer (KM)',
+                  value: '${NumberFormat("#,##0", "id_ID").format(kmVal)} KM'),
+              SuccessReceiptItem(
+                  label: 'Kelayakan Unit',
+                  value: isUnitSiap
+                      ? 'SIAP PAKAI (LAYAK)'
+                      : 'STOP OPERASI (RUSAK)',
+                  highlightColor: isUnitSiap
+                      ? const Color(0xFF10B981)
+                      : const Color(0xFFDC2626),
+                  isHighlight: true),
             ],
             primaryButtonText: 'Kembali ke Menu P2H',
           );
@@ -778,17 +857,28 @@ class _P2HFormPageState extends State<P2HFormPage> {
         await showProfessionalSuccessSheet(
           context: context,
           title: 'P2H Tersimpan di HP (Offline)!',
-          subtitle: 'Laporan pemeriksaan sarana tersimpan aman di HP & otomatis disinkronkan saat terhubung ke server.',
+          subtitle:
+              'Laporan pemeriksaan sarana tersimpan aman di HP & otomatis disinkronkan saat terhubung ke server.',
           referenceNumber: 'P2H-OFFLINE-$tranId',
           accentColor: const Color(0xFF0284C7),
           icon: Icons.cloud_done_rounded,
           isOffline: true,
-          statusBadgeText: 'OFFLINE STORAGE (SIAP SINKRON)',
+          statusBadgeText: 'TERSIMPAN DI PERANGKAT',
           receiptItems: [
-            SuccessReceiptItem(label: 'Nomor Lambung', value: noLambung, isHighlight: true),
+            SuccessReceiptItem(
+                label: 'Nomor Lambung', value: noLambung, isHighlight: true),
             SuccessReceiptItem(label: 'Merek / Tipe', value: merek),
-            SuccessReceiptItem(label: 'Odometer (KM)', value: '${NumberFormat("#,##0", "id_ID").format(kmVal)} KM'),
-            SuccessReceiptItem(label: 'Kelayakan Unit', value: isUnitSiap ? 'SIAP PAKAI (LAYAK)' : 'STOP OPERASI (RUSAK)', highlightColor: isUnitSiap ? const Color(0xFF10B981) : const Color(0xFFDC2626), isHighlight: true),
+            SuccessReceiptItem(
+                label: 'Odometer (KM)',
+                value: '${NumberFormat("#,##0", "id_ID").format(kmVal)} KM'),
+            SuccessReceiptItem(
+                label: 'Kelayakan Unit',
+                value:
+                    isUnitSiap ? 'SIAP PAKAI (LAYAK)' : 'STOP OPERASI (RUSAK)',
+                highlightColor: isUnitSiap
+                    ? const Color(0xFF10B981)
+                    : const Color(0xFFDC2626),
+                isHighlight: true),
           ],
           primaryButtonText: 'Kembali ke Menu P2H',
         );
@@ -797,7 +887,8 @@ class _P2HFormPageState extends State<P2HFormPage> {
     } catch (e) {
       debugPrint('[P2HForm] Submit error: $e');
       if (mounted) {
-        SnackBarMsg.danger(context, 'Terjadi kesalahan saat menyimpan data: $e');
+        SnackBarMsg.danger(
+            context, 'Terjadi kesalahan saat menyimpan data: $e');
       }
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
@@ -877,7 +968,10 @@ class _P2HFormPageState extends State<P2HFormPage> {
                           // No Lambung Searchable
                           const Text(
                             'No. Lambung Kendaraan *',
-                            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF334155)),
+                            style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFF334155)),
                           ),
                           const SizedBox(height: 6),
                           Row(
@@ -886,17 +980,22 @@ class _P2HFormPageState extends State<P2HFormPage> {
                                 child: TextFormField(
                                   controller: _noLambungCtrl,
                                   focusNode: _noLambungFocusNode,
-                                  textCapitalization: TextCapitalization.characters,
+                                  textCapitalization:
+                                      TextCapitalization.characters,
                                   decoration: InputDecoration(
-                                    hintText: 'Ketik No. Lambung (Misal: 007)...',
-                                    prefixIcon: const Icon(Icons.pin_outlined, color: Color(0xFF0284C7), size: 20),
+                                    hintText:
+                                        'Ketik No. Lambung (Misal: 007)...',
+                                    prefixIcon: const Icon(Icons.pin_outlined,
+                                        color: Color(0xFF0284C7), size: 20),
                                     suffixIcon: _noLambungCtrl.text.isNotEmpty
                                         ? IconButton(
-                                            icon: const Icon(Icons.clear, size: 18),
+                                            icon: const Icon(Icons.clear,
+                                                size: 18),
                                             onPressed: () {
                                               setState(() {
                                                 _noLambungCtrl.clear();
-                                                _showInlineVehicleSuggestions = false;
+                                                _showInlineVehicleSuggestions =
+                                                    false;
                                                 _lastRecordedKm = 0.0;
                                                 _lastRecordedKmDate = null;
                                               });
@@ -905,14 +1004,26 @@ class _P2HFormPageState extends State<P2HFormPage> {
                                         : null,
                                     filled: true,
                                     fillColor: Colors.white,
-                                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: Colors.grey.shade300)),
-                                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: Colors.grey.shade300)),
-                                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFF0284C7), width: 1.5)),
+                                    contentPadding: const EdgeInsets.symmetric(
+                                        horizontal: 14, vertical: 12),
+                                    border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(10),
+                                        borderSide: BorderSide(
+                                            color: Colors.grey.shade300)),
+                                    enabledBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(10),
+                                        borderSide: BorderSide(
+                                            color: Colors.grey.shade300)),
+                                    focusedBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(10),
+                                        borderSide: const BorderSide(
+                                            color: Color(0xFF0284C7),
+                                            width: 1.5)),
                                   ),
                                   onChanged: (val) {
                                     setState(() {
-                                      _showInlineVehicleSuggestions = val.trim().isNotEmpty;
+                                      _showInlineVehicleSuggestions =
+                                          val.trim().isNotEmpty;
                                     });
                                     if (val.trim().isNotEmpty) {
                                       _lookupLastRecordedKm(val);
@@ -925,13 +1036,15 @@ class _P2HFormPageState extends State<P2HFormPage> {
                                 onTap: () => _openVehiclePickerModal(context),
                                 borderRadius: BorderRadius.circular(10),
                                 child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 14, vertical: 13),
                                   decoration: BoxDecoration(
                                     color: const Color(0xFF0284C7),
                                     borderRadius: BorderRadius.circular(10),
                                     boxShadow: [
                                       BoxShadow(
-                                        color: const Color(0xFF0284C7).withValues(alpha: 0.25),
+                                        color: const Color(0xFF0284C7)
+                                            .withValues(alpha: 0.25),
                                         blurRadius: 4,
                                         offset: const Offset(0, 2),
                                       ),
@@ -939,11 +1052,15 @@ class _P2HFormPageState extends State<P2HFormPage> {
                                   ),
                                   child: const Row(
                                     children: [
-                                      Icon(Icons.search, color: Colors.white, size: 18),
+                                      Icon(Icons.search,
+                                          color: Colors.white, size: 18),
                                       SizedBox(width: 4),
                                       Text(
                                         'Pilih',
-                                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                                        style: TextStyle(
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 13),
                                       ),
                                     ],
                                   ),
@@ -953,52 +1070,80 @@ class _P2HFormPageState extends State<P2HFormPage> {
                           ),
 
                           // Smart Inline Suggestions Card (Exact Web Experience)
-                          if (_showInlineVehicleSuggestions && _noLambungCtrl.text.trim().isNotEmpty) ...[
+                          if (_showInlineVehicleSuggestions &&
+                              _noLambungCtrl.text.trim().isNotEmpty) ...[
                             Builder(
                               builder: (ctx) {
-                                final query = _noLambungCtrl.text.trim().toLowerCase();
+                                final query =
+                                    _noLambungCtrl.text.trim().toLowerCase();
                                 final matches = _availableVehicles.where((v) {
-                                  final nl = v['noLambung']?.toString().toLowerCase() ?? '';
-                                  final mrk = v['merek']?.toString().toLowerCase() ?? '';
-                                  return nl.contains(query) || mrk.contains(query);
+                                  final nl = v['noLambung']
+                                          ?.toString()
+                                          .toLowerCase() ??
+                                      '';
+                                  final mrk =
+                                      v['merek']?.toString().toLowerCase() ??
+                                          '';
+                                  return nl.contains(query) ||
+                                      mrk.contains(query);
                                 }).toList();
-                                final isExactMatch = _availableVehicles.any((v) => v['noLambung'].toString().toLowerCase() == query);
+                                final isExactMatch = _availableVehicles.any(
+                                    (v) =>
+                                        v['noLambung']
+                                            .toString()
+                                            .toLowerCase() ==
+                                        query);
 
                                 return Container(
                                   margin: const EdgeInsets.only(top: 8),
                                   decoration: BoxDecoration(
                                     color: Colors.white,
                                     borderRadius: BorderRadius.circular(10),
-                                    border: Border.all(color: const Color(0xFF0284C7).withValues(alpha: 0.3)),
+                                    border: Border.all(
+                                        color: const Color(0xFF0284C7)
+                                            .withValues(alpha: 0.3)),
                                     boxShadow: [
                                       BoxShadow(
-                                        color: Colors.black.withValues(alpha: 0.08),
+                                        color: Colors.black
+                                            .withValues(alpha: 0.08),
                                         blurRadius: 8,
                                         offset: const Offset(0, 3),
                                       ),
                                     ],
                                   ),
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.stretch,
                                     children: [
                                       // If no exact match, offer to Add as New Unit
                                       if (!isExactMatch)
                                         InkWell(
-                                          onTap: () => _onSelectNewUnit(_noLambungCtrl.text.trim()),
+                                          onTap: () => _onSelectNewUnit(
+                                              _noLambungCtrl.text.trim()),
                                           child: Container(
-                                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                            padding: const EdgeInsets.symmetric(
+                                                horizontal: 12, vertical: 10),
                                             decoration: const BoxDecoration(
                                               color: Color(0xFFFEF3C7),
-                                              borderRadius: BorderRadius.vertical(top: Radius.circular(9)),
+                                              borderRadius:
+                                                  BorderRadius.vertical(
+                                                      top: Radius.circular(9)),
                                             ),
                                             child: Row(
                                               children: [
-                                                const Icon(Icons.add_circle, color: Color(0xFFD97706), size: 18),
+                                                const Icon(Icons.add_circle,
+                                                    color: Color(0xFFD97706),
+                                                    size: 18),
                                                 const SizedBox(width: 8),
                                                 Expanded(
                                                   child: Text(
                                                     'Tambah "${_noLambungCtrl.text.trim().toUpperCase()}" Sebagai Unit Baru',
-                                                    style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFFB45309), fontSize: 12.5),
+                                                    style: const TextStyle(
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                        color:
+                                                            Color(0xFFB45309),
+                                                        fontSize: 12.5),
                                                   ),
                                                 ),
                                               ],
@@ -1011,39 +1156,70 @@ class _P2HFormPageState extends State<P2HFormPage> {
                                         return InkWell(
                                           onTap: () => _selectVehicle(v),
                                           child: Container(
-                                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+                                            padding: const EdgeInsets.symmetric(
+                                                horizontal: 12, vertical: 9),
                                             decoration: BoxDecoration(
-                                              border: Border(top: BorderSide(color: Colors.grey.shade200)),
+                                              border: Border(
+                                                  top: BorderSide(
+                                                      color: Colors
+                                                          .grey.shade200)),
                                             ),
                                             child: Row(
                                               children: [
-                                                const Icon(Icons.local_shipping_outlined, color: Color(0xFF0284C7), size: 18),
+                                                const Icon(
+                                                    Icons
+                                                        .local_shipping_outlined,
+                                                    color: Color(0xFF0284C7),
+                                                    size: 18),
                                                 const SizedBox(width: 8),
                                                 Expanded(
                                                   child: Column(
-                                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                                    crossAxisAlignment:
+                                                        CrossAxisAlignment
+                                                            .start,
                                                     children: [
                                                       Text(
-                                                        v['noLambung']?.toString() ?? '',
-                                                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF1E293B)),
+                                                        v['noLambung']
+                                                                ?.toString() ??
+                                                            '',
+                                                        style: const TextStyle(
+                                                            fontWeight:
+                                                                FontWeight.bold,
+                                                            fontSize: 13,
+                                                            color: Color(
+                                                                0xFF1E293B)),
                                                       ),
                                                       Text(
                                                         '${v['merek']} • ${v['jenisKendaraan']}',
-                                                        style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                                                        style: TextStyle(
+                                                            fontSize: 11,
+                                                            color: Colors
+                                                                .grey.shade600),
                                                       ),
                                                     ],
                                                   ),
                                                 ),
                                                 if (km > 0)
                                                   Container(
-                                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                    padding: const EdgeInsets
+                                                        .symmetric(
+                                                        horizontal: 6,
+                                                        vertical: 2),
                                                     decoration: BoxDecoration(
-                                                      color: const Color(0xFFE0F2FE),
-                                                      borderRadius: BorderRadius.circular(4),
+                                                      color: const Color(
+                                                          0xFFE0F2FE),
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                              4),
                                                     ),
                                                     child: Text(
                                                       '${NumberFormat("#,##0", "id_ID").format(km)} KM',
-                                                      style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF0284C7)),
+                                                      style: const TextStyle(
+                                                          fontSize: 10,
+                                                          fontWeight:
+                                                              FontWeight.bold,
+                                                          color: Color(
+                                                              0xFF0284C7)),
                                                     ),
                                                   ),
                                               ],
@@ -1052,15 +1228,24 @@ class _P2HFormPageState extends State<P2HFormPage> {
                                         );
                                       }),
                                       InkWell(
-                                        onTap: () => setState(() => _showInlineVehicleSuggestions = false),
+                                        onTap: () => setState(() =>
+                                            _showInlineVehicleSuggestions =
+                                                false),
                                         child: Container(
-                                          padding: const EdgeInsets.symmetric(vertical: 6),
+                                          padding: const EdgeInsets.symmetric(
+                                              vertical: 6),
                                           alignment: Alignment.center,
                                           decoration: BoxDecoration(
                                             color: Colors.grey.shade100,
-                                            borderRadius: const BorderRadius.vertical(bottom: Radius.circular(9)),
+                                            borderRadius:
+                                                const BorderRadius.vertical(
+                                                    bottom: Radius.circular(9)),
                                           ),
-                                          child: const Text('Tutup Saran', style: TextStyle(fontSize: 11, color: Colors.grey, fontWeight: FontWeight.w600)),
+                                          child: const Text('Tutup Saran',
+                                              style: TextStyle(
+                                                  fontSize: 11,
+                                                  color: Colors.grey,
+                                                  fontWeight: FontWeight.w600)),
                                         ),
                                       ),
                                     ],
@@ -1079,20 +1264,38 @@ class _P2HFormPageState extends State<P2HFormPage> {
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    const Text('Merek / Tipe *', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF334155))),
+                                    const Text('Merek / Tipe *',
+                                        style: TextStyle(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w600,
+                                            color: Color(0xFF334155))),
                                     const SizedBox(height: 6),
                                     TextFormField(
                                       controller: _merekCtrl,
                                       focusNode: _merekFocusNode,
-                                      textCapitalization: TextCapitalization.characters,
+                                      textCapitalization:
+                                          TextCapitalization.characters,
                                       decoration: InputDecoration(
                                         hintText: 'Misal: TRITON 2.5L',
-                                        prefixIcon: const Icon(Icons.branding_watermark_outlined, color: Color(0xFF0284C7), size: 20),
+                                        prefixIcon: const Icon(
+                                            Icons.branding_watermark_outlined,
+                                            color: Color(0xFF0284C7),
+                                            size: 20),
                                         filled: true,
                                         fillColor: Colors.white,
-                                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: Colors.grey.shade300)),
-                                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: Colors.grey.shade300)),
+                                        contentPadding:
+                                            const EdgeInsets.symmetric(
+                                                horizontal: 14, vertical: 12),
+                                        border: OutlineInputBorder(
+                                            borderRadius:
+                                                BorderRadius.circular(10),
+                                            borderSide: BorderSide(
+                                                color: Colors.grey.shade300)),
+                                        enabledBorder: OutlineInputBorder(
+                                            borderRadius:
+                                                BorderRadius.circular(10),
+                                            borderSide: BorderSide(
+                                                color: Colors.grey.shade300)),
                                       ),
                                     ),
                                   ],
@@ -1103,23 +1306,50 @@ class _P2HFormPageState extends State<P2HFormPage> {
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    const Text('Jenis Kendaraan *', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF334155))),
+                                    const Text('Jenis Kendaraan *',
+                                        style: TextStyle(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w600,
+                                            color: Color(0xFF334155))),
                                     const SizedBox(height: 6),
                                     DropdownButtonFormField<String>(
                                       initialValue: _jenisKendaraan,
                                       isExpanded: true,
                                       decoration: InputDecoration(
-                                        prefixIcon: const Icon(Icons.category_outlined, color: Color(0xFF0284C7), size: 20),
+                                        prefixIcon: const Icon(
+                                            Icons.category_outlined,
+                                            color: Color(0xFF0284C7),
+                                            size: 20),
                                         filled: true,
                                         fillColor: Colors.white,
-                                        contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
-                                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: Colors.grey.shade300)),
-                                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: Colors.grey.shade300)),
+                                        contentPadding:
+                                            const EdgeInsets.symmetric(
+                                                horizontal: 10, vertical: 12),
+                                        border: OutlineInputBorder(
+                                            borderRadius:
+                                                BorderRadius.circular(10),
+                                            borderSide: BorderSide(
+                                                color: Colors.grey.shade300)),
+                                        enabledBorder: OutlineInputBorder(
+                                            borderRadius:
+                                                BorderRadius.circular(10),
+                                            borderSide: BorderSide(
+                                                color: Colors.grey.shade300)),
                                       ),
-                                      style: const TextStyle(fontSize: 12, color: Colors.black87),
-                                      items: _vehicleTypes.map((t) => DropdownMenuItem(value: t, child: Text(t, style: const TextStyle(fontSize: 12, overflow: TextOverflow.ellipsis)))).toList(),
+                                      style: const TextStyle(
+                                          fontSize: 12, color: Colors.black87),
+                                      items: _vehicleTypes
+                                          .map((t) => DropdownMenuItem(
+                                              value: t,
+                                              child: Text(t,
+                                                  style: const TextStyle(
+                                                      fontSize: 12,
+                                                      overflow: TextOverflow
+                                                          .ellipsis))))
+                                          .toList(),
                                       onChanged: (val) {
-                                        if (val != null) setState(() => _jenisKendaraan = val);
+                                        if (val != null)
+                                          setState(() => _jenisKendaraan = val);
                                       },
                                     ),
                                   ],
@@ -1138,63 +1368,108 @@ class _P2HFormPageState extends State<P2HFormPage> {
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    const Text('Odometer / KM *', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF334155))),
+                                    const Text('Odometer / KM *',
+                                        style: TextStyle(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w600,
+                                            color: Color(0xFF334155))),
                                     const SizedBox(height: 6),
                                     TextFormField(
                                       controller: _kmCtrl,
-                                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                                      inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]'))],
+                                      keyboardType:
+                                          const TextInputType.numberWithOptions(
+                                              decimal: true),
+                                      inputFormatters: [
+                                        FilteringTextInputFormatter.allow(
+                                            RegExp(r'[0-9.,]'))
+                                      ],
                                       decoration: InputDecoration(
-                                        hintText: _lastRecordedKm > 0 ? '> ${_lastRecordedKm.toStringAsFixed(0)}' : 'Misal: 45000',
-                                        prefixIcon: const Icon(Icons.speed_rounded, color: Color(0xFF0284C7), size: 20),
+                                        hintText: _lastRecordedKm > 0
+                                            ? '> ${_lastRecordedKm.toStringAsFixed(0)}'
+                                            : 'Misal: 45000',
+                                        prefixIcon: const Icon(
+                                            Icons.speed_rounded,
+                                            color: Color(0xFF0284C7),
+                                            size: 20),
                                         filled: true,
                                         fillColor: Colors.white,
-                                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: Colors.grey.shade300)),
-                                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: Colors.grey.shade300)),
+                                        contentPadding:
+                                            const EdgeInsets.symmetric(
+                                                horizontal: 14, vertical: 12),
+                                        border: OutlineInputBorder(
+                                            borderRadius:
+                                                BorderRadius.circular(10),
+                                            borderSide: BorderSide(
+                                                color: Colors.grey.shade300)),
+                                        enabledBorder: OutlineInputBorder(
+                                            borderRadius:
+                                                BorderRadius.circular(10),
+                                            borderSide: BorderSide(
+                                                color: Colors.grey.shade300)),
                                       ),
                                       onChanged: (val) => setState(() {}),
                                     ),
                                     if (_lastRecordedKm > 0) ...[
                                       const SizedBox(height: 4),
                                       Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 8, vertical: 4),
                                         decoration: BoxDecoration(
                                           color: const Color(0xFFF0FDF4),
-                                          borderRadius: BorderRadius.circular(6),
-                                          border: Border.all(color: const Color(0xFF86EFAC)),
+                                          borderRadius:
+                                              BorderRadius.circular(6),
+                                          border: Border.all(
+                                              color: const Color(0xFF86EFAC)),
                                         ),
                                         child: Row(
                                           children: [
-                                            const Icon(Icons.history, color: Color(0xFF16A34A), size: 13),
+                                            const Icon(Icons.history,
+                                                color: Color(0xFF16A34A),
+                                                size: 13),
                                             const SizedBox(width: 4),
                                             Expanded(
                                               child: Text(
                                                 'KM Sebelumnya: ${NumberFormat("#,##0", "id_ID").format(_lastRecordedKm)} KM${_lastRecordedKmDate != null ? ' ($_lastRecordedKmDate)' : ''}',
-                                                style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF15803D)),
+                                                style: const TextStyle(
+                                                    fontSize: 10,
+                                                    fontWeight: FontWeight.bold,
+                                                    color: Color(0xFF15803D)),
                                               ),
                                             ),
                                           ],
                                         ),
                                       ),
                                     ],
-                                    if (_lastRecordedKm > 0 && _kmCtrl.text.isNotEmpty && (double.tryParse(_kmCtrl.text.replaceAll(',', '.')) ?? 0) <= _lastRecordedKm) ...[
+                                    if (_lastRecordedKm > 0 &&
+                                        _kmCtrl.text.isNotEmpty &&
+                                        (double.tryParse(_kmCtrl.text
+                                                    .replaceAll(',', '.')) ??
+                                                0) <=
+                                            _lastRecordedKm) ...[
                                       const SizedBox(height: 4),
                                       Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 8, vertical: 4),
                                         decoration: BoxDecoration(
                                           color: const Color(0xFFFEF2F2),
-                                          borderRadius: BorderRadius.circular(6),
-                                          border: Border.all(color: const Color(0xFFFCA5A5)),
+                                          borderRadius:
+                                              BorderRadius.circular(6),
+                                          border: Border.all(
+                                              color: const Color(0xFFFCA5A5)),
                                         ),
                                         child: Row(
                                           children: [
-                                            const Icon(Icons.error_outline, color: Color(0xFFDC2626), size: 13),
+                                            const Icon(Icons.error_outline,
+                                                color: Color(0xFFDC2626),
+                                                size: 13),
                                             const SizedBox(width: 4),
                                             Expanded(
                                               child: Text(
                                                 'Wajib > ${_lastRecordedKm.toStringAsFixed(0)} KM!',
-                                                style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFFB91C1C)),
+                                                style: const TextStyle(
+                                                    fontSize: 10,
+                                                    fontWeight: FontWeight.bold,
+                                                    color: Color(0xFFB91C1C)),
                                               ),
                                             ),
                                           ],
@@ -1209,26 +1484,55 @@ class _P2HFormPageState extends State<P2HFormPage> {
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    const Text('SIMPER / KIMPER Aktif? *', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF334155))),
+                                    const Text('SIMPER / KIMPER Aktif? *',
+                                        style: TextStyle(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w600,
+                                            color: Color(0xFF334155))),
                                     const SizedBox(height: 6),
                                     DropdownButtonFormField<String>(
                                       initialValue: _simperKimper,
                                       isExpanded: true,
                                       decoration: InputDecoration(
-                                        prefixIcon: const Icon(Icons.credit_card_rounded, color: Color(0xFF0284C7), size: 20),
+                                        prefixIcon: const Icon(
+                                            Icons.credit_card_rounded,
+                                            color: Color(0xFF0284C7),
+                                            size: 20),
                                         filled: true,
                                         fillColor: Colors.white,
-                                        contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
-                                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: Colors.grey.shade300)),
-                                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: Colors.grey.shade300)),
+                                        contentPadding:
+                                            const EdgeInsets.symmetric(
+                                                horizontal: 10, vertical: 12),
+                                        border: OutlineInputBorder(
+                                            borderRadius:
+                                                BorderRadius.circular(10),
+                                            borderSide: BorderSide(
+                                                color: Colors.grey.shade300)),
+                                        enabledBorder: OutlineInputBorder(
+                                            borderRadius:
+                                                BorderRadius.circular(10),
+                                            borderSide: BorderSide(
+                                                color: Colors.grey.shade300)),
                                       ),
-                                      style: const TextStyle(fontSize: 13, color: Colors.black87),
+                                      style: const TextStyle(
+                                          fontSize: 13, color: Colors.black87),
                                       items: const [
-                                        DropdownMenuItem(value: 'YA', child: Text('YA', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.green))),
-                                        DropdownMenuItem(value: 'TIDAK', child: Text('TIDAK', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.red))),
+                                        DropdownMenuItem(
+                                            value: 'YA',
+                                            child: Text('YA',
+                                                style: TextStyle(
+                                                    fontWeight: FontWeight.bold,
+                                                    color: Colors.green))),
+                                        DropdownMenuItem(
+                                            value: 'TIDAK',
+                                            child: Text('TIDAK',
+                                                style: TextStyle(
+                                                    fontWeight: FontWeight.bold,
+                                                    color: Colors.red))),
                                       ],
                                       onChanged: (val) {
-                                        if (val != null) setState(() => _simperKimper = val);
+                                        if (val != null)
+                                          setState(() => _simperKimper = val);
                                       },
                                     ),
                                   ],
@@ -1258,7 +1562,8 @@ class _P2HFormPageState extends State<P2HFormPage> {
                         badgeColor: const Color(0xFFE11D48),
                         bgColor: const Color(0xFFFFF1F2),
                         isExpanded: _isGolAExpanded,
-                        onToggle: () => setState(() => _isGolAExpanded = !_isGolAExpanded),
+                        onToggle: () =>
+                            setState(() => _isGolAExpanded = !_isGolAExpanded),
                         items: _golAItems,
                       ),
 
@@ -1271,7 +1576,8 @@ class _P2HFormPageState extends State<P2HFormPage> {
                         badgeColor: const Color(0xFFD97706),
                         bgColor: const Color(0xFFFFFBEB),
                         isExpanded: _isGolBExpanded,
-                        onToggle: () => setState(() => _isGolBExpanded = !_isGolBExpanded),
+                        onToggle: () =>
+                            setState(() => _isGolBExpanded = !_isGolBExpanded),
                         items: _golBItems,
                       ),
 
@@ -1284,7 +1590,8 @@ class _P2HFormPageState extends State<P2HFormPage> {
                         badgeColor: const Color(0xFF0284C7),
                         bgColor: const Color(0xFFF0F9FF),
                         isExpanded: _isGolCExpanded,
-                        onToggle: () => setState(() => _isGolCExpanded = !_isGolCExpanded),
+                        onToggle: () =>
+                            setState(() => _isGolCExpanded = !_isGolCExpanded),
                         items: _golCItems,
                       ),
 
@@ -1316,7 +1623,9 @@ class _P2HFormPageState extends State<P2HFormPage> {
               child: SafeArea(
                 top: false,
                 child: buttonApp(
-                  label: _isSubmitting ? 'MENYIMPAN LAPORAN...' : 'KIRIM LAPORAN P2H',
+                  label: _isSubmitting
+                      ? 'MENYIMPAN LAPORAN...'
+                      : 'KIRIM LAPORAN P2H',
                   bgColor: const Color(0xFF0284C7),
                   onPressed: _isSubmitting ? null : _submitP2H,
                 ),
@@ -1351,33 +1660,44 @@ class _P2HFormPageState extends State<P2HFormPage> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
-                  color: isOnline ? Colors.white.withValues(alpha: 0.25) : Colors.orange.withValues(alpha: 0.35),
+                  color: isOnline
+                      ? Colors.white.withValues(alpha: 0.25)
+                      : Colors.orange.withValues(alpha: 0.35),
                   borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: Colors.white.withValues(alpha: 0.4)),
+                  border:
+                      Border.all(color: Colors.white.withValues(alpha: 0.4)),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Icon(
-                      isOnline ? Icons.cloud_done_rounded : Icons.cloud_off_rounded,
+                      isOnline
+                          ? Icons.cloud_done_rounded
+                          : Icons.cloud_off_rounded,
                       size: 14,
                       color: Colors.white,
                     ),
                     const SizedBox(width: 6),
                     Text(
                       isOnline ? 'Online Sync' : 'Mode Offline Siap',
-                      style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                      style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold),
                     ),
                   ],
                 ),
               ),
-              const Icon(Icons.verified_user_rounded, color: Colors.white70, size: 20),
+              const Icon(Icons.verified_user_rounded,
+                  color: Colors.white70, size: 20),
             ],
           ),
           const SizedBox(height: 12),
-          const Icon(Icons.local_shipping_rounded, color: Colors.white, size: 38),
+          const Icon(Icons.local_shipping_rounded,
+              color: Colors.white, size: 38),
           const SizedBox(height: 6),
           const Text(
             'P2H - PEMERIKSAAN KENDARAAN',
@@ -1456,11 +1776,16 @@ class _P2HFormPageState extends State<P2HFormPage> {
     );
   }
 
-  Widget _buildReadOnlyField({required String label, required String value, required IconData icon}) {
+  Widget _buildReadOnlyField(
+      {required String label, required String value, required IconData icon}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF64748B))),
+        Text(label,
+            style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF64748B))),
         const SizedBox(height: 4),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -1476,7 +1801,10 @@ class _P2HFormPageState extends State<P2HFormPage> {
               Expanded(
                 child: Text(
                   value,
-                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF334155)),
+                  style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF334155)),
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
@@ -1491,7 +1819,11 @@ class _P2HFormPageState extends State<P2HFormPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('Tanggal *', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF334155))),
+        const Text('Tanggal *',
+            style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF334155))),
         const SizedBox(height: 4),
         InkWell(
           onTap: () async {
@@ -1515,12 +1847,14 @@ class _P2HFormPageState extends State<P2HFormPage> {
             ),
             child: Row(
               children: [
-                const Icon(Icons.calendar_month_rounded, size: 18, color: Color(0xFF0284C7)),
+                const Icon(Icons.calendar_month_rounded,
+                    size: 18, color: Color(0xFF0284C7)),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     DateFormat('dd/MM/yyyy').format(_tanggal),
-                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                    style: const TextStyle(
+                        fontSize: 12, fontWeight: FontWeight.w600),
                   ),
                 ),
               ],
@@ -1535,7 +1869,11 @@ class _P2HFormPageState extends State<P2HFormPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('Waktu *', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF334155))),
+        const Text('Waktu *',
+            style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF334155))),
         const SizedBox(height: 4),
         InkWell(
           onTap: () async {
@@ -1554,12 +1892,14 @@ class _P2HFormPageState extends State<P2HFormPage> {
             ),
             child: Row(
               children: [
-                const Icon(Icons.access_time_rounded, size: 18, color: Color(0xFF0284C7)),
+                const Icon(Icons.access_time_rounded,
+                    size: 18, color: Color(0xFF0284C7)),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     '${_waktu.hour.toString().padLeft(2, '0')}:${_waktu.minute.toString().padLeft(2, '0')}',
-                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                    style: const TextStyle(
+                        fontSize: 12, fontWeight: FontWeight.w600),
                   ),
                 ),
               ],
@@ -1579,12 +1919,19 @@ class _P2HFormPageState extends State<P2HFormPage> {
           children: [
             const Text(
               'Foto Speedometer *',
-              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF334155)),
+              style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF334155)),
             ),
             if (_fotoSpeedometer != null)
               GestureDetector(
                 onTap: () => setState(() => _fotoSpeedometer = null),
-                child: const Text('Hapus', style: TextStyle(color: Colors.red, fontSize: 11, fontWeight: FontWeight.bold)),
+                child: const Text('Hapus',
+                    style: TextStyle(
+                        color: Colors.red,
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold)),
               ),
           ],
         ),
@@ -1595,15 +1942,21 @@ class _P2HFormPageState extends State<P2HFormPage> {
             decoration: BoxDecoration(
               color: const Color(0xFFF8FAFC),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFF0284C7).withValues(alpha: 0.4), style: BorderStyle.solid),
+              border: Border.all(
+                  color: const Color(0xFF0284C7).withValues(alpha: 0.4),
+                  style: BorderStyle.solid),
             ),
             child: Column(
               children: [
-                const Icon(Icons.speed_rounded, color: Color(0xFF0284C7), size: 36),
+                const Icon(Icons.speed_rounded,
+                    color: Color(0xFF0284C7), size: 36),
                 const SizedBox(height: 8),
                 const Text(
                   'Unggah Foto Speedometer Terbaru',
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
+                  style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF1E293B)),
                 ),
                 const SizedBox(height: 4),
                 const Text(
@@ -1619,11 +1972,14 @@ class _P2HFormPageState extends State<P2HFormPage> {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF0284C7),
                         foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 8),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8)),
                       ),
                       icon: const Icon(Icons.camera_alt_rounded, size: 16),
-                      label: const Text('Kamera', style: TextStyle(fontSize: 12)),
+                      label:
+                          const Text('Kamera', style: TextStyle(fontSize: 12)),
                       onPressed: () => _pickSpeedoImage(ImageSource.camera),
                     ),
                     const SizedBox(width: 10),
@@ -1631,11 +1987,14 @@ class _P2HFormPageState extends State<P2HFormPage> {
                       style: OutlinedButton.styleFrom(
                         foregroundColor: const Color(0xFF0284C7),
                         side: const BorderSide(color: Color(0xFF0284C7)),
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 8),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8)),
                       ),
                       icon: const Icon(Icons.photo_library_rounded, size: 16),
-                      label: const Text('Galeri', style: TextStyle(fontSize: 12)),
+                      label:
+                          const Text('Galeri', style: TextStyle(fontSize: 12)),
                       onPressed: () => _pickSpeedoImage(ImageSource.gallery),
                     ),
                   ],
@@ -1668,14 +2027,22 @@ class _P2HFormPageState extends State<P2HFormPage> {
                   children: [
                     const Row(
                       children: [
-                        Icon(Icons.check_circle_rounded, color: Colors.green, size: 16),
+                        Icon(Icons.check_circle_rounded,
+                            color: Colors.green, size: 16),
                         SizedBox(width: 6),
-                        Text('Foto terpasang', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.green)),
+                        Text('Foto terpasang',
+                            style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.green)),
                       ],
                     ),
                     TextButton.icon(
-                      icon: const Icon(Icons.replay_rounded, size: 14, color: Color(0xFF0284C7)),
-                      label: const Text('Ganti', style: TextStyle(fontSize: 11, color: Color(0xFF0284C7))),
+                      icon: const Icon(Icons.replay_rounded,
+                          size: 14, color: Color(0xFF0284C7)),
+                      label: const Text('Ganti',
+                          style: TextStyle(
+                              fontSize: 11, color: Color(0xFF0284C7))),
                       onPressed: () => _pickSpeedoImage(ImageSource.camera),
                     ),
                   ],
@@ -1705,12 +2072,17 @@ class _P2HFormPageState extends State<P2HFormPage> {
             InkWell(
               onTap: () => _autoFillAll('GOOD'),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
-                  gradient: const LinearGradient(colors: [Color(0xFF10B981), Color(0xFF059669)]),
+                  gradient: const LinearGradient(
+                      colors: [Color(0xFF10B981), Color(0xFF059669)]),
                   borderRadius: BorderRadius.circular(16),
                   boxShadow: [
-                    BoxShadow(color: const Color(0xFF10B981).withValues(alpha: 0.3), blurRadius: 4, offset: const Offset(0, 2)),
+                    BoxShadow(
+                        color: const Color(0xFF10B981).withValues(alpha: 0.3),
+                        blurRadius: 4,
+                        offset: const Offset(0, 2)),
                   ],
                 ),
                 child: const Row(
@@ -1718,7 +2090,11 @@ class _P2HFormPageState extends State<P2HFormPage> {
                   children: [
                     Icon(Icons.done_all_rounded, color: Colors.white, size: 14),
                     SizedBox(width: 4),
-                    Text('Semua BAIK', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                    Text('Semua BAIK',
+                        style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold)),
                   ],
                 ),
               ),
@@ -1727,12 +2103,17 @@ class _P2HFormPageState extends State<P2HFormPage> {
             InkWell(
               onTap: () => _autoFillAll('NOT_GOOD'),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
-                  gradient: const LinearGradient(colors: [Color(0xFFF43F5E), Color(0xFFE11D48)]),
+                  gradient: const LinearGradient(
+                      colors: [Color(0xFFF43F5E), Color(0xFFE11D48)]),
                   borderRadius: BorderRadius.circular(16),
                   boxShadow: [
-                    BoxShadow(color: const Color(0xFFF43F5E).withValues(alpha: 0.3), blurRadius: 4, offset: const Offset(0, 2)),
+                    BoxShadow(
+                        color: const Color(0xFFF43F5E).withValues(alpha: 0.3),
+                        blurRadius: 4,
+                        offset: const Offset(0, 2)),
                   ],
                 ),
                 child: const Row(
@@ -1740,7 +2121,11 @@ class _P2HFormPageState extends State<P2HFormPage> {
                   children: [
                     Icon(Icons.close_rounded, color: Colors.white, size: 14),
                     SizedBox(width: 4),
-                    Text('Semua RUSAK', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                    Text('Semua RUSAK',
+                        style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold)),
                   ],
                 ),
               ),
@@ -1766,7 +2151,10 @@ class _P2HFormPageState extends State<P2HFormPage> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: isExpanded ? badgeColor.withValues(alpha: 0.5) : Colors.grey.shade200),
+        border: Border.all(
+            color: isExpanded
+                ? badgeColor.withValues(alpha: 0.5)
+                : Colors.grey.shade200),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.03),
@@ -1786,44 +2174,59 @@ class _P2HFormPageState extends State<P2HFormPage> {
               decoration: BoxDecoration(
                 color: bgColor,
                 borderRadius: isExpanded
-                    ? const BorderRadius.only(topLeft: Radius.circular(14), topRight: Radius.circular(14))
+                    ? const BorderRadius.only(
+                        topLeft: Radius.circular(14),
+                        topRight: Radius.circular(14))
                     : BorderRadius.circular(14),
               ),
               child: Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                     decoration: BoxDecoration(
                       color: badgeColor,
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: Text(
                       badgeText,
-                      style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                      style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold),
                     ),
                   ),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
                       title,
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF1E293B)),
+                      style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                          color: Color(0xFF1E293B)),
                     ),
                   ),
                   if (badCount > 0)
                     Container(
                       margin: const EdgeInsets.only(right: 6),
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 2),
                       decoration: BoxDecoration(
                         color: Colors.red,
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Text(
                         '$badCount Rusak',
-                        style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                        style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold),
                       ),
                     ),
                   Icon(
-                    isExpanded ? Icons.expand_less_rounded : Icons.expand_more_rounded,
+                    isExpanded
+                        ? Icons.expand_less_rounded
+                        : Icons.expand_more_rounded,
                     color: Colors.grey.shade700,
                   ),
                 ],
@@ -1884,15 +2287,20 @@ class _P2HFormPageState extends State<P2HFormPage> {
                     });
                   },
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     decoration: BoxDecoration(
-                      color: isGood ? const Color(0xFF10B981) : Colors.grey.shade100,
+                      color: isGood
+                          ? const Color(0xFF10B981)
+                          : Colors.grey.shade100,
                       borderRadius: const BorderRadius.only(
                         topLeft: Radius.circular(8),
                         bottomLeft: Radius.circular(8),
                       ),
                       border: Border.all(
-                        color: isGood ? const Color(0xFF10B981) : Colors.grey.shade300,
+                        color: isGood
+                            ? const Color(0xFF10B981)
+                            : Colors.grey.shade300,
                       ),
                     ),
                     child: Text(
@@ -1912,15 +2320,20 @@ class _P2HFormPageState extends State<P2HFormPage> {
                     });
                   },
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     decoration: BoxDecoration(
-                      color: !isGood ? const Color(0xFFE11D48) : Colors.grey.shade100,
+                      color: !isGood
+                          ? const Color(0xFFE11D48)
+                          : Colors.grey.shade100,
                       borderRadius: const BorderRadius.only(
                         topRight: Radius.circular(8),
                         bottomRight: Radius.circular(8),
                       ),
                       border: Border.all(
-                        color: !isGood ? const Color(0xFFE11D48) : Colors.grey.shade300,
+                        color: !isGood
+                            ? const Color(0xFFE11D48)
+                            : Colors.grey.shade300,
                       ),
                     ),
                     child: Text(
@@ -1956,18 +2369,26 @@ class _P2HFormPageState extends State<P2HFormPage> {
                   children: [
                     const Row(
                       children: [
-                        Icon(Icons.camera_alt_rounded, color: Color(0xFFE11D48), size: 14),
+                        Icon(Icons.camera_alt_rounded,
+                            color: Color(0xFFE11D48), size: 14),
                         SizedBox(width: 4),
                         Text(
                           'Foto Kerusakan (Wajib)',
-                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFFE11D48)),
+                          style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFFE11D48)),
                         ),
                       ],
                     ),
                     if (item.localPhotoPath != null)
                       GestureDetector(
                         onTap: () => setState(() => item.localPhotoPath = null),
-                        child: const Text('Hapus', style: TextStyle(color: Colors.red, fontSize: 10, fontWeight: FontWeight.bold)),
+                        child: const Text('Hapus',
+                            style: TextStyle(
+                                color: Colors.red,
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold)),
                       ),
                   ],
                 ),
@@ -1979,24 +2400,32 @@ class _P2HFormPageState extends State<P2HFormPage> {
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFFE11D48),
                           foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 6),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(6)),
                         ),
                         icon: const Icon(Icons.camera_alt_rounded, size: 14),
-                        label: const Text('Kamera', style: TextStyle(fontSize: 11)),
-                        onPressed: () => _pickDefectImage(item, ImageSource.camera),
+                        label: const Text('Kamera',
+                            style: TextStyle(fontSize: 11)),
+                        onPressed: () =>
+                            _pickDefectImage(item, ImageSource.camera),
                       ),
                       const SizedBox(width: 8),
                       OutlinedButton.icon(
                         style: OutlinedButton.styleFrom(
                           foregroundColor: const Color(0xFFE11D48),
                           side: const BorderSide(color: Color(0xFFE11D48)),
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 6),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(6)),
                         ),
                         icon: const Icon(Icons.photo_library_rounded, size: 14),
-                        label: const Text('Galeri', style: TextStyle(fontSize: 11)),
-                        onPressed: () => _pickDefectImage(item, ImageSource.gallery),
+                        label: const Text('Galeri',
+                            style: TextStyle(fontSize: 11)),
+                        onPressed: () =>
+                            _pickDefectImage(item, ImageSource.gallery),
                       ),
                     ],
                   )
@@ -2016,15 +2445,23 @@ class _P2HFormPageState extends State<P2HFormPage> {
                       const Expanded(
                         child: Row(
                           children: [
-                            Icon(Icons.check_circle_rounded, color: Colors.green, size: 16),
+                            Icon(Icons.check_circle_rounded,
+                                color: Colors.green, size: 16),
                             SizedBox(width: 4),
-                            Text('Foto terlampir', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.green)),
+                            Text('Foto terlampir',
+                                style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.green)),
                           ],
                         ),
                       ),
                       TextButton(
-                        onPressed: () => _pickDefectImage(item, ImageSource.camera),
-                        child: const Text('Ganti', style: TextStyle(fontSize: 11, color: Color(0xFF0284C7))),
+                        onPressed: () =>
+                            _pickDefectImage(item, ImageSource.camera),
+                        child: const Text('Ganti',
+                            style: TextStyle(
+                                fontSize: 11, color: Color(0xFF0284C7))),
                       ),
                     ],
                   ),

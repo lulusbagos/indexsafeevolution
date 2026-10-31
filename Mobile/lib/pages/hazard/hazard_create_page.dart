@@ -53,7 +53,8 @@ const List<JenisBahayaDef> kJenisBahayaDefs = [
     name: 'Fisikal',
     icon: Icons.hearing_disabled_rounded,
     color: Color(0xFF0284C7),
-    subtitle: 'Kebisingan tinggi, pencahayaan kurang, suhu ekstrim, debu tambang',
+    subtitle:
+        'Kebisingan tinggi, pencahayaan kurang, suhu ekstrim, debu tambang',
   ),
   JenisBahayaDef(
     name: 'Kelistrikan',
@@ -77,13 +78,15 @@ const List<JenisBahayaDef> kJenisBahayaDefs = [
     name: 'Longsor',
     icon: Icons.landslide_rounded,
     color: Color(0xFFC2410C),
-    subtitle: 'Retakan lereng pit, slope failure highwall/disposal, batu runtuh',
+    subtitle:
+        'Retakan lereng pit, slope failure highwall/disposal, batu runtuh',
   ),
   JenisBahayaDef(
     name: 'Mekanikal',
     icon: Icons.settings_suggest_rounded,
     color: Color(0xFF2563EB),
-    subtitle: 'Gir berputar tanpa penutup, rem blong, pinch point, hidrolik bocor',
+    subtitle:
+        'Gir berputar tanpa penutup, rem blong, pinch point, hidrolik bocor',
   ),
   JenisBahayaDef(
     name: 'Perilaku',
@@ -243,7 +246,8 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
       ''');
 
       // Bersihkan entri invalid CAMP EKSPLORASI dari tabel lokal jika masih ada
-      await sqldb.execute("DELETE FROM tbl_m_benchmark WHERE area_utama LIKE '%CAMP EKSPLORASI%' OR nama_benchmark = 'CAMP EKSPLORASI BLOCK CENTRAL'");
+      await sqldb.execute(
+          "DELETE FROM tbl_m_benchmark WHERE area_utama LIKE '%CAMP EKSPLORASI%' OR nama_benchmark = 'CAMP EKSPLORASI BLOCK CENTRAL'");
 
       // 2. Baca dari database SQLite lokal (semua area yang tersimpan)
       final localAreas = await sqldb.rawQuery(
@@ -253,9 +257,11 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
         setState(() {
           _masterAreas = localAreas
               .map((e) => e['area_utama'].toString().trim())
-              .where((s) => s.isNotEmpty && !s.toUpperCase().contains('CAMP EKSPLORASI'))
+              .where((s) =>
+                  s.isNotEmpty && !s.toUpperCase().contains('CAMP EKSPLORASI'))
               .toSet()
-              .toList()..sort();
+              .toList()
+            ..sort();
         });
         onDone?.call();
         _onAreasLoadedModal?.call();
@@ -265,7 +271,9 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
       final serverAreas = await _api.getMasterAreas(perusahaanId: companyId);
       if (serverAreas.isNotEmpty && mounted) {
         setState(() {
-          _masterAreas = serverAreas.where((s) => !s.toUpperCase().contains('CAMP EKSPLORASI')).toList();
+          _masterAreas = serverAreas
+              .where((s) => !s.toUpperCase().contains('CAMP EKSPLORASI'))
+              .toList();
         });
         onDone?.call();
         _onAreasLoadedModal?.call();
@@ -290,7 +298,8 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
     }
   }
 
-  Future<void> _loadBenchmarksForArea(String area, {VoidCallback? onDone}) async {
+  Future<void> _loadBenchmarksForArea(String area,
+      {VoidCallback? onDone}) async {
     final cleanArea = area.trim();
     if (cleanArea.isEmpty) {
       if (mounted) {
@@ -331,14 +340,20 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
       );
       if (localRows.isNotEmpty && mounted) {
         setState(() {
-          _benchmarksList = localRows.map((e) => e['nama_benchmark'].toString().trim()).where((s) => s.isNotEmpty).toSet().toList()..sort();
+          _benchmarksList = localRows
+              .map((e) => e['nama_benchmark'].toString().trim())
+              .where((s) => s.isNotEmpty)
+              .toSet()
+              .toList()
+            ..sort();
         });
         onDone?.call();
         _onBenchmarksLoadedModal?.call();
       }
 
       // 3. Ambil dari server API tbl_m_benchmark sesuai perusahaan_id user login
-      final serverBenchmarks = await _api.getBenchmarks(cleanArea, perusahaanId: companyId);
+      final serverBenchmarks =
+          await _api.getBenchmarks(cleanArea, perusahaanId: companyId);
       if (serverBenchmarks.isNotEmpty && mounted) {
         setState(() {
           _benchmarksList = serverBenchmarks;
@@ -385,8 +400,11 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
               });
             }
 
-            final filtered = _masterAreas.where((a) => a.toLowerCase().contains(filter.toLowerCase())).toList();
-            final hasExactMatch = _masterAreas.any((a) => a.toLowerCase() == filter.trim().toLowerCase());
+            final filtered = _masterAreas
+                .where((a) => a.toLowerCase().contains(filter.toLowerCase()))
+                .toList();
+            final hasExactMatch = _masterAreas
+                .any((a) => a.toLowerCase() == filter.trim().toLowerCase());
             final canAddCustom = filter.trim().isNotEmpty && !hasExactMatch;
 
             return Container(
@@ -407,7 +425,6 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
                     ),
                   ),
                   const SizedBox(height: 14),
-
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 20),
                     child: Row(
@@ -427,20 +444,20 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
                             SizedBox(height: 2),
                             Text(
                               'Pilih atau ketik untuk mencari & menambah area',
-                              style: TextStyle(color: Color(0xFF64748B), fontSize: 12),
+                              style: TextStyle(
+                                  color: Color(0xFF64748B), fontSize: 12),
                             ),
                           ],
                         ),
                         IconButton(
                           onPressed: () => Navigator.pop(modalCtx),
-                          icon: const Icon(Icons.close_rounded, color: Color(0xFF64748B)),
+                          icon: const Icon(Icons.close_rounded,
+                              color: Color(0xFF64748B)),
                         ),
                       ],
                     ),
                   ),
-
                   const SizedBox(height: 12),
-
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 20),
                     child: Container(
@@ -452,29 +469,34 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
                       child: TextField(
                         autofocus: false,
                         onChanged: (val) => setModalState(() => filter = val),
-                        style: const TextStyle(fontSize: 14, color: Color(0xFF0F172A)),
+                        style: const TextStyle(
+                            fontSize: 14, color: Color(0xFF0F172A)),
                         decoration: InputDecoration(
                           hintText: 'Ketik untuk mencari area...',
-                          hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
-                          prefixIcon: const Icon(Icons.search_rounded, color: Color(0xFF64748B)),
+                          hintStyle: const TextStyle(
+                              color: Color(0xFF94A3B8), fontSize: 13),
+                          prefixIcon: const Icon(Icons.search_rounded,
+                              color: Color(0xFF64748B)),
                           suffixIcon: filter.isNotEmpty
                               ? IconButton(
-                                  icon: const Icon(Icons.clear_rounded, size: 18),
-                                  onPressed: () => setModalState(() => filter = ''),
+                                  icon:
+                                      const Icon(Icons.clear_rounded, size: 18),
+                                  onPressed: () =>
+                                      setModalState(() => filter = ''),
                                 )
                               : null,
                           border: InputBorder.none,
-                          contentPadding: const EdgeInsets.symmetric(vertical: 14),
+                          contentPadding:
+                              const EdgeInsets.symmetric(vertical: 14),
                         ),
                       ),
                     ),
                   ),
-
                   const SizedBox(height: 12),
-
                   if (canAddCustom)
                     Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 20, vertical: 4),
                       child: InkWell(
                         onTap: () async {
                           Navigator.pop(modalCtx);
@@ -482,7 +504,8 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
                         },
                         borderRadius: BorderRadius.circular(12),
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 14, vertical: 12),
                           decoration: BoxDecoration(
                             color: const Color(0xFFEFF6FF),
                             borderRadius: BorderRadius.circular(12),
@@ -496,7 +519,8 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
                                   color: const Color(0xFF0284C7),
                                   borderRadius: BorderRadius.circular(8),
                                 ),
-                                child: const Icon(Icons.add, color: Colors.white, size: 16),
+                                child: const Icon(Icons.add,
+                                    color: Colors.white, size: 16),
                               ),
                               const SizedBox(width: 12),
                               Expanded(
@@ -505,7 +529,10 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
                                   children: [
                                     Text(
                                       'Gunakan / Tambah Area Baru:',
-                                      style: TextStyle(color: Colors.blue.shade700, fontSize: 11, fontWeight: FontWeight.w600),
+                                      style: TextStyle(
+                                          color: Colors.blue.shade700,
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w600),
                                     ),
                                     Text(
                                       '"${filter.trim()}"',
@@ -518,13 +545,13 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
                                   ],
                                 ),
                               ),
-                              const Icon(Icons.arrow_forward_ios_rounded, color: Color(0xFF0284C7), size: 14),
+                              const Icon(Icons.arrow_forward_ios_rounded,
+                                  color: Color(0xFF0284C7), size: 14),
                             ],
                           ),
                         ),
                       ),
                     ),
-
                   Expanded(
                     child: _isLoadingAreas && _masterAreas.isEmpty
                         ? const Center(
@@ -534,57 +561,70 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
                                 SizedBox(
                                   width: 28,
                                   height: 28,
-                                  child: CircularProgressIndicator(strokeWidth: 2.5),
+                                  child: CircularProgressIndicator(
+                                      strokeWidth: 2.5),
                                 ),
                                 SizedBox(height: 14),
                                 Text(
-                                  'Memuat daftar area dari database...',
-                                  style: TextStyle(color: Color(0xFF64748B), fontSize: 13),
+                                  'Memuat daftar area...',
+                                  style: TextStyle(
+                                      color: Color(0xFF64748B), fontSize: 13),
                                 ),
                               ],
                             ),
                           )
                         : filtered.isEmpty && !canAddCustom
-                        ? const Center(
-                            child: Text('Area tidak ditemukan', style: TextStyle(color: Color(0xFF94A3B8))),
-                          )
-                        : ListView.separated(
-                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                            itemCount: filtered.length,
-                            separatorBuilder: (_, __) => const Divider(height: 1, color: Color(0xFFF1F5F9)),
-                            itemBuilder: (context, index) {
-                              final item = filtered[index];
-                              final isSelected = item == _area;
-                              return ListTile(
-                                dense: true,
-                                contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                leading: Icon(
-                                  Icons.place_rounded,
-                                  color: isSelected ? const Color(0xFF0284C7) : const Color(0xFF94A3B8),
-                                  size: 20,
-                                ),
-                                title: Text(
-                                  item,
-                                  style: TextStyle(
-                                    color: isSelected ? const Color(0xFF0284C7) : const Color(0xFF1E293B),
-                                    fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                                    fontSize: 13,
-                                  ),
-                                ),
-                                trailing: isSelected
-                                    ? const Icon(Icons.check_circle_rounded, color: Color(0xFF0284C7), size: 20)
-                                    : null,
-                                onTap: () {
-                                  Navigator.pop(modalCtx);
-                                  setState(() {
-                                    _area = item;
-                                    _detilLokasiCtrl.text = '';
-                                  });
-                                  _loadBenchmarksForArea(item);
+                            ? const Center(
+                                child: Text('Area tidak ditemukan',
+                                    style: TextStyle(color: Color(0xFF94A3B8))),
+                              )
+                            : ListView.separated(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 20, vertical: 8),
+                                itemCount: filtered.length,
+                                separatorBuilder: (_, __) => const Divider(
+                                    height: 1, color: Color(0xFFF1F5F9)),
+                                itemBuilder: (context, index) {
+                                  final item = filtered[index];
+                                  final isSelected = item == _area;
+                                  return ListTile(
+                                    dense: true,
+                                    contentPadding: const EdgeInsets.symmetric(
+                                        horizontal: 8, vertical: 2),
+                                    leading: Icon(
+                                      Icons.place_rounded,
+                                      color: isSelected
+                                          ? const Color(0xFF0284C7)
+                                          : const Color(0xFF94A3B8),
+                                      size: 20,
+                                    ),
+                                    title: Text(
+                                      item,
+                                      style: TextStyle(
+                                        color: isSelected
+                                            ? const Color(0xFF0284C7)
+                                            : const Color(0xFF1E293B),
+                                        fontWeight: isSelected
+                                            ? FontWeight.bold
+                                            : FontWeight.w500,
+                                        fontSize: 13,
+                                      ),
+                                    ),
+                                    trailing: isSelected
+                                        ? const Icon(Icons.check_circle_rounded,
+                                            color: Color(0xFF0284C7), size: 20)
+                                        : null,
+                                    onTap: () {
+                                      Navigator.pop(modalCtx);
+                                      setState(() {
+                                        _area = item;
+                                        _detilLokasiCtrl.text = '';
+                                      });
+                                      _loadBenchmarksForArea(item);
+                                    },
+                                  );
                                 },
-                              );
-                            },
-                          ),
+                              ),
                   ),
                 ],
               ),
@@ -609,7 +649,9 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
             };
 
             // Auto fetch if empty (safely scheduled)
-            if (_benchmarksList.isEmpty && !_isLoadingBenchmarks && _area.isNotEmpty) {
+            if (_benchmarksList.isEmpty &&
+                !_isLoadingBenchmarks &&
+                _area.isNotEmpty) {
               WidgetsBinding.instance.addPostFrameCallback((_) {
                 _loadBenchmarksForArea(_area);
               });
@@ -618,7 +660,8 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
             final filtered = _benchmarksList
                 .where((b) => b.toLowerCase().contains(filter.toLowerCase()))
                 .toList();
-            final hasExactMatch = _benchmarksList.any((b) => b.toLowerCase() == filter.trim().toLowerCase());
+            final hasExactMatch = _benchmarksList
+                .any((b) => b.toLowerCase() == filter.trim().toLowerCase());
             final canAddCustom = filter.trim().isNotEmpty && !hasExactMatch;
 
             return Container(
@@ -639,7 +682,6 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
                     ),
                   ),
                   const SizedBox(height: 14),
-
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 20),
                     child: Row(
@@ -660,7 +702,10 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
                               const SizedBox(height: 2),
                               Text(
                                 'Area: $_area',
-                                style: const TextStyle(color: Color(0xFF0284C7), fontSize: 12, fontWeight: FontWeight.w600),
+                                style: const TextStyle(
+                                    color: Color(0xFF0284C7),
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                               ),
@@ -669,14 +714,13 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
                         ),
                         IconButton(
                           onPressed: () => Navigator.pop(modalCtx),
-                          icon: const Icon(Icons.close_rounded, color: Color(0xFF64748B)),
+                          icon: const Icon(Icons.close_rounded,
+                              color: Color(0xFF64748B)),
                         ),
                       ],
                     ),
                   ),
-
                   const SizedBox(height: 12),
-
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 20),
                     child: Container(
@@ -688,29 +732,34 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
                       child: TextField(
                         autofocus: false,
                         onChanged: (val) => setModalState(() => filter = val),
-                        style: const TextStyle(fontSize: 14, color: Color(0xFF0F172A)),
+                        style: const TextStyle(
+                            fontSize: 14, color: Color(0xFF0F172A)),
                         decoration: InputDecoration(
                           hintText: 'Ketik untuk mencari benchmark...',
-                          hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
-                          prefixIcon: const Icon(Icons.search_rounded, color: Color(0xFF64748B)),
+                          hintStyle: const TextStyle(
+                              color: Color(0xFF94A3B8), fontSize: 13),
+                          prefixIcon: const Icon(Icons.search_rounded,
+                              color: Color(0xFF64748B)),
                           suffixIcon: filter.isNotEmpty
                               ? IconButton(
-                                  icon: const Icon(Icons.clear_rounded, size: 18),
-                                  onPressed: () => setModalState(() => filter = ''),
+                                  icon:
+                                      const Icon(Icons.clear_rounded, size: 18),
+                                  onPressed: () =>
+                                      setModalState(() => filter = ''),
                                 )
                               : null,
                           border: InputBorder.none,
-                          contentPadding: const EdgeInsets.symmetric(vertical: 14),
+                          contentPadding:
+                              const EdgeInsets.symmetric(vertical: 14),
                         ),
                       ),
                     ),
                   ),
-
                   const SizedBox(height: 12),
-
                   if (canAddCustom)
                     Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 20, vertical: 4),
                       child: InkWell(
                         onTap: () async {
                           Navigator.pop(modalCtx);
@@ -718,7 +767,8 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
                         },
                         borderRadius: BorderRadius.circular(12),
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 14, vertical: 12),
                           decoration: BoxDecoration(
                             color: const Color(0xFFEFF6FF),
                             borderRadius: BorderRadius.circular(12),
@@ -732,7 +782,8 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
                                   color: const Color(0xFF38BDF8),
                                   borderRadius: BorderRadius.circular(8),
                                 ),
-                                child: const Icon(Icons.add, color: Colors.white, size: 16),
+                                child: const Icon(Icons.add,
+                                    color: Colors.white, size: 16),
                               ),
                               const SizedBox(width: 12),
                               Expanded(
@@ -740,8 +791,11 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      'Tambah Benchmark Baru ke Database:',
-                                      style: TextStyle(color: Colors.blue.shade700, fontSize: 11, fontWeight: FontWeight.w600),
+                                      'Tambah acuan baru:',
+                                      style: TextStyle(
+                                          color: Colors.blue.shade700,
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w600),
                                     ),
                                     Text(
                                       '"${filter.trim()}"',
@@ -754,13 +808,13 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
                                   ],
                                 ),
                               ),
-                              const Icon(Icons.arrow_forward_ios_rounded, color: Color(0xFF0284C7), size: 14),
+                              const Icon(Icons.arrow_forward_ios_rounded,
+                                  color: Color(0xFF0284C7), size: 14),
                             ],
                           ),
                         ),
                       ),
                     ),
-
                   Expanded(
                     child: _isLoadingBenchmarks && _benchmarksList.isEmpty
                         ? const Center(
@@ -770,82 +824,102 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
                                 SizedBox(
                                   width: 28,
                                   height: 28,
-                                  child: CircularProgressIndicator(strokeWidth: 2.5),
+                                  child: CircularProgressIndicator(
+                                      strokeWidth: 2.5),
                                 ),
                                 SizedBox(height: 14),
                                 Text(
-                                  'Memuat benchmark dari database...',
-                                  style: TextStyle(color: Color(0xFF64748B), fontSize: 13),
+                                  'Memuat data acuan...',
+                                  style: TextStyle(
+                                      color: Color(0xFF64748B), fontSize: 13),
                                 ),
                               ],
                             ),
                           )
                         : filtered.isEmpty && !canAddCustom
-                        ? Center(
-                            child: Padding(
-                              padding: const EdgeInsets.all(24),
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  const Icon(Icons.explore_off_rounded, color: Color(0xFF94A3B8), size: 48),
-                                  const SizedBox(height: 12),
-                                  Text(
-                                    'Belum ada benchmark terdaftar untuk area "$_area".',
-                                    textAlign: TextAlign.center,
-                                    style: const TextStyle(color: Color(0xFF64748B), fontSize: 13),
+                            ? Center(
+                                child: Padding(
+                                  padding: const EdgeInsets.all(24),
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Icon(Icons.explore_off_rounded,
+                                          color: Color(0xFF94A3B8), size: 48),
+                                      const SizedBox(height: 12),
+                                      Text(
+                                        'Belum ada benchmark terdaftar untuk area "$_area".',
+                                        textAlign: TextAlign.center,
+                                        style: const TextStyle(
+                                            color: Color(0xFF64748B),
+                                            fontSize: 13),
+                                      ),
+                                      const SizedBox(height: 12),
+                                      FilledButton.icon(
+                                        onPressed: () {
+                                          Navigator.pop(modalCtx);
+                                          _showAddBenchmarkDialog();
+                                        },
+                                        icon: const Icon(Icons.add, size: 18),
+                                        label:
+                                            const Text('Tambah Benchmark Baru'),
+                                        style: FilledButton.styleFrom(
+                                          backgroundColor:
+                                              const Color(0xFF38BDF8),
+                                          shape: RoundedRectangleBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(12)),
+                                        ),
+                                      ),
+                                    ],
                                   ),
-                                  const SizedBox(height: 12),
-                                  FilledButton.icon(
-                                    onPressed: () {
-                                      Navigator.pop(modalCtx);
-                                      _showAddBenchmarkDialog();
-                                    },
-                                    icon: const Icon(Icons.add, size: 18),
-                                    label: const Text('Tambah Benchmark Baru'),
-                                    style: FilledButton.styleFrom(
-                                      backgroundColor: const Color(0xFF38BDF8),
-                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                ),
+                              )
+                            : ListView.separated(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 20, vertical: 8),
+                                itemCount: filtered.length,
+                                separatorBuilder: (_, __) => const Divider(
+                                    height: 1, color: Color(0xFFF1F5F9)),
+                                itemBuilder: (context, index) {
+                                  final item = filtered[index];
+                                  final isSelected =
+                                      item == _detilLokasiCtrl.text;
+                                  return ListTile(
+                                    dense: true,
+                                    contentPadding: const EdgeInsets.symmetric(
+                                        horizontal: 8, vertical: 2),
+                                    leading: Icon(
+                                      Icons.explore_rounded,
+                                      color: isSelected
+                                          ? const Color(0xFF0284C7)
+                                          : const Color(0xFF94A3B8),
+                                      size: 20,
                                     ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          )
-                        : ListView.separated(
-                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                            itemCount: filtered.length,
-                            separatorBuilder: (_, __) => const Divider(height: 1, color: Color(0xFFF1F5F9)),
-                            itemBuilder: (context, index) {
-                              final item = filtered[index];
-                              final isSelected = item == _detilLokasiCtrl.text;
-                              return ListTile(
-                                dense: true,
-                                contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                leading: Icon(
-                                  Icons.explore_rounded,
-                                  color: isSelected ? const Color(0xFF0284C7) : const Color(0xFF94A3B8),
-                                  size: 20,
-                                ),
-                                title: Text(
-                                  item,
-                                  style: TextStyle(
-                                    color: isSelected ? const Color(0xFF0284C7) : const Color(0xFF1E293B),
-                                    fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                                    fontSize: 13,
-                                  ),
-                                ),
-                                trailing: isSelected
-                                    ? const Icon(Icons.check_circle_rounded, color: Color(0xFF0284C7), size: 20)
-                                    : null,
-                                onTap: () {
-                                  Navigator.pop(modalCtx);
-                                  setState(() {
-                                    _detilLokasiCtrl.text = item;
-                                  });
+                                    title: Text(
+                                      item,
+                                      style: TextStyle(
+                                        color: isSelected
+                                            ? const Color(0xFF0284C7)
+                                            : const Color(0xFF1E293B),
+                                        fontWeight: isSelected
+                                            ? FontWeight.bold
+                                            : FontWeight.w500,
+                                        fontSize: 13,
+                                      ),
+                                    ),
+                                    trailing: isSelected
+                                        ? const Icon(Icons.check_circle_rounded,
+                                            color: Color(0xFF0284C7), size: 20)
+                                        : null,
+                                    onTap: () {
+                                      Navigator.pop(modalCtx);
+                                      setState(() {
+                                        _detilLokasiCtrl.text = item;
+                                      });
+                                    },
+                                  );
                                 },
-                              );
-                            },
-                          ),
+                              ),
                   ),
                 ],
               ),
@@ -879,7 +953,8 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
             icon: Icons.pan_tool_outlined,
             color: const Color(0xFFE11D48),
             isSelected: _kategoriBahaya == 'Tindakan Tidak Aman',
-            onTap: () => setState(() => _kategoriBahaya = 'Tindakan Tidak Aman'),
+            onTap: () =>
+                setState(() => _kategoriBahaya = 'Tindakan Tidak Aman'),
           ),
         ),
       ],
@@ -902,7 +977,9 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: isSelected ? color.withValues(alpha: 0.08) : const Color(0xFFF8FAFC),
+          color: isSelected
+              ? color.withValues(alpha: 0.08)
+              : const Color(0xFFF8FAFC),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
             color: isSelected ? color : const Color(0xFFE2E8F0),
@@ -930,10 +1007,12 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
                     color: isSelected ? color : color.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: Icon(icon, color: isSelected ? Colors.white : color, size: 20),
+                  child: Icon(icon,
+                      color: isSelected ? Colors.white : color, size: 20),
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
                   decoration: BoxDecoration(
                     color: isSelected ? color : const Color(0xFFE2E8F0),
                     borderRadius: BorderRadius.circular(6),
@@ -941,7 +1020,8 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
                   child: Text(
                     code,
                     style: TextStyle(
-                      color: isSelected ? Colors.white : const Color(0xFF475569),
+                      color:
+                          isSelected ? Colors.white : const Color(0xFF475569),
                       fontSize: 10.5,
                       fontWeight: FontWeight.bold,
                     ),
@@ -953,7 +1033,9 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
             Text(
               title,
               style: TextStyle(
-                color: isSelected ? const Color(0xFF0F172A) : const Color(0xFF334155),
+                color: isSelected
+                    ? const Color(0xFF0F172A)
+                    : const Color(0xFF334155),
                 fontSize: 13,
                 fontWeight: FontWeight.bold,
               ),
@@ -976,8 +1058,12 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
   }
 
   Widget _buildJenisBahayaSelector() {
-    final currentVal = kJenisBahayaDefs.any((d) => d.name.toLowerCase() == _jenisBahaya.toLowerCase())
-        ? kJenisBahayaDefs.firstWhere((d) => d.name.toLowerCase() == _jenisBahaya.toLowerCase()).name
+    final currentVal = kJenisBahayaDefs
+            .any((d) => d.name.toLowerCase() == _jenisBahaya.toLowerCase())
+        ? kJenisBahayaDefs
+            .firstWhere(
+                (d) => d.name.toLowerCase() == _jenisBahaya.toLowerCase())
+            .name
         : null;
 
     return Container(
@@ -985,7 +1071,9 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
         color: const Color(0xFFF8FAFC),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: _jenisBahaya.isEmpty ? const Color(0xFFCBD5E1) : const Color(0xFFE2E8F0),
+          color: _jenisBahaya.isEmpty
+              ? const Color(0xFFCBD5E1)
+              : const Color(0xFFE2E8F0),
         ),
       ),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
@@ -996,7 +1084,8 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
           itemHeight: 56,
           dropdownColor: Colors.white,
           borderRadius: BorderRadius.circular(14),
-          icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Color(0xFF64748B), size: 22),
+          icon: const Icon(Icons.keyboard_arrow_down_rounded,
+              color: Color(0xFF64748B), size: 22),
           hint: Row(
             children: [
               Container(
@@ -1007,7 +1096,8 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(color: const Color(0xFFE2E8F0)),
                 ),
-                child: const Icon(Icons.category_outlined, color: Color(0xFF94A3B8), size: 18),
+                child: const Icon(Icons.category_outlined,
+                    color: Color(0xFF94A3B8), size: 18),
               ),
               const SizedBox(width: 10),
               const Text(
@@ -1165,7 +1255,9 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
             ),
             boxShadow: [
               BoxShadow(
-                color: isSelected ? color.withValues(alpha: 0.18) : Colors.black.withValues(alpha: 0.02),
+                color: isSelected
+                    ? color.withValues(alpha: 0.18)
+                    : Colors.black.withValues(alpha: 0.02),
                 blurRadius: isSelected ? 8 : 4,
                 offset: const Offset(0, 2),
               ),
@@ -1220,22 +1312,26 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
       case 'ekstrim':
         color = const Color(0xFFDC2626);
         icon = Icons.error_outline_rounded;
-        text = 'STOP OPERASI (SWA)! Bahaya kritis berpotensi fatalitas / cacat permanen. Wajib dihentikan & dilaporkan segera!';
+        text =
+            'STOP OPERASI (SWA)! Bahaya kritis berpotensi fatalitas / cacat permanen. Wajib dihentikan & dilaporkan segera!';
         break;
       case 'tinggi':
         color = const Color(0xFFEA580C);
         icon = Icons.warning_amber_rounded;
-        text = 'Prioritas Tinggi: Bahaya berpotensi cedera berat atau kerusakan aset signifikan. Memerlukan penanganan segera.';
+        text =
+            'Prioritas Tinggi: Bahaya berpotensi cedera berat atau kerusakan aset signifikan. Memerlukan penanganan segera.';
         break;
       case 'sedang':
         color = const Color(0xFFD97706);
         icon = Icons.info_outline_rounded;
-        text = 'Perhatian Khusus: Bahaya berpotensi menimbulkan cedera ringan atau kerugian operasional. Memerlukan tindakan terencana.';
+        text =
+            'Perhatian Khusus: Bahaya berpotensi menimbulkan cedera ringan atau kerugian operasional. Memerlukan tindakan terencana.';
         break;
       default:
         color = const Color(0xFF059669);
         icon = Icons.check_circle_outline_rounded;
-        text = 'Tindakan Terjadwal: Bahaya berdampak minimal. Perbaikan dilakukan melalui pemeliharaan atau housekeeping berkala.';
+        text =
+            'Tindakan Terjadwal: Bahaya berdampak minimal. Perbaikan dilakukan melalui pemeliharaan atau housekeeping berkala.';
         break;
     }
 
@@ -1273,7 +1369,8 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
       context: context,
       builder: (dlgCtx) {
         return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
           title: Row(
             children: [
               Container(
@@ -1282,7 +1379,8 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
                   color: const Color(0xFFE0F2FE),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: const Icon(Icons.add_location_alt_rounded, color: Color(0xFF0284C7), size: 20),
+                child: const Icon(Icons.add_location_alt_rounded,
+                    color: Color(0xFF0284C7), size: 20),
               ),
               const SizedBox(width: 10),
               const Expanded(
@@ -1299,7 +1397,10 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
             children: [
               Text(
                 'Area Utama: $_area',
-                style: const TextStyle(color: Color(0xFF0284C7), fontSize: 12, fontWeight: FontWeight.bold),
+                style: const TextStyle(
+                    color: Color(0xFF0284C7),
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 12),
               TextField(
@@ -1309,13 +1410,14 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
                 decoration: InputDecoration(
                   labelText: 'Nama Benchmark / Detail Lokasi',
                   hintText: 'Contoh: RL 50, BM-22, Seam B',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12)),
                   prefixIcon: const Icon(Icons.explore_rounded),
                 ),
               ),
               const SizedBox(height: 8),
               const Text(
-                'Benchmark ini akan langsung disimpan ke database tbl_m_benchmark.',
+                'Data acuan ini akan langsung tersimpan dan tersedia untuk pilihan berikutnya.',
                 style: TextStyle(color: Color(0xFF64748B), fontSize: 11),
               ),
             ],
@@ -1334,7 +1436,8 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
               },
               style: FilledButton.styleFrom(
                 backgroundColor: const Color(0xFF0284C7),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10)),
               ),
               child: const Text('Simpan Benchmark'),
             ),
@@ -1369,7 +1472,14 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
       await sqldb.rawInsert(
         '''INSERT INTO tbl_m_benchmark (perusahaan_id, area_utama, nama_benchmark, created_by_nik, created_by_name, created_at)
            VALUES (?, ?, ?, ?, ?, ?)''',
-        [profile?.companyId ?? 1, _area, cleanName, userNik, userName, DateTime.now().toIso8601String()],
+        [
+          profile?.companyId ?? 1,
+          _area,
+          cleanName,
+          userNik,
+          userName,
+          DateTime.now().toIso8601String()
+        ],
       );
     } catch (_) {}
 
@@ -1383,9 +1493,11 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
       );
       if (mounted) {
         if (result != null) {
-          SnackBarMsg.success(context, 'Benchmark "$cleanName" berhasil disimpan ke database!');
+          SnackBarMsg.success(
+              context, 'Data acuan "$cleanName" berhasil disimpan.');
         } else {
-          SnackBarMsg.info(context, 'Benchmark "$cleanName" tersimpan di HP (Mode Offline)');
+          SnackBarMsg.info(
+              context, 'Benchmark "$cleanName" tersimpan di HP (Mode Offline)');
         }
       }
     } catch (e) {
@@ -1418,7 +1530,13 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
       await sqldb.rawInsert(
         '''INSERT INTO tbl_m_benchmark (perusahaan_id, area_utama, nama_benchmark, created_by_nik, created_by_name, created_at)
            VALUES (?, ?, '', ?, ?, ?)''',
-        [profile?.companyId ?? 1, cleanName, userNik, userName, DateTime.now().toIso8601String()],
+        [
+          profile?.companyId ?? 1,
+          cleanName,
+          userNik,
+          userName,
+          DateTime.now().toIso8601String()
+        ],
       );
     } catch (_) {}
 
@@ -1494,7 +1612,8 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
             setState(() {
               _isSearchingPja = false;
               if (data.isNotEmpty) {
-                _pjaSearchResults = data.map((e) => PjaSearchResult.fromJson(e)).toList();
+                _pjaSearchResults =
+                    data.map((e) => PjaSearchResult.fromJson(e)).toList();
               }
             });
           }
@@ -1512,13 +1631,18 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
       final rows = await sqldb.rawQuery(
         "SELECT no_nik, nama_lengkap, depart, posisi, departemen, jabatan, perusahaan FROM employees WHERE no_nik LIKE '%$safeQ%' OR nama_lengkap LIKE '%$safeQ%' LIMIT 30",
       );
-      final list = rows.map((r) => PjaSearchResult(
-        nik: r['no_nik']?.toString() ?? '',
-        nama: r['nama_lengkap']?.toString() ?? '',
-        departemen: (r['departemen'] ?? r['depart'])?.toString() ?? 'GENERAL',
-        jabatan: (r['jabatan'] ?? r['posisi'])?.toString() ?? 'Karyawan',
-        perusahaan: r['perusahaan']?.toString() ?? 'PT INDEXIM COALINDO',
-      )).toList();
+      final list = rows
+          .map((r) => PjaSearchResult(
+                nik: r['no_nik']?.toString() ?? '',
+                nama: r['nama_lengkap']?.toString() ?? '',
+                departemen:
+                    (r['departemen'] ?? r['depart'])?.toString() ?? 'GENERAL',
+                jabatan:
+                    (r['jabatan'] ?? r['posisi'])?.toString() ?? 'Karyawan',
+                perusahaan:
+                    r['perusahaan']?.toString() ?? 'PT INDEXIM COALINDO',
+              ))
+          .toList();
 
       return list;
     } catch (e) {
@@ -1562,7 +1686,8 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
                       color: const Color(0xFFEA580C).withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(10),
                     ),
-                    child: const Icon(Icons.add_photo_alternate_rounded, color: Color(0xFFEA580C), size: 22),
+                    child: const Icon(Icons.add_photo_alternate_rounded,
+                        color: Color(0xFFEA580C), size: 22),
                   ),
                   const SizedBox(width: 12),
                   const Expanded(
@@ -1580,7 +1705,8 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
                         SizedBox(height: 2),
                         Text(
                           'Pilih sumber foto temuan keselamatan kerja',
-                          style: TextStyle(fontSize: 11.5, color: Color(0xFF64748B)),
+                          style: TextStyle(
+                              fontSize: 11.5, color: Color(0xFF64748B)),
                         ),
                       ],
                     ),
@@ -1614,13 +1740,15 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
                           borderRadius: BorderRadius.circular(12),
                           boxShadow: [
                             BoxShadow(
-                              color: const Color(0xFFEA580C).withValues(alpha: 0.25),
+                              color: const Color(0xFFEA580C)
+                                  .withValues(alpha: 0.25),
                               blurRadius: 8,
                               offset: const Offset(0, 3),
                             ),
                           ],
                         ),
-                        child: const Icon(Icons.photo_camera_rounded, color: Colors.white, size: 22),
+                        child: const Icon(Icons.photo_camera_rounded,
+                            color: Colors.white, size: 22),
                       ),
                       const SizedBox(width: 14),
                       Expanded(
@@ -1639,10 +1767,12 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
                                 ),
                                 const SizedBox(width: 8),
                                 Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 6, vertical: 2),
                                   decoration: const BoxDecoration(
                                     color: Color(0xFFECFDF5),
-                                    borderRadius: BorderRadius.all(Radius.circular(6)),
+                                    borderRadius:
+                                        BorderRadius.all(Radius.circular(6)),
                                   ),
                                   child: const Text(
                                     'REKOMENDASI',
@@ -1659,12 +1789,14 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
                             const SizedBox(height: 3),
                             const Text(
                               'Potret kondisi aktual langsung di lokasi kerja',
-                              style: TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                              style: TextStyle(
+                                  fontSize: 11, color: Color(0xFF64748B)),
                             ),
                           ],
                         ),
                       ),
-                      const Icon(Icons.chevron_right_rounded, color: Color(0xFF94A3B8), size: 22),
+                      const Icon(Icons.chevron_right_rounded,
+                          color: Color(0xFF94A3B8), size: 22),
                     ],
                   ),
                 ),
@@ -1697,13 +1829,15 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
                           borderRadius: BorderRadius.circular(12),
                           boxShadow: [
                             BoxShadow(
-                              color: const Color(0xFF3B82F6).withValues(alpha: 0.25),
+                              color: const Color(0xFF3B82F6)
+                                  .withValues(alpha: 0.25),
                               blurRadius: 8,
                               offset: const Offset(0, 3),
                             ),
                           ],
                         ),
-                        child: const Icon(Icons.photo_library_rounded, color: Colors.white, size: 22),
+                        child: const Icon(Icons.photo_library_rounded,
+                            color: Colors.white, size: 22),
                       ),
                       const SizedBox(width: 14),
                       const Expanded(
@@ -1721,12 +1855,14 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
                             SizedBox(height: 3),
                             Text(
                               'Gunakan foto dokumentasi yang tersimpan di HP',
-                              style: TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                              style: TextStyle(
+                                  fontSize: 11, color: Color(0xFF64748B)),
                             ),
                           ],
                         ),
                       ),
-                      const Icon(Icons.chevron_right_rounded, color: Color(0xFF94A3B8), size: 22),
+                      const Icon(Icons.chevron_right_rounded,
+                          color: Color(0xFF94A3B8), size: 22),
                     ],
                   ),
                 ),
@@ -1757,7 +1893,8 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
       } catch (err) {
         debugPrint('[PickImage] Error: $err');
         if (mounted) {
-          SnackBarMsg.danger(context, 'Tidak dapat membuka foto. Pastikan izin kamera/galeri telah diizinkan.');
+          SnackBarMsg.danger(context,
+              'Tidak dapat membuka foto. Pastikan izin kamera/galeri telah diizinkan.');
         }
       }
     }
@@ -1791,7 +1928,8 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
           perusahaan: 'INTERNAL',
         );
       } else {
-        SnackBarMsg.danger(context, 'Penanggung Jawab Area (PJA) wajib dipilih atau diketik untuk menindaklanjuti temuan.');
+        SnackBarMsg.danger(context,
+            'Penanggung Jawab Area (PJA) wajib dipilih atau diketik untuk menindaklanjuti temuan.');
         return;
       }
     }
@@ -1799,8 +1937,11 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
       SnackBarMsg.danger(context, 'Foto bukti temuan (Before) wajib diunggah.');
       return;
     }
-    if (_isSelfClosed && _fotoPerbaikan == null && widget.editItem?.fotoPerbaikan == null) {
-      SnackBarMsg.danger(context, 'Foto bukti perbaikan (After) wajib diunggah untuk status selesai langsung.');
+    if (_isSelfClosed &&
+        _fotoPerbaikan == null &&
+        widget.editItem?.fotoPerbaikan == null) {
+      SnackBarMsg.danger(context,
+          'Foto bukti perbaikan (After) wajib diunggah untuk status selesai langsung.');
       return;
     }
 
@@ -1809,11 +1950,13 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
     final minAllowed = today.subtract(const Duration(days: 2));
     final targetDate = DateTime(_tanggal.year, _tanggal.month, _tanggal.day);
     if (targetDate.isBefore(minAllowed)) {
-      SnackBarMsg.danger(context, 'Tanggal temuan tidak boleh backdate lebih dari 2 hari terakhir.');
+      SnackBarMsg.danger(context,
+          'Tanggal temuan tidak boleh backdate lebih dari 2 hari terakhir.');
       return;
     }
     if (targetDate.isAfter(today)) {
-      SnackBarMsg.danger(context, 'Tanggal temuan tidak boleh melebihi hari ini.');
+      SnackBarMsg.danger(
+          context, 'Tanggal temuan tidak boleh melebihi hari ini.');
       return;
     }
 
@@ -1821,7 +1964,8 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
 
     final fields = <String, dynamic>{
       'tanggal': DateFormat('yyyy-MM-dd').format(_tanggal),
-      'waktu': '${_waktu.hour.toString().padLeft(2, '0')}:${_waktu.minute.toString().padLeft(2, '0')}',
+      'waktu':
+          '${_waktu.hour.toString().padLeft(2, '0')}:${_waktu.minute.toString().padLeft(2, '0')}',
       'area': _area.isNotEmpty ? _area : 'PIT AREA',
       'lokasi': _lokasiCtrl.text.trim(),
       'detil_lokasi': _detilLokasiCtrl.text.trim(),
@@ -1832,9 +1976,13 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
       'temuan': _temuanCtrl.text.trim(),
       'perbaikan': _perbaikanCtrl.text.trim(),
       'tindakan_perbaikan': _tindakanCtrl.text.trim(),
-      'pja': _isSelfClosed ? profileNama : (_selectedPja?.nama ?? _pjaSearchCtrl.text.trim().toUpperCase()),
+      'pja': _isSelfClosed
+          ? profileNama
+          : (_selectedPja?.nama ?? _pjaSearchCtrl.text.trim().toUpperCase()),
       'nik_pja': _isSelfClosed ? profileNik : (_selectedPja?.nik ?? 'MANUAL'),
-      'departemen_pja': _isSelfClosed ? profileDepartemen : (_selectedPja?.departemen ?? 'LAPANGAN'),
+      'departemen_pja': _isSelfClosed
+          ? profileDepartemen
+          : (_selectedPja?.departemen ?? 'LAPANGAN'),
       'status_temuan': _isSelfClosed ? 'Closed' : 'Open',
     };
 
@@ -1868,18 +2016,34 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
         await showProfessionalSuccessSheet(
           context: context,
           title: 'Laporan Hazard Sukses Dikirim!',
-          subtitle: 'Temuan bahaya Anda telah terkirim dan resmi tercatat di database pusat IndexSafe.',
-          referenceNumber: 'HZD-${DateTime.now().millisecondsSinceEpoch.toString().substring(5)}',
+          subtitle: 'Temuan bahaya Anda telah terkirim dan berhasil tercatat.',
+          referenceNumber:
+              'HZD-${DateTime.now().millisecondsSinceEpoch.toString().substring(5)}',
           accentColor: const Color(0xFFF97316),
           icon: Icons.warning_amber_rounded,
-          statusBadgeText: 'DATABASE PUSAT (ONLINE)',
+          statusBadgeText: 'BERHASIL TERSIMPAN',
           receiptItems: [
-            SuccessReceiptItem(label: 'Kategori Bahaya', value: fields['kategori_bahaya']?.toString() ?? '-', isHighlight: true),
-            SuccessReceiptItem(label: 'Jenis Bahaya', value: fields['jenis_bahaya']?.toString() ?? '-'),
-            SuccessReceiptItem(label: 'Tingkat Resiko', value: fields['tingkat_resiko']?.toString() ?? 'Sedang', highlightColor: const Color(0xFFEF4444)),
-            SuccessReceiptItem(label: 'Area & Lokasi', value: '${fields['area']} - ${fields['lokasi']}'),
-            SuccessReceiptItem(label: 'Penanggung Jawab (PJA)', value: fields['pja']?.toString() ?? '-'),
-            SuccessReceiptItem(label: 'Status Temuan', value: fields['status_temuan']?.toString() ?? 'Open', isHighlight: true),
+            SuccessReceiptItem(
+                label: 'Kategori Bahaya',
+                value: fields['kategori_bahaya']?.toString() ?? '-',
+                isHighlight: true),
+            SuccessReceiptItem(
+                label: 'Jenis Bahaya',
+                value: fields['jenis_bahaya']?.toString() ?? '-'),
+            SuccessReceiptItem(
+                label: 'Tingkat Resiko',
+                value: fields['tingkat_resiko']?.toString() ?? 'Sedang',
+                highlightColor: const Color(0xFFEF4444)),
+            SuccessReceiptItem(
+                label: 'Area & Lokasi',
+                value: '${fields['area']} - ${fields['lokasi']}'),
+            SuccessReceiptItem(
+                label: 'Penanggung Jawab (PJA)',
+                value: fields['pja']?.toString() ?? '-'),
+            SuccessReceiptItem(
+                label: 'Status Temuan',
+                value: fields['status_temuan']?.toString() ?? 'Open',
+                isHighlight: true),
           ],
           primaryButtonText: 'Kembali ke Hub Hazard',
         );
@@ -1892,11 +2056,15 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
     final profile = PreferenceService.getProfile();
     final profileId = profile?.id ?? 0;
     try {
-      final code = '${profile?.noNik ?? "EMP"}-${DateTime.now().millisecondsSinceEpoch}'.padRight(20).substring(0, 20);
+      final code =
+          '${profile?.noNik ?? "EMP"}-${DateTime.now().millisecondsSinceEpoch}'
+              .padRight(20)
+              .substring(0, 20);
       final row = <String, dynamic>{
         'code': code,
         'title': '${fields['kategori_bahaya']} - ${fields['jenis_bahaya']}',
-        'location_detail': '${fields['lokasi']} ${fields['detil_lokasi']}'.trim(),
+        'location_detail':
+            '${fields['lokasi']} ${fields['detil_lokasi']}'.trim(),
         'date': fields['tanggal'],
         'time': fields['waktu'],
         'remark': fields['temuan'],
@@ -1927,18 +2095,31 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
       await showProfessionalSuccessSheet(
         context: context,
         title: 'Temuan Tersimpan di HP (Offline)!',
-        subtitle: 'Data tersimpan aman di database lokal HP & akan otomatis disinkronkan ke server pusat saat online.',
+        subtitle:
+            'Data tersimpan aman di perangkat dan akan dikirim otomatis saat terhubung ke internet.',
         referenceNumber: code,
         accentColor: const Color(0xFFD97706),
         icon: Icons.cloud_done_rounded,
         isOffline: true,
-        statusBadgeText: 'OFFLINE STORAGE (SIAP SINKRON)',
+        statusBadgeText: 'TERSIMPAN DI PERANGKAT',
         receiptItems: [
-          SuccessReceiptItem(label: 'Kategori Bahaya', value: fields['kategori_bahaya']?.toString() ?? '-', isHighlight: true),
-          SuccessReceiptItem(label: 'Jenis Bahaya', value: fields['jenis_bahaya']?.toString() ?? '-'),
-          SuccessReceiptItem(label: 'Tingkat Resiko', value: fields['tingkat_resiko']?.toString() ?? 'Sedang', highlightColor: const Color(0xFFEF4444)),
-          SuccessReceiptItem(label: 'Area & Lokasi', value: '${fields['area']} - ${fields['lokasi']}'),
-          SuccessReceiptItem(label: 'Penanggung Jawab (PJA)', value: fields['pja']?.toString() ?? '-'),
+          SuccessReceiptItem(
+              label: 'Kategori Bahaya',
+              value: fields['kategori_bahaya']?.toString() ?? '-',
+              isHighlight: true),
+          SuccessReceiptItem(
+              label: 'Jenis Bahaya',
+              value: fields['jenis_bahaya']?.toString() ?? '-'),
+          SuccessReceiptItem(
+              label: 'Tingkat Resiko',
+              value: fields['tingkat_resiko']?.toString() ?? 'Sedang',
+              highlightColor: const Color(0xFFEF4444)),
+          SuccessReceiptItem(
+              label: 'Area & Lokasi',
+              value: '${fields['area']} - ${fields['lokasi']}'),
+          SuccessReceiptItem(
+              label: 'Penanggung Jawab (PJA)',
+              value: fields['pja']?.toString() ?? '-'),
         ],
         primaryButtonText: 'Kembali ke Hub Hazard',
       );
@@ -1968,9 +2149,10 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
       child: Scaffold(
         backgroundColor: Colors.white,
         appBar: TopBar(
-          title: widget.editItem != null ? 'Edit Temuan Hazard' : 'Temuan Hazard',
+          title:
+              widget.editItem != null ? 'Edit Temuan Hazard' : 'Temuan Hazard',
         ),
-      body: SingleChildScrollView(
+        body: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -2000,7 +2182,8 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(color: const Color(0xFFFFEDD5)),
                       ),
-                      child: const Icon(Icons.warning_amber_rounded, color: Color(0xFFEA580C), size: 24),
+                      child: const Icon(Icons.warning_amber_rounded,
+                          color: Color(0xFFEA580C), size: 24),
                     ),
                     const SizedBox(width: 12),
                     const Expanded(
@@ -2009,12 +2192,16 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
                         children: [
                           Text(
                             'Formulir Laporan Hazard',
-                            style: TextStyle(color: Color(0xFF0F172A), fontSize: 14, fontWeight: FontWeight.bold),
+                            style: TextStyle(
+                                color: Color(0xFF0F172A),
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold),
                           ),
                           SizedBox(height: 2),
                           Text(
                             'Laporkan kondisi & tindakan berbahaya untuk keselamatan bersama.',
-                            style: TextStyle(color: Color(0xFF64748B), fontSize: 11),
+                            style: TextStyle(
+                                color: Color(0xFF64748B), fontSize: 11),
                           ),
                         ],
                       ),
@@ -2045,8 +2232,10 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
                           date: _tanggal,
                           onTap: () async {
                             final now = DateTime.now();
-                            final today = DateTime(now.year, now.month, now.day);
-                            final minDate = today.subtract(const Duration(days: 2));
+                            final today =
+                                DateTime(now.year, now.month, now.day);
+                            final minDate =
+                                today.subtract(const Duration(days: 2));
                             final initial = _tanggal.isBefore(minDate)
                                 ? minDate
                                 : (_tanggal.isAfter(today) ? today : _tanggal);
@@ -2058,7 +2247,8 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
                               lastDate: today,
                               helpText: 'PILIH TANGGAL (MAKS. 2 HARI TERAKHIR)',
                             );
-                            if (picked != null) setState(() => _tanggal = picked);
+                            if (picked != null)
+                              setState(() => _tanggal = picked);
                           },
                         ),
                       ),
@@ -2082,36 +2272,57 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
                   const SizedBox(height: 14),
 
                   // Area Utama
-                  const Text('AREA UTAMA *', style: TextStyle(color: Color(0xFF0F172A), fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+                  const Text('AREA UTAMA *',
+                      style: TextStyle(
+                          color: Color(0xFF0F172A),
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 0.5)),
                   const SizedBox(height: 6),
                   InkWell(
                     onTap: _showAreaPickerModal,
                     borderRadius: BorderRadius.circular(12),
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 14),
                       decoration: BoxDecoration(
                         color: const Color(0xFFF8FAFC),
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: _area.isNotEmpty ? const Color(0xFFBAE6FD) : const Color(0xFFE2E8F0)),
+                        border: Border.all(
+                            color: _area.isNotEmpty
+                                ? const Color(0xFFBAE6FD)
+                                : const Color(0xFFE2E8F0)),
                       ),
                       child: Row(
                         children: [
-                          const Icon(Icons.place_rounded, color: Color(0xFF0284C7), size: 20),
+                          const Icon(Icons.place_rounded,
+                              color: Color(0xFF0284C7), size: 20),
                           const SizedBox(width: 10),
                           Expanded(
                             child: Text(
-                              _area.isNotEmpty ? _area : 'KETIK UNTUK MENCARI AREA...',
+                              _area.isNotEmpty
+                                  ? _area
+                                  : 'KETIK UNTUK MENCARI AREA...',
                               style: TextStyle(
-                                color: _area.isNotEmpty ? const Color(0xFF0F172A) : const Color(0xFF94A3B8),
+                                color: _area.isNotEmpty
+                                    ? const Color(0xFF0F172A)
+                                    : const Color(0xFF94A3B8),
                                 fontSize: 13,
-                                fontWeight: _area.isNotEmpty ? FontWeight.w600 : FontWeight.normal,
+                                fontWeight: _area.isNotEmpty
+                                    ? FontWeight.w600
+                                    : FontWeight.normal,
                               ),
                             ),
                           ),
                           if (_isLoadingAreas)
-                            const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF0284C7)))
+                            const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                    strokeWidth: 2, color: Color(0xFF0284C7)))
                           else
-                            const Icon(Icons.keyboard_arrow_down_rounded, color: Color(0xFF64748B), size: 20),
+                            const Icon(Icons.keyboard_arrow_down_rounded,
+                                color: Color(0xFF64748B), size: 20),
                         ],
                       ),
                     ),
@@ -2120,7 +2331,12 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
                   const SizedBox(height: 14),
 
                   // Detail Lokasi / Benchmark
-                  const Text('DETAIL LOKASI / BENCHMARK', style: TextStyle(color: Color(0xFF0F172A), fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+                  const Text('DETAIL LOKASI / BENCHMARK',
+                      style: TextStyle(
+                          color: Color(0xFF0F172A),
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 0.5)),
                   const SizedBox(height: 6),
                   Row(
                     children: [
@@ -2128,22 +2344,26 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
                         child: InkWell(
                           onTap: () {
                             if (_area.isEmpty) {
-                              SnackBarMsg.warning(context, 'Pilih Area Utama terlebih dahulu.');
+                              SnackBarMsg.warning(
+                                  context, 'Pilih Area Utama terlebih dahulu.');
                               return;
                             }
                             _showBenchmarkPickerModal();
                           },
                           borderRadius: BorderRadius.circular(12),
                           child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 14, vertical: 14),
                             decoration: BoxDecoration(
                               color: const Color(0xFFF8FAFC),
                               borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: const Color(0xFFE2E8F0)),
+                              border:
+                                  Border.all(color: const Color(0xFFE2E8F0)),
                             ),
                             child: Row(
                               children: [
-                                const Icon(Icons.explore_rounded, color: Color(0xFF0284C7), size: 20),
+                                const Icon(Icons.explore_rounded,
+                                    color: Color(0xFF0284C7), size: 20),
                                 const SizedBox(width: 10),
                                 Expanded(
                                   child: Text(
@@ -2157,14 +2377,23 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
                                           ? const Color(0xFF0F172A)
                                           : const Color(0xFF94A3B8),
                                       fontSize: 13,
-                                      fontWeight: _detilLokasiCtrl.text.isNotEmpty ? FontWeight.w600 : FontWeight.normal,
+                                      fontWeight:
+                                          _detilLokasiCtrl.text.isNotEmpty
+                                              ? FontWeight.w600
+                                              : FontWeight.normal,
                                     ),
                                   ),
                                 ),
                                 if (_isLoadingBenchmarks)
-                                  const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF0284C7)))
+                                  const SizedBox(
+                                      width: 16,
+                                      height: 16,
+                                      child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          color: Color(0xFF0284C7)))
                                 else
-                                  const Icon(Icons.keyboard_arrow_down_rounded, color: Color(0xFF64748B), size: 20),
+                                  const Icon(Icons.keyboard_arrow_down_rounded,
+                                      color: Color(0xFF64748B), size: 20),
                               ],
                             ),
                           ),
@@ -2175,7 +2404,8 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
                       InkWell(
                         onTap: () {
                           if (_area.isEmpty) {
-                            SnackBarMsg.warning(context, 'Pilih Area Utama terlebih dahulu sebelum menambah benchmark.');
+                            SnackBarMsg.warning(context,
+                                'Pilih Area Utama terlebih dahulu sebelum menambah benchmark.');
                             return;
                           }
                           _showAddBenchmarkDialog();
@@ -2189,13 +2419,15 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
                             borderRadius: BorderRadius.circular(12),
                             boxShadow: [
                               BoxShadow(
-                                color: const Color(0xFF0284C7).withValues(alpha: 0.3),
+                                color: const Color(0xFF0284C7)
+                                    .withValues(alpha: 0.3),
                                 blurRadius: 6,
                                 offset: const Offset(0, 2),
                               ),
                             ],
                           ),
-                          child: const Icon(Icons.add_location_alt_rounded, color: Colors.white, size: 22),
+                          child: const Icon(Icons.add_location_alt_rounded,
+                              color: Colors.white, size: 22),
                         ),
                       ),
                     ],
@@ -2207,19 +2439,32 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text('LOKASI SPESIFIK (GPS) *', style: TextStyle(color: Color(0xFF0F172A), fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+                      const Text('LOKASI SPESIFIK (GPS) *',
+                          style: TextStyle(
+                              color: Color(0xFF0F172A),
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 0.5)),
                       Row(
                         children: [
                           Icon(
-                            _lokasiCtrl.text.isNotEmpty ? Icons.gps_fixed_rounded : Icons.gps_not_fixed_rounded,
+                            _lokasiCtrl.text.isNotEmpty
+                                ? Icons.gps_fixed_rounded
+                                : Icons.gps_not_fixed_rounded,
                             size: 13,
-                            color: _lokasiCtrl.text.isNotEmpty ? const Color(0xFF10B981) : const Color(0xFF64748B),
+                            color: _lokasiCtrl.text.isNotEmpty
+                                ? const Color(0xFF10B981)
+                                : const Color(0xFF64748B),
                           ),
                           const SizedBox(width: 4),
                           Text(
-                            _lokasiCtrl.text.isNotEmpty ? 'Satelit Terkunci' : 'Auto-Deteksi',
+                            _lokasiCtrl.text.isNotEmpty
+                                ? 'Satelit Terkunci'
+                                : 'Auto-Deteksi',
                             style: TextStyle(
-                              color: _lokasiCtrl.text.isNotEmpty ? const Color(0xFF10B981) : const Color(0xFF64748B),
+                              color: _lokasiCtrl.text.isNotEmpty
+                                  ? const Color(0xFF10B981)
+                                  : const Color(0xFF64748B),
                               fontSize: 11,
                               fontWeight: FontWeight.w600,
                             ),
@@ -2230,30 +2475,39 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
                   ),
                   const SizedBox(height: 6),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
                     decoration: BoxDecoration(
                       color: const Color(0xFFF8FAFC),
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
-                        color: _lokasiCtrl.text.isNotEmpty ? const Color(0xFF86EFAC) : const Color(0xFFE2E8F0),
+                        color: _lokasiCtrl.text.isNotEmpty
+                            ? const Color(0xFF86EFAC)
+                            : const Color(0xFFE2E8F0),
                       ),
                     ),
                     child: Row(
                       children: [
                         Icon(
                           Icons.place_rounded,
-                          color: _lokasiCtrl.text.isNotEmpty ? const Color(0xFF16A34A) : const Color(0xFF0284C7),
+                          color: _lokasiCtrl.text.isNotEmpty
+                              ? const Color(0xFF16A34A)
+                              : const Color(0xFF0284C7),
                           size: 20,
                         ),
                         const SizedBox(width: 10),
                         Expanded(
                           child: TextField(
                             controller: _lokasiCtrl,
-                            style: const TextStyle(color: Color(0xFF0F172A), fontSize: 13, fontWeight: FontWeight.w600),
+                            style: const TextStyle(
+                                color: Color(0xFF0F172A),
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600),
                             decoration: const InputDecoration(
                               border: InputBorder.none,
                               hintText: 'Titik koordinat GPS...',
-                              hintStyle: TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
+                              hintStyle: TextStyle(
+                                  color: Color(0xFF94A3B8), fontSize: 13),
                             ),
                           ),
                         ),
@@ -2299,9 +2553,13 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Icon(
-                        _lokasiCtrl.text.isNotEmpty ? Icons.satellite_alt_rounded : Icons.info_outline_rounded,
+                        _lokasiCtrl.text.isNotEmpty
+                            ? Icons.satellite_alt_rounded
+                            : Icons.info_outline_rounded,
                         size: 13,
-                        color: _lokasiCtrl.text.isNotEmpty ? const Color(0xFF059669) : const Color(0xFF64748B),
+                        color: _lokasiCtrl.text.isNotEmpty
+                            ? const Color(0xFF059669)
+                            : const Color(0xFF64748B),
                       ),
                       const SizedBox(width: 5),
                       Expanded(
@@ -2312,9 +2570,13 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
                                   ? 'Mencari sinyal satelit GPS perangkat Anda...'
                                   : 'Titik koordinat otomatis terisi via satelit GPS.'),
                           style: TextStyle(
-                            color: _lokasiCtrl.text.isNotEmpty ? const Color(0xFF059669) : const Color(0xFF64748B),
+                            color: _lokasiCtrl.text.isNotEmpty
+                                ? const Color(0xFF059669)
+                                : const Color(0xFF64748B),
                             fontSize: 10.5,
-                            fontWeight: _lokasiCtrl.text.isNotEmpty ? FontWeight.w600 : FontWeight.normal,
+                            fontWeight: _lokasiCtrl.text.isNotEmpty
+                                ? FontWeight.w600
+                                : FontWeight.normal,
                             height: 1.3,
                           ),
                         ),
@@ -2350,8 +2612,15 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
                   const Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text('KATEGORI BAHAYA *', style: TextStyle(color: Color(0xFF0F172A), fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
-                      Text('Pilih tipe temuan', style: TextStyle(color: Color(0xFF64748B), fontSize: 11)),
+                      Text('KATEGORI BAHAYA *',
+                          style: TextStyle(
+                              color: Color(0xFF0F172A),
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 0.5)),
+                      Text('Pilih tipe temuan',
+                          style: TextStyle(
+                              color: Color(0xFF64748B), fontSize: 11)),
                     ],
                   ),
                   const SizedBox(height: 8),
@@ -2363,8 +2632,15 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
                   const Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text('JENIS BAHAYA *', style: TextStyle(color: Color(0xFF0F172A), fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
-                      Text('Pilih jenis bahaya', style: TextStyle(color: Color(0xFF64748B), fontSize: 11)),
+                      Text('JENIS BAHAYA *',
+                          style: TextStyle(
+                              color: Color(0xFF0F172A),
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 0.5)),
+                      Text('Pilih jenis bahaya',
+                          style: TextStyle(
+                              color: Color(0xFF64748B), fontSize: 11)),
                     ],
                   ),
                   const SizedBox(height: 8),
@@ -2373,11 +2649,17 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
                   const SizedBox(height: 16),
 
                   // Jenis Ketidaksesuaian
-                  const Text('JENIS KETIDAKSESUAIAN', style: TextStyle(color: Color(0xFF0F172A), fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+                  const Text('JENIS KETIDAKSESUAIAN',
+                      style: TextStyle(
+                          color: Color(0xFF0F172A),
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 0.5)),
                   const SizedBox(height: 6),
                   _buildTextField(
                     controller: _ketidaksesuaianCtrl,
-                    hint: 'MISAL: RAMBU LALU LINTAS TIDAK JELAS, TIDAK PAKAI APD',
+                    hint:
+                        'MISAL: RAMBU LALU LINTAS TIDAK JELAS, TIDAK PAKAI APD',
                     icon: Icons.help_outline_rounded,
                   ),
 
@@ -2387,8 +2669,15 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
                   const Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text('TINGKAT RISIKO *', style: TextStyle(color: Color(0xFF0F172A), fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
-                      Text('Matriks Keparahan & Peluang', style: TextStyle(color: Color(0xFF64748B), fontSize: 11)),
+                      Text('TINGKAT RISIKO *',
+                          style: TextStyle(
+                              color: Color(0xFF0F172A),
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 0.5)),
+                      Text('Matriks Keparahan & Peluang',
+                          style: TextStyle(
+                              color: Color(0xFF64748B), fontSize: 11)),
                     ],
                   ),
                   const SizedBox(height: 8),
@@ -2405,7 +2694,12 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
                 accentColor: const Color(0xFF6366F1),
                 children: [
                   // Detil Temuan Hazard
-                  const Text('DETIL TEMUAN HAZARD *', style: TextStyle(color: Color(0xFF0F172A), fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+                  const Text('DETIL TEMUAN HAZARD *',
+                      style: TextStyle(
+                          color: Color(0xFF0F172A),
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 0.5)),
                   const SizedBox(height: 6),
                   _buildTextArea(
                     controller: _temuanCtrl,
@@ -2417,7 +2711,12 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
                   const SizedBox(height: 14),
 
                   // Tindakan Perbaikan Langsung
-                  const Text('TINDAKAN PERBAIKAN LANGSUNG (BILA ADA)', style: TextStyle(color: Color(0xFF0F172A), fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+                  const Text('TINDAKAN PERBAIKAN LANGSUNG (BILA ADA)',
+                      style: TextStyle(
+                          color: Color(0xFF0F172A),
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 0.5)),
                   const SizedBox(height: 6),
                   _buildTextArea(
                     controller: _perbaikanCtrl,
@@ -2429,7 +2728,12 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
                   const SizedBox(height: 14),
 
                   // Rencana Tindakan Lanjutan
-                  const Text('RENCANA TINDAKAN LANJUTAN', style: TextStyle(color: Color(0xFF0F172A), fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+                  const Text('RENCANA TINDAKAN LANJUTAN',
+                      style: TextStyle(
+                          color: Color(0xFF0F172A),
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 0.5)),
                   const SizedBox(height: 6),
                   _buildTextArea(
                     controller: _tindakanCtrl,
@@ -2451,11 +2755,17 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
                   // 1. Switch Status Penanganan (Selesai Langsung vs Butuh PJA)
                   AnimatedContainer(
                     duration: const Duration(milliseconds: 200),
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 10),
                     decoration: BoxDecoration(
-                      color: _isSelfClosed ? const Color(0xFFECFDF5) : const Color(0xFFF8FAFC),
+                      color: _isSelfClosed
+                          ? const Color(0xFFECFDF5)
+                          : const Color(0xFFF8FAFC),
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: _isSelfClosed ? const Color(0xFFA7F3D0) : const Color(0xFFE2E8F0)),
+                      border: Border.all(
+                          color: _isSelfClosed
+                              ? const Color(0xFFA7F3D0)
+                              : const Color(0xFFE2E8F0)),
                     ),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -2467,7 +2777,9 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
                               Text(
                                 'Tindakan Sudah Selesai Langsung?',
                                 style: TextStyle(
-                                  color: _isSelfClosed ? const Color(0xFF065F46) : const Color(0xFF0F172A),
+                                  color: _isSelfClosed
+                                      ? const Color(0xFF065F46)
+                                      : const Color(0xFF0F172A),
                                   fontSize: 12.5,
                                   fontWeight: FontWeight.bold,
                                 ),
@@ -2478,7 +2790,9 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
                                     ? 'Status CLOSED: Bahaya telah diselesaikan langsung di tempat oleh Anda.'
                                     : 'Status OPEN: Memerlukan delegasi ke Pengawas / PJA untuk perbaikan.',
                                 style: TextStyle(
-                                  color: _isSelfClosed ? const Color(0xFF047857) : const Color(0xFF64748B),
+                                  color: _isSelfClosed
+                                      ? const Color(0xFF047857)
+                                      : const Color(0xFF64748B),
                                   fontSize: 10.5,
                                 ),
                               ),
@@ -2493,7 +2807,8 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
                             setState(() {
                               _isSelfClosed = v;
                               if (v) {
-                                _selectedPja = null; // Bersihkan PJA karena ditangani sendiri
+                                _selectedPja =
+                                    null; // Bersihkan PJA karena ditangani sendiri
                               }
                             });
                           },
@@ -2520,11 +2835,15 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
                             children: [
                               const Row(
                                 children: [
-                                  Icon(Icons.person_pin_rounded, color: Color(0xFF0284C7), size: 18),
+                                  Icon(Icons.person_pin_rounded,
+                                      color: Color(0xFF0284C7), size: 18),
                                   SizedBox(width: 8),
                                   Text(
                                     'Penanggung Jawab Area (PJA) *',
-                                    style: TextStyle(color: Color(0xFF0F172A), fontSize: 12.5, fontWeight: FontWeight.bold),
+                                    style: TextStyle(
+                                        color: Color(0xFF0F172A),
+                                        fontSize: 12.5,
+                                        fontWeight: FontWeight.bold),
                                   ),
                                 ],
                               ),
@@ -2539,12 +2858,17 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
                                 },
                                 borderRadius: BorderRadius.circular(20),
                                 child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 8, vertical: 3),
                                   decoration: BoxDecoration(
-                                    color: _lintasPerusahaan ? const Color(0xFFEFF6FF) : const Color(0xFFF1F5F9),
+                                    color: _lintasPerusahaan
+                                        ? const Color(0xFFEFF6FF)
+                                        : const Color(0xFFF1F5F9),
                                     borderRadius: BorderRadius.circular(20),
                                     border: Border.all(
-                                      color: _lintasPerusahaan ? const Color(0xFF3B82F6) : const Color(0xFFCBD5E1),
+                                      color: _lintasPerusahaan
+                                          ? const Color(0xFF3B82F6)
+                                          : const Color(0xFFCBD5E1),
                                       width: 1,
                                     ),
                                   ),
@@ -2552,17 +2876,25 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
                                       Icon(
-                                        _lintasPerusahaan ? Icons.corporate_fare_rounded : Icons.domain_rounded,
+                                        _lintasPerusahaan
+                                            ? Icons.corporate_fare_rounded
+                                            : Icons.domain_rounded,
                                         size: 12,
-                                        color: _lintasPerusahaan ? const Color(0xFF1D4ED8) : const Color(0xFF64748B),
+                                        color: _lintasPerusahaan
+                                            ? const Color(0xFF1D4ED8)
+                                            : const Color(0xFF64748B),
                                       ),
                                       const SizedBox(width: 4),
                                       Text(
-                                        _lintasPerusahaan ? 'Lintas PT' : 'Internal',
+                                        _lintasPerusahaan
+                                            ? 'Lintas PT'
+                                            : 'Internal',
                                         style: TextStyle(
                                           fontSize: 9.5,
                                           fontWeight: FontWeight.bold,
-                                          color: _lintasPerusahaan ? const Color(0xFF1D4ED8) : const Color(0xFF64748B),
+                                          color: _lintasPerusahaan
+                                              ? const Color(0xFF1D4ED8)
+                                              : const Color(0xFF64748B),
                                         ),
                                       ),
                                     ],
@@ -2582,31 +2914,48 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
                             if (_isSearchingPja)
                               const Padding(
                                 padding: EdgeInsets.symmetric(vertical: 8),
-                                child: Center(child: SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFFEA580C)))),
+                                child: Center(
+                                    child: SizedBox(
+                                        width: 18,
+                                        height: 18,
+                                        child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                            color: Color(0xFFEA580C)))),
                               ),
-                            if (_pjaSearchCtrl.text.trim().isNotEmpty || _pjaSearchResults.isNotEmpty)
+                            if (_pjaSearchCtrl.text.trim().isNotEmpty ||
+                                _pjaSearchResults.isNotEmpty)
                               Container(
-                                constraints: const BoxConstraints(maxHeight: 240),
+                                constraints:
+                                    const BoxConstraints(maxHeight: 240),
                                 margin: const EdgeInsets.only(top: 8),
                                 decoration: BoxDecoration(
                                   color: Colors.white,
                                   borderRadius: BorderRadius.circular(10),
-                                  border: Border.all(color: const Color(0xFFCBD5E1)),
+                                  border: Border.all(
+                                      color: const Color(0xFFCBD5E1)),
                                   boxShadow: [
-                                    BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 6, offset: const Offset(0, 2)),
+                                    BoxShadow(
+                                        color: Colors.black
+                                            .withValues(alpha: 0.05),
+                                        blurRadius: 6,
+                                        offset: const Offset(0, 2)),
                                   ],
                                 ),
                                 child: ListView(
                                   shrinkWrap: true,
                                   padding: EdgeInsets.zero,
                                   children: [
-                                    if (_pjaSearchCtrl.text.trim().isNotEmpty) ...[
+                                    if (_pjaSearchCtrl.text
+                                        .trim()
+                                        .isNotEmpty) ...[
                                       InkWell(
                                         onTap: () {
                                           setState(() {
                                             _selectedPja = PjaSearchResult(
                                               nik: 'MANUAL',
-                                              nama: _pjaSearchCtrl.text.trim().toUpperCase(),
+                                              nama: _pjaSearchCtrl.text
+                                                  .trim()
+                                                  .toUpperCase(),
                                               departemen: 'LAPANGAN',
                                               jabatan: 'PJA Offline',
                                               perusahaan: 'INTERNAL',
@@ -2616,69 +2965,117 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
                                           });
                                         },
                                         child: Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 12, vertical: 10),
                                           decoration: const BoxDecoration(
                                             color: Color(0xFFEFF6FF),
-                                            borderRadius: BorderRadius.vertical(top: Radius.circular(9)),
+                                            borderRadius: BorderRadius.vertical(
+                                                top: Radius.circular(9)),
                                           ),
                                           child: Row(
                                             children: [
                                               Container(
-                                                padding: const EdgeInsets.all(6),
+                                                padding:
+                                                    const EdgeInsets.all(6),
                                                 decoration: BoxDecoration(
-                                                  color: const Color(0xFF2563EB),
-                                                  borderRadius: BorderRadius.circular(6),
+                                                  color:
+                                                      const Color(0xFF2563EB),
+                                                  borderRadius:
+                                                      BorderRadius.circular(6),
                                                 ),
-                                                child: const Icon(Icons.person_add_alt_1_rounded, color: Colors.white, size: 16),
+                                                child: const Icon(
+                                                    Icons
+                                                        .person_add_alt_1_rounded,
+                                                    color: Colors.white,
+                                                    size: 16),
                                               ),
                                               const SizedBox(width: 10),
                                               Expanded(
                                                 child: Column(
-                                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                                  crossAxisAlignment:
+                                                      CrossAxisAlignment.start,
                                                   children: [
                                                     Text(
                                                       'Gunakan: "${_pjaSearchCtrl.text.trim().toUpperCase()}"',
-                                                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF1D4ED8)),
+                                                      style: const TextStyle(
+                                                          fontWeight:
+                                                              FontWeight.bold,
+                                                          fontSize: 12,
+                                                          color: Color(
+                                                              0xFF1D4ED8)),
                                                     ),
                                                     const Text(
                                                       'Gunakan nama ini sebagai PJA (Mode Offline / Bebas Ketik)',
-                                                      style: TextStyle(fontSize: 10, color: Color(0xFF64748B)),
+                                                      style: TextStyle(
+                                                          fontSize: 10,
+                                                          color: Color(
+                                                              0xFF64748B)),
                                                     ),
                                                   ],
                                                 ),
                                               ),
-                                              const Icon(Icons.check_circle_rounded, size: 18, color: Color(0xFF2563EB)),
+                                              const Icon(
+                                                  Icons.check_circle_rounded,
+                                                  size: 18,
+                                                  color: Color(0xFF2563EB)),
                                             ],
                                           ),
                                         ),
                                       ),
-                                      const Divider(height: 1, color: Color(0xFFE2E8F0)),
+                                      const Divider(
+                                          height: 1, color: Color(0xFFE2E8F0)),
                                     ],
                                     if (_pjaSearchResults.isNotEmpty)
                                       ListView.separated(
                                         shrinkWrap: true,
-                                        physics: const NeverScrollableScrollPhysics(),
+                                        physics:
+                                            const NeverScrollableScrollPhysics(),
                                         itemCount: _pjaSearchResults.length,
-                                        separatorBuilder: (_, __) => const Divider(color: Color(0xFFF1F5F9), height: 1),
+                                        separatorBuilder: (_, __) =>
+                                            const Divider(
+                                                color: Color(0xFFF1F5F9),
+                                                height: 1),
                                         itemBuilder: (ctx, idx) {
                                           final p = _pjaSearchResults[idx];
                                           return ListTile(
                                             dense: true,
-                                            title: Text(p.nama, style: const TextStyle(color: Color(0xFF0F172A), fontSize: 12, fontWeight: FontWeight.bold)),
+                                            title: Text(p.nama,
+                                                style: const TextStyle(
+                                                    color: Color(0xFF0F172A),
+                                                    fontSize: 12,
+                                                    fontWeight:
+                                                        FontWeight.bold)),
                                             subtitle: Column(
-                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
                                               children: [
-                                                Text('${p.nik} • ${p.departemen} • ${p.jabatan}', style: const TextStyle(color: Color(0xFF64748B), fontSize: 10)),
+                                                Text(
+                                                    '${p.nik} • ${p.departemen} • ${p.jabatan}',
+                                                    style: const TextStyle(
+                                                        color:
+                                                            Color(0xFF64748B),
+                                                        fontSize: 10)),
                                                 const SizedBox(height: 2),
                                                 Container(
-                                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                                                  padding: const EdgeInsets
+                                                      .symmetric(
+                                                      horizontal: 6,
+                                                      vertical: 1.5),
                                                   decoration: BoxDecoration(
-                                                    color: const Color(0xFFF1F5F9),
-                                                    borderRadius: BorderRadius.circular(4),
+                                                    color:
+                                                        const Color(0xFFF1F5F9),
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                            4),
                                                   ),
                                                   child: Text(
                                                     p.perusahaan,
-                                                    style: const TextStyle(color: Color(0xFF0284C7), fontSize: 9.5, fontWeight: FontWeight.w600),
+                                                    style: const TextStyle(
+                                                        color:
+                                                            Color(0xFF0284C7),
+                                                        fontSize: 9.5,
+                                                        fontWeight:
+                                                            FontWeight.w600),
                                                   ),
                                                 ),
                                               ],
@@ -2693,14 +3090,19 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
                                           );
                                         },
                                       ),
-                                    if (_pjaSearchResults.isEmpty && _pjaSearchCtrl.text.trim().isNotEmpty && !_isSearchingPja)
+                                    if (_pjaSearchResults.isEmpty &&
+                                        _pjaSearchCtrl.text.trim().isNotEmpty &&
+                                        !_isSearchingPja)
                                       const Padding(
-                                        padding: EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+                                        padding: EdgeInsets.symmetric(
+                                            vertical: 10, horizontal: 12),
                                         child: Center(
                                           child: Text(
-                                            'Tidak ada kecocokan di database. Klik tombol biru di atas untuk menetapkan PJA secara manual.',
+                                            'Tidak ada data yang cocok. Gunakan tombol di atas untuk menetapkan PJA secara manual.',
                                             textAlign: TextAlign.center,
-                                            style: TextStyle(fontSize: 10.5, color: Color(0xFF94A3B8)),
+                                            style: TextStyle(
+                                                fontSize: 10.5,
+                                                color: Color(0xFF94A3B8)),
                                           ),
                                         ),
                                       ),
@@ -2713,7 +3115,8 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
                               decoration: BoxDecoration(
                                 color: const Color(0xFFF0FDF4),
                                 borderRadius: BorderRadius.circular(10),
-                                border: Border.all(color: const Color(0xFF86EFAC)),
+                                border:
+                                    Border.all(color: const Color(0xFF86EFAC)),
                               ),
                               child: Row(
                                 children: [
@@ -2721,24 +3124,42 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
                                     radius: 18,
                                     backgroundColor: const Color(0xFF16A34A),
                                     child: Text(
-                                      _selectedPja!.nama.isNotEmpty ? _selectedPja!.nama[0].toUpperCase() : 'P',
-                                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                                      _selectedPja!.nama.isNotEmpty
+                                          ? _selectedPja!.nama[0].toUpperCase()
+                                          : 'P',
+                                      style: const TextStyle(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.bold),
                                     ),
                                   ),
                                   const SizedBox(width: 12),
                                   Expanded(
                                     child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       children: [
-                                        Text(_selectedPja!.nama, style: const TextStyle(color: Color(0xFF0F172A), fontSize: 12, fontWeight: FontWeight.bold)),
-                                        Text('${_selectedPja!.nik} • ${_selectedPja!.departemen}', style: const TextStyle(color: Color(0xFF64748B), fontSize: 10)),
-                                        Text(_selectedPja!.perusahaan, style: const TextStyle(color: Color(0xFF0284C7), fontSize: 10)),
+                                        Text(_selectedPja!.nama,
+                                            style: const TextStyle(
+                                                color: Color(0xFF0F172A),
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.bold)),
+                                        Text(
+                                            '${_selectedPja!.nik} • ${_selectedPja!.departemen}',
+                                            style: const TextStyle(
+                                                color: Color(0xFF64748B),
+                                                fontSize: 10)),
+                                        Text(_selectedPja!.perusahaan,
+                                            style: const TextStyle(
+                                                color: Color(0xFF0284C7),
+                                                fontSize: 10)),
                                       ],
                                     ),
                                   ),
                                   IconButton(
-                                    icon: const Icon(Icons.close_rounded, color: Color(0xFFDC2626), size: 18),
-                                    onPressed: () => setState(() => _selectedPja = null),
+                                    icon: const Icon(Icons.close_rounded,
+                                        color: Color(0xFFDC2626), size: 18),
+                                    onPressed: () =>
+                                        setState(() => _selectedPja = null),
                                   ),
                                 ],
                               ),
@@ -2759,7 +3180,8 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
                       ),
                       child: const Row(
                         children: [
-                          Icon(Icons.check_circle_rounded, color: Color(0xFF16A34A), size: 20),
+                          Icon(Icons.check_circle_rounded,
+                              color: Color(0xFF16A34A), size: 20),
                           SizedBox(width: 10),
                           Expanded(
                             child: Column(
@@ -2767,12 +3189,16 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
                               children: [
                                 Text(
                                   'Perbaikan Mandiri di Tempat',
-                                  style: TextStyle(color: Color(0xFF065F46), fontSize: 12, fontWeight: FontWeight.bold),
+                                  style: TextStyle(
+                                      color: Color(0xFF065F46),
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold),
                                 ),
                                 SizedBox(height: 1),
                                 Text(
                                   'Bahaya telah diselesaikan langsung oleh Anda. Tidak memerlukan delegasi PJA.',
-                                  style: TextStyle(color: Color(0xFF047857), fontSize: 10.5),
+                                  style: TextStyle(
+                                      color: Color(0xFF047857), fontSize: 10.5),
                                 ),
                               ],
                             ),
@@ -2785,7 +3211,11 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
                   const SizedBox(height: 16),
 
                   // 3. Upload Foto Temuan (Before)
-                  const Text('Foto Bukti Temuan (Before) *', style: TextStyle(color: Color(0xFF0F172A), fontSize: 12, fontWeight: FontWeight.w600)),
+                  const Text('Foto Bukti Temuan (Before) *',
+                      style: TextStyle(
+                          color: Color(0xFF0F172A),
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600)),
                   const SizedBox(height: 8),
                   _buildPhotoPicker(
                     file: _fotoTemuan,
@@ -2799,7 +3229,11 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
                   // 4. Upload Foto Perbaikan (After) jika selesai langsung
                   if (_isSelfClosed) ...[
                     const SizedBox(height: 16),
-                    const Text('Foto Bukti Perbaikan (After) *', style: TextStyle(color: Color(0xFF0F172A), fontSize: 12, fontWeight: FontWeight.w600)),
+                    const Text('Foto Bukti Perbaikan (After) *',
+                        style: TextStyle(
+                            color: Color(0xFF0F172A),
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600)),
                     const SizedBox(height: 8),
                     _buildPhotoPicker(
                       file: _fotoPerbaikan,
@@ -2823,16 +3257,26 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFFEA580C),
                     foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14)),
                     elevation: 1,
                   ),
                   onPressed: _isSubmitting ? null : _submitHazard,
                   icon: _isSubmitting
-                      ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                              color: Colors.white, strokeWidth: 2))
                       : const Icon(Icons.send_rounded, size: 18),
                   label: Text(
-                    _isSubmitting ? 'MENYIMPAN LAPORAN...' : 'KIRIM LAPORAN HAZARD',
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5, letterSpacing: 0.3),
+                    _isSubmitting
+                        ? 'MENYIMPAN LAPORAN...'
+                        : 'KIRIM LAPORAN HAZARD',
+                    style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13.5,
+                        letterSpacing: 0.3),
                   ),
                 ),
               ),
@@ -2884,9 +3328,14 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
     }
 
     // 6. PJA & Bukti Foto
-    final bool fotoBeforeValid = _fotoTemuan != null || (widget.editItem?.fotoTemuan != null && widget.editItem!.fotoTemuan!.isNotEmpty);
+    final bool fotoBeforeValid = _fotoTemuan != null ||
+        (widget.editItem?.fotoTemuan != null &&
+            widget.editItem!.fotoTemuan!.isNotEmpty);
     final bool pjaValid = _isSelfClosed || _selectedPja != null;
-    final bool fotoAfterValid = !_isSelfClosed || (_fotoPerbaikan != null || (widget.editItem?.fotoPerbaikan != null && widget.editItem!.fotoPerbaikan!.isNotEmpty));
+    final bool fotoAfterValid = !_isSelfClosed ||
+        (_fotoPerbaikan != null ||
+            (widget.editItem?.fotoPerbaikan != null &&
+                widget.editItem!.fotoPerbaikan!.isNotEmpty));
 
     if (pjaValid && fotoBeforeValid && fotoAfterValid) {
       completed++;
@@ -2925,13 +3374,17 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
               Row(
                 children: [
                   Icon(
-                    pct >= 1.0 ? Icons.check_circle_rounded : Icons.pending_actions_rounded,
+                    pct >= 1.0
+                        ? Icons.check_circle_rounded
+                        : Icons.pending_actions_rounded,
                     size: 16,
                     color: barColor,
                   ),
                   const SizedBox(width: 6),
                   Text(
-                    pct >= 1.0 ? 'Semua Bagian Lengkap' : 'Kelengkapan Formulir: ${(pct * 100).toInt()}%',
+                    pct >= 1.0
+                        ? 'Semua Bagian Lengkap'
+                        : 'Kelengkapan Formulir: ${(pct * 100).toInt()}%',
                     style: TextStyle(
                       color: barColor,
                       fontSize: 12,
@@ -2942,7 +3395,10 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
               ),
               Text(
                 '$completed dari $totalSteps bagian',
-                style: const TextStyle(color: Color(0xFF64748B), fontSize: 11, fontWeight: FontWeight.w600),
+                style: const TextStyle(
+                    color: Color(0xFF64748B),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600),
               ),
             ],
           ),
@@ -2960,7 +3416,10 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
             const SizedBox(height: 6),
             Text(
               'Belum lengkap: ${missing.join(", ")}',
-              style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 10.5, fontStyle: FontStyle.italic),
+              style: const TextStyle(
+                  color: Color(0xFF94A3B8),
+                  fontSize: 10.5,
+                  fontStyle: FontStyle.italic),
             ),
           ],
         ],
@@ -3004,7 +3463,8 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
                   decoration: BoxDecoration(
                     color: accentColor.withValues(alpha: 0.12),
                     shape: BoxShape.circle,
-                    border: Border.all(color: accentColor.withValues(alpha: 0.3)),
+                    border:
+                        Border.all(color: accentColor.withValues(alpha: 0.3)),
                   ),
                   alignment: Alignment.center,
                   child: Text(
@@ -3041,7 +3501,8 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
                       const SizedBox(height: 2),
                       Text(
                         subtitle,
-                        style: const TextStyle(color: Color(0xFF64748B), fontSize: 10.5),
+                        style: const TextStyle(
+                            color: Color(0xFF64748B), fontSize: 10.5),
                       ),
                     ],
                   ),
@@ -3063,15 +3524,26 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
     );
   }
 
-  Widget _buildDatePicker({required String label, required DateTime date, required VoidCallback onTap}) {
+  Widget _buildDatePicker(
+      {required String label,
+      required DateTime date,
+      required VoidCallback onTap}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(label, style: const TextStyle(color: Color(0xFF0F172A), fontSize: 12, fontWeight: FontWeight.w600)),
-            const Text('Maks. H-2', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 10.5, fontWeight: FontWeight.w500)),
+            Text(label,
+                style: const TextStyle(
+                    color: Color(0xFF0F172A),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600)),
+            const Text('Maks. H-2',
+                style: TextStyle(
+                    color: Color(0xFF94A3B8),
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w500)),
           ],
         ),
         const SizedBox(height: 6),
@@ -3087,12 +3559,16 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
             ),
             child: Row(
               children: [
-                const Icon(Icons.calendar_month_rounded, color: Color(0xFFEA580C), size: 18),
+                const Icon(Icons.calendar_month_rounded,
+                    color: Color(0xFFEA580C), size: 18),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     DateFormat('dd/MM/yyyy').format(date),
-                    style: const TextStyle(color: Color(0xFF0F172A), fontSize: 12, fontWeight: FontWeight.w600),
+                    style: const TextStyle(
+                        color: Color(0xFF0F172A),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600),
                   ),
                 ),
               ],
@@ -3103,11 +3579,18 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
     );
   }
 
-  Widget _buildTimePicker({required String label, required TimeOfDay time, required VoidCallback onTap}) {
+  Widget _buildTimePicker(
+      {required String label,
+      required TimeOfDay time,
+      required VoidCallback onTap}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: const TextStyle(color: Color(0xFF0F172A), fontSize: 12, fontWeight: FontWeight.w600)),
+        Text(label,
+            style: const TextStyle(
+                color: Color(0xFF0F172A),
+                fontSize: 12,
+                fontWeight: FontWeight.w600)),
         const SizedBox(height: 6),
         InkWell(
           onTap: onTap,
@@ -3121,12 +3604,16 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
             ),
             child: Row(
               children: [
-                const Icon(Icons.access_time_filled_rounded, color: Color(0xFFEA580C), size: 18),
+                const Icon(Icons.access_time_filled_rounded,
+                    color: Color(0xFFEA580C), size: 18),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}',
-                    style: const TextStyle(color: Color(0xFF0F172A), fontSize: 12, fontWeight: FontWeight.w600),
+                    style: const TextStyle(
+                        color: Color(0xFF0F172A),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600),
                   ),
                 ),
               ],
@@ -3162,7 +3649,8 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
           focusedBorder: InputBorder.none,
           filled: false,
           fillColor: Colors.transparent,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
         ),
       ),
     );
@@ -3231,7 +3719,6 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
     );
   }
 
-
   Widget _buildPhotoPicker({
     File? file,
     String? existingUrl,
@@ -3268,11 +3755,13 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
                     Colors.black.withValues(alpha: 0.0),
                   ],
                 ),
-                borderRadius: const BorderRadius.vertical(bottom: Radius.circular(12)),
+                borderRadius:
+                    const BorderRadius.vertical(bottom: Radius.circular(12)),
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.verified_rounded, size: 14, color: Color(0xFF10B981)),
+                  const Icon(Icons.verified_rounded,
+                      size: 14, color: Color(0xFF10B981)),
                   const SizedBox(width: 6),
                   Expanded(
                     child: Column(
@@ -3281,14 +3770,18 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
                       children: [
                         Text(
                           '${badgeTitle ?? "BUKTI FOTO"} • ${DateFormat("yyyy-MM-dd HH:mm").format(DateTime.now())}',
-                          style: const TextStyle(color: Colors.white, fontSize: 9.5, fontWeight: FontWeight.bold),
+                          style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 9.5,
+                              fontWeight: FontWeight.bold),
                         ),
                         if (_lokasiCtrl.text.isNotEmpty || _area.isNotEmpty)
                           Text(
                             '${_area.isNotEmpty ? "$_area | " : ""}${_lokasiCtrl.text}',
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(color: Color(0xFFCBD5E1), fontSize: 8.5),
+                            style: const TextStyle(
+                                color: Color(0xFFCBD5E1), fontSize: 8.5),
                           ),
                       ],
                     ),
@@ -3308,7 +3801,8 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
                   color: Colors.black54,
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(Icons.close_rounded, color: Colors.white, size: 16),
+                child: const Icon(Icons.close_rounded,
+                    color: Colors.white, size: 16),
               ),
             ),
           ),
@@ -3317,7 +3811,9 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
     }
 
     if (existingUrl != null && existingUrl.isNotEmpty) {
-      final fullUrl = existingUrl.startsWith('http') ? existingUrl : '${ApiService().baseUrl}$existingUrl';
+      final fullUrl = existingUrl.startsWith('http')
+          ? existingUrl
+          : '${ApiService().baseUrl}$existingUrl';
       return Stack(
         children: [
           ClipRRect(
@@ -3337,7 +3833,8 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.black87,
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               ),
               onPressed: onTap,
               icon: const Icon(Icons.camera_alt_rounded, size: 14),
@@ -3368,9 +3865,11 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
               decoration: BoxDecoration(
                 color: const Color(0xFFEA580C).withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFFEA580C).withValues(alpha: 0.2)),
+                border: Border.all(
+                    color: const Color(0xFFEA580C).withValues(alpha: 0.2)),
               ),
-              child: const Icon(Icons.add_a_photo_rounded, color: Color(0xFFEA580C), size: 22),
+              child: const Icon(Icons.add_a_photo_rounded,
+                  color: Color(0xFFEA580C), size: 22),
             ),
             const SizedBox(width: 14),
             Expanded(
@@ -3398,7 +3897,8 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
                 ],
               ),
             ),
-            const Icon(Icons.chevron_right_rounded, color: Color(0xFF94A3B8), size: 20),
+            const Icon(Icons.chevron_right_rounded,
+                color: Color(0xFF94A3B8), size: 20),
           ],
         ),
       ),

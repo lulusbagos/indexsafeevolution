@@ -91,70 +91,80 @@ class _SimamaFormPageState extends State<SimamaFormPage> {
       id: 1,
       category: 'Kebugaran & Anti-Fatigue Pekerja',
       title: 'Kebugaran Fisik & Kewaspadaan (Anti-Fatigue)',
-      hint: 'Pekerja tidak mengantuk, fit to work, dan siap bekerja shift malam.',
+      hint:
+          'Pekerja tidak mengantuk, fit to work, dan siap bekerja shift malam.',
       isOk: true,
     ),
     SimamaChecklistItem(
       id: 2,
       category: 'Kebugaran & Anti-Fatigue Pekerja',
       title: 'Fasilitas Rest Area & Minuman Hangat',
-      hint: 'Fasilitas rest room / crib room bersih, air minum & fasilitas hangat tersedia.',
+      hint:
+          'Fasilitas rest room / crib room bersih, air minum & fasilitas hangat tersedia.',
       isOk: true,
     ),
     SimamaChecklistItem(
       id: 3,
       category: 'Penerangan & Pencahayaan Lapangan',
       title: 'Pencahayaan Area Kerja Aktif',
-      hint: 'Pencahayaan mencukupi di area kerja aktif, disposal, dan front loading.',
+      hint:
+          'Pencahayaan mencukupi di area kerja aktif, disposal, dan front loading.',
       isOk: true,
     ),
     SimamaChecklistItem(
       id: 4,
       category: 'Penerangan & Pencahayaan Lapangan',
       title: 'Fungsi & Posisi Tower Lamp',
-      hint: 'Tower lamp berfungsi optimal, terarah baik, dan tidak menyilaukan operator.',
+      hint:
+          'Tower lamp berfungsi optimal, terarah baik, dan tidak menyilaukan operator.',
       isOk: true,
     ),
     SimamaChecklistItem(
       id: 5,
       category: 'Kelayakan Sarana & Komunikasi',
       title: 'Sistem Penerangan & Lampu Unit',
-      hint: 'Lampu kerja, lampu mundur, dan rotary lamp unit kendaraan menyala normal.',
+      hint:
+          'Lampu kerja, lampu mundur, dan rotary lamp unit kendaraan menyala normal.',
       isOk: true,
     ),
     SimamaChecklistItem(
       id: 6,
       category: 'Kelayakan Sarana & Komunikasi',
       title: 'Komunikasi Radio Dua Arah (Two-Way Radio)',
-      hint: 'Saluran radio komunikasi aktif dan respon channel shift malam jelas.',
+      hint:
+          'Saluran radio komunikasi aktif dan respon channel shift malam jelas.',
       isOk: true,
     ),
     SimamaChecklistItem(
       id: 7,
       category: 'Visibilitas & Kepatuhan APD Malam',
       title: 'Rompi & Scotlite Reflektif (High-Visibility)',
-      hint: 'Pekerja mengenakan rompi/seragam dengan scotlite reflektif yang memantulkan cahaya.',
+      hint:
+          'Pekerja mengenakan rompi/seragam dengan scotlite reflektif yang memantulkan cahaya.',
       isOk: true,
     ),
     SimamaChecklistItem(
       id: 8,
       category: 'Visibilitas & Kepatuhan APD Malam',
       title: 'Kelengkapan APD Standar Shift Malam',
-      hint: 'APD wajib (helm, sepatu safety, kacamata malam/bening) dipakai dengan benar.',
+      hint:
+          'APD wajib (helm, sepatu safety, kacamata malam/bening) dipakai dengan benar.',
       isOk: true,
     ),
     SimamaChecklistItem(
       id: 9,
       category: 'Jalan Angkut & Tanggul Pengaman',
       title: 'Patok Delineator & Reflektor Jalan',
-      hint: 'Patok delineator / reflektor haul road terlihat jelas dan tidak tertimbun lumpur/debu.',
+      hint:
+          'Patok delineator / reflektor haul road terlihat jelas dan tidak tertimbun lumpur/debu.',
       isOk: true,
     ),
     SimamaChecklistItem(
       id: 10,
       category: 'Pengawasan Lapangan Shift Malam',
       title: 'Keberadaan & Patroli Pengawas Lapangan',
-      hint: 'Pengawas operasional / Foreman standby aktif melakukan kontrol keselamatan di lapangan.',
+      hint:
+          'Pengawas operasional / Foreman standby aktif melakukan kontrol keselamatan di lapangan.',
       isOk: true,
     ),
   ];
@@ -184,20 +194,23 @@ class _SimamaFormPageState extends State<SimamaFormPage> {
         try {
           final parts = d['time'].toString().split(':');
           if (parts.length >= 2) {
-            _time = TimeOfDay(hour: int.parse(parts[0]), minute: int.parse(parts[1]));
+            _time = TimeOfDay(
+                hour: int.parse(parts[0]), minute: int.parse(parts[1]));
           }
         } catch (_) {}
       }
       _area = d['area']?.toString() ?? '';
       _areaCtrl.text = _area;
       _lokasiCtrl.text = d['lokasi']?.toString() ?? '';
-      _detilLokasiCtrl.text = (d['location_detail'] ?? d['detil_lokasi'])?.toString() ?? '';
+      _detilLokasiCtrl.text =
+          (d['location_detail'] ?? d['detil_lokasi'])?.toString() ?? '';
       _timPendampingCtrl.text = d['pja']?.toString() ?? '';
       _catatanCtrl.text = d['remark']?.toString() ?? '';
       _existingImageUrl = d['image']?.toString();
 
       // Restore checkpoints from payload_json if available
-      if (d['payload_json'] != null && d['payload_json'].toString().isNotEmpty) {
+      if (d['payload_json'] != null &&
+          d['payload_json'].toString().isNotEmpty) {
         try {
           final payload = jsonDecode(d['payload_json'].toString()) as Map;
           if (payload['checkpoints'] is List) {
@@ -205,7 +218,8 @@ class _SimamaFormPageState extends State<SimamaFormPage> {
             for (var saved in savedList) {
               if (saved is Map) {
                 final id = saved['id'];
-                final item = _checkpoints.firstWhere((c) => c.id == id, orElse: () => _checkpoints.first);
+                final item = _checkpoints.firstWhere((c) => c.id == id,
+                    orElse: () => _checkpoints.first);
                 if (saved.containsKey('isOk')) {
                   item.isOk = saved['isOk'] == true;
                 }
@@ -250,7 +264,8 @@ class _SimamaFormPageState extends State<SimamaFormPage> {
         )
       ''');
 
-      await sqldb.execute("DELETE FROM tbl_m_benchmark WHERE area_utama LIKE '%CAMP EKSPLORASI%' OR nama_benchmark = 'CAMP EKSPLORASI BLOCK CENTRAL'");
+      await sqldb.execute(
+          "DELETE FROM tbl_m_benchmark WHERE area_utama LIKE '%CAMP EKSPLORASI%' OR nama_benchmark = 'CAMP EKSPLORASI BLOCK CENTRAL'");
 
       final localAreas = await sqldb.rawQuery(
         "SELECT DISTINCT area_utama FROM tbl_m_benchmark WHERE area_utama IS NOT NULL AND area_utama != '' AND area_utama NOT LIKE '%CAMP EKSPLORASI%' ORDER BY area_utama",
@@ -259,9 +274,11 @@ class _SimamaFormPageState extends State<SimamaFormPage> {
         setState(() {
           _masterAreas = localAreas
               .map((e) => e['area_utama'].toString().trim())
-              .where((s) => s.isNotEmpty && !s.toUpperCase().contains('CAMP EKSPLORASI'))
+              .where((s) =>
+                  s.isNotEmpty && !s.toUpperCase().contains('CAMP EKSPLORASI'))
               .toSet()
-              .toList()..sort();
+              .toList()
+            ..sort();
         });
         onDone?.call();
         _onAreasLoadedModal?.call();
@@ -270,7 +287,9 @@ class _SimamaFormPageState extends State<SimamaFormPage> {
       final serverAreas = await _api.getMasterAreas(perusahaanId: companyId);
       if (serverAreas.isNotEmpty && mounted) {
         setState(() {
-          _masterAreas = serverAreas.where((s) => !s.toUpperCase().contains('CAMP EKSPLORASI')).toList();
+          _masterAreas = serverAreas
+              .where((s) => !s.toUpperCase().contains('CAMP EKSPLORASI'))
+              .toList();
         });
         onDone?.call();
         _onAreasLoadedModal?.call();
@@ -294,7 +313,8 @@ class _SimamaFormPageState extends State<SimamaFormPage> {
     }
   }
 
-  Future<void> _loadBenchmarksForArea(String area, {VoidCallback? onDone}) async {
+  Future<void> _loadBenchmarksForArea(String area,
+      {VoidCallback? onDone}) async {
     final cleanArea = area.trim();
     if (cleanArea.isEmpty) {
       if (mounted) {
@@ -332,13 +352,19 @@ class _SimamaFormPageState extends State<SimamaFormPage> {
       );
       if (localRows.isNotEmpty && mounted) {
         setState(() {
-          _benchmarksList = localRows.map((e) => e['nama_benchmark'].toString().trim()).where((s) => s.isNotEmpty).toSet().toList()..sort();
+          _benchmarksList = localRows
+              .map((e) => e['nama_benchmark'].toString().trim())
+              .where((s) => s.isNotEmpty)
+              .toSet()
+              .toList()
+            ..sort();
         });
         onDone?.call();
         _onBenchmarksLoadedModal?.call();
       }
 
-      final serverBenchmarks = await _api.getBenchmarks(cleanArea, perusahaanId: companyId);
+      final serverBenchmarks =
+          await _api.getBenchmarks(cleanArea, perusahaanId: companyId);
       if (serverBenchmarks.isNotEmpty && mounted) {
         setState(() {
           _benchmarksList = serverBenchmarks;
@@ -385,8 +411,11 @@ class _SimamaFormPageState extends State<SimamaFormPage> {
               });
             }
 
-            final filtered = _masterAreas.where((a) => a.toLowerCase().contains(filter.toLowerCase())).toList();
-            final hasExactMatch = _masterAreas.any((a) => a.toLowerCase() == filter.trim().toLowerCase());
+            final filtered = _masterAreas
+                .where((a) => a.toLowerCase().contains(filter.toLowerCase()))
+                .toList();
+            final hasExactMatch = _masterAreas
+                .any((a) => a.toLowerCase() == filter.trim().toLowerCase());
             final canAddCustom = filter.trim().isNotEmpty && !hasExactMatch;
 
             return Container(
@@ -407,7 +436,6 @@ class _SimamaFormPageState extends State<SimamaFormPage> {
                     ),
                   ),
                   const SizedBox(height: 14),
-
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 20),
                     child: Row(
@@ -427,20 +455,20 @@ class _SimamaFormPageState extends State<SimamaFormPage> {
                             SizedBox(height: 2),
                             Text(
                               'Pilih atau ketik untuk mencari & menambah area',
-                              style: TextStyle(color: Color(0xFF64748B), fontSize: 12),
+                              style: TextStyle(
+                                  color: Color(0xFF64748B), fontSize: 12),
                             ),
                           ],
                         ),
                         IconButton(
                           onPressed: () => Navigator.pop(modalCtx),
-                          icon: const Icon(Icons.close_rounded, color: Color(0xFF64748B)),
+                          icon: const Icon(Icons.close_rounded,
+                              color: Color(0xFF64748B)),
                         ),
                       ],
                     ),
                   ),
-
                   const SizedBox(height: 12),
-
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 20),
                     child: Container(
@@ -452,29 +480,34 @@ class _SimamaFormPageState extends State<SimamaFormPage> {
                       child: TextField(
                         autofocus: false,
                         onChanged: (val) => setModalState(() => filter = val),
-                        style: const TextStyle(fontSize: 14, color: Color(0xFF0F172A)),
+                        style: const TextStyle(
+                            fontSize: 14, color: Color(0xFF0F172A)),
                         decoration: InputDecoration(
                           hintText: 'Ketik untuk mencari area...',
-                          hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
-                          prefixIcon: const Icon(Icons.search_rounded, color: Color(0xFF64748B)),
+                          hintStyle: const TextStyle(
+                              color: Color(0xFF94A3B8), fontSize: 13),
+                          prefixIcon: const Icon(Icons.search_rounded,
+                              color: Color(0xFF64748B)),
                           suffixIcon: filter.isNotEmpty
                               ? IconButton(
-                                  icon: const Icon(Icons.clear_rounded, size: 18),
-                                  onPressed: () => setModalState(() => filter = ''),
+                                  icon:
+                                      const Icon(Icons.clear_rounded, size: 18),
+                                  onPressed: () =>
+                                      setModalState(() => filter = ''),
                                 )
                               : null,
                           border: InputBorder.none,
-                          contentPadding: const EdgeInsets.symmetric(vertical: 14),
+                          contentPadding:
+                              const EdgeInsets.symmetric(vertical: 14),
                         ),
                       ),
                     ),
                   ),
-
                   const SizedBox(height: 12),
-
                   if (canAddCustom)
                     Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 20, vertical: 4),
                       child: InkWell(
                         onTap: () async {
                           Navigator.pop(modalCtx);
@@ -482,7 +515,8 @@ class _SimamaFormPageState extends State<SimamaFormPage> {
                         },
                         borderRadius: BorderRadius.circular(12),
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 14, vertical: 12),
                           decoration: BoxDecoration(
                             color: const Color(0xFFF5F3FF),
                             borderRadius: BorderRadius.circular(12),
@@ -496,7 +530,8 @@ class _SimamaFormPageState extends State<SimamaFormPage> {
                                   color: primaryPurple,
                                   borderRadius: BorderRadius.circular(8),
                                 ),
-                                child: const Icon(Icons.add, color: Colors.white, size: 16),
+                                child: const Icon(Icons.add,
+                                    color: Colors.white, size: 16),
                               ),
                               const SizedBox(width: 12),
                               Expanded(
@@ -505,7 +540,10 @@ class _SimamaFormPageState extends State<SimamaFormPage> {
                                   children: [
                                     const Text(
                                       'Gunakan / Tambah Area Baru:',
-                                      style: TextStyle(color: primaryPurple, fontSize: 11, fontWeight: FontWeight.w600),
+                                      style: TextStyle(
+                                          color: primaryPurple,
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w600),
                                     ),
                                     Text(
                                       '"${filter.trim()}"',
@@ -518,13 +556,13 @@ class _SimamaFormPageState extends State<SimamaFormPage> {
                                   ],
                                 ),
                               ),
-                              const Icon(Icons.arrow_forward_ios_rounded, color: primaryPurple, size: 14),
+                              const Icon(Icons.arrow_forward_ios_rounded,
+                                  color: primaryPurple, size: 14),
                             ],
                           ),
                         ),
                       ),
                     ),
-
                   Expanded(
                     child: _isLoadingAreas && _masterAreas.isEmpty
                         ? const Center(
@@ -534,58 +572,71 @@ class _SimamaFormPageState extends State<SimamaFormPage> {
                                 SizedBox(
                                   width: 28,
                                   height: 28,
-                                  child: CircularProgressIndicator(strokeWidth: 2.5, color: primaryPurple),
+                                  child: CircularProgressIndicator(
+                                      strokeWidth: 2.5, color: primaryPurple),
                                 ),
                                 SizedBox(height: 14),
                                 Text(
-                                  'Memuat daftar area dari database...',
-                                  style: TextStyle(color: Color(0xFF64748B), fontSize: 13),
+                                  'Memuat daftar area...',
+                                  style: TextStyle(
+                                      color: Color(0xFF64748B), fontSize: 13),
                                 ),
                               ],
                             ),
                           )
                         : filtered.isEmpty && !canAddCustom
-                        ? const Center(
-                            child: Text('Area tidak ditemukan', style: TextStyle(color: Color(0xFF94A3B8))),
-                          )
-                        : ListView.separated(
-                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                            itemCount: filtered.length,
-                            separatorBuilder: (_, __) => const Divider(height: 1, color: Color(0xFFF1F5F9)),
-                            itemBuilder: (context, index) {
-                              final item = filtered[index];
-                              final isSelected = item == _area;
-                              return ListTile(
-                                dense: true,
-                                contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                leading: Icon(
-                                  Icons.place_rounded,
-                                  color: isSelected ? primaryPurple : const Color(0xFF94A3B8),
-                                  size: 20,
-                                ),
-                                title: Text(
-                                  item,
-                                  style: TextStyle(
-                                    color: isSelected ? primaryPurple : const Color(0xFF1E293B),
-                                    fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                                    fontSize: 13,
-                                  ),
-                                ),
-                                trailing: isSelected
-                                    ? const Icon(Icons.check_circle_rounded, color: primaryPurple, size: 20)
-                                    : null,
-                                onTap: () {
-                                  Navigator.pop(modalCtx);
-                                  setState(() {
-                                    _area = item;
-                                    _areaCtrl.text = item;
-                                    _detilLokasiCtrl.text = '';
-                                  });
-                                  _loadBenchmarksForArea(item);
+                            ? const Center(
+                                child: Text('Area tidak ditemukan',
+                                    style: TextStyle(color: Color(0xFF94A3B8))),
+                              )
+                            : ListView.separated(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 20, vertical: 8),
+                                itemCount: filtered.length,
+                                separatorBuilder: (_, __) => const Divider(
+                                    height: 1, color: Color(0xFFF1F5F9)),
+                                itemBuilder: (context, index) {
+                                  final item = filtered[index];
+                                  final isSelected = item == _area;
+                                  return ListTile(
+                                    dense: true,
+                                    contentPadding: const EdgeInsets.symmetric(
+                                        horizontal: 8, vertical: 2),
+                                    leading: Icon(
+                                      Icons.place_rounded,
+                                      color: isSelected
+                                          ? primaryPurple
+                                          : const Color(0xFF94A3B8),
+                                      size: 20,
+                                    ),
+                                    title: Text(
+                                      item,
+                                      style: TextStyle(
+                                        color: isSelected
+                                            ? primaryPurple
+                                            : const Color(0xFF1E293B),
+                                        fontWeight: isSelected
+                                            ? FontWeight.bold
+                                            : FontWeight.w500,
+                                        fontSize: 13,
+                                      ),
+                                    ),
+                                    trailing: isSelected
+                                        ? const Icon(Icons.check_circle_rounded,
+                                            color: primaryPurple, size: 20)
+                                        : null,
+                                    onTap: () {
+                                      Navigator.pop(modalCtx);
+                                      setState(() {
+                                        _area = item;
+                                        _areaCtrl.text = item;
+                                        _detilLokasiCtrl.text = '';
+                                      });
+                                      _loadBenchmarksForArea(item);
+                                    },
+                                  );
                                 },
-                              );
-                            },
-                          ),
+                              ),
                   ),
                 ],
               ),
@@ -619,7 +670,13 @@ class _SimamaFormPageState extends State<SimamaFormPage> {
       await sqldb.rawInsert(
         '''INSERT INTO tbl_m_benchmark (perusahaan_id, area_utama, nama_benchmark, created_by_nik, created_by_name, created_at)
            VALUES (?, ?, '', ?, ?, ?)''',
-        [_profile?.companyId ?? 1, cleanName, userNik, userName, DateTime.now().toIso8601String()],
+        [
+          _profile?.companyId ?? 1,
+          cleanName,
+          userNik,
+          userName,
+          DateTime.now().toIso8601String()
+        ],
       );
     } catch (_) {}
 
@@ -651,7 +708,9 @@ class _SimamaFormPageState extends State<SimamaFormPage> {
               if (modalCtx.mounted) setModalState(() {});
             };
 
-            if (_benchmarksList.isEmpty && !_isLoadingBenchmarks && _area.isNotEmpty) {
+            if (_benchmarksList.isEmpty &&
+                !_isLoadingBenchmarks &&
+                _area.isNotEmpty) {
               WidgetsBinding.instance.addPostFrameCallback((_) {
                 _loadBenchmarksForArea(_area);
               });
@@ -660,7 +719,8 @@ class _SimamaFormPageState extends State<SimamaFormPage> {
             final filtered = _benchmarksList
                 .where((b) => b.toLowerCase().contains(filter.toLowerCase()))
                 .toList();
-            final hasExactMatch = _benchmarksList.any((b) => b.toLowerCase() == filter.trim().toLowerCase());
+            final hasExactMatch = _benchmarksList
+                .any((b) => b.toLowerCase() == filter.trim().toLowerCase());
             final canAddCustom = filter.trim().isNotEmpty && !hasExactMatch;
 
             return Container(
@@ -681,7 +741,6 @@ class _SimamaFormPageState extends State<SimamaFormPage> {
                     ),
                   ),
                   const SizedBox(height: 14),
-
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 20),
                     child: Row(
@@ -702,7 +761,10 @@ class _SimamaFormPageState extends State<SimamaFormPage> {
                               const SizedBox(height: 2),
                               Text(
                                 'Area: $_area',
-                                style: const TextStyle(color: primaryPurple, fontSize: 12, fontWeight: FontWeight.w600),
+                                style: const TextStyle(
+                                    color: primaryPurple,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                               ),
@@ -711,14 +773,13 @@ class _SimamaFormPageState extends State<SimamaFormPage> {
                         ),
                         IconButton(
                           onPressed: () => Navigator.pop(modalCtx),
-                          icon: const Icon(Icons.close_rounded, color: Color(0xFF64748B)),
+                          icon: const Icon(Icons.close_rounded,
+                              color: Color(0xFF64748B)),
                         ),
                       ],
                     ),
                   ),
-
                   const SizedBox(height: 12),
-
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 20),
                     child: Container(
@@ -730,29 +791,34 @@ class _SimamaFormPageState extends State<SimamaFormPage> {
                       child: TextField(
                         autofocus: false,
                         onChanged: (val) => setModalState(() => filter = val),
-                        style: const TextStyle(fontSize: 14, color: Color(0xFF0F172A)),
+                        style: const TextStyle(
+                            fontSize: 14, color: Color(0xFF0F172A)),
                         decoration: InputDecoration(
                           hintText: 'Ketik untuk mencari benchmark...',
-                          hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
-                          prefixIcon: const Icon(Icons.search_rounded, color: Color(0xFF64748B)),
+                          hintStyle: const TextStyle(
+                              color: Color(0xFF94A3B8), fontSize: 13),
+                          prefixIcon: const Icon(Icons.search_rounded,
+                              color: Color(0xFF64748B)),
                           suffixIcon: filter.isNotEmpty
                               ? IconButton(
-                                  icon: const Icon(Icons.clear_rounded, size: 18),
-                                  onPressed: () => setModalState(() => filter = ''),
+                                  icon:
+                                      const Icon(Icons.clear_rounded, size: 18),
+                                  onPressed: () =>
+                                      setModalState(() => filter = ''),
                                 )
                               : null,
                           border: InputBorder.none,
-                          contentPadding: const EdgeInsets.symmetric(vertical: 14),
+                          contentPadding:
+                              const EdgeInsets.symmetric(vertical: 14),
                         ),
                       ),
                     ),
                   ),
-
                   const SizedBox(height: 12),
-
                   if (canAddCustom)
                     Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 20, vertical: 4),
                       child: InkWell(
                         onTap: () async {
                           Navigator.pop(modalCtx);
@@ -760,7 +826,8 @@ class _SimamaFormPageState extends State<SimamaFormPage> {
                         },
                         borderRadius: BorderRadius.circular(12),
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 14, vertical: 12),
                           decoration: BoxDecoration(
                             color: const Color(0xFFF5F3FF),
                             borderRadius: BorderRadius.circular(12),
@@ -774,7 +841,8 @@ class _SimamaFormPageState extends State<SimamaFormPage> {
                                   color: primaryPurple,
                                   borderRadius: BorderRadius.circular(8),
                                 ),
-                                child: const Icon(Icons.add, color: Colors.white, size: 16),
+                                child: const Icon(Icons.add,
+                                    color: Colors.white, size: 16),
                               ),
                               const SizedBox(width: 12),
                               Expanded(
@@ -782,8 +850,11 @@ class _SimamaFormPageState extends State<SimamaFormPage> {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     const Text(
-                                      'Tambah Benchmark Baru ke Database:',
-                                      style: TextStyle(color: primaryPurple, fontSize: 11, fontWeight: FontWeight.w600),
+                                      'Tambah acuan baru:',
+                                      style: TextStyle(
+                                          color: primaryPurple,
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w600),
                                     ),
                                     Text(
                                       '"${filter.trim()}"',
@@ -796,13 +867,13 @@ class _SimamaFormPageState extends State<SimamaFormPage> {
                                   ],
                                 ),
                               ),
-                              const Icon(Icons.arrow_forward_ios_rounded, color: primaryPurple, size: 14),
+                              const Icon(Icons.arrow_forward_ios_rounded,
+                                  color: primaryPurple, size: 14),
                             ],
                           ),
                         ),
                       ),
                     ),
-
                   Expanded(
                     child: _isLoadingBenchmarks && _benchmarksList.isEmpty
                         ? const Center(
@@ -812,82 +883,101 @@ class _SimamaFormPageState extends State<SimamaFormPage> {
                                 SizedBox(
                                   width: 28,
                                   height: 28,
-                                  child: CircularProgressIndicator(strokeWidth: 2.5, color: primaryPurple),
+                                  child: CircularProgressIndicator(
+                                      strokeWidth: 2.5, color: primaryPurple),
                                 ),
                                 SizedBox(height: 14),
                                 Text(
-                                  'Memuat benchmark dari database...',
-                                  style: TextStyle(color: Color(0xFF64748B), fontSize: 13),
+                                  'Memuat data acuan...',
+                                  style: TextStyle(
+                                      color: Color(0xFF64748B), fontSize: 13),
                                 ),
                               ],
                             ),
                           )
                         : filtered.isEmpty && !canAddCustom
-                        ? Center(
-                            child: Padding(
-                              padding: const EdgeInsets.all(24),
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  const Icon(Icons.explore_off_rounded, color: Color(0xFF94A3B8), size: 48),
-                                  const SizedBox(height: 12),
-                                  Text(
-                                    'Belum ada benchmark terdaftar untuk area "$_area".',
-                                    textAlign: TextAlign.center,
-                                    style: const TextStyle(color: Color(0xFF64748B), fontSize: 13),
+                            ? Center(
+                                child: Padding(
+                                  padding: const EdgeInsets.all(24),
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Icon(Icons.explore_off_rounded,
+                                          color: Color(0xFF94A3B8), size: 48),
+                                      const SizedBox(height: 12),
+                                      Text(
+                                        'Belum ada benchmark terdaftar untuk area "$_area".',
+                                        textAlign: TextAlign.center,
+                                        style: const TextStyle(
+                                            color: Color(0xFF64748B),
+                                            fontSize: 13),
+                                      ),
+                                      const SizedBox(height: 12),
+                                      FilledButton.icon(
+                                        onPressed: () {
+                                          Navigator.pop(modalCtx);
+                                          _showAddBenchmarkDialog();
+                                        },
+                                        icon: const Icon(Icons.add, size: 18),
+                                        label:
+                                            const Text('Tambah Benchmark Baru'),
+                                        style: FilledButton.styleFrom(
+                                          backgroundColor: primaryPurple,
+                                          shape: RoundedRectangleBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(12)),
+                                        ),
+                                      ),
+                                    ],
                                   ),
-                                  const SizedBox(height: 12),
-                                  FilledButton.icon(
-                                    onPressed: () {
-                                      Navigator.pop(modalCtx);
-                                      _showAddBenchmarkDialog();
-                                    },
-                                    icon: const Icon(Icons.add, size: 18),
-                                    label: const Text('Tambah Benchmark Baru'),
-                                    style: FilledButton.styleFrom(
-                                      backgroundColor: primaryPurple,
-                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                ),
+                              )
+                            : ListView.separated(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 20, vertical: 8),
+                                itemCount: filtered.length,
+                                separatorBuilder: (_, __) => const Divider(
+                                    height: 1, color: Color(0xFFF1F5F9)),
+                                itemBuilder: (context, index) {
+                                  final item = filtered[index];
+                                  final isSelected =
+                                      item == _detilLokasiCtrl.text;
+                                  return ListTile(
+                                    dense: true,
+                                    contentPadding: const EdgeInsets.symmetric(
+                                        horizontal: 8, vertical: 2),
+                                    leading: Icon(
+                                      Icons.explore_rounded,
+                                      color: isSelected
+                                          ? primaryPurple
+                                          : const Color(0xFF94A3B8),
+                                      size: 20,
                                     ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          )
-                        : ListView.separated(
-                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                            itemCount: filtered.length,
-                            separatorBuilder: (_, __) => const Divider(height: 1, color: Color(0xFFF1F5F9)),
-                            itemBuilder: (context, index) {
-                              final item = filtered[index];
-                              final isSelected = item == _detilLokasiCtrl.text;
-                              return ListTile(
-                                dense: true,
-                                contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                leading: Icon(
-                                  Icons.explore_rounded,
-                                  color: isSelected ? primaryPurple : const Color(0xFF94A3B8),
-                                  size: 20,
-                                ),
-                                title: Text(
-                                  item,
-                                  style: TextStyle(
-                                    color: isSelected ? primaryPurple : const Color(0xFF1E293B),
-                                    fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                                    fontSize: 13,
-                                  ),
-                                ),
-                                trailing: isSelected
-                                    ? const Icon(Icons.check_circle_rounded, color: primaryPurple, size: 20)
-                                    : null,
-                                onTap: () {
-                                  Navigator.pop(modalCtx);
-                                  setState(() {
-                                    _detilLokasiCtrl.text = item;
-                                  });
+                                    title: Text(
+                                      item,
+                                      style: TextStyle(
+                                        color: isSelected
+                                            ? primaryPurple
+                                            : const Color(0xFF1E293B),
+                                        fontWeight: isSelected
+                                            ? FontWeight.bold
+                                            : FontWeight.w500,
+                                        fontSize: 13,
+                                      ),
+                                    ),
+                                    trailing: isSelected
+                                        ? const Icon(Icons.check_circle_rounded,
+                                            color: primaryPurple, size: 20)
+                                        : null,
+                                    onTap: () {
+                                      Navigator.pop(modalCtx);
+                                      setState(() {
+                                        _detilLokasiCtrl.text = item;
+                                      });
+                                    },
+                                  );
                                 },
-                              );
-                            },
-                          ),
+                              ),
                   ),
                 ],
               ),
@@ -905,7 +995,8 @@ class _SimamaFormPageState extends State<SimamaFormPage> {
       context: context,
       builder: (dlgCtx) {
         return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
           title: Row(
             children: [
               Container(
@@ -914,7 +1005,8 @@ class _SimamaFormPageState extends State<SimamaFormPage> {
                   color: const Color(0xFFF5F3FF),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: const Icon(Icons.add_location_alt_rounded, color: primaryPurple, size: 20),
+                child: const Icon(Icons.add_location_alt_rounded,
+                    color: primaryPurple, size: 20),
               ),
               const SizedBox(width: 10),
               const Expanded(
@@ -931,7 +1023,10 @@ class _SimamaFormPageState extends State<SimamaFormPage> {
             children: [
               Text(
                 'Area Utama: $_area',
-                style: const TextStyle(color: primaryPurple, fontSize: 12, fontWeight: FontWeight.bold),
+                style: const TextStyle(
+                    color: primaryPurple,
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 12),
               TextField(
@@ -941,13 +1036,14 @@ class _SimamaFormPageState extends State<SimamaFormPage> {
                 decoration: InputDecoration(
                   labelText: 'Nama Benchmark / Detail Lokasi',
                   hintText: 'Contoh: RL 50, BM-22, Front Loading Ex-201',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12)),
                   prefixIcon: const Icon(Icons.explore_rounded),
                 ),
               ),
               const SizedBox(height: 8),
               const Text(
-                'Benchmark ini akan langsung disimpan ke database tbl_m_benchmark.',
+                'Data acuan ini akan langsung tersimpan dan tersedia untuk pilihan berikutnya.',
                 style: TextStyle(color: Color(0xFF64748B), fontSize: 11),
               ),
             ],
@@ -966,7 +1062,8 @@ class _SimamaFormPageState extends State<SimamaFormPage> {
               },
               style: FilledButton.styleFrom(
                 backgroundColor: primaryPurple,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10)),
               ),
               child: const Text('Simpan Benchmark'),
             ),
@@ -1000,7 +1097,14 @@ class _SimamaFormPageState extends State<SimamaFormPage> {
       await sqldb.rawInsert(
         '''INSERT INTO tbl_m_benchmark (perusahaan_id, area_utama, nama_benchmark, created_by_nik, created_by_name, created_at)
            VALUES (?, ?, ?, ?, ?, ?)''',
-        [_profile?.companyId ?? 1, _area, cleanName, userNik, userName, DateTime.now().toIso8601String()],
+        [
+          _profile?.companyId ?? 1,
+          _area,
+          cleanName,
+          userNik,
+          userName,
+          DateTime.now().toIso8601String()
+        ],
       );
     } catch (_) {}
 
@@ -1014,9 +1118,11 @@ class _SimamaFormPageState extends State<SimamaFormPage> {
       );
       if (mounted) {
         if (result != null) {
-          SnackBarMsg.success(context, 'Benchmark "$cleanName" berhasil disimpan ke database!');
+          SnackBarMsg.success(
+              context, 'Data acuan "$cleanName" berhasil disimpan.');
         } else {
-          SnackBarMsg.info(context, 'Benchmark "$cleanName" tersimpan di HP (Mode Offline)');
+          SnackBarMsg.info(
+              context, 'Benchmark "$cleanName" tersimpan di HP (Mode Offline)');
         }
       }
     } catch (e) {
@@ -1078,13 +1184,15 @@ class _SimamaFormPageState extends State<SimamaFormPage> {
       return;
     }
     if (_lokasiCtrl.text.trim().isEmpty) {
-      SnackBarMsg.warning(context, 'Titik koordinat GPS atau lokasi spesifik wajib terisi.');
+      SnackBarMsg.warning(
+          context, 'Titik koordinat GPS atau lokasi spesifik wajib terisi.');
       return;
     }
 
     final hasUnanswered = _checkpoints.any((c) => c.isOk == null);
     if (hasUnanswered) {
-      SnackBarMsg.warning(context, 'Harap lengkapi semua checklist fokus K3 shift malam.');
+      SnackBarMsg.warning(
+          context, 'Harap lengkapi semua checklist fokus K3 shift malam.');
       return;
     }
 
@@ -1093,7 +1201,8 @@ class _SimamaFormPageState extends State<SimamaFormPage> {
     final chosenDate = DateTime(_date.year, _date.month, _date.day);
     final isEdit = widget.editData != null;
     if (!isEdit && chosenDate.isBefore(today)) {
-      SnackBarMsg.warning(context, 'Tanggal SiMaMa tidak boleh backdate (kurang dari hari ini).');
+      SnackBarMsg.warning(context,
+          'Tanggal SiMaMa tidak boleh backdate (kurang dari hari ini).');
       return;
     }
 
@@ -1101,7 +1210,8 @@ class _SimamaFormPageState extends State<SimamaFormPage> {
 
     try {
       final dateStr = DateFormat('yyyy-MM-dd').format(_date);
-      final timeStr = '${_time.hour.toString().padLeft(2, '0')}:${_time.minute.toString().padLeft(2, '0')}';
+      final timeStr =
+          '${_time.hour.toString().padLeft(2, '0')}:${_time.minute.toString().padLeft(2, '0')}';
       final isEdit = widget.editData != null;
       final editId = isEdit ? widget.editData!['id'] as int : 0;
 
@@ -1123,7 +1233,9 @@ class _SimamaFormPageState extends State<SimamaFormPage> {
         'area': areaVal,
         'lokasi': _lokasiCtrl.text.trim(),
         'location_detail': _detilLokasiCtrl.text.trim(),
-        'remark': _catatanCtrl.text.trim().isEmpty ? 'Sidak Malam Management' : _catatanCtrl.text.trim(),
+        'remark': _catatanCtrl.text.trim().isEmpty
+            ? 'Sidak Malam Management'
+            : _catatanCtrl.text.trim(),
         'pja': _timPendampingCtrl.text.trim(),
         'employee_id': _profile?.id ?? 0,
         'status': 1,
@@ -1147,7 +1259,8 @@ class _SimamaFormPageState extends State<SimamaFormPage> {
       if (isEdit) {
         await _db.update('inspection_trans', row, editId);
       } else {
-        row['code'] = 'SIMAMA-${DateTime.now().millisecondsSinceEpoch.toString().substring(5)}';
+        row['code'] =
+            'SIMAMA-${DateTime.now().millisecondsSinceEpoch.toString().substring(5)}';
         row['created_at'] = DateTime.now().toString();
         tranId = await _db.insert('inspection_trans', row);
       }
@@ -1155,7 +1268,8 @@ class _SimamaFormPageState extends State<SimamaFormPage> {
       // Save inspection_details locally
       if (tranId > 0) {
         final sqldb = await _db.database;
-        await sqldb.delete('inspection_details', where: 'tran_id = ?', whereArgs: [tranId]);
+        await sqldb.delete('inspection_details',
+            where: 'tran_id = ?', whereArgs: [tranId]);
 
         for (var c in _checkpoints) {
           await _db.insert('inspection_details', {
@@ -1198,7 +1312,9 @@ class _SimamaFormPageState extends State<SimamaFormPage> {
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       appBar: TopBar(
-        title: widget.editData != null ? 'Edit Sidak Malam' : 'Sidak Malam (SiMaMa)',
+        title: widget.editData != null
+            ? 'Edit Sidak Malam'
+            : 'Sidak Malam (SiMaMa)',
       ),
       body: SingleChildScrollView(
         controller: _scrollCtrl,
@@ -1243,7 +1359,8 @@ class _SimamaFormPageState extends State<SimamaFormPage> {
                         CircleAvatar(
                           radius: 20,
                           backgroundColor: primaryPurple.withValues(alpha: .15),
-                          child: const Icon(Icons.person_pin_rounded, color: primaryPurple, size: 24),
+                          child: const Icon(Icons.person_pin_rounded,
+                              color: primaryPurple, size: 24),
                         ),
                         const SizedBox(width: 12),
                         Expanded(
@@ -1252,24 +1369,32 @@ class _SimamaFormPageState extends State<SimamaFormPage> {
                             children: [
                               Text(
                                 _profile?.namaLengkap ?? 'Pemeriksa Utama',
-                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF0F172A)),
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 13,
+                                    color: Color(0xFF0F172A)),
                               ),
                               Text(
                                 'NIK: ${_profile?.noNik ?? "-"} • ${_profile?.depart ?? _profile?.posisi ?? "K3 Operasional"}',
-                                style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                                style: const TextStyle(
+                                    fontSize: 11, color: Color(0xFF64748B)),
                               ),
                             ],
                           ),
                         ),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 4),
                           decoration: BoxDecoration(
                             color: const Color(0xFF312E81),
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: const Text(
                             'Shift Malam',
-                            style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                            style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold),
                           ),
                         ),
                       ],
@@ -1281,11 +1406,16 @@ class _SimamaFormPageState extends State<SimamaFormPage> {
                     controller: _timPendampingCtrl,
                     decoration: InputDecoration(
                       labelText: 'Tim Pendamping / Anggota Sidak (Opsional)',
-                      hintText: 'Misal: Spv Pit Barat, Foreman Elektrikal, Safety Officer',
-                      hintStyle: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
-                      prefixIcon: const Icon(Icons.group_rounded, color: primaryPurple, size: 20),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      hintText:
+                          'Misal: Spv Pit Barat, Foreman Elektrikal, Safety Officer',
+                      hintStyle: const TextStyle(
+                          fontSize: 12, color: Color(0xFF94A3B8)),
+                      prefixIcon: const Icon(Icons.group_rounded,
+                          color: primaryPurple, size: 20),
+                      border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 12),
                     ),
                   ),
                 ],
@@ -1316,25 +1446,35 @@ class _SimamaFormPageState extends State<SimamaFormPage> {
                     onTap: _showAreaPickerModal,
                     borderRadius: BorderRadius.circular(12),
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 14),
                       decoration: BoxDecoration(
                         color: const Color(0xFFF8FAFC),
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
-                          color: _area.isNotEmpty ? primaryPurple.withValues(alpha: 0.35) : const Color(0xFFE2E8F0),
+                          color: _area.isNotEmpty
+                              ? primaryPurple.withValues(alpha: 0.35)
+                              : const Color(0xFFE2E8F0),
                         ),
                       ),
                       child: Row(
                         children: [
-                          const Icon(Icons.place_rounded, color: primaryPurple, size: 20),
+                          const Icon(Icons.place_rounded,
+                              color: primaryPurple, size: 20),
                           const SizedBox(width: 10),
                           Expanded(
                             child: Text(
-                              _area.isNotEmpty ? _area : 'KETIK UNTUK MENCARI AREA...',
+                              _area.isNotEmpty
+                                  ? _area
+                                  : 'KETIK UNTUK MENCARI AREA...',
                               style: TextStyle(
-                                color: _area.isNotEmpty ? const Color(0xFF0F172A) : const Color(0xFF94A3B8),
+                                color: _area.isNotEmpty
+                                    ? const Color(0xFF0F172A)
+                                    : const Color(0xFF94A3B8),
                                 fontSize: 13,
-                                fontWeight: _area.isNotEmpty ? FontWeight.w600 : FontWeight.normal,
+                                fontWeight: _area.isNotEmpty
+                                    ? FontWeight.w600
+                                    : FontWeight.normal,
                               ),
                             ),
                           ),
@@ -1342,10 +1482,12 @@ class _SimamaFormPageState extends State<SimamaFormPage> {
                             const SizedBox(
                               width: 16,
                               height: 16,
-                              child: CircularProgressIndicator(strokeWidth: 2, color: primaryPurple),
+                              child: CircularProgressIndicator(
+                                  strokeWidth: 2, color: primaryPurple),
                             )
                           else
-                            const Icon(Icons.keyboard_arrow_down_rounded, color: Color(0xFF64748B), size: 20),
+                            const Icon(Icons.keyboard_arrow_down_rounded,
+                                color: Color(0xFF64748B), size: 20),
                         ],
                       ),
                     ),
@@ -1370,22 +1512,26 @@ class _SimamaFormPageState extends State<SimamaFormPage> {
                         child: InkWell(
                           onTap: () {
                             if (_area.isEmpty) {
-                              SnackBarMsg.warning(context, 'Pilih Area Utama terlebih dahulu.');
+                              SnackBarMsg.warning(
+                                  context, 'Pilih Area Utama terlebih dahulu.');
                               return;
                             }
                             _showBenchmarkPickerModal();
                           },
                           borderRadius: BorderRadius.circular(12),
                           child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 14, vertical: 14),
                             decoration: BoxDecoration(
                               color: const Color(0xFFF8FAFC),
                               borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: const Color(0xFFE2E8F0)),
+                              border:
+                                  Border.all(color: const Color(0xFFE2E8F0)),
                             ),
                             child: Row(
                               children: [
-                                const Icon(Icons.explore_rounded, color: primaryPurple, size: 20),
+                                const Icon(Icons.explore_rounded,
+                                    color: primaryPurple, size: 20),
                                 const SizedBox(width: 10),
                                 Expanded(
                                   child: Text(
@@ -1399,7 +1545,10 @@ class _SimamaFormPageState extends State<SimamaFormPage> {
                                           ? const Color(0xFF0F172A)
                                           : const Color(0xFF94A3B8),
                                       fontSize: 13,
-                                      fontWeight: _detilLokasiCtrl.text.isNotEmpty ? FontWeight.w600 : FontWeight.normal,
+                                      fontWeight:
+                                          _detilLokasiCtrl.text.isNotEmpty
+                                              ? FontWeight.w600
+                                              : FontWeight.normal,
                                     ),
                                   ),
                                 ),
@@ -1407,10 +1556,12 @@ class _SimamaFormPageState extends State<SimamaFormPage> {
                                   const SizedBox(
                                     width: 16,
                                     height: 16,
-                                    child: CircularProgressIndicator(strokeWidth: 2, color: primaryPurple),
+                                    child: CircularProgressIndicator(
+                                        strokeWidth: 2, color: primaryPurple),
                                   )
                                 else
-                                  const Icon(Icons.keyboard_arrow_down_rounded, color: Color(0xFF64748B), size: 20),
+                                  const Icon(Icons.keyboard_arrow_down_rounded,
+                                      color: Color(0xFF64748B), size: 20),
                               ],
                             ),
                           ),
@@ -1421,7 +1572,8 @@ class _SimamaFormPageState extends State<SimamaFormPage> {
                       InkWell(
                         onTap: () {
                           if (_area.isEmpty) {
-                            SnackBarMsg.warning(context, 'Pilih Area Utama terlebih dahulu sebelum menambah benchmark.');
+                            SnackBarMsg.warning(context,
+                                'Pilih Area Utama terlebih dahulu sebelum menambah benchmark.');
                             return;
                           }
                           _showAddBenchmarkDialog();
@@ -1441,7 +1593,8 @@ class _SimamaFormPageState extends State<SimamaFormPage> {
                               ),
                             ],
                           ),
-                          child: const Icon(Icons.add_location_alt_rounded, color: Colors.white, size: 22),
+                          child: const Icon(Icons.add_location_alt_rounded,
+                              color: Colors.white, size: 22),
                         ),
                       ),
                     ],
@@ -1465,15 +1618,23 @@ class _SimamaFormPageState extends State<SimamaFormPage> {
                       Row(
                         children: [
                           Icon(
-                            _lokasiCtrl.text.isNotEmpty ? Icons.gps_fixed_rounded : Icons.gps_not_fixed_rounded,
+                            _lokasiCtrl.text.isNotEmpty
+                                ? Icons.gps_fixed_rounded
+                                : Icons.gps_not_fixed_rounded,
                             size: 13,
-                            color: _lokasiCtrl.text.isNotEmpty ? const Color(0xFF10B981) : const Color(0xFF64748B),
+                            color: _lokasiCtrl.text.isNotEmpty
+                                ? const Color(0xFF10B981)
+                                : const Color(0xFF64748B),
                           ),
                           const SizedBox(width: 4),
                           Text(
-                            _lokasiCtrl.text.isNotEmpty ? 'Satelit Terkunci' : 'Auto-Deteksi',
+                            _lokasiCtrl.text.isNotEmpty
+                                ? 'Satelit Terkunci'
+                                : 'Auto-Deteksi',
                             style: TextStyle(
-                              color: _lokasiCtrl.text.isNotEmpty ? const Color(0xFF10B981) : const Color(0xFF64748B),
+                              color: _lokasiCtrl.text.isNotEmpty
+                                  ? const Color(0xFF10B981)
+                                  : const Color(0xFF64748B),
                               fontSize: 11,
                               fontWeight: FontWeight.w600,
                             ),
@@ -1484,19 +1645,24 @@ class _SimamaFormPageState extends State<SimamaFormPage> {
                   ),
                   const SizedBox(height: 6),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
                     decoration: BoxDecoration(
                       color: const Color(0xFFF8FAFC),
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
-                        color: _lokasiCtrl.text.isNotEmpty ? const Color(0xFF86EFAC) : const Color(0xFFE2E8F0),
+                        color: _lokasiCtrl.text.isNotEmpty
+                            ? const Color(0xFF86EFAC)
+                            : const Color(0xFFE2E8F0),
                       ),
                     ),
                     child: Row(
                       children: [
                         Icon(
                           Icons.place_rounded,
-                          color: _lokasiCtrl.text.isNotEmpty ? const Color(0xFF16A34A) : primaryPurple,
+                          color: _lokasiCtrl.text.isNotEmpty
+                              ? const Color(0xFF16A34A)
+                              : primaryPurple,
                           size: 20,
                         ),
                         const SizedBox(width: 10),
@@ -1511,7 +1677,8 @@ class _SimamaFormPageState extends State<SimamaFormPage> {
                             decoration: const InputDecoration(
                               border: InputBorder.none,
                               hintText: 'Titik koordinat GPS...',
-                              hintStyle: TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
+                              hintStyle: TextStyle(
+                                  color: Color(0xFF94A3B8), fontSize: 13),
                             ),
                           ),
                         ),
@@ -1614,7 +1781,9 @@ class _SimamaFormPageState extends State<SimamaFormPage> {
                                   errorBuilder: (_, __, ___) => Container(
                                     height: 200,
                                     color: Colors.grey.shade200,
-                                    child: const Center(child: Icon(Icons.broken_image, size: 40, color: Colors.grey)),
+                                    child: const Center(
+                                        child: Icon(Icons.broken_image,
+                                            size: 40, color: Colors.grey)),
                                   ),
                                 ),
                         ),
@@ -1630,8 +1799,10 @@ class _SimamaFormPageState extends State<SimamaFormPage> {
                             },
                             child: CircleAvatar(
                               radius: 16,
-                              backgroundColor: Colors.black.withValues(alpha: .7),
-                              child: const Icon(Icons.close_rounded, color: Colors.white, size: 18),
+                              backgroundColor:
+                                  Colors.black.withValues(alpha: .7),
+                              child: const Icon(Icons.close_rounded,
+                                  color: Colors.white, size: 18),
                             ),
                           ),
                         ),
@@ -1645,12 +1816,15 @@ class _SimamaFormPageState extends State<SimamaFormPage> {
                             style: OutlinedButton.styleFrom(
                               foregroundColor: primaryPurple,
                               side: const BorderSide(color: Color(0xFFCBD5E1)),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12)),
                               padding: const EdgeInsets.symmetric(vertical: 14),
                             ),
                             onPressed: () => _pickImage(ImageSource.camera),
                             icon: const Icon(Icons.camera_alt_rounded),
-                            label: const Text('Buka Kamera', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                            label: const Text('Buka Kamera',
+                                style: TextStyle(
+                                    fontWeight: FontWeight.bold, fontSize: 12)),
                           ),
                         ),
                         const SizedBox(width: 12),
@@ -1659,12 +1833,15 @@ class _SimamaFormPageState extends State<SimamaFormPage> {
                             style: OutlinedButton.styleFrom(
                               foregroundColor: const Color(0xFF475569),
                               side: const BorderSide(color: Color(0xFFCBD5E1)),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12)),
                               padding: const EdgeInsets.symmetric(vertical: 14),
                             ),
                             onPressed: () => _pickImage(ImageSource.gallery),
                             icon: const Icon(Icons.photo_library_rounded),
-                            label: const Text('Dari Galeri', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                            label: const Text('Dari Galeri',
+                                style: TextStyle(
+                                    fontWeight: FontWeight.bold, fontSize: 12)),
                           ),
                         ),
                       ],
@@ -1683,9 +1860,12 @@ class _SimamaFormPageState extends State<SimamaFormPage> {
                 controller: _catatanCtrl,
                 maxLines: 4,
                 decoration: InputDecoration(
-                  hintText: 'Tuliskan catatan observasi lapangan, temuan positif, atau rekomendasi perbaikan untuk shift malam...',
-                  hintStyle: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  hintText:
+                      'Tuliskan catatan observasi lapangan, temuan positif, atau rekomendasi perbaikan untuk shift malam...',
+                  hintStyle:
+                      const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12)),
                   contentPadding: const EdgeInsets.all(14),
                 ),
               ),
@@ -1699,7 +1879,9 @@ class _SimamaFormPageState extends State<SimamaFormPage> {
               child: buttonApp(
                 label: _isSubmitting
                     ? 'Menyimpan Laporan...'
-                    : (widget.editData != null ? 'Perbarui Data Sidak Malam' : 'Simpan Laporan Sidak Malam'),
+                    : (widget.editData != null
+                        ? 'Perbarui Data Sidak Malam'
+                        : 'Simpan Laporan Sidak Malam'),
                 bgColor: primaryPurple,
                 onPressed: _isSubmitting ? null : _submit,
               ),
@@ -1744,7 +1926,8 @@ class _SimamaFormPageState extends State<SimamaFormPage> {
                   color: Colors.white.withValues(alpha: .2),
                   borderRadius: BorderRadius.circular(14),
                 ),
-                child: const Icon(Icons.nights_stay_rounded, color: Colors.white, size: 28),
+                child: const Icon(Icons.nights_stay_rounded,
+                    color: Colors.white, size: 28),
               ),
               const SizedBox(width: 14),
               const Expanded(
@@ -1776,7 +1959,8 @@ class _SimamaFormPageState extends State<SimamaFormPage> {
           const SizedBox(height: 10),
           const Text(
             'Kontrol kepatuhan K3, kesiapan kerja shift malam, pencahayaan, anti-fatigue, dan keselamatan operasional tambang.',
-            style: TextStyle(color: Color(0xFFFAF5FF), fontSize: 11.5, height: 1.4),
+            style: TextStyle(
+                color: Color(0xFFFAF5FF), fontSize: 11.5, height: 1.4),
           ),
         ],
       ),
@@ -1861,10 +2045,14 @@ class _SimamaFormPageState extends State<SimamaFormPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Tanggal Sidak', style: TextStyle(fontSize: 10, color: Color(0xFF64748B))),
+                  const Text('Tanggal Sidak',
+                      style: TextStyle(fontSize: 10, color: Color(0xFF64748B))),
                   Text(
                     DateFormat('dd MMM yyyy').format(_date),
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF0F172A)),
+                    style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                        color: Color(0xFF0F172A)),
                   ),
                 ],
               ),
@@ -1900,10 +2088,14 @@ class _SimamaFormPageState extends State<SimamaFormPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Waktu / Jam', style: TextStyle(fontSize: 10, color: Color(0xFF64748B))),
+                  const Text('Waktu / Jam',
+                      style: TextStyle(fontSize: 10, color: Color(0xFF64748B))),
                   Text(
                     '${_time.hour.toString().padLeft(2, '0')}:${_time.minute.toString().padLeft(2, '0')}',
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF0F172A)),
+                    style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                        color: Color(0xFF0F172A)),
                   ),
                 ],
               ),
@@ -1914,7 +2106,8 @@ class _SimamaFormPageState extends State<SimamaFormPage> {
     );
   }
 
-  Widget _buildChecklistItem(int number, SimamaChecklistItem item, Color accent) {
+  Widget _buildChecklistItem(
+      int number, SimamaChecklistItem item, Color accent) {
     final isOk = item.isOk;
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -1922,12 +2115,16 @@ class _SimamaFormPageState extends State<SimamaFormPage> {
       decoration: BoxDecoration(
         color: isOk == true
             ? const Color(0xFFF0FDF4)
-            : (isOk == false ? const Color(0xFFFEF2F2) : const Color(0xFFF8FAFC)),
+            : (isOk == false
+                ? const Color(0xFFFEF2F2)
+                : const Color(0xFFF8FAFC)),
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
           color: isOk == true
               ? const Color(0xFF86EFAC)
-              : (isOk == false ? const Color(0xFFFCA5A5) : const Color(0xFFE2E8F0)),
+              : (isOk == false
+                  ? const Color(0xFFFCA5A5)
+                  : const Color(0xFFE2E8F0)),
         ),
       ),
       child: Column(
@@ -1939,7 +2136,11 @@ class _SimamaFormPageState extends State<SimamaFormPage> {
               CircleAvatar(
                 radius: 12,
                 backgroundColor: accent.withValues(alpha: .15),
-                child: Text('$number', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: accent)),
+                child: Text('$number',
+                    style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: accent)),
               ),
               const SizedBox(width: 10),
               Expanded(
@@ -1948,12 +2149,16 @@ class _SimamaFormPageState extends State<SimamaFormPage> {
                   children: [
                     Text(
                       item.title,
-                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
+                      style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF0F172A)),
                     ),
                     const SizedBox(height: 2),
                     Text(
                       item.hint,
-                      style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                      style: const TextStyle(
+                          fontSize: 11, color: Color(0xFF64748B)),
                     ),
                   ],
                 ),
@@ -1970,10 +2175,13 @@ class _SimamaFormPageState extends State<SimamaFormPage> {
                   child: Container(
                     padding: const EdgeInsets.symmetric(vertical: 8),
                     decoration: BoxDecoration(
-                      color: isOk == true ? const Color(0xFF16A34A) : Colors.white,
+                      color:
+                          isOk == true ? const Color(0xFF16A34A) : Colors.white,
                       borderRadius: BorderRadius.circular(10),
                       border: Border.all(
-                        color: isOk == true ? const Color(0xFF16A34A) : const Color(0xFFCBD5E1),
+                        color: isOk == true
+                            ? const Color(0xFF16A34A)
+                            : const Color(0xFFCBD5E1),
                       ),
                     ),
                     child: Row(
@@ -1982,7 +2190,9 @@ class _SimamaFormPageState extends State<SimamaFormPage> {
                         Icon(
                           Icons.check_circle_rounded,
                           size: 16,
-                          color: isOk == true ? Colors.white : const Color(0xFF16A34A),
+                          color: isOk == true
+                              ? Colors.white
+                              : const Color(0xFF16A34A),
                         ),
                         const SizedBox(width: 6),
                         Text(
@@ -1990,7 +2200,9 @@ class _SimamaFormPageState extends State<SimamaFormPage> {
                           style: TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.bold,
-                            color: isOk == true ? Colors.white : const Color(0xFF16A34A),
+                            color: isOk == true
+                                ? Colors.white
+                                : const Color(0xFF16A34A),
                           ),
                         ),
                       ],
@@ -2006,10 +2218,14 @@ class _SimamaFormPageState extends State<SimamaFormPage> {
                   child: Container(
                     padding: const EdgeInsets.symmetric(vertical: 8),
                     decoration: BoxDecoration(
-                      color: isOk == false ? const Color(0xFFDC2626) : Colors.white,
+                      color: isOk == false
+                          ? const Color(0xFFDC2626)
+                          : Colors.white,
                       borderRadius: BorderRadius.circular(10),
                       border: Border.all(
-                        color: isOk == false ? const Color(0xFFDC2626) : const Color(0xFFCBD5E1),
+                        color: isOk == false
+                            ? const Color(0xFFDC2626)
+                            : const Color(0xFFCBD5E1),
                       ),
                     ),
                     child: Row(
@@ -2018,7 +2234,9 @@ class _SimamaFormPageState extends State<SimamaFormPage> {
                         Icon(
                           Icons.warning_amber_rounded,
                           size: 16,
-                          color: isOk == false ? Colors.white : const Color(0xFFDC2626),
+                          color: isOk == false
+                              ? Colors.white
+                              : const Color(0xFFDC2626),
                         ),
                         const SizedBox(width: 6),
                         Text(
@@ -2026,7 +2244,9 @@ class _SimamaFormPageState extends State<SimamaFormPage> {
                           style: TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.bold,
-                            color: isOk == false ? Colors.white : const Color(0xFFDC2626),
+                            color: isOk == false
+                                ? Colors.white
+                                : const Color(0xFFDC2626),
                           ),
                         ),
                       ],
@@ -2041,13 +2261,16 @@ class _SimamaFormPageState extends State<SimamaFormPage> {
             TextField(
               onChanged: (val) => item.findingRemark = val,
               controller: TextEditingController(text: item.findingRemark)
-                ..selection = TextSelection.fromPosition(TextPosition(offset: item.findingRemark.length)),
+                ..selection = TextSelection.fromPosition(
+                    TextPosition(offset: item.findingRemark.length)),
               decoration: InputDecoration(
                 hintText: 'Deskripsikan temuan / tindakan koreksi...',
-                hintStyle: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
+                hintStyle:
+                    const TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
                 filled: true,
                 fillColor: Colors.white,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
                   borderSide: const BorderSide(color: Color(0xFFFCA5A5)),

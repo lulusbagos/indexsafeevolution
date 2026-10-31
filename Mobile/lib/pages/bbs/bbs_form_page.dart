@@ -161,7 +161,8 @@ class _BbsFormPageState extends State<BbsFormPage> {
               .map((e) => e['area_utama'].toString().trim())
               .where((s) => s.isNotEmpty)
               .toSet()
-              .toList()..sort();
+              .toList()
+            ..sort();
         });
       }
 
@@ -171,13 +172,15 @@ class _BbsFormPageState extends State<BbsFormPage> {
       );
       if (compRows.isNotEmpty && mounted) {
         setState(() {
-          _mbsCompanies = compRows.map((r) => {'id': r['id'], 'name': r['name']}).toList();
+          _mbsCompanies =
+              compRows.map((r) => {'id': r['id'], 'name': r['name']}).toList();
         });
       }
 
       // 3. Load Cached Categories dari SharedPreferences
       final sp = await SharedPreferences.getInstance();
-      final cacheKey = 'bbs_cached_categories_${_observationType == 'Special Case' ? 'special' : 'rutin'}';
+      final cacheKey =
+          'bbs_cached_categories_${_observationType == 'Special Case' ? 'special' : 'rutin'}';
       final cachedJson = sp.getString(cacheKey);
       if (cachedJson != null && cachedJson.isNotEmpty && mounted) {
         final decoded = jsonDecode(cachedJson);
@@ -188,7 +191,9 @@ class _BbsFormPageState extends State<BbsFormPage> {
             _mbsCategories = cats;
             _categoryId = firstCat['id'] as int?;
             _category = firstCat['name']?.toString();
-            _mbsBehaviorItems = (firstCat['behaviors'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+            _mbsBehaviorItems = (firstCat['behaviors'] as List?)
+                    ?.cast<Map<String, dynamic>>() ??
+                [];
           });
         }
       }
@@ -227,9 +232,11 @@ class _BbsFormPageState extends State<BbsFormPage> {
         setState(() {
           _masterAreas = localAreas
               .map((e) => e['area_utama'].toString().trim())
-              .where((s) => s.isNotEmpty && !s.toUpperCase().contains('CAMP EKSPLORASI'))
+              .where((s) =>
+                  s.isNotEmpty && !s.toUpperCase().contains('CAMP EKSPLORASI'))
               .toSet()
-              .toList()..sort();
+              .toList()
+            ..sort();
         });
         onDone?.call();
         _onAreasLoadedModal?.call();
@@ -239,7 +246,9 @@ class _BbsFormPageState extends State<BbsFormPage> {
       final serverAreas = await _api.getMasterAreas(perusahaanId: companyId);
       if (serverAreas.isNotEmpty && mounted) {
         setState(() {
-          _masterAreas = serverAreas.where((s) => !s.toUpperCase().contains('CAMP EKSPLORASI')).toList();
+          _masterAreas = serverAreas
+              .where((s) => !s.toUpperCase().contains('CAMP EKSPLORASI'))
+              .toList();
         });
         onDone?.call();
         _onAreasLoadedModal?.call();
@@ -264,7 +273,8 @@ class _BbsFormPageState extends State<BbsFormPage> {
     }
   }
 
-  Future<void> _loadBenchmarksForArea(String area, {VoidCallback? onDone}) async {
+  Future<void> _loadBenchmarksForArea(String area,
+      {VoidCallback? onDone}) async {
     final cleanArea = area.trim();
     if (cleanArea.isEmpty) {
       if (mounted) {
@@ -295,14 +305,16 @@ class _BbsFormPageState extends State<BbsFormPage> {
               .map((e) => e['nama_benchmark'].toString().trim())
               .where((s) => s.isNotEmpty)
               .toSet()
-              .toList()..sort();
+              .toList()
+            ..sort();
         });
         onDone?.call();
         _onBenchmarksLoadedModal?.call();
       }
 
       // 2. Ambil dari server API
-      final serverBenchmarks = await _api.getBenchmarks(cleanArea, perusahaanId: companyId);
+      final serverBenchmarks =
+          await _api.getBenchmarks(cleanArea, perusahaanId: companyId);
       if (serverBenchmarks.isNotEmpty && mounted) {
         setState(() {
           _benchmarksList = serverBenchmarks;
@@ -349,8 +361,11 @@ class _BbsFormPageState extends State<BbsFormPage> {
               });
             }
 
-            final filtered = _masterAreas.where((a) => a.toLowerCase().contains(filter.toLowerCase())).toList();
-            final hasExactMatch = _masterAreas.any((a) => a.toLowerCase() == filter.trim().toLowerCase());
+            final filtered = _masterAreas
+                .where((a) => a.toLowerCase().contains(filter.toLowerCase()))
+                .toList();
+            final hasExactMatch = _masterAreas
+                .any((a) => a.toLowerCase() == filter.trim().toLowerCase());
             final canAddCustom = filter.trim().isNotEmpty && !hasExactMatch;
 
             return Container(
@@ -371,7 +386,6 @@ class _BbsFormPageState extends State<BbsFormPage> {
                     ),
                   ),
                   const SizedBox(height: 14),
-
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 20),
                     child: Row(
@@ -391,19 +405,20 @@ class _BbsFormPageState extends State<BbsFormPage> {
                             SizedBox(height: 2),
                             Text(
                               'Pilih atau ketik untuk mencari & menambah area',
-                              style: TextStyle(color: Color(0xFF64748B), fontSize: 12),
+                              style: TextStyle(
+                                  color: Color(0xFF64748B), fontSize: 12),
                             ),
                           ],
                         ),
                         IconButton(
                           onPressed: () => Navigator.pop(modalCtx),
-                          icon: const Icon(Icons.close_rounded, color: Color(0xFF64748B)),
+                          icon: const Icon(Icons.close_rounded,
+                              color: Color(0xFF64748B)),
                         ),
                       ],
                     ),
                   ),
                   const SizedBox(height: 12),
-
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 20),
                     child: Container(
@@ -415,28 +430,34 @@ class _BbsFormPageState extends State<BbsFormPage> {
                       child: TextField(
                         autofocus: false,
                         onChanged: (val) => setModalState(() => filter = val),
-                        style: const TextStyle(fontSize: 14, color: Color(0xFF0F172A)),
+                        style: const TextStyle(
+                            fontSize: 14, color: Color(0xFF0F172A)),
                         decoration: InputDecoration(
                           hintText: 'Ketik untuk mencari area...',
-                          hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
-                          prefixIcon: const Icon(Icons.search_rounded, color: Color(0xFF64748B)),
+                          hintStyle: const TextStyle(
+                              color: Color(0xFF94A3B8), fontSize: 13),
+                          prefixIcon: const Icon(Icons.search_rounded,
+                              color: Color(0xFF64748B)),
                           suffixIcon: filter.isNotEmpty
                               ? IconButton(
-                                  icon: const Icon(Icons.clear_rounded, size: 18),
-                                  onPressed: () => setModalState(() => filter = ''),
+                                  icon:
+                                      const Icon(Icons.clear_rounded, size: 18),
+                                  onPressed: () =>
+                                      setModalState(() => filter = ''),
                                 )
                               : null,
                           border: InputBorder.none,
-                          contentPadding: const EdgeInsets.symmetric(vertical: 14),
+                          contentPadding:
+                              const EdgeInsets.symmetric(vertical: 14),
                         ),
                       ),
                     ),
                   ),
                   const SizedBox(height: 12),
-
                   if (canAddCustom)
                     Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 20, vertical: 4),
                       child: InkWell(
                         onTap: () async {
                           Navigator.pop(modalCtx);
@@ -444,7 +465,8 @@ class _BbsFormPageState extends State<BbsFormPage> {
                         },
                         borderRadius: BorderRadius.circular(12),
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 14, vertical: 12),
                           decoration: BoxDecoration(
                             color: const Color(0xFFEFF6FF),
                             borderRadius: BorderRadius.circular(12),
@@ -458,7 +480,8 @@ class _BbsFormPageState extends State<BbsFormPage> {
                                   color: _kPrimary,
                                   borderRadius: BorderRadius.circular(8),
                                 ),
-                                child: const Icon(Icons.add, color: Colors.white, size: 16),
+                                child: const Icon(Icons.add,
+                                    color: Colors.white, size: 16),
                               ),
                               const SizedBox(width: 12),
                               Expanded(
@@ -467,7 +490,10 @@ class _BbsFormPageState extends State<BbsFormPage> {
                                   children: [
                                     Text(
                                       'Gunakan / Tambah Area Baru:',
-                                      style: TextStyle(color: Colors.blue.shade700, fontSize: 11, fontWeight: FontWeight.w600),
+                                      style: TextStyle(
+                                          color: Colors.blue.shade700,
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w600),
                                     ),
                                     Text(
                                       '"${filter.trim()}"',
@@ -480,52 +506,71 @@ class _BbsFormPageState extends State<BbsFormPage> {
                                   ],
                                 ),
                               ),
-                              const Icon(Icons.arrow_forward_ios_rounded, color: _kPrimary, size: 14),
+                              const Icon(Icons.arrow_forward_ios_rounded,
+                                  color: _kPrimary, size: 14),
                             ],
                           ),
                         ),
                       ),
                     ),
-
                   Expanded(
                     child: _isLoadingAreas && _masterAreas.isEmpty
                         ? const Center(
                             child: Column(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                SizedBox(width: 28, height: 28, child: CircularProgressIndicator(strokeWidth: 2.5, color: _kPrimary)),
+                                SizedBox(
+                                    width: 28,
+                                    height: 28,
+                                    child: CircularProgressIndicator(
+                                        strokeWidth: 2.5, color: _kPrimary)),
                                 SizedBox(height: 14),
-                                Text('Memuat daftar area dari database...', style: TextStyle(color: Color(0xFF64748B), fontSize: 13)),
+                                Text('Memuat daftar area...',
+                                    style: TextStyle(
+                                        color: Color(0xFF64748B),
+                                        fontSize: 13)),
                               ],
                             ),
                           )
                         : filtered.isEmpty && !canAddCustom
-                            ? const Center(child: Text('Area tidak ditemukan', style: TextStyle(color: Color(0xFF94A3B8))))
+                            ? const Center(
+                                child: Text('Area tidak ditemukan',
+                                    style: TextStyle(color: Color(0xFF94A3B8))))
                             : ListView.separated(
-                                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 20, vertical: 8),
                                 itemCount: filtered.length,
-                                separatorBuilder: (_, __) => const Divider(height: 1, color: Color(0xFFF1F5F9)),
+                                separatorBuilder: (_, __) => const Divider(
+                                    height: 1, color: Color(0xFFF1F5F9)),
                                 itemBuilder: (context, index) {
                                   final item = filtered[index];
                                   final isSelected = item == _area;
                                   return ListTile(
                                     dense: true,
-                                    contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                    contentPadding: const EdgeInsets.symmetric(
+                                        horizontal: 8, vertical: 2),
                                     leading: Icon(
                                       Icons.place_rounded,
-                                      color: isSelected ? _kPrimary : const Color(0xFF94A3B8),
+                                      color: isSelected
+                                          ? _kPrimary
+                                          : const Color(0xFF94A3B8),
                                       size: 20,
                                     ),
                                     title: Text(
                                       item,
                                       style: TextStyle(
-                                        color: isSelected ? _kPrimary : const Color(0xFF1E293B),
-                                        fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                                        color: isSelected
+                                            ? _kPrimary
+                                            : const Color(0xFF1E293B),
+                                        fontWeight: isSelected
+                                            ? FontWeight.bold
+                                            : FontWeight.w500,
                                         fontSize: 13.5,
                                       ),
                                     ),
                                     trailing: isSelected
-                                        ? const Icon(Icons.check_circle_rounded, color: _kPrimary, size: 20)
+                                        ? const Icon(Icons.check_circle_rounded,
+                                            color: _kPrimary, size: 20)
                                         : null,
                                     onTap: () {
                                       Navigator.pop(modalCtx);
@@ -567,7 +612,9 @@ class _BbsFormPageState extends State<BbsFormPage> {
               if (modalCtx.mounted) setModalState(() {});
             };
 
-            if (_benchmarksList.isEmpty && !_isLoadingBenchmarks && _area.isNotEmpty) {
+            if (_benchmarksList.isEmpty &&
+                !_isLoadingBenchmarks &&
+                _area.isNotEmpty) {
               WidgetsBinding.instance.addPostFrameCallback((_) {
                 _loadBenchmarksForArea(_area);
               });
@@ -576,7 +623,8 @@ class _BbsFormPageState extends State<BbsFormPage> {
             final filtered = _benchmarksList
                 .where((b) => b.toLowerCase().contains(filter.toLowerCase()))
                 .toList();
-            final hasExactMatch = _benchmarksList.any((b) => b.toLowerCase() == filter.trim().toLowerCase());
+            final hasExactMatch = _benchmarksList
+                .any((b) => b.toLowerCase() == filter.trim().toLowerCase());
             final canAddCustom = filter.trim().isNotEmpty && !hasExactMatch;
 
             return Container(
@@ -597,7 +645,6 @@ class _BbsFormPageState extends State<BbsFormPage> {
                     ),
                   ),
                   const SizedBox(height: 14),
-
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 20),
                     child: Row(
@@ -618,7 +665,10 @@ class _BbsFormPageState extends State<BbsFormPage> {
                               const SizedBox(height: 2),
                               Text(
                                 'Area: $_area',
-                                style: const TextStyle(color: _kPrimary, fontSize: 12, fontWeight: FontWeight.w600),
+                                style: const TextStyle(
+                                    color: _kPrimary,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                               ),
@@ -627,13 +677,13 @@ class _BbsFormPageState extends State<BbsFormPage> {
                         ),
                         IconButton(
                           onPressed: () => Navigator.pop(modalCtx),
-                          icon: const Icon(Icons.close_rounded, color: Color(0xFF64748B)),
+                          icon: const Icon(Icons.close_rounded,
+                              color: Color(0xFF64748B)),
                         ),
                       ],
                     ),
                   ),
                   const SizedBox(height: 12),
-
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 20),
                     child: Container(
@@ -645,28 +695,34 @@ class _BbsFormPageState extends State<BbsFormPage> {
                       child: TextField(
                         autofocus: false,
                         onChanged: (val) => setModalState(() => filter = val),
-                        style: const TextStyle(fontSize: 14, color: Color(0xFF0F172A)),
+                        style: const TextStyle(
+                            fontSize: 14, color: Color(0xFF0F172A)),
                         decoration: InputDecoration(
                           hintText: 'Ketik untuk mencari benchmark...',
-                          hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
-                          prefixIcon: const Icon(Icons.search_rounded, color: Color(0xFF64748B)),
+                          hintStyle: const TextStyle(
+                              color: Color(0xFF94A3B8), fontSize: 13),
+                          prefixIcon: const Icon(Icons.search_rounded,
+                              color: Color(0xFF64748B)),
                           suffixIcon: filter.isNotEmpty
                               ? IconButton(
-                                  icon: const Icon(Icons.clear_rounded, size: 18),
-                                  onPressed: () => setModalState(() => filter = ''),
+                                  icon:
+                                      const Icon(Icons.clear_rounded, size: 18),
+                                  onPressed: () =>
+                                      setModalState(() => filter = ''),
                                 )
                               : null,
                           border: InputBorder.none,
-                          contentPadding: const EdgeInsets.symmetric(vertical: 14),
+                          contentPadding:
+                              const EdgeInsets.symmetric(vertical: 14),
                         ),
                       ),
                     ),
                   ),
                   const SizedBox(height: 12),
-
                   if (canAddCustom)
                     Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 20, vertical: 4),
                       child: InkWell(
                         onTap: () async {
                           Navigator.pop(modalCtx);
@@ -674,7 +730,8 @@ class _BbsFormPageState extends State<BbsFormPage> {
                         },
                         borderRadius: BorderRadius.circular(12),
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 14, vertical: 12),
                           decoration: BoxDecoration(
                             color: const Color(0xFFEFF6FF),
                             borderRadius: BorderRadius.circular(12),
@@ -688,7 +745,8 @@ class _BbsFormPageState extends State<BbsFormPage> {
                                   color: const Color(0xFF38BDF8),
                                   borderRadius: BorderRadius.circular(8),
                                 ),
-                                child: const Icon(Icons.add, color: Colors.white, size: 16),
+                                child: const Icon(Icons.add,
+                                    color: Colors.white, size: 16),
                               ),
                               const SizedBox(width: 12),
                               Expanded(
@@ -696,8 +754,11 @@ class _BbsFormPageState extends State<BbsFormPage> {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      'Tambah Benchmark Baru ke Database:',
-                                      style: TextStyle(color: Colors.blue.shade700, fontSize: 11, fontWeight: FontWeight.w600),
+                                      'Tambah acuan baru:',
+                                      style: TextStyle(
+                                          color: Colors.blue.shade700,
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w600),
                                     ),
                                     Text(
                                       '"${filter.trim()}"',
@@ -710,52 +771,71 @@ class _BbsFormPageState extends State<BbsFormPage> {
                                   ],
                                 ),
                               ),
-                              const Icon(Icons.arrow_forward_ios_rounded, color: _kPrimary, size: 14),
+                              const Icon(Icons.arrow_forward_ios_rounded,
+                                  color: _kPrimary, size: 14),
                             ],
                           ),
                         ),
                       ),
                     ),
-
                   Expanded(
                     child: _isLoadingBenchmarks && _benchmarksList.isEmpty
                         ? const Center(
                             child: Column(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                SizedBox(width: 28, height: 28, child: CircularProgressIndicator(strokeWidth: 2.5, color: _kPrimary)),
+                                SizedBox(
+                                    width: 28,
+                                    height: 28,
+                                    child: CircularProgressIndicator(
+                                        strokeWidth: 2.5, color: _kPrimary)),
                                 SizedBox(height: 14),
-                                Text('Memuat benchmark dari database...', style: TextStyle(color: Color(0xFF64748B), fontSize: 13)),
+                                Text('Memuat data acuan...',
+                                    style: TextStyle(
+                                        color: Color(0xFF64748B),
+                                        fontSize: 13)),
                               ],
                             ),
                           )
                         : filtered.isEmpty && !canAddCustom
-                            ? const Center(child: Text('Belum ada benchmark terdaftar', style: TextStyle(color: Color(0xFF94A3B8))))
+                            ? const Center(
+                                child: Text('Belum ada benchmark terdaftar',
+                                    style: TextStyle(color: Color(0xFF94A3B8))))
                             : ListView.separated(
-                                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 20, vertical: 8),
                                 itemCount: filtered.length,
-                                separatorBuilder: (_, __) => const Divider(height: 1, color: Color(0xFFF1F5F9)),
+                                separatorBuilder: (_, __) => const Divider(
+                                    height: 1, color: Color(0xFFF1F5F9)),
                                 itemBuilder: (context, index) {
                                   final item = filtered[index];
                                   final isSelected = item == _benchmark;
                                   return ListTile(
                                     dense: true,
-                                    contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                    contentPadding: const EdgeInsets.symmetric(
+                                        horizontal: 8, vertical: 2),
                                     leading: Icon(
                                       Icons.location_on_rounded,
-                                      color: isSelected ? _kPrimary : const Color(0xFF94A3B8),
+                                      color: isSelected
+                                          ? _kPrimary
+                                          : const Color(0xFF94A3B8),
                                       size: 20,
                                     ),
                                     title: Text(
                                       item,
                                       style: TextStyle(
-                                        color: isSelected ? _kPrimary : const Color(0xFF1E293B),
-                                        fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                                        color: isSelected
+                                            ? _kPrimary
+                                            : const Color(0xFF1E293B),
+                                        fontWeight: isSelected
+                                            ? FontWeight.bold
+                                            : FontWeight.w500,
                                         fontSize: 13.5,
                                       ),
                                     ),
                                     trailing: isSelected
-                                        ? const Icon(Icons.check_circle_rounded, color: _kPrimary, size: 20)
+                                        ? const Icon(Icons.check_circle_rounded,
+                                            color: _kPrimary, size: 20)
                                         : null,
                                     onTap: () {
                                       Navigator.pop(modalCtx);
@@ -797,7 +877,13 @@ class _BbsFormPageState extends State<BbsFormPage> {
       await sqldb.rawInsert(
         '''INSERT INTO tbl_m_benchmark (perusahaan_id, area_utama, nama_benchmark, created_by_nik, created_by_name, created_at)
            VALUES (?, ?, '', ?, ?, ?)''',
-        [companyId, cleanName, userNik, userName, DateTime.now().toIso8601String()],
+        [
+          companyId,
+          cleanName,
+          userNik,
+          userName,
+          DateTime.now().toIso8601String()
+        ],
       );
     } catch (_) {}
 
@@ -812,7 +898,8 @@ class _BbsFormPageState extends State<BbsFormPage> {
       }
     } catch (_) {
       if (mounted) {
-        SnackBarMsg.info(context, 'Area "$cleanName" tersimpan di HP (Mode Offline)');
+        SnackBarMsg.info(
+            context, 'Area "$cleanName" tersimpan di HP (Mode Offline)');
       }
     }
   }
@@ -842,7 +929,14 @@ class _BbsFormPageState extends State<BbsFormPage> {
       await sqldb.rawInsert(
         '''INSERT INTO tbl_m_benchmark (perusahaan_id, area_utama, nama_benchmark, created_by_nik, created_by_name, created_at)
            VALUES (?, ?, ?, ?, ?, ?)''',
-        [companyId, _area, cleanName, userNik, userName, DateTime.now().toIso8601String()],
+        [
+          companyId,
+          _area,
+          cleanName,
+          userNik,
+          userName,
+          DateTime.now().toIso8601String()
+        ],
       );
     } catch (_) {}
 
@@ -856,9 +950,11 @@ class _BbsFormPageState extends State<BbsFormPage> {
       );
       if (mounted) {
         if (res != null) {
-          SnackBarMsg.success(context, 'Benchmark "$cleanName" berhasil disimpan!');
+          SnackBarMsg.success(
+              context, 'Benchmark "$cleanName" berhasil disimpan!');
         } else {
-          SnackBarMsg.info(context, 'Benchmark "$cleanName" tersimpan di HP (Mode Offline)');
+          SnackBarMsg.info(
+              context, 'Benchmark "$cleanName" tersimpan di HP (Mode Offline)');
         }
       }
     } catch (_) {
@@ -878,23 +974,32 @@ class _BbsFormPageState extends State<BbsFormPage> {
           "SELECT id, name FROM enum_masters WHERE deleted_at IS NULL AND type = 'company' ORDER BY name",
         );
         if (rows.isNotEmpty) {
-          companies = rows.map((r) => {'id': r['id'], 'name': r['name']}).toList();
+          companies =
+              rows.map((r) => {'id': r['id'], 'name': r['name']}).toList();
         } else {
-          companies = [{'id': 1, 'name': 'PT INDEXIM COALINDO'}];
+          companies = [
+            {'id': 1, 'name': 'PT INDEXIM COALINDO'}
+          ];
         }
       } catch (_) {
-        companies = [{'id': 1, 'name': 'PT INDEXIM COALINDO'}];
+        companies = [
+          {'id': 1, 'name': 'PT INDEXIM COALINDO'}
+        ];
       }
     }
     if (mounted) {
       setState(() {
         _mbsCompanies = companies;
         if (_companyId != null) {
-          final comp = companies.where(
-            (c) => int.tryParse((c['Id'] ?? c['id']).toString()) == _companyId,
-          ).firstOrNull;
+          final comp = companies
+              .where(
+                (c) =>
+                    int.tryParse((c['Id'] ?? c['id']).toString()) == _companyId,
+              )
+              .firstOrNull;
           if (comp != null) {
-            _companyName = (comp['Nama'] ?? comp['nama'] ?? comp['name']).toString();
+            _companyName =
+                (comp['Nama'] ?? comp['nama'] ?? comp['name']).toString();
           }
         }
       });
@@ -944,7 +1049,8 @@ class _BbsFormPageState extends State<BbsFormPage> {
 
   void _showDepartmentPickerModal() {
     if (_companyId == null) {
-      SnackBarMsg.warning(context, 'Pilih Perusahaan / Kontraktor terlebih dahulu.');
+      SnackBarMsg.warning(
+          context, 'Pilih Perusahaan / Kontraktor terlebih dahulu.');
       return;
     }
 
@@ -959,7 +1065,8 @@ class _BbsFormPageState extends State<BbsFormPage> {
             final filtered = _departmentOptions
                 .where((d) => d.toLowerCase().contains(filter.toLowerCase()))
                 .toList();
-            final hasExactMatch = _departmentOptions.any((d) => d.toLowerCase() == filter.trim().toLowerCase());
+            final hasExactMatch = _departmentOptions
+                .any((d) => d.toLowerCase() == filter.trim().toLowerCase());
             final canAddCustom = filter.trim().isNotEmpty && !hasExactMatch;
 
             return Container(
@@ -980,7 +1087,6 @@ class _BbsFormPageState extends State<BbsFormPage> {
                     ),
                   ),
                   const SizedBox(height: 14),
-
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 20),
                     child: Row(
@@ -1001,7 +1107,10 @@ class _BbsFormPageState extends State<BbsFormPage> {
                               const SizedBox(height: 2),
                               Text(
                                 'Perusahaan: ${_companyName ?? "Semua"}',
-                                style: const TextStyle(color: _kPrimary, fontSize: 12, fontWeight: FontWeight.w600),
+                                style: const TextStyle(
+                                    color: _kPrimary,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                               ),
@@ -1010,13 +1119,13 @@ class _BbsFormPageState extends State<BbsFormPage> {
                         ),
                         IconButton(
                           onPressed: () => Navigator.pop(modalCtx),
-                          icon: const Icon(Icons.close_rounded, color: Color(0xFF64748B)),
+                          icon: const Icon(Icons.close_rounded,
+                              color: Color(0xFF64748B)),
                         ),
                       ],
                     ),
                   ),
                   const SizedBox(height: 12),
-
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 20),
                     child: Container(
@@ -1028,28 +1137,34 @@ class _BbsFormPageState extends State<BbsFormPage> {
                       child: TextField(
                         autofocus: false,
                         onChanged: (val) => setModalState(() => filter = val),
-                        style: const TextStyle(fontSize: 14, color: Color(0xFF0F172A)),
+                        style: const TextStyle(
+                            fontSize: 14, color: Color(0xFF0F172A)),
                         decoration: InputDecoration(
                           hintText: 'Ketik untuk mencari departemen...',
-                          hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
-                          prefixIcon: const Icon(Icons.search_rounded, color: Color(0xFF64748B)),
+                          hintStyle: const TextStyle(
+                              color: Color(0xFF94A3B8), fontSize: 13),
+                          prefixIcon: const Icon(Icons.search_rounded,
+                              color: Color(0xFF64748B)),
                           suffixIcon: filter.isNotEmpty
                               ? IconButton(
-                                  icon: const Icon(Icons.clear_rounded, size: 18),
-                                  onPressed: () => setModalState(() => filter = ''),
+                                  icon:
+                                      const Icon(Icons.clear_rounded, size: 18),
+                                  onPressed: () =>
+                                      setModalState(() => filter = ''),
                                 )
                               : null,
                           border: InputBorder.none,
-                          contentPadding: const EdgeInsets.symmetric(vertical: 14),
+                          contentPadding:
+                              const EdgeInsets.symmetric(vertical: 14),
                         ),
                       ),
                     ),
                   ),
                   const SizedBox(height: 12),
-
                   if (canAddCustom)
                     Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 20, vertical: 4),
                       child: InkWell(
                         onTap: () {
                           Navigator.pop(modalCtx);
@@ -1057,7 +1172,8 @@ class _BbsFormPageState extends State<BbsFormPage> {
                         },
                         borderRadius: BorderRadius.circular(12),
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 14, vertical: 12),
                           decoration: BoxDecoration(
                             color: const Color(0xFFEFF6FF),
                             borderRadius: BorderRadius.circular(12),
@@ -1071,7 +1187,8 @@ class _BbsFormPageState extends State<BbsFormPage> {
                                   color: _kPrimary,
                                   borderRadius: BorderRadius.circular(8),
                                 ),
-                                child: const Icon(Icons.check, color: Colors.white, size: 16),
+                                child: const Icon(Icons.check,
+                                    color: Colors.white, size: 16),
                               ),
                               const SizedBox(width: 12),
                               Expanded(
@@ -1080,7 +1197,10 @@ class _BbsFormPageState extends State<BbsFormPage> {
                                   children: [
                                     Text(
                                       'Gunakan Nama Departemen Baru:',
-                                      style: TextStyle(color: Colors.blue.shade700, fontSize: 11, fontWeight: FontWeight.w600),
+                                      style: TextStyle(
+                                          color: Colors.blue.shade700,
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w600),
                                     ),
                                     Text(
                                       '"${filter.trim()}"',
@@ -1093,52 +1213,71 @@ class _BbsFormPageState extends State<BbsFormPage> {
                                   ],
                                 ),
                               ),
-                              const Icon(Icons.arrow_forward_ios_rounded, color: _kPrimary, size: 14),
+                              const Icon(Icons.arrow_forward_ios_rounded,
+                                  color: _kPrimary, size: 14),
                             ],
                           ),
                         ),
                       ),
                     ),
-
                   Expanded(
                     child: _departmentsLoading && _departmentOptions.isEmpty
                         ? const Center(
                             child: Column(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                SizedBox(width: 28, height: 28, child: CircularProgressIndicator(strokeWidth: 2.5, color: _kPrimary)),
+                                SizedBox(
+                                    width: 28,
+                                    height: 28,
+                                    child: CircularProgressIndicator(
+                                        strokeWidth: 2.5, color: _kPrimary)),
                                 SizedBox(height: 14),
-                                Text('Memuat departemen perusahaan...', style: TextStyle(color: Color(0xFF64748B), fontSize: 13)),
+                                Text('Memuat departemen perusahaan...',
+                                    style: TextStyle(
+                                        color: Color(0xFF64748B),
+                                        fontSize: 13)),
                               ],
                             ),
                           )
                         : filtered.isEmpty && !canAddCustom
-                            ? const Center(child: Text('Departemen tidak ditemukan', style: TextStyle(color: Color(0xFF94A3B8))))
+                            ? const Center(
+                                child: Text('Departemen tidak ditemukan',
+                                    style: TextStyle(color: Color(0xFF94A3B8))))
                             : ListView.separated(
-                                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 20, vertical: 8),
                                 itemCount: filtered.length,
-                                separatorBuilder: (_, __) => const Divider(height: 1, color: Color(0xFFF1F5F9)),
+                                separatorBuilder: (_, __) => const Divider(
+                                    height: 1, color: Color(0xFFF1F5F9)),
                                 itemBuilder: (context, index) {
                                   final item = filtered[index];
                                   final isSelected = item == _department.text;
                                   return ListTile(
                                     dense: true,
-                                    contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                    contentPadding: const EdgeInsets.symmetric(
+                                        horizontal: 8, vertical: 2),
                                     leading: Icon(
                                       Icons.apartment_rounded,
-                                      color: isSelected ? _kPrimary : const Color(0xFF94A3B8),
+                                      color: isSelected
+                                          ? _kPrimary
+                                          : const Color(0xFF94A3B8),
                                       size: 20,
                                     ),
                                     title: Text(
                                       item,
                                       style: TextStyle(
-                                        color: isSelected ? _kPrimary : const Color(0xFF1E293B),
-                                        fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                                        color: isSelected
+                                            ? _kPrimary
+                                            : const Color(0xFF1E293B),
+                                        fontWeight: isSelected
+                                            ? FontWeight.bold
+                                            : FontWeight.w500,
                                         fontSize: 13.5,
                                       ),
                                     ),
                                     trailing: isSelected
-                                        ? const Icon(Icons.check_circle_rounded, color: _kPrimary, size: 20)
+                                        ? const Icon(Icons.check_circle_rounded,
+                                            color: _kPrimary, size: 20)
                                         : null,
                                     onTap: () {
                                       Navigator.pop(modalCtx);
@@ -1170,18 +1309,22 @@ class _BbsFormPageState extends State<BbsFormPage> {
       if (categories.isNotEmpty) {
         // Cache to SharedPreferences
         final sp = await SharedPreferences.getInstance();
-        final cacheKey = 'bbs_cached_categories_${_observationType == 'Special Case' ? 'special' : 'rutin'}';
+        final cacheKey =
+            'bbs_cached_categories_${_observationType == 'Special Case' ? 'special' : 'rutin'}';
         await sp.setString(cacheKey, jsonEncode(categories));
 
         Map<String, dynamic>? defaultCat;
         if (_categoryId != null) {
-          defaultCat = categories.where((c) => c['id'] == _categoryId).firstOrNull;
+          defaultCat =
+              categories.where((c) => c['id'] == _categoryId).firstOrNull;
         }
         defaultCat ??= categories.first;
 
         _categoryId = defaultCat['id'] as int?;
         _category = defaultCat['name']?.toString();
-        final behaviorItems = (defaultCat['behaviors'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+        final behaviorItems =
+            (defaultCat['behaviors'] as List?)?.cast<Map<String, dynamic>>() ??
+                [];
         List<Map<String, dynamic>> topics = [];
         if (_categoryId != null && _observationType == 'Special Case') {
           topics = await _api.getBbsTopics(_categoryId!);
@@ -1291,7 +1434,8 @@ class _BbsFormPageState extends State<BbsFormPage> {
       _workerPhoto = worker['foto']?.toString().trim();
       _workerPerusahaan = worker['perusahaan']?.toString().trim();
 
-      final pId = worker['perusahaanId'] ?? worker['companyId'] ?? worker['company_id'];
+      final pId =
+          worker['perusahaanId'] ?? worker['companyId'] ?? worker['company_id'];
       if (pId != null) {
         final parsedId = int.tryParse(pId.toString());
         if (parsedId != null && parsedId > 0 && parsedId != _companyId) {
@@ -1321,7 +1465,8 @@ class _BbsFormPageState extends State<BbsFormPage> {
 
   bool _validateForm() {
     if (_companyId == null) {
-      SnackBarMsg.warning(context, 'Pilih Perusahaan / Kontraktor pekerja terlebih dahulu.');
+      SnackBarMsg.warning(
+          context, 'Pilih Perusahaan / Kontraktor pekerja terlebih dahulu.');
       return false;
     }
     if (_area.isEmpty) {
@@ -1329,7 +1474,8 @@ class _BbsFormPageState extends State<BbsFormPage> {
       return false;
     }
     if (_observedPerson.text.trim().isEmpty) {
-      SnackBarMsg.warning(context, 'Pilih pekerja yang diamati dari pencarian karyawan.');
+      SnackBarMsg.warning(
+          context, 'Pilih pekerja yang diamati dari pencarian karyawan.');
       return false;
     }
     if (_department.text.trim().isEmpty) {
@@ -1341,23 +1487,28 @@ class _BbsFormPageState extends State<BbsFormPage> {
       return false;
     }
     if (_behaviors.isEmpty && _otherBehavior.text.trim().isEmpty) {
-      SnackBarMsg.warning(context, 'Pilih minimal satu butir perilaku yang diamati.');
+      SnackBarMsg.warning(
+          context, 'Pilih minimal satu butir perilaku yang diamati.');
       return false;
     }
     if (_potentialConsequence.text.trim().isEmpty) {
-      SnackBarMsg.warning(context, 'Lengkapi deskripsi risiko / konsekuensi potensial.');
+      SnackBarMsg.warning(
+          context, 'Lengkapi deskripsi risiko / konsekuensi potensial.');
       return false;
     }
     if (_immediateActions.isEmpty && _otherAction.text.trim().isEmpty) {
-      SnackBarMsg.warning(context, 'Pilih minimal satu tindakan langsung yang diambil.');
+      SnackBarMsg.warning(
+          context, 'Pilih minimal satu tindakan langsung yang diambil.');
       return false;
     }
     if (_coachingNotes.text.trim().isEmpty) {
-      SnackBarMsg.warning(context, 'Lengkapi catatan dialog coaching dengan pekerja.');
+      SnackBarMsg.warning(
+          context, 'Lengkapi catatan dialog coaching dengan pekerja.');
       return false;
     }
     if (_commitment.text.trim().isEmpty) {
-      SnackBarMsg.warning(context, 'Lengkapi komitmen / tindakan perbaikan pekerja.');
+      SnackBarMsg.warning(
+          context, 'Lengkapi komitmen / tindakan perbaikan pekerja.');
       return false;
     }
     return true;
@@ -1381,7 +1532,8 @@ class _BbsFormPageState extends State<BbsFormPage> {
         _riskLevel == 'Sangat Tinggi';
 
     final behaviorEntries = behaviors.map((text) {
-      final master = _mbsBehaviorItems.where((item) => item['behaviorText']?.toString() == text);
+      final master = _mbsBehaviorItems
+          .where((item) => item['behaviorText']?.toString() == text);
       return jsonEncode({
         'id': master.isEmpty ? 0 : master.first['id'],
         'text': text,
@@ -1394,11 +1546,16 @@ class _BbsFormPageState extends State<BbsFormPage> {
     );
     final companyName = selectedCompany.isEmpty
         ? (_workerPerusahaan ?? _companyName ?? _profile?.company ?? '')
-        : (selectedCompany.first['Nama'] ?? selectedCompany.first['nama'] ?? selectedCompany.first['name'] ?? '').toString();
+        : (selectedCompany.first['Nama'] ??
+                selectedCompany.first['nama'] ??
+                selectedCompany.first['name'] ??
+                '')
+            .toString();
 
     final form = <String, dynamic>{
       'Id': '0',
-      'ObservationType': _observationType == 'Special Case' ? 'SpecialCase' : 'Rutin',
+      'ObservationType':
+          _observationType == 'Special Case' ? 'SpecialCase' : 'Rutin',
       'Tanggal': DateFormat('yyyy-MM-dd').format(_observedAt),
       'waktuStr': DateFormat('HH:mm').format(_observedAt),
       'Area': _area,
@@ -1420,13 +1577,16 @@ class _BbsFormPageState extends State<BbsFormPage> {
       'KondisiKerja': _trafficCondition,
       'Deskripsi': _potentialConsequence.text.trim(),
       'ResponsPekerja': _workerResponse,
-      'CatatanCoaching': '${_coachingNotes.text.trim()}\n${_commitment.text.trim()}'.trim(),
-      for (var i = 0; i < behaviorEntries.length; i++) 'selectedBehaviors[$i]': behaviorEntries[i],
+      'CatatanCoaching':
+          '${_coachingNotes.text.trim()}\n${_commitment.text.trim()}'.trim(),
+      for (var i = 0; i < behaviorEntries.length; i++)
+        'selectedBehaviors[$i]': behaviorEntries[i],
       'triggers': _triggerFactors.toList(),
       'actions': actions,
     };
 
-    final localId = 'BBS-${DateFormat('yyyyMMdd-HHmmss').format(DateTime.now())}';
+    final localId =
+        'BBS-${DateFormat('yyyyMMdd-HHmmss').format(DateTime.now())}';
     final online = OfflineSyncService.instance.state.value.isOnline;
     final synced = online &&
         await _api.submitBbs(
@@ -1485,18 +1645,30 @@ class _BbsFormPageState extends State<BbsFormPage> {
       context: context,
       title: 'Observasi BBS Berhasil Disimpan!',
       subtitle: synced
-          ? 'Data perilaku observasi K3 telah tersimpan di database pusat IndexSafe.'
+          ? 'Data observasi perilaku K3 telah tersimpan dengan aman.'
           : 'Data tersimpan di penyimpanan lokal HP & otomatis disinkronkan saat online.',
-      referenceNumber: 'BBS-${DateTime.now().millisecondsSinceEpoch.toString().substring(5)}',
+      referenceNumber:
+          'BBS-${DateTime.now().millisecondsSinceEpoch.toString().substring(5)}',
       accentColor: const Color(0xFF2563EB),
       icon: Icons.visibility_rounded,
       isOffline: !synced,
-      statusBadgeText: synced ? 'DATABASE PUSAT (ONLINE)' : 'OFFLINE STORAGE (SIAP SINKRON)',
+      statusBadgeText: synced ? 'BERHASIL TERSIMPAN' : 'TERSIMPAN DI PERANGKAT',
       receiptItems: [
-        SuccessReceiptItem(label: 'Pekerja Diamati', value: '${_observedPerson.text.trim()} (${_observedNik.text.trim()})', isHighlight: true),
-        SuccessReceiptItem(label: 'Perusahaan / Dept', value: '${_companyName ?? "-"} - ${_observedPosition.text.trim()}'),
-        SuccessReceiptItem(label: 'Lokasi Observasi', value: '$_area - $_benchmark'),
-        SuccessReceiptItem(label: 'Komitmen Perbaikan', value: _commitment.text.trim().isEmpty ? 'Pekerja berkomitmen taat K3' : _commitment.text.trim()),
+        SuccessReceiptItem(
+            label: 'Pekerja Diamati',
+            value:
+                '${_observedPerson.text.trim()} (${_observedNik.text.trim()})',
+            isHighlight: true),
+        SuccessReceiptItem(
+            label: 'Perusahaan / Dept',
+            value: '${_companyName ?? "-"} - ${_observedPosition.text.trim()}'),
+        SuccessReceiptItem(
+            label: 'Lokasi Observasi', value: '$_area - $_benchmark'),
+        SuccessReceiptItem(
+            label: 'Komitmen Perbaikan',
+            value: _commitment.text.trim().isEmpty
+                ? 'Pekerja berkomitmen taat K3'
+                : _commitment.text.trim()),
       ],
       primaryButtonText: 'Buka Detail Observasi',
     );
@@ -1512,7 +1684,8 @@ class _BbsFormPageState extends State<BbsFormPage> {
 
   Future<void> _pickEvidence() async {
     if (_evidencePaths.isNotEmpty) {
-      SnackBarMsg.warning(context, 'BBS hanya menerima 1 foto bukti observasi.');
+      SnackBarMsg.warning(
+          context, 'BBS hanya menerima 1 foto bukti observasi.');
       return;
     }
     final source = await showModalBottomSheet<ImageSource>(
@@ -1530,15 +1703,18 @@ class _BbsFormPageState extends State<BbsFormPage> {
                   backgroundColor: Color(0xFFE0F2FE),
                   child: Icon(Icons.camera_alt_rounded, color: _kPrimary),
                 ),
-                title: const Text('Ambil Foto Kamera', style: TextStyle(fontWeight: FontWeight.w600)),
+                title: const Text('Ambil Foto Kamera',
+                    style: TextStyle(fontWeight: FontWeight.w600)),
                 onTap: () => Navigator.pop(ctx, ImageSource.camera),
               ),
               ListTile(
                 leading: const CircleAvatar(
                   backgroundColor: Color(0xFFF1F5F9),
-                  child: Icon(Icons.photo_library_rounded, color: Color(0xFF475569)),
+                  child: Icon(Icons.photo_library_rounded,
+                      color: Color(0xFF475569)),
                 ),
-                title: const Text('Pilih dari Galeri', style: TextStyle(fontWeight: FontWeight.w600)),
+                title: const Text('Pilih dari Galeri',
+                    style: TextStyle(fontWeight: FontWeight.w600)),
                 onTap: () => Navigator.pop(ctx, ImageSource.gallery),
               ),
             ],
@@ -1574,7 +1750,8 @@ class _BbsFormPageState extends State<BbsFormPage> {
             // Header Card
             const SapHeaderCard(
               title: 'Formulir Observasi BBS',
-              subtitle: 'Amati perilaku kerja lapangan, beri apresiasi perilaku aman, dan lakukan dialog coaching.',
+              subtitle:
+                  'Amati perilaku kerja lapangan, beri apresiasi perilaku aman, dan lakukan dialog coaching.',
               icon: Icons.person_pin_circle_rounded,
               accentColor: _kPrimary,
               badgeBgColor: Color(0xFFF0F9FF),
@@ -1600,7 +1777,8 @@ class _BbsFormPageState extends State<BbsFormPage> {
                           final picked = await showDatePicker(
                             context: context,
                             initialDate: _observedAt,
-                            firstDate: DateTime.now().subtract(const Duration(days: 30)),
+                            firstDate: DateTime.now()
+                                .subtract(const Duration(days: 30)),
                             lastDate: DateTime.now(),
                           );
                           if (picked != null) {
@@ -1646,7 +1824,12 @@ class _BbsFormPageState extends State<BbsFormPage> {
                 const SizedBox(height: 14),
 
                 // Tipe Observasi
-                const Text('TIPE OBSERVASI *', style: TextStyle(color: Color(0xFF0F172A), fontSize: 11.5, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+                const Text('TIPE OBSERVASI *',
+                    style: TextStyle(
+                        color: Color(0xFF0F172A),
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 0.5)),
                 const SizedBox(height: 6),
                 Row(
                   children: [
@@ -1678,33 +1861,52 @@ class _BbsFormPageState extends State<BbsFormPage> {
                 const SizedBox(height: 14),
 
                 // Area Utama (Like Hazard)
-                const Text('AREA UTAMA *', style: TextStyle(color: Color(0xFF0F172A), fontSize: 11.5, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+                const Text('AREA UTAMA *',
+                    style: TextStyle(
+                        color: Color(0xFF0F172A),
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 0.5)),
                 const SizedBox(height: 6),
                 _PickerTile(
                   icon: Icons.map_rounded,
                   value: _area.isEmpty ? null : _area,
-                  hint: _isLoadingAreas && _masterAreas.isEmpty ? 'Memuat daftar area...' : 'Pilih Area Utama (seperti di Hazard)',
+                  hint: _isLoadingAreas && _masterAreas.isEmpty
+                      ? 'Memuat daftar area...'
+                      : 'Pilih Area Utama (seperti di Hazard)',
                   enabled: true,
                   onTap: _showAreaPickerModal,
                 ),
                 const SizedBox(height: 14),
 
                 // Detail Lokasi / Benchmark (Like Hazard)
-                const Text('DETAIL LOKASI / BENCHMARK *', style: TextStyle(color: Color(0xFF0F172A), fontSize: 11.5, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+                const Text('DETAIL LOKASI / BENCHMARK *',
+                    style: TextStyle(
+                        color: Color(0xFF0F172A),
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 0.5)),
                 const SizedBox(height: 6),
                 _PickerTile(
                   icon: Icons.place_rounded,
                   value: _benchmark.isEmpty ? null : _benchmark,
                   hint: _area.isEmpty
                       ? 'Pilih Area Utama terlebih dahulu'
-                      : (_isLoadingBenchmarks && _benchmarksList.isEmpty ? 'Memuat benchmark...' : 'Pilih Detail Lokasi / Benchmark'),
+                      : (_isLoadingBenchmarks && _benchmarksList.isEmpty
+                          ? 'Memuat benchmark...'
+                          : 'Pilih Detail Lokasi / Benchmark'),
                   enabled: _area.isNotEmpty,
                   onTap: _showBenchmarkPickerModal,
                 ),
                 const SizedBox(height: 14),
 
                 // GPS
-                const Text('TITIK KOORDINAT GPS (AKTUAL)', style: TextStyle(color: Color(0xFF0F172A), fontSize: 11.5, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+                const Text('TITIK KOORDINAT GPS (AKTUAL)',
+                    style: TextStyle(
+                        color: Color(0xFF0F172A),
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 0.5)),
                 const SizedBox(height: 6),
                 TextField(
                   controller: _coordinate,
@@ -1719,7 +1921,8 @@ class _BbsFormPageState extends State<BbsFormPage> {
                     iconColor: _kPrimary,
                   ).copyWith(
                     hintText: 'Ketuk ikon GPS untuk mengambil posisi terkini',
-                    hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
+                    hintStyle:
+                        const TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
                   ),
                 ),
               ],
@@ -1730,28 +1933,46 @@ class _BbsFormPageState extends State<BbsFormPage> {
             SapSectionCard(
               stepNumber: '2',
               title: 'PEKERJA YANG DIOBSERVASI',
-              subtitle: 'Perusahaan, unit departemen, dan data pekerja lapangan',
+              subtitle:
+                  'Perusahaan, unit departemen, dan data pekerja lapangan',
               icon: Icons.person_search_rounded,
               accentColor: _kPrimary,
               children: [
                 // Perusahaan / Kontraktor
-                const Text('PERUSAHAAN / KONTRAKTOR *', style: TextStyle(color: Color(0xFF0F172A), fontSize: 11.5, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+                const Text('PERUSAHAAN / KONTRAKTOR *',
+                    style: TextStyle(
+                        color: Color(0xFF0F172A),
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 0.5)),
                 const SizedBox(height: 6),
                 _PickerTile(
                   icon: Icons.business_rounded,
                   value: _companyName ??
                       _mbsCompanies
-                          .where((c) => int.tryParse((c['Id'] ?? c['id']).toString()) == _companyId)
-                          .map((c) => (c['Nama'] ?? c['nama'] ?? c['name']).toString())
+                          .where((c) =>
+                              int.tryParse((c['Id'] ?? c['id']).toString()) ==
+                              _companyId)
+                          .map((c) =>
+                              (c['Nama'] ?? c['nama'] ?? c['name']).toString())
                           .firstOrNull,
-                  hint: _mbsCompanies.isEmpty ? 'Memuat perusahaan...' : 'Pilih Perusahaan / Kontraktor',
+                  hint: _mbsCompanies.isEmpty
+                      ? 'Memuat perusahaan...'
+                      : 'Pilih Perusahaan / Kontraktor',
                   enabled: _mbsCompanies.isNotEmpty,
                   onTap: () async {
-                    final names = _mbsCompanies.map((c) => (c['Nama'] ?? c['nama'] ?? c['name']).toString()).toList();
-                    final picked = await _showSearchSheet('Pilih Perusahaan / Kontraktor', names);
+                    final names = _mbsCompanies
+                        .map((c) =>
+                            (c['Nama'] ?? c['nama'] ?? c['name']).toString())
+                        .toList();
+                    final picked = await _showSearchSheet(
+                        'Pilih Perusahaan / Kontraktor', names);
                     if (picked == null || !mounted) return;
-                    final comp = _mbsCompanies.firstWhere((c) => (c['Nama'] ?? c['nama'] ?? c['name']).toString() == picked);
-                    final newCid = int.tryParse((comp['Id'] ?? comp['id']).toString());
+                    final comp = _mbsCompanies.firstWhere((c) =>
+                        (c['Nama'] ?? c['nama'] ?? c['name']).toString() ==
+                        picked);
+                    final newCid =
+                        int.tryParse((comp['Id'] ?? comp['id']).toString());
                     setState(() {
                       _companyId = newCid;
                       _companyName = picked;
@@ -1769,12 +1990,18 @@ class _BbsFormPageState extends State<BbsFormPage> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text('UNIT / DEPARTEMEN *', style: TextStyle(color: Color(0xFF0F172A), fontSize: 11.5, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+                    const Text('UNIT / DEPARTEMEN *',
+                        style: TextStyle(
+                            color: Color(0xFF0F172A),
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 0.5)),
                     if (_departmentsLoading)
                       const SizedBox(
                         width: 14,
                         height: 14,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: _kPrimary),
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2, color: _kPrimary),
                       ),
                   ],
                 ),
@@ -1799,7 +2026,8 @@ class _BbsFormPageState extends State<BbsFormPage> {
                     decoration: BoxDecoration(
                       color: const Color(0xFFF0F9FF),
                       borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: const Color(0xFFBAE6FD), width: 1.2),
+                      border: Border.all(
+                          color: const Color(0xFFBAE6FD), width: 1.2),
                     ),
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.center,
@@ -1819,24 +2047,34 @@ class _BbsFormPageState extends State<BbsFormPage> {
                             children: [
                               Text(
                                 _observedPerson.text,
-                                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
+                                style: const TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w800,
+                                    color: Color(0xFF0F172A)),
                               ),
                               const SizedBox(height: 3),
                               Text(
                                 [
-                                  if (_observedNik.text.isNotEmpty) 'NIK: ${_observedNik.text}',
-                                  if (_observedPosition.text.isNotEmpty) _observedPosition.text,
-                                  if (_department.text.isNotEmpty) _department.text,
-                                  if (_workerPerusahaan != null && _workerPerusahaan!.isNotEmpty) _workerPerusahaan!,
+                                  if (_observedNik.text.isNotEmpty)
+                                    'NIK: ${_observedNik.text}',
+                                  if (_observedPosition.text.isNotEmpty)
+                                    _observedPosition.text,
+                                  if (_department.text.isNotEmpty)
+                                    _department.text,
+                                  if (_workerPerusahaan != null &&
+                                      _workerPerusahaan!.isNotEmpty)
+                                    _workerPerusahaan!,
                                 ].join(' • '),
-                                style: const TextStyle(fontSize: 11, color: Color(0xFF475569)),
+                                style: const TextStyle(
+                                    fontSize: 11, color: Color(0xFF475569)),
                               ),
                             ],
                           ),
                         ),
                         IconButton(
                           onPressed: _clearSelectedWorker,
-                          icon: const Icon(Icons.close_rounded, color: _kDanger, size: 20),
+                          icon: const Icon(Icons.close_rounded,
+                              color: _kDanger, size: 20),
                           tooltip: 'Ganti Pekerja',
                           style: IconButton.styleFrom(
                             backgroundColor: const Color(0xFFFEE2E2),
@@ -1850,7 +2088,12 @@ class _BbsFormPageState extends State<BbsFormPage> {
                   const SizedBox(height: 12),
                 ] else ...[
                   // Search Worker Input (Fast & Debounced)
-                  const Text('CARI PEKERJA (SEMUA KARYAWAN AKTIF) *', style: TextStyle(color: Color(0xFF0F172A), fontSize: 11.5, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+                  const Text('CARI PEKERJA (SEMUA KARYAWAN AKTIF) *',
+                      style: TextStyle(
+                          color: Color(0xFF0F172A),
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 0.5)),
                   const SizedBox(height: 6),
                   TextField(
                     controller: _workerSearchCtrl,
@@ -1860,12 +2103,18 @@ class _BbsFormPageState extends State<BbsFormPage> {
                       hintText: _companyId == null
                           ? 'Pilih perusahaan atau ketik NIK/Nama...'
                           : 'Ketik minimal 2 huruf nama atau NIK...',
-                      hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
-                      prefixIcon: const Icon(Icons.search_rounded, color: _kPrimary, size: 20),
+                      hintStyle: const TextStyle(
+                          color: Color(0xFF94A3B8), fontSize: 13),
+                      prefixIcon: const Icon(Icons.search_rounded,
+                          color: _kPrimary, size: 20),
                       suffixIcon: _workerSearching
                           ? const Padding(
                               padding: EdgeInsets.all(12),
-                              child: SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: _kPrimary)),
+                              child: SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                      strokeWidth: 2, color: _kPrimary)),
                             )
                           : (_workerSearchCtrl.text.isNotEmpty
                               ? IconButton(
@@ -1878,10 +2127,20 @@ class _BbsFormPageState extends State<BbsFormPage> {
                               : null),
                       filled: true,
                       fillColor: const Color(0xFFF8FAFC),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
-                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
-                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: _kPrimary, width: 1.5)),
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 13),
+                      border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide:
+                              const BorderSide(color: Color(0xFFE2E8F0))),
+                      enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide:
+                              const BorderSide(color: Color(0xFFE2E8F0))),
+                      focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide:
+                              const BorderSide(color: _kPrimary, width: 1.5)),
                     ),
                   ),
 
@@ -1907,14 +2166,17 @@ class _BbsFormPageState extends State<BbsFormPage> {
                         child: ListView.separated(
                           shrinkWrap: true,
                           itemCount: _workerResults.length,
-                          separatorBuilder: (_, __) => const Divider(height: 1, color: Color(0xFFF1F5F9)),
+                          separatorBuilder: (_, __) => const Divider(
+                              height: 1, color: Color(0xFFF1F5F9)),
                           itemBuilder: (context, index) {
                             final w = _workerResults[index];
                             final name = w['nama']?.toString().trim() ?? '-';
                             final nik = w['nik']?.toString().trim() ?? '-';
                             final role = w['jabatan']?.toString().trim() ?? '';
-                            final dept = w['departemen']?.toString().trim() ?? '';
-                            final comp = w['perusahaan']?.toString().trim() ?? '';
+                            final dept =
+                                w['departemen']?.toString().trim() ?? '';
+                            final comp =
+                                w['perusahaan']?.toString().trim() ?? '';
                             final photo = w['foto']?.toString().trim();
 
                             return ListTile(
@@ -1926,7 +2188,10 @@ class _BbsFormPageState extends State<BbsFormPage> {
                               ),
                               title: Text(
                                 name,
-                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5, color: Color(0xFF0F172A)),
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 13.5,
+                                    color: Color(0xFF0F172A)),
                               ),
                               subtitle: Text(
                                 [
@@ -1935,11 +2200,15 @@ class _BbsFormPageState extends State<BbsFormPage> {
                                   if (dept.isNotEmpty) dept,
                                   if (comp.isNotEmpty) comp,
                                 ].join(' • '),
-                                style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                                style: const TextStyle(
+                                    fontSize: 11, color: Color(0xFF64748B)),
                                 maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
                               ),
-                              trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 13, color: Color(0xFF94A3B8)),
+                              trailing: const Icon(
+                                  Icons.arrow_forward_ios_rounded,
+                                  size: 13,
+                                  color: Color(0xFF94A3B8)),
                               onTap: () => _selectWorker(w),
                             );
                           },
@@ -1951,20 +2220,32 @@ class _BbsFormPageState extends State<BbsFormPage> {
 
                 // Role/Position
                 const SizedBox(height: 14),
-                const Text('JABATAN / PERAN (OPSIONAL)', style: TextStyle(color: Color(0xFF0F172A), fontSize: 11.5, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+                const Text('JABATAN / PERAN (OPSIONAL)',
+                    style: TextStyle(
+                        color: Color(0xFF0F172A),
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 0.5)),
                 const SizedBox(height: 6),
                 TextField(
                   controller: _observedPosition,
                   textCapitalization: TextCapitalization.words,
                   decoration: InputDecoration(
                     hintText: 'Contoh: Operator Hauler / Mekanik / Supervisor',
-                    hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
-                    prefixIcon: const Icon(Icons.badge_outlined, color: _kPrimary, size: 20),
+                    hintStyle:
+                        const TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
+                    prefixIcon: const Icon(Icons.badge_outlined,
+                        color: _kPrimary, size: 20),
                     filled: true,
                     fillColor: const Color(0xFFF8FAFC),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
-                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 13),
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                    enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
                   ),
                 ),
               ],
@@ -1975,31 +2256,50 @@ class _BbsFormPageState extends State<BbsFormPage> {
             SapSectionCard(
               stepNumber: '3',
               title: 'KATEGORI & BUTIR PERILAKU',
-              subtitle: 'Pilih topik BBS dan amati butir perilaku secara spesifik',
+              subtitle:
+                  'Pilih topik BBS dan amati butir perilaku secara spesifik',
               icon: Icons.checklist_rounded,
               accentColor: _kPrimary,
               children: [
                 // Kategori
-                const Text('KATEGORI BBS *', style: TextStyle(color: Color(0xFF0F172A), fontSize: 11.5, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+                const Text('KATEGORI BBS *',
+                    style: TextStyle(
+                        color: Color(0xFF0F172A),
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 0.5)),
                 const SizedBox(height: 6),
                 _PickerTile(
                   icon: Icons.category_rounded,
                   value: _category,
-                  hint: _mbsCategories.isEmpty ? 'Memuat kategori BBS...' : 'Pilih Kategori BBS',
+                  hint: _mbsCategories.isEmpty
+                      ? 'Memuat kategori BBS...'
+                      : 'Pilih Kategori BBS',
                   enabled: _mbsCategories.isNotEmpty,
                   onTap: () async {
-                    final names = _mbsCategories.map((c) => c['name']?.toString() ?? '').where((s) => s.isNotEmpty).toList();
-                    final picked = await _showSearchSheet('Pilih Kategori BBS', names);
+                    final names = _mbsCategories
+                        .map((c) => c['name']?.toString() ?? '')
+                        .where((s) => s.isNotEmpty)
+                        .toList();
+                    final picked =
+                        await _showSearchSheet('Pilih Kategori BBS', names);
                     if (picked == null || !mounted) return;
-                    final cat = _mbsCategories.firstWhere((c) => c['name']?.toString() == picked);
+                    final cat = _mbsCategories
+                        .firstWhere((c) => c['name']?.toString() == picked);
                     _onCategoryChanged(cat);
                   },
                 ),
 
                 // Special Case Topic
-                if (_observationType == 'Special Case' && _mbsTopics.isNotEmpty) ...[
+                if (_observationType == 'Special Case' &&
+                    _mbsTopics.isNotEmpty) ...[
                   const SizedBox(height: 14),
-                  const Text('SUB-TOPIK SPECIAL CASE *', style: TextStyle(color: Color(0xFF0F172A), fontSize: 11.5, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+                  const Text('SUB-TOPIK SPECIAL CASE *',
+                      style: TextStyle(
+                          color: Color(0xFF0F172A),
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 0.5)),
                   const SizedBox(height: 6),
                   _PickerTile(
                     icon: Icons.bolt_rounded,
@@ -2007,10 +2307,15 @@ class _BbsFormPageState extends State<BbsFormPage> {
                     hint: 'Pilih Sub-Topik Special Case',
                     enabled: true,
                     onTap: () async {
-                      final names = _mbsTopics.map((t) => t['name']?.toString() ?? '').where((s) => s.isNotEmpty).toList();
-                      final picked = await _showSearchSheet('Pilih Sub-Topik', names);
+                      final names = _mbsTopics
+                          .map((t) => t['name']?.toString() ?? '')
+                          .where((s) => s.isNotEmpty)
+                          .toList();
+                      final picked =
+                          await _showSearchSheet('Pilih Sub-Topik', names);
                       if (picked == null || !mounted) return;
-                      final topic = _mbsTopics.firstWhere((t) => t['name']?.toString() == picked);
+                      final topic = _mbsTopics
+                          .firstWhere((t) => t['name']?.toString() == picked);
                       _selectTopic(topic['id'] as int?, picked);
                     },
                   ),
@@ -2021,9 +2326,18 @@ class _BbsFormPageState extends State<BbsFormPage> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text('BUTIR PERILAKU YANG DIAMATI *', style: TextStyle(color: Color(0xFF0F172A), fontSize: 11.5, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+                    const Text('BUTIR PERILAKU YANG DIAMATI *',
+                        style: TextStyle(
+                            color: Color(0xFF0F172A),
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 0.5)),
                     if (_masterLoading)
-                      const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: _kPrimary)),
+                      const SizedBox(
+                          width: 14,
+                          height: 14,
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2, color: _kPrimary)),
                   ],
                 ),
                 const SizedBox(height: 4),
@@ -2041,22 +2355,35 @@ class _BbsFormPageState extends State<BbsFormPage> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: const Center(
-                      child: Text('Pilih kategori di atas untuk memuat butir perilaku.', style: TextStyle(color: Color(0xFF64748B), fontSize: 12)),
+                      child: Text(
+                          'Pilih kategori di atas untuk memuat butir perilaku.',
+                          style: TextStyle(
+                              color: Color(0xFF64748B), fontSize: 12)),
                     ),
                   ),
 
                 ..._mbsBehaviorItems.map((item) {
-                  final text = item['behaviorText']?.toString() ?? item['text']?.toString() ?? '';
+                  final text = item['behaviorText']?.toString() ??
+                      item['text']?.toString() ??
+                      '';
                   final isChecked = _behaviors.contains(text);
                   final status = _behaviorStatuses[text] ?? 'Aman';
 
                   return Container(
                     margin: const EdgeInsets.only(bottom: 8),
                     decoration: BoxDecoration(
-                      color: isChecked ? (status == 'Aman' ? const Color(0xFFECFDF5) : const Color(0xFFFEF2F2)) : Colors.white,
+                      color: isChecked
+                          ? (status == 'Aman'
+                              ? const Color(0xFFECFDF5)
+                              : const Color(0xFFFEF2F2))
+                          : Colors.white,
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
-                        color: isChecked ? (status == 'Aman' ? const Color(0xFF6EE7B7) : const Color(0xFFFCA5A5)) : const Color(0xFFE2E8F0),
+                        color: isChecked
+                            ? (status == 'Aman'
+                                ? const Color(0xFF6EE7B7)
+                                : const Color(0xFFFCA5A5))
+                            : const Color(0xFFE2E8F0),
                         width: isChecked ? 1.4 : 1,
                       ),
                     ),
@@ -2080,21 +2407,27 @@ class _BbsFormPageState extends State<BbsFormPage> {
                             text,
                             style: TextStyle(
                               fontSize: 12.5,
-                              fontWeight: isChecked ? FontWeight.w700 : FontWeight.w500,
+                              fontWeight:
+                                  isChecked ? FontWeight.w700 : FontWeight.w500,
                               color: const Color(0xFF0F172A),
                             ),
                           ),
                           activeColor: status == 'Aman' ? _kSuccess : _kDanger,
                           controlAffinity: ListTileControlAffinity.leading,
                           dense: true,
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+                          contentPadding:
+                              const EdgeInsets.symmetric(horizontal: 8),
                         ),
                         if (isChecked)
                           Padding(
                             padding: const EdgeInsets.fromLTRB(14, 0, 14, 10),
                             child: Row(
                               children: [
-                                const Text('Status Pengamatan:', style: TextStyle(fontSize: 11, color: Color(0xFF64748B), fontWeight: FontWeight.w600)),
+                                const Text('Status Pengamatan:',
+                                    style: TextStyle(
+                                        fontSize: 11,
+                                        color: Color(0xFF64748B),
+                                        fontWeight: FontWeight.w600)),
                                 const Spacer(),
                                 _StatusToggleChip(
                                   label: 'Aman',
@@ -2137,12 +2470,17 @@ class _BbsFormPageState extends State<BbsFormPage> {
                   maxLines: 3,
                   decoration: InputDecoration(
                     labelText: 'Perilaku Lainnya (Opsional)',
-                    hintText: 'Tuliskan jika ada perilaku spesifik lain yang diamati...',
+                    hintText:
+                        'Tuliskan jika ada perilaku spesifik lain yang diamati...',
                     alignLabelWithHint: true,
                     filled: true,
                     fillColor: const Color(0xFFF8FAFC),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
-                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                    enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
                   ),
                 ),
               ],
@@ -2153,12 +2491,18 @@ class _BbsFormPageState extends State<BbsFormPage> {
             SapSectionCard(
               stepNumber: '4',
               title: 'KLASIFIKASI & EVALUASI RISIKO',
-              subtitle: 'Penilaian perilaku keseluruhan, tingkat risiko & kondisi kerja',
+              subtitle:
+                  'Penilaian perilaku keseluruhan, tingkat risiko & kondisi kerja',
               icon: Icons.security_rounded,
               accentColor: _kPrimary,
               children: [
                 // Classification
-                const Text('KLASIFIKASI PERILAKU *', style: TextStyle(color: Color(0xFF0F172A), fontSize: 11.5, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+                const Text('KLASIFIKASI PERILAKU *',
+                    style: TextStyle(
+                        color: Color(0xFF0F172A),
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 0.5)),
                 const SizedBox(height: 6),
                 Row(
                   children: [
@@ -2168,7 +2512,8 @@ class _BbsFormPageState extends State<BbsFormPage> {
                         icon: Icons.thumb_up_alt_rounded,
                         isSelected: _classification == 'Perilaku Aman',
                         activeColor: _kSuccess,
-                        onTap: () => setState(() => _classification = 'Perilaku Aman'),
+                        onTap: () =>
+                            setState(() => _classification = 'Perilaku Aman'),
                       ),
                     ),
                     const SizedBox(width: 10),
@@ -2178,7 +2523,8 @@ class _BbsFormPageState extends State<BbsFormPage> {
                         icon: Icons.thumb_down_alt_rounded,
                         isSelected: _classification == 'Perilaku Berisiko',
                         activeColor: _kDanger,
-                        onTap: () => setState(() => _classification = 'Perilaku Berisiko'),
+                        onTap: () => setState(
+                            () => _classification = 'Perilaku Berisiko'),
                       ),
                     ),
                   ],
@@ -2186,7 +2532,12 @@ class _BbsFormPageState extends State<BbsFormPage> {
                 const SizedBox(height: 14),
 
                 // Risk Level
-                const Text('TINGKAT RISIKO / POTENSI DAMPAK *', style: TextStyle(color: Color(0xFF0F172A), fontSize: 11.5, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+                const Text('TINGKAT RISIKO / POTENSI DAMPAK *',
+                    style: TextStyle(
+                        color: Color(0xFF0F172A),
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 0.5)),
                 const SizedBox(height: 6),
                 Wrap(
                   spacing: 8,
@@ -2227,7 +2578,11 @@ class _BbsFormPageState extends State<BbsFormPage> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text('KONDISI JALAN / AREA', style: TextStyle(color: Color(0xFF0F172A), fontSize: 11, fontWeight: FontWeight.bold)),
+                          const Text('KONDISI JALAN / AREA',
+                              style: TextStyle(
+                                  color: Color(0xFF0F172A),
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold)),
                           const SizedBox(height: 6),
                           _PickerTile(
                             icon: Icons.terrain_rounded,
@@ -2235,13 +2590,15 @@ class _BbsFormPageState extends State<BbsFormPage> {
                             hint: 'Pilih Kondisi',
                             enabled: true,
                             onTap: () async {
-                              final picked = await _showSearchSheet('Kondisi Jalan / Area', const [
+                              final picked = await _showSearchSheet(
+                                  'Kondisi Jalan / Area', const [
                                 'Normal / Kering',
                                 'Basah / Licin',
                                 'Berdebu / Kabut',
                                 'Bergelombang / Rusak',
                               ]);
-                              if (picked != null) setState(() => _roadCondition = picked);
+                              if (picked != null)
+                                setState(() => _roadCondition = picked);
                             },
                           ),
                         ],
@@ -2252,7 +2609,11 @@ class _BbsFormPageState extends State<BbsFormPage> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text('KEPADATAN TRAFFIC', style: TextStyle(color: Color(0xFF0F172A), fontSize: 11, fontWeight: FontWeight.bold)),
+                          const Text('KEPADATAN TRAFFIC',
+                              style: TextStyle(
+                                  color: Color(0xFF0F172A),
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold)),
                           const SizedBox(height: 6),
                           _PickerTile(
                             icon: Icons.traffic_rounded,
@@ -2260,12 +2621,14 @@ class _BbsFormPageState extends State<BbsFormPage> {
                             hint: 'Pilih Traffic',
                             enabled: true,
                             onTap: () async {
-                              final picked = await _showSearchSheet('Kepadatan Traffic', const [
+                              final picked = await _showSearchSheet(
+                                  'Kepadatan Traffic', const [
                                 'Lancar',
                                 'Sedang',
                                 'Padat / Ramai',
                               ]);
-                              if (picked != null) setState(() => _trafficCondition = picked);
+                              if (picked != null)
+                                setState(() => _trafficCondition = picked);
                             },
                           ),
                         ],
@@ -2297,7 +2660,8 @@ class _BbsFormPageState extends State<BbsFormPage> {
                                   color: const Color(0xFFFEF3C7),
                                   borderRadius: BorderRadius.circular(8),
                                 ),
-                                child: const Icon(Icons.bolt_rounded, size: 16, color: Color(0xFFD97706)),
+                                child: const Icon(Icons.bolt_rounded,
+                                    size: 16, color: Color(0xFFD97706)),
                               ),
                               const SizedBox(width: 8),
                               const Text(
@@ -2313,11 +2677,13 @@ class _BbsFormPageState extends State<BbsFormPage> {
                           ),
                           if (_triggerFactors.isNotEmpty)
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 3),
                               decoration: BoxDecoration(
                                 color: const Color(0xFFE0F2FE),
                                 borderRadius: BorderRadius.circular(99),
-                                border: Border.all(color: const Color(0xFFBAE6FD)),
+                                border:
+                                    Border.all(color: const Color(0xFFBAE6FD)),
                               ),
                               child: Text(
                                 '${_triggerFactors.length} Dipilih',
@@ -2333,12 +2699,15 @@ class _BbsFormPageState extends State<BbsFormPage> {
                       const SizedBox(height: 6),
                       const Text(
                         'Pilih faktor atau kondisi yang mempengaruhi perilaku pekerja (bisa lebih dari satu):',
-                        style: TextStyle(fontSize: 11.5, color: Color(0xFF64748B)),
+                        style:
+                            TextStyle(fontSize: 11.5, color: Color(0xFF64748B)),
                       ),
                       const SizedBox(height: 12),
                       Column(
                         children: [
-                          for (int i = 0; i < _kTriggerFactorItems.length; i += 2)
+                          for (int i = 0;
+                              i < _kTriggerFactorItems.length;
+                              i += 2)
                             Padding(
                               padding: const EdgeInsets.only(bottom: 8),
                               child: Row(
@@ -2346,13 +2715,17 @@ class _BbsFormPageState extends State<BbsFormPage> {
                                   Expanded(
                                     child: _TriggerCard(
                                       item: _kTriggerFactorItems[i],
-                                      isSelected: _triggerFactors.contains(_kTriggerFactorItems[i].title),
+                                      isSelected: _triggerFactors.contains(
+                                          _kTriggerFactorItems[i].title),
                                       onTap: () {
                                         setState(() {
-                                          if (_triggerFactors.contains(_kTriggerFactorItems[i].title)) {
-                                            _triggerFactors.remove(_kTriggerFactorItems[i].title);
+                                          if (_triggerFactors.contains(
+                                              _kTriggerFactorItems[i].title)) {
+                                            _triggerFactors.remove(
+                                                _kTriggerFactorItems[i].title);
                                           } else {
-                                            _triggerFactors.add(_kTriggerFactorItems[i].title);
+                                            _triggerFactors.add(
+                                                _kTriggerFactorItems[i].title);
                                           }
                                         });
                                       },
@@ -2363,13 +2736,24 @@ class _BbsFormPageState extends State<BbsFormPage> {
                                     child: (i + 1 < _kTriggerFactorItems.length)
                                         ? _TriggerCard(
                                             item: _kTriggerFactorItems[i + 1],
-                                            isSelected: _triggerFactors.contains(_kTriggerFactorItems[i + 1].title),
+                                            isSelected:
+                                                _triggerFactors.contains(
+                                                    _kTriggerFactorItems[i + 1]
+                                                        .title),
                                             onTap: () {
                                               setState(() {
-                                                if (_triggerFactors.contains(_kTriggerFactorItems[i + 1].title)) {
-                                                  _triggerFactors.remove(_kTriggerFactorItems[i + 1].title);
+                                                if (_triggerFactors.contains(
+                                                    _kTriggerFactorItems[i + 1]
+                                                        .title)) {
+                                                  _triggerFactors.remove(
+                                                      _kTriggerFactorItems[
+                                                              i + 1]
+                                                          .title);
                                                 } else {
-                                                  _triggerFactors.add(_kTriggerFactorItems[i + 1].title);
+                                                  _triggerFactors.add(
+                                                      _kTriggerFactorItems[
+                                                              i + 1]
+                                                          .title);
                                                 }
                                               });
                                             },
@@ -2392,24 +2776,36 @@ class _BbsFormPageState extends State<BbsFormPage> {
             SapSectionCard(
               stepNumber: '5',
               title: 'DESKRIPSI & TINDAKAN COACHING',
-              subtitle: 'Catatan pengamatan, respon pekerja, dan dialog coaching',
+              subtitle:
+                  'Catatan pengamatan, respon pekerja, dan dialog coaching',
               icon: Icons.record_voice_over_rounded,
               accentColor: _kPrimary,
               children: [
                 // Potential Consequence
-                const Text('DESKRIPSI PENGAMATAN / POTENSI DAMPAK *', style: TextStyle(color: Color(0xFF0F172A), fontSize: 11.5, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+                const Text('DESKRIPSI PENGAMATAN / POTENSI DAMPAK *',
+                    style: TextStyle(
+                        color: Color(0xFF0F172A),
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 0.5)),
                 const SizedBox(height: 6),
                 TextField(
                   controller: _potentialConsequence,
                   minLines: 3,
                   maxLines: 5,
                   decoration: InputDecoration(
-                    hintText: 'Jelaskan apa yang sedang dilakukan pekerja dan potensi dampak bahayanya...',
-                    hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12.5),
+                    hintText:
+                        'Jelaskan apa yang sedang dilakukan pekerja dan potensi dampak bahayanya...',
+                    hintStyle: const TextStyle(
+                        color: Color(0xFF94A3B8), fontSize: 12.5),
                     filled: true,
                     fillColor: const Color(0xFFF8FAFC),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
-                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                    enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
                   ),
                 ),
                 const SizedBox(height: 14),
@@ -2436,7 +2832,8 @@ class _BbsFormPageState extends State<BbsFormPage> {
                                   color: const Color(0xFFDCFCE7),
                                   borderRadius: BorderRadius.circular(8),
                                 ),
-                                child: const Icon(Icons.flash_on_rounded, size: 16, color: Color(0xFF16A34A)),
+                                child: const Icon(Icons.flash_on_rounded,
+                                    size: 16, color: Color(0xFF16A34A)),
                               ),
                               const SizedBox(width: 8),
                               const Text(
@@ -2450,13 +2847,16 @@ class _BbsFormPageState extends State<BbsFormPage> {
                               ),
                             ],
                           ),
-                          if (_immediateActions.isNotEmpty || _otherAction.text.trim().isNotEmpty)
+                          if (_immediateActions.isNotEmpty ||
+                              _otherAction.text.trim().isNotEmpty)
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 3),
                               decoration: BoxDecoration(
                                 color: const Color(0xFFDCFCE7),
                                 borderRadius: BorderRadius.circular(99),
-                                border: Border.all(color: const Color(0xFF86EFAC)),
+                                border:
+                                    Border.all(color: const Color(0xFF86EFAC)),
                               ),
                               child: Text(
                                 '${_immediateActions.length + (_otherAction.text.trim().isNotEmpty ? 1 : 0)} Tindakan',
@@ -2472,11 +2872,13 @@ class _BbsFormPageState extends State<BbsFormPage> {
                       const SizedBox(height: 6),
                       const Text(
                         'Pilih aksi korektif / coaching yang langsung Anda lakukan di lokasi:',
-                        style: TextStyle(fontSize: 11.5, color: Color(0xFF64748B)),
+                        style:
+                            TextStyle(fontSize: 11.5, color: Color(0xFF64748B)),
                       ),
                       const SizedBox(height: 12),
                       ..._kImmediateActionItems.map((action) {
-                        final isSelected = _immediateActions.contains(action.title);
+                        final isSelected =
+                            _immediateActions.contains(action.title);
                         return Padding(
                           padding: const EdgeInsets.only(bottom: 8),
                           child: _ActionCardTile(
@@ -2507,7 +2909,8 @@ class _BbsFormPageState extends State<BbsFormPage> {
                           children: [
                             Row(
                               children: [
-                                Icon(Icons.edit_note_rounded, size: 18, color: Colors.blueGrey.shade600),
+                                Icon(Icons.edit_note_rounded,
+                                    size: 18, color: Colors.blueGrey.shade600),
                                 const SizedBox(width: 6),
                                 const Text(
                                   'Tindakan Langsung Lainnya (Opsional)',
@@ -2524,22 +2927,28 @@ class _BbsFormPageState extends State<BbsFormPage> {
                               controller: _otherAction,
                               onChanged: (_) => setState(() {}),
                               decoration: InputDecoration(
-                                hintText: 'Tuliskan tindakan lapangan spesifik lainnya jika ada...',
-                                hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
+                                hintText:
+                                    'Tuliskan tindakan lapangan spesifik lainnya jika ada...',
+                                hintStyle: const TextStyle(
+                                    color: Color(0xFF94A3B8), fontSize: 12),
                                 filled: true,
                                 fillColor: const Color(0xFFF8FAFC),
-                                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 10),
                                 border: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(10),
-                                  borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                                  borderSide: const BorderSide(
+                                      color: Color(0xFFE2E8F0)),
                                 ),
                                 enabledBorder: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(10),
-                                  borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                                  borderSide: const BorderSide(
+                                      color: Color(0xFFE2E8F0)),
                                 ),
                                 focusedBorder: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(10),
-                                  borderSide: const BorderSide(color: _kPrimary, width: 1.5),
+                                  borderSide: const BorderSide(
+                                      color: _kPrimary, width: 1.5),
                                 ),
                               ),
                             ),
@@ -2552,7 +2961,12 @@ class _BbsFormPageState extends State<BbsFormPage> {
                 const SizedBox(height: 14),
 
                 // Respons Pekerja
-                const Text('RESPONS PEKERJA *', style: TextStyle(color: Color(0xFF0F172A), fontSize: 11.5, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+                const Text('RESPONS PEKERJA *',
+                    style: TextStyle(
+                        color: Color(0xFF0F172A),
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 0.5)),
                 const SizedBox(height: 6),
                 Row(
                   children: [
@@ -2562,7 +2976,8 @@ class _BbsFormPageState extends State<BbsFormPage> {
                         icon: Icons.sentiment_satisfied_alt_rounded,
                         isSelected: _workerResponse == 'Positif',
                         activeColor: _kSuccess,
-                        onTap: () => setState(() => _workerResponse = 'Positif'),
+                        onTap: () =>
+                            setState(() => _workerResponse = 'Positif'),
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -2582,7 +2997,8 @@ class _BbsFormPageState extends State<BbsFormPage> {
                         icon: Icons.sentiment_dissatisfied_rounded,
                         isSelected: _workerResponse == 'Resisten',
                         activeColor: _kDanger,
-                        onTap: () => setState(() => _workerResponse = 'Resisten'),
+                        onTap: () =>
+                            setState(() => _workerResponse = 'Resisten'),
                       ),
                     ),
                   ],
@@ -2590,53 +3006,83 @@ class _BbsFormPageState extends State<BbsFormPage> {
                 const SizedBox(height: 14),
 
                 // Catatan Coaching
-                const Text('CATATAN COACHING & DIALOG *', style: TextStyle(color: Color(0xFF0F172A), fontSize: 11.5, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+                const Text('CATATAN COACHING & DIALOG *',
+                    style: TextStyle(
+                        color: Color(0xFF0F172A),
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 0.5)),
                 const SizedBox(height: 6),
                 TextField(
                   controller: _coachingNotes,
                   minLines: 3,
                   maxLines: 5,
                   decoration: InputDecoration(
-                    hintText: 'Tuliskan dialog perbaikan, pemahaman pekerja, dan pesan keselamatan...',
-                    hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12.5),
+                    hintText:
+                        'Tuliskan dialog perbaikan, pemahaman pekerja, dan pesan keselamatan...',
+                    hintStyle: const TextStyle(
+                        color: Color(0xFF94A3B8), fontSize: 12.5),
                     filled: true,
                     fillColor: const Color(0xFFF8FAFC),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
-                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                    enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
                   ),
                 ),
                 const SizedBox(height: 14),
 
                 // Komitmen Pekerja
-                const Text('KOMITMEN PEKERJA *', style: TextStyle(color: Color(0xFF0F172A), fontSize: 11.5, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+                const Text('KOMITMEN PEKERJA *',
+                    style: TextStyle(
+                        color: Color(0xFF0F172A),
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 0.5)),
                 const SizedBox(height: 6),
                 TextField(
                   controller: _commitment,
                   minLines: 2,
                   maxLines: 4,
                   decoration: InputDecoration(
-                    hintText: 'Tuliskan kesepakatan atau komitmen dari pekerja...',
-                    hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12.5),
+                    hintText:
+                        'Tuliskan kesepakatan atau komitmen dari pekerja...',
+                    hintStyle: const TextStyle(
+                        color: Color(0xFF94A3B8), fontSize: 12.5),
                     filled: true,
                     fillColor: const Color(0xFFF8FAFC),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
-                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                    enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
                   ),
                 ),
                 const SizedBox(height: 14),
 
                 // Due Date
-                const Text('TARGET FOLLOW UP (OPSIONAL)', style: TextStyle(color: Color(0xFF0F172A), fontSize: 11.5, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+                const Text('TARGET FOLLOW UP (OPSIONAL)',
+                    style: TextStyle(
+                        color: Color(0xFF0F172A),
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 0.5)),
                 const SizedBox(height: 6),
                 _PickerTile(
                   icon: Icons.event_available_rounded,
-                  value: _dueDate == null ? null : DateFormat('dd MMMM yyyy').format(_dueDate!),
+                  value: _dueDate == null
+                      ? null
+                      : DateFormat('dd MMMM yyyy').format(_dueDate!),
                   hint: 'Pilih tanggal target perbaikan / evaluasi',
                   enabled: true,
                   onTap: () async {
                     final picked = await showDatePicker(
                       context: context,
-                      initialDate: _dueDate ?? DateTime.now().add(const Duration(days: 7)),
+                      initialDate: _dueDate ??
+                          DateTime.now().add(const Duration(days: 7)),
                       firstDate: DateTime.now(),
                       lastDate: DateTime.now().add(const Duration(days: 365)),
                     );
@@ -2674,8 +3120,10 @@ class _BbsFormPageState extends State<BbsFormPage> {
                           backgroundColor: Colors.black.withValues(alpha: 0.65),
                           radius: 18,
                           child: IconButton(
-                            icon: const Icon(Icons.close_rounded, color: Colors.white, size: 18),
-                            onPressed: () => setState(() => _evidencePaths.clear()),
+                            icon: const Icon(Icons.close_rounded,
+                                color: Colors.white, size: 18),
+                            onPressed: () =>
+                                setState(() => _evidencePaths.clear()),
                           ),
                         ),
                       ),
@@ -2690,7 +3138,10 @@ class _BbsFormPageState extends State<BbsFormPage> {
                       decoration: BoxDecoration(
                         color: const Color(0xFFF0F9FF),
                         borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: const Color(0xFFBAE6FD), width: 1.5, style: BorderStyle.solid),
+                        border: Border.all(
+                            color: const Color(0xFFBAE6FD),
+                            width: 1.5,
+                            style: BorderStyle.solid),
                       ),
                       child: const Center(
                         child: Column(
@@ -2699,12 +3150,19 @@ class _BbsFormPageState extends State<BbsFormPage> {
                             CircleAvatar(
                               backgroundColor: Color(0xFFE0F2FE),
                               radius: 22,
-                              child: Icon(Icons.add_a_photo_rounded, color: _kPrimary, size: 22),
+                              child: Icon(Icons.add_a_photo_rounded,
+                                  color: _kPrimary, size: 22),
                             ),
                             SizedBox(height: 8),
-                            Text('Ketuk untuk Ambil Foto Bukti Observasi', style: TextStyle(color: _kPrimary, fontSize: 13, fontWeight: FontWeight.bold)),
+                            Text('Ketuk untuk Ambil Foto Bukti Observasi',
+                                style: TextStyle(
+                                    color: _kPrimary,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.bold)),
                             SizedBox(height: 2),
-                            Text('Kamera atau Galeri (1 Foto)', style: TextStyle(color: Color(0xFF64748B), fontSize: 11)),
+                            Text('Kamera atau Galeri (1 Foto)',
+                                style: TextStyle(
+                                    color: Color(0xFF64748B), fontSize: 11)),
                           ],
                         ),
                       ),
@@ -2720,15 +3178,23 @@ class _BbsFormPageState extends State<BbsFormPage> {
               style: FilledButton.styleFrom(
                 backgroundColor: _kPrimary,
                 minimumSize: const Size.fromHeight(52),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14)),
                 elevation: 2,
               ),
               icon: _saving
-                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: Colors.white))
                   : const Icon(Icons.send_rounded, size: 20),
               label: Text(
                 _saving ? 'Mengirim Observasi BBS...' : 'Kirim Observasi BBS',
-                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, letterSpacing: 0.3),
+                style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 0.3),
               ),
             ),
           ],
@@ -2754,7 +3220,9 @@ class _BbsFormPageState extends State<BbsFormPage> {
         String filter = '';
         return StatefulBuilder(
           builder: (modalCtx, setModalState) {
-            final filtered = options.where((e) => e.toLowerCase().contains(filter.toLowerCase())).toList();
+            final filtered = options
+                .where((e) => e.toLowerCase().contains(filter.toLowerCase()))
+                .toList();
             return Container(
               height: MediaQuery.of(context).size.height * 0.75,
               decoration: const BoxDecoration(
@@ -2773,7 +3241,6 @@ class _BbsFormPageState extends State<BbsFormPage> {
                     ),
                   ),
                   const SizedBox(height: 14),
-
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 20),
                     child: Row(
@@ -2781,7 +3248,10 @@ class _BbsFormPageState extends State<BbsFormPage> {
                       children: [
                         Text(
                           title,
-                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                          style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF0F172A)),
                         ),
                         IconButton(
                           icon: const Icon(Icons.close_rounded),
@@ -2796,14 +3266,23 @@ class _BbsFormPageState extends State<BbsFormPage> {
                       autofocus: false,
                       onChanged: (v) => setModalState(() => filter = v),
                       decoration: InputDecoration(
-                        prefixIcon: const Icon(Icons.search_rounded, color: _kPrimary, size: 20),
+                        prefixIcon: const Icon(Icons.search_rounded,
+                            color: _kPrimary, size: 20),
                         hintText: 'Cari dalam daftar...',
-                        hintStyle: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
+                        hintStyle: const TextStyle(
+                            fontSize: 13, color: Color(0xFF94A3B8)),
                         filled: true,
                         fillColor: const Color(0xFFF8FAFC),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
-                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 11),
+                        border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide:
+                                const BorderSide(color: Color(0xFFE2E8F0))),
+                        enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide:
+                                const BorderSide(color: Color(0xFFE2E8F0))),
                       ),
                     ),
                   ),
@@ -2811,11 +3290,17 @@ class _BbsFormPageState extends State<BbsFormPage> {
                   Expanded(
                     child: ListView.separated(
                       itemCount: filtered.length,
-                      separatorBuilder: (_, __) => const Divider(height: 1, color: Color(0xFFF1F5F9)),
+                      separatorBuilder: (_, __) =>
+                          const Divider(height: 1, color: Color(0xFFF1F5F9)),
                       itemBuilder: (context, i) => ListTile(
                         dense: true,
-                        title: Text(filtered[i], style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: Color(0xFF0F172A))),
-                        trailing: const Icon(Icons.chevron_right_rounded, size: 18, color: Color(0xFF94A3B8)),
+                        title: Text(filtered[i],
+                            style: const TextStyle(
+                                fontSize: 13.5,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFF0F172A))),
+                        trailing: const Icon(Icons.chevron_right_rounded,
+                            size: 18, color: Color(0xFF94A3B8)),
                         onTap: () => Navigator.pop(modalCtx, filtered[i]),
                       ),
                     ),
@@ -2872,11 +3357,14 @@ class _PickerTile extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 13,
                   fontWeight: hasVal ? FontWeight.w600 : FontWeight.normal,
-                  color: hasVal ? const Color(0xFF0F172A) : const Color(0xFF94A3B8),
+                  color: hasVal
+                      ? const Color(0xFF0F172A)
+                      : const Color(0xFF94A3B8),
                 ),
               ),
             ),
-            const Icon(Icons.keyboard_arrow_down_rounded, color: Color(0xFF64748B), size: 20),
+            const Icon(Icons.keyboard_arrow_down_rounded,
+                color: Color(0xFF64748B), size: 20),
           ],
         ),
       ),
@@ -2907,7 +3395,9 @@ class _ChoicePill extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
         decoration: BoxDecoration(
-          color: isSelected ? activeColor.withValues(alpha: 0.1) : const Color(0xFFF8FAFC),
+          color: isSelected
+              ? activeColor.withValues(alpha: 0.1)
+              : const Color(0xFFF8FAFC),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: isSelected ? activeColor : const Color(0xFFE2E8F0),
@@ -2917,7 +3407,9 @@ class _ChoicePill extends StatelessWidget {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, size: 16, color: isSelected ? activeColor : const Color(0xFF64748B)),
+            Icon(icon,
+                size: 16,
+                color: isSelected ? activeColor : const Color(0xFF64748B)),
             const SizedBox(width: 6),
             Flexible(
               child: Text(
@@ -3155,8 +3647,11 @@ class _TriggerCard extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         fontSize: 11.5,
-                        fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
-                        color: isSelected ? const Color(0xFF0F172A) : const Color(0xFF334155),
+                        fontWeight:
+                            isSelected ? FontWeight.bold : FontWeight.w600,
+                        color: isSelected
+                            ? const Color(0xFF0F172A)
+                            : const Color(0xFF334155),
                         height: 1.2,
                       ),
                     ),
@@ -3167,7 +3662,9 @@ class _TriggerCard extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         fontSize: 9.5,
-                        color: isSelected ? const Color(0xFF0284C7) : const Color(0xFF94A3B8),
+                        color: isSelected
+                            ? const Color(0xFF0284C7)
+                            : const Color(0xFF94A3B8),
                       ),
                     ),
                   ],
@@ -3175,7 +3672,9 @@ class _TriggerCard extends StatelessWidget {
               ),
               const SizedBox(width: 4),
               Icon(
-                isSelected ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded,
+                isSelected
+                    ? Icons.check_circle_rounded
+                    : Icons.radio_button_unchecked_rounded,
                 size: 16,
                 color: isSelected ? _kPrimary : const Color(0xFFCBD5E1),
               ),
@@ -3264,7 +3763,9 @@ class _ActionCardTile extends StatelessWidget {
             color: isSelected ? const Color(0xFFF0FDF4) : Colors.white,
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
-              color: isSelected ? const Color(0xFF16A34A) : const Color(0xFFE2E8F0),
+              color: isSelected
+                  ? const Color(0xFF16A34A)
+                  : const Color(0xFFE2E8F0),
               width: isSelected ? 1.6 : 1,
             ),
             boxShadow: isSelected
@@ -3304,8 +3805,11 @@ class _ActionCardTile extends StatelessWidget {
                       item.title,
                       style: TextStyle(
                         fontSize: 12.5,
-                        fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
-                        color: isSelected ? const Color(0xFF0F172A) : const Color(0xFF1E293B),
+                        fontWeight:
+                            isSelected ? FontWeight.bold : FontWeight.w600,
+                        color: isSelected
+                            ? const Color(0xFF0F172A)
+                            : const Color(0xFF1E293B),
                         height: 1.25,
                       ),
                     ),
@@ -3314,7 +3818,9 @@ class _ActionCardTile extends StatelessWidget {
                       item.desc,
                       style: TextStyle(
                         fontSize: 11,
-                        color: isSelected ? const Color(0xFF15803D) : const Color(0xFF64748B),
+                        color: isSelected
+                            ? const Color(0xFF15803D)
+                            : const Color(0xFF64748B),
                       ),
                     ),
                   ],
@@ -3324,7 +3830,9 @@ class _ActionCardTile extends StatelessWidget {
               Icon(
                 isSelected ? Icons.check_circle_rounded : Icons.circle_outlined,
                 size: 22,
-                color: isSelected ? const Color(0xFF16A34A) : const Color(0xFFCBD5E1),
+                color: isSelected
+                    ? const Color(0xFF16A34A)
+                    : const Color(0xFFCBD5E1),
               ),
             ],
           ),

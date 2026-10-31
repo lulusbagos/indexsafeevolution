@@ -1112,6 +1112,7 @@ namespace Indexsafe.Api.Services
                 try
                 {
                     var qrMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                    var employeeNames = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
                     try
                     {
                         var sqlConnStr = _configuration.GetConnectionString("DefaultConnection");
@@ -1120,8 +1121,9 @@ namespace Indexsafe.Api.Services
                             await using var sqlConn = new Microsoft.Data.SqlClient.SqlConnection(sqlConnStr);
                             await sqlConn.OpenAsync();
                             const string sqlQrs = @"
-                                SELECT ttk.no_nik, 
-                                       CONCAT(tmp2.id, FORMAT(tmp.tanggal_lahir , 'yyyyMMdd'), FORMAT(ttk.date_of_hire , 'ddMMyyyy'), left(tmp.nama_lengkap, 3)) as qr_code
+                                SELECT ttk.no_nik,
+                                       CONCAT(tmp2.id, FORMAT(tmp.tanggal_lahir , 'yyyyMMdd'), FORMAT(ttk.date_of_hire , 'ddMMyyyy'), left(tmp.nama_lengkap, 3)) as qr_code,
+                                       tmp.nama_lengkap
                                 FROM [ONE_DB_MITRA].dbo.tbl_m_personal tmp 
                                 JOIN [ONE_DB_MITRA].dbo.tbl_t_karyawan ttk on tmp.id_personal = ttk.id_personal 
                                 JOIN [ONE_DB_MITRA].dbo.tbl_m_perusahaan tmp2 on tmp2.id = ttk.id_perusahaan   
@@ -1136,6 +1138,11 @@ namespace Indexsafe.Api.Services
                                 if (!string.IsNullOrEmpty(n) && !string.IsNullOrEmpty(q))
                                 {
                                     qrMap[n] = q;
+                                    if (!readerQrs.IsDBNull(2))
+                                    {
+                                        var name = readerQrs.GetString(2).Trim();
+                                        if (!string.IsNullOrEmpty(name)) employeeNames[n] = name;
+                                    }
                                 }
                             }
                         }
@@ -1231,6 +1238,34 @@ namespace Indexsafe.Api.Services
 
                         result.Add(item);
                     }
+
+                    // Kartu QR perusahaan diterbitkan untuk seluruh karyawan aktif,
+                    // tidak hanya untuk yang sudah memiliki Mine Permit. Sertakan
+                    // sisanya sebagai record identitas offline agar scanner tetap
+                    // mengenali kartu saat tanpa jaringan. Flag is_employee_only
+                    // memastikan mobile tidak pernah menganggapnya Mine Permit.
+                    var existingNiks = new HashSet<string>(
+                        result.Select(x => x.Nik), StringComparer.OrdinalIgnoreCase);
+                    long offlineEmployeeId = -1;
+                    foreach (var pair in qrMap)
+                    {
+                        if (existingNiks.Contains(pair.Key)) continue;
+                        result.Add(new PermitOfflineItemDto
+                        {
+                            Id = offlineEmployeeId--,
+                            Nik = pair.Key,
+                            QrCode = pair.Value,
+                            Nama = employeeNames.TryGetValue(pair.Key, out var name)
+                                ? name
+                                : "Karyawan Aktif",
+                            Perusahaan = "PT INDEXIM COALINDO",
+                            Departemen = "-",
+                            Jabatan = "-",
+                            Status = "EMPLOYEE",
+                            IsEmployeeOnly = true,
+                            PhotoUrl = $"/api/qr/permit/photo/{pair.Key}"
+                        });
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -1297,6 +1332,9 @@ namespace Indexsafe.Api.Services
 
         [JsonPropertyName("photo_url")]
         public string? PhotoUrl { get; set; }
+
+        [JsonPropertyName("is_employee_only")]
+        public bool IsEmployeeOnly { get; set; }
     }
 
     public class SimperOfflineItemDto

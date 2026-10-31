@@ -166,14 +166,16 @@ class _OptionPageState extends State<OptionPage> {
         if (result.success > 0) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Berhasil menyinkronkan ${result.success} laporan!'),
+              content:
+                  Text('Berhasil menyinkronkan ${result.success} laporan!'),
               backgroundColor: const Color(0xFF16A34A),
             ),
           );
         } else if (result.failed > 0) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Gagal menyinkronkan data. Pastikan server terhubung.'),
+              content:
+                  Text('Gagal menyinkronkan data. Pastikan server terhubung.'),
               backgroundColor: Color(0xFFDC2626),
             ),
           );
@@ -221,24 +223,42 @@ class _OptionPageState extends State<OptionPage> {
                   final row = <String, dynamic>{
                     'id': id,
                     'code': item['code'] ?? 'AP-$id',
-                    'title': item['title'] ?? item['detilTemuan'] ?? item['kategoriTemuan'] ?? 'Action',
-                    'location_detail': item['location_detail'] ?? item['detilLokasi'] ?? item['lokasi'] ?? '',
+                    'title': item['title'] ??
+                        item['detilTemuan'] ??
+                        item['kategoriTemuan'] ??
+                        'Action',
+                    'location_detail': item['location_detail'] ??
+                        item['detilLokasi'] ??
+                        item['lokasi'] ??
+                        '',
                     'date': item['date'] ?? item['tanggal'] ?? '',
                     'time': item['time'] ?? item['waktu'] ?? '',
                     'remark': item['remark'] ?? item['detilTemuan'] ?? '',
                     'image': item['image'] ?? item['fotoTemuan'],
                     'status': item['status'] is int ? item['status'] : 0,
-                    'pja_id': (item['nik_pja'] == userNik || item['nikPja'] == userNik) ? profileId : (item['pja_id'] ?? 0),
-                    'pic_id': (item['nik_pic'] == userNik || item['nikPic'] == userNik) ? profileId : (item['pic_id'] ?? 0),
-                    'employee_id': (item['nik'] == userNik) ? profileId : (item['employee_id'] ?? 0),
+                    'pja_id': (item['nik_pja'] == userNik ||
+                            item['nikPja'] == userNik)
+                        ? profileId
+                        : (item['pja_id'] ?? 0),
+                    'pic_id': (item['nik_pic'] == userNik ||
+                            item['nikPic'] == userNik)
+                        ? profileId
+                        : (item['pic_id'] ?? 0),
+                    'employee_id': (item['nik'] == userNik)
+                        ? profileId
+                        : (item['employee_id'] ?? 0),
                     'plan': item['plan'] ?? item['rencanaPerbaikan'],
-                    'plan_date': item['plan_date'] ?? item['tanggalRencanaPerbaikan'],
+                    'plan_date':
+                        item['plan_date'] ?? item['tanggalRencanaPerbaikan'],
                     'action': item['action'] ?? item['perbaikan'],
-                    'action_date': item['action_date'] ?? item['tanggalPerbaikan'],
-                    'action_image': item['action_image'] ?? item['fotoPerbaikan'],
+                    'action_date':
+                        item['action_date'] ?? item['tanggalPerbaikan'],
+                    'action_image':
+                        item['action_image'] ?? item['fotoPerbaikan'],
                     'table': widget.module.name,
                     'category': widget.module.name,
-                    'created_at': item['created_at'] ?? DateTime.now().toString(),
+                    'created_at':
+                        item['created_at'] ?? DateTime.now().toString(),
                     'updated_at': DateTime.now().toString(),
                   };
 
@@ -268,8 +288,10 @@ class _OptionPageState extends State<OptionPage> {
                   final row = <String, dynamic>{
                     'id': id,
                     'code': item['code'] ?? 'HZ-$id',
-                    'title': item['title'] ?? item['remark'] ?? 'Laporan Bahaya',
-                    'location_detail': item['location_detail'] ?? item['lokasi'] ?? '',
+                    'title':
+                        item['title'] ?? item['remark'] ?? 'Laporan Bahaya',
+                    'location_detail':
+                        item['location_detail'] ?? item['lokasi'] ?? '',
                     'date': item['date'] ?? '',
                     'time': item['time'] ?? '',
                     'remark': item['remark'] ?? '',
@@ -277,11 +299,17 @@ class _OptionPageState extends State<OptionPage> {
                     'status': item['status'] is int ? item['status'] : 0,
                     'repair': item['repair'] is int ? item['repair'] : 0,
                     'repair_remark': item['repair_remark'] ?? item['perbaikan'],
-                    'repair_image': item['repair_image'] ?? item['foto_perbaikan'],
-                    'pja_id': (item['nik_pja'] == userNik) ? profileId : (item['pja_id'] ?? 0),
-                    'employee_id': (item['nik'] == userNik) ? profileId : (item['employee_id'] ?? profileId),
+                    'repair_image':
+                        item['repair_image'] ?? item['foto_perbaikan'],
+                    'pja_id': (item['nik_pja'] == userNik)
+                        ? profileId
+                        : (item['pja_id'] ?? 0),
+                    'employee_id': (item['nik'] == userNik)
+                        ? profileId
+                        : (item['employee_id'] ?? profileId),
                     'sync_id': id,
-                    'created_at': item['created_at'] ?? DateTime.now().toString(),
+                    'created_at':
+                        item['created_at'] ?? DateTime.now().toString(),
                   };
 
                   final existing = await _db.get('hazard_trans', id);
@@ -297,10 +325,13 @@ class _OptionPageState extends State<OptionPage> {
         } catch (e) {
           debugPrint('[OptionPage] Error fetching hazard_trans: $e');
         }
-      } else if (widget.module == Module.inspection || widget.module == Module.simama) {
+      } else if (widget.module == Module.inspection ||
+          widget.module == Module.simama) {
         try {
           final isSimama = widget.module == Module.simama;
-          final endpoint = isSimama ? '/tran/simama?limit=100' : '/tran/inspection?limit=100';
+          final endpoint = isSimama
+              ? '/tran/simama?limit=100'
+              : '/tran/inspection?limit=100';
           final res = await _api.dio.get(endpoint);
           if (res.data != null && res.data['data'] is List) {
             for (var raw in (res.data['data'] as List)) {
@@ -310,12 +341,19 @@ class _OptionPageState extends State<OptionPage> {
                 if (id is int) {
                   final row = <String, dynamic>{
                     'id': id,
-                    'code': item['code'] ?? (isSimama ? 'SIMAMA-$id' : 'INSP-$id'),
-                    'title': item['jenisInspeksi'] ?? item['title'] ?? (isSimama ? 'Sidak Malam Management (SiMaMa)' : 'Inspeksi K3'),
+                    'code':
+                        item['code'] ?? (isSimama ? 'SIMAMA-$id' : 'INSP-$id'),
+                    'title': item['jenisInspeksi'] ??
+                        item['title'] ??
+                        (isSimama
+                            ? 'Sidak Malam Management (SiMaMa)'
+                            : 'Inspeksi K3'),
                     'area': item['area'] ?? '',
                     'lokasi': item['lokasi'] ?? '',
-                    'location_detail': item['detilLokasi'] ?? item['lokasi'] ?? '',
-                    'date': (item['tanggal'] != null && item['tanggal'].toString().length >= 10)
+                    'location_detail':
+                        item['detilLokasi'] ?? item['lokasi'] ?? '',
+                    'date': (item['tanggal'] != null &&
+                            item['tanggal'].toString().length >= 10)
                         ? item['tanggal'].toString().substring(0, 10)
                         : '',
                     'time': item['waktu']?.toString() ?? '',
@@ -326,10 +364,15 @@ class _OptionPageState extends State<OptionPage> {
                     'pja': item['pja'] ?? '',
                     'nik_pja': item['nikPja'] ?? '',
                     'departemen_pja': item['departemenPja'] ?? '',
-                    'pja_id': (item['nikPja'] == userNik) ? profileId : (item['pjaId'] ?? 0),
-                    'employee_id': (item['nik'] == userNik) ? profileId : (item['employeeId'] ?? profileId),
+                    'pja_id': (item['nikPja'] == userNik)
+                        ? profileId
+                        : (item['pjaId'] ?? 0),
+                    'employee_id': (item['nik'] == userNik)
+                        ? profileId
+                        : (item['employeeId'] ?? profileId),
                     'sync_id': id,
-                    'created_at': item['createdAt'] ?? DateTime.now().toString(),
+                    'created_at':
+                        item['createdAt'] ?? DateTime.now().toString(),
                   };
 
                   final existing = await _db.get('inspection_trans', id);
@@ -356,7 +399,8 @@ class _OptionPageState extends State<OptionPage> {
                 if (id is int) {
                   final row = <String, dynamic>{
                     'code': item['code'] ?? 'P5M-$id',
-                    'title': item['title'] ?? item['judul'] ?? 'P5M & Fit to Work',
+                    'title':
+                        item['title'] ?? item['judul'] ?? 'P5M & Fit to Work',
                     'date': item['date'] ?? '',
                     'time': item['time'] ?? '',
                     'area': item['area'] ?? '',
@@ -370,18 +414,24 @@ class _OptionPageState extends State<OptionPage> {
                     'image': item['foto_kegiatan'] ?? item['image'],
                     'fit_status': item['fit_status'] ?? 'FIT TO WORK',
                     'questions_json': (item['checklist'] != null)
-                        ? jsonEncode((item['checklist'] as List).map((e) => e['question']).toList())
+                        ? jsonEncode((item['checklist'] as List)
+                            .map((e) => e['question'])
+                            .toList())
                         : null,
                     'answers_json': (item['checklist'] != null)
-                        ? jsonEncode((item['checklist'] as List).map((e) => e['answer']).toList())
+                        ? jsonEncode((item['checklist'] as List)
+                            .map((e) => e['answer'])
+                            .toList())
                         : null,
                     'sync_id': id,
                     'employee_id': profileId,
                     'nik': item['nik'] ?? userNik,
                     'nama': item['nama'] ?? _profile?.namaLengkap ?? '',
-                    'created_at': item['created_at'] ?? DateTime.now().toString(),
+                    'created_at':
+                        item['created_at'] ?? DateTime.now().toString(),
                   };
-                  final existing = await _db.rawQuery('SELECT id FROM p5m_trans WHERE sync_id = $id OR id = $id LIMIT 1');
+                  final existing = await _db.rawQuery(
+                      'SELECT id FROM p5m_trans WHERE sync_id = $id OR id = $id LIMIT 1');
                   if (existing.isEmpty) {
                     row['id'] = id;
                     await _db.insert('p5m_trans', row);
@@ -434,7 +484,8 @@ class _OptionPageState extends State<OptionPage> {
               if (_offlinePendingCount > 0) ...[
                 const SizedBox(height: 12),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                   decoration: BoxDecoration(
                     color: const Color(0xFFFFFBEB),
                     borderRadius: BorderRadius.circular(14),
@@ -455,7 +506,8 @@ class _OptionPageState extends State<OptionPage> {
                           color: const Color(0xFFFEF3C7),
                           borderRadius: BorderRadius.circular(10),
                         ),
-                        child: const Icon(Icons.cloud_off_rounded, color: Color(0xFFD97706), size: 20),
+                        child: const Icon(Icons.cloud_off_rounded,
+                            color: Color(0xFFD97706), size: 20),
                       ),
                       const SizedBox(width: 10),
                       Expanded(
@@ -472,8 +524,9 @@ class _OptionPageState extends State<OptionPage> {
                             ),
                             const SizedBox(height: 1),
                             const Text(
-                              'Data belum tersinkronkan ke database server.',
-                              style: TextStyle(color: Color(0xFFB45309), fontSize: 11),
+                              'Data belum terkirim ke server.',
+                              style: TextStyle(
+                                  color: Color(0xFFB45309), fontSize: 11),
                             ),
                           ],
                         ),
@@ -484,20 +537,24 @@ class _OptionPageState extends State<OptionPage> {
                           backgroundColor: const Color(0xFFD97706),
                           foregroundColor: Colors.white,
                           elevation: 0,
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 8),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8)),
                         ),
                         onPressed: _isSyncingOffline ? null : _syncOfflineNow,
                         icon: _isSyncingOffline
                             ? const SizedBox(
                                 width: 12,
                                 height: 12,
-                                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                child: CircularProgressIndicator(
+                                    strokeWidth: 2, color: Colors.white),
                               )
                             : const Icon(Icons.sync_rounded, size: 16),
                         label: Text(
                           _isSyncingOffline ? 'Sinkron...' : 'Singkronkan',
-                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                          style: const TextStyle(
+                              fontSize: 12, fontWeight: FontWeight.bold),
                         ),
                       ),
                     ],
@@ -588,7 +645,6 @@ class _OptionPageState extends State<OptionPage> {
                 color: const Color(0xFF16A34A),
                 onTap: () => _openHistory(History.monitoring),
               ),
-
             ],
           ),
         ),
