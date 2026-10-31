@@ -218,7 +218,7 @@ class DatabaseService {
     }
   }
 
-  Future<int> saveOfflineSimpers(List<dynamic> items) async {
+  Future<int> saveOfflineSimpers(List<dynamic> items, {void Function(int current, int total)? onProgress}) async {
     if (items.isEmpty) return 0;
     final db = await database;
     int saved = 0;
@@ -275,6 +275,9 @@ class DatabaseService {
           }
         }
         await batch.commit(noResult: true);
+        if (onProgress != null) {
+          onProgress(saved, items.length);
+        }
       }
     } catch (e) {
       debugPrint('[DatabaseService] Error saveOfflineSimpers: $e');
@@ -481,7 +484,7 @@ class DatabaseService {
     }
   }
 
-  Future<int> saveOfflinePermits(List<dynamic> items) async {
+  Future<int> saveOfflinePermits(List<dynamic> items, {void Function(int current, int total)? onProgress}) async {
     if (items.isEmpty) return 0;
     final db = await database;
     int saved = 0;
@@ -530,6 +533,9 @@ class DatabaseService {
           }
         }
         await batch.commit(noResult: true);
+        if (onProgress != null) {
+          onProgress(saved, items.length);
+        }
       }
     } catch (e) {
       debugPrint('[DatabaseService] Error saveOfflinePermits: $e');
