@@ -374,11 +374,11 @@ class ApiService {
 
   Future<Either<Map, AuthModel>> register(name, email, pswd) async {
     try {
-      var con = await Connectivity().checkConnectivity();
-      if (con.contains(ConnectivityResult.wifi) == false &&
-          con.contains(ConnectivityResult.mobile) == false) {
-        return const Left({'message': 'No internet access!'});
-      }
+      final con = await Connectivity().checkConnectivity();
+      final hasNetwork = con.contains(ConnectivityResult.wifi) ||
+          con.contains(ConnectivityResult.mobile) ||
+          con.contains(ConnectivityResult.ethernet) ||
+          con.contains(ConnectivityResult.vpn);
 
       var res = await dio.post('/register',
           data: json.encode(<String, dynamic>{
@@ -614,9 +614,12 @@ class ApiService {
       dio.options.headers['Authorization'] = 'Bearer $token';
     }
     try {
-      var con = await Connectivity().checkConnectivity();
-      if (con.contains(ConnectivityResult.wifi) == false &&
-          con.contains(ConnectivityResult.mobile) == false) {
+      final con = await Connectivity().checkConnectivity();
+      final hasNetwork = con.contains(ConnectivityResult.wifi) ||
+          con.contains(ConnectivityResult.mobile) ||
+          con.contains(ConnectivityResult.ethernet) ||
+          con.contains(ConnectivityResult.vpn);
+      if (!hasNetwork) {
         return const Left({'message': 'No internet access!'});
       }
 
@@ -716,17 +719,42 @@ class ApiService {
                   name.toString().toLowerCase() == 'employees')
               ? 30000
               : 10000;
-      final targets = _buildCandidateUrls('/master/$name?limit=$masterLimit');
+      final allTargets =
+          _buildCandidateUrls('/master/$name?limit=$masterLimit');
+      final targets = allTargets;
+      final isEmployeeMaster = name.toString().toLowerCase() == 'employee' ||
+          name.toString().toLowerCase() == 'employees';
+      Map? fallbackEmployeeResponse;
       for (final url in targets) {
         try {
           final res = await dio.get(url);
           if (res.statusCode == 200 && res.data != null) {
-            if (res.data is List) {
-              return Right({'data': res.data});
+            final normalized = res.data is List
+                ? <String, dynamic>{'data': res.data}
+                : Map<String, dynamic>.from(res.data as Map);
+            final rows = normalized['data'];
+            final hasPhysicalQr = rows is List &&
+                rows.any((row) =>
+                    row is Map &&
+                    (row['qr_code'] ?? row['qrCode'] ?? '')
+                        .toString()
+                        .trim()
+                        .isNotEmpty);
+            // Production versions that predate QR-cache support still return
+            // valid employee data, but cannot resolve physical cards offline.
+            // Keep that response as a safe fallback while trying a reachable
+            // newer backend (e.g. the local maintenance backend via ADB).
+            if (isEmployeeMaster && !hasPhysicalQr) {
+              fallbackEmployeeResponse ??= normalized;
+              continue;
             }
-            return Right(Map<String, dynamic>.from(res.data as Map));
+            return Right(normalized);
           }
         } catch (_) {}
+      }
+
+      if (fallbackEmployeeResponse != null) {
+        return Right(fallbackEmployeeResponse);
       }
 
       var res = await dio.get('/master/$name?limit=$masterLimit');

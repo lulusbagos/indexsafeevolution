@@ -86,18 +86,13 @@ class _ScanPageState extends State<ScanPage>
   }
 
   Future<void> _upgradeOfflineQrDatasetIfNeeded() async {
-    // V5 includes every active employee's physical-card QR, without photos.
-    const requiredVersion = 5;
+    // V7 refreshes the complete physical-card QR cache from the online
+    // master-data endpoint, while photos stay out of the offline cache.
+    const requiredVersion = 7;
     if ((PreferenceService.prefs?.getInt('offlineQrDatasetVersion') ?? 0) >=
         requiredVersion) {
       return;
     }
-    final connection = await Connectivity().checkConnectivity();
-    final online = connection.contains(ConnectivityResult.wifi) ||
-        connection.contains(ConnectivityResult.mobile) ||
-        connection.contains(ConnectivityResult.ethernet) ||
-        connection.contains(ConnectivityResult.vpn);
-    if (!online) return;
     final updated = await _refreshOfflineScanDataset(silent: true);
     if (updated) {
       await PreferenceService.prefs
@@ -658,6 +653,7 @@ class _ScanPageState extends State<ScanPage>
         final isAttendance = actionType == 'Attendance';
         final isMinePermit = actionType == 'MinePermit';
         final isSimper = actionType == 'Simper';
+        final isEmployeeOffline = actionType == 'EmployeeOffline';
         final isVehicle = actionType == 'Vehicle';
         final isDenied = actionType == 'Denied';
 
@@ -766,6 +762,10 @@ class _ScanPageState extends State<ScanPage>
           primaryColor = const Color(0xFFF59E0B);
           iconData = Icons.directions_car_filled_rounded;
           statusBadgeText = 'UNIT KENDARAAN TERDETEKSI';
+        } else if (isEmployeeOffline) {
+          primaryColor = const Color(0xFF0D9488);
+          iconData = Icons.badge_rounded;
+          statusBadgeText = 'DATA KARYAWAN OFFLINE';
         } else if (!isSuccess) {
           primaryColor = const Color(0xFFEF4444);
           iconData = Icons.cancel_rounded;
@@ -1026,6 +1026,12 @@ class _ScanPageState extends State<ScanPage>
                     ),
                   ),
                   const SizedBox(height: 24),
+                ],
+
+                // Detail Card if Mine Permit
+                if (isEmployeeOffline && data != null) ...[
+                  _buildOfflineEmployeeResultCard(data),
+                  const SizedBox(height: 22),
                 ],
 
                 // Detail Card if Mine Permit
@@ -1852,6 +1858,106 @@ class _ScanPageState extends State<ScanPage>
           ],
         ],
       ),
+    );
+  }
+
+  Widget _buildOfflineEmployeeResultCard(Map<String, dynamic> data) {
+    final nama = data['nama']?.toString().trim();
+    final nik = (data['nik'] ?? data['employee_id'] ?? '-').toString();
+    final jabatan = (data['jabatan'] ?? data['posisi'] ?? '-').toString();
+    final departemen = data['departemen']?.toString() ?? '-';
+    final perusahaan = data['perusahaan']?.toString() ?? '-';
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF0FDFA),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFF99F6E4)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFCCFBF1),
+                  borderRadius: BorderRadius.circular(13),
+                ),
+                child: const Icon(Icons.person_rounded,
+                    color: Color(0xFF0D9488), size: 23),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      nama == null || nama.isEmpty ? 'Karyawan' : nama,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w900,
+                        color: Color(0xFF0F172A),
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text('NIK: $nik',
+                        style: const TextStyle(
+                            fontSize: 12,
+                            color: Color(0xFF0D9488),
+                            fontWeight: FontWeight.w800)),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          const Divider(height: 1, color: Color(0xFF99F6E4)),
+          const SizedBox(height: 12),
+          _offlineEmployeeField(Icons.work_outline_rounded, 'Jabatan', jabatan),
+          const SizedBox(height: 9),
+          _offlineEmployeeField(
+              Icons.account_tree_outlined, 'Departemen', departemen),
+          const SizedBox(height: 9),
+          _offlineEmployeeField(
+              Icons.business_outlined, 'Perusahaan', perusahaan),
+          const SizedBox(height: 13),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: .72),
+              borderRadius: BorderRadius.circular(11),
+            ),
+            child: const Text(
+              'Identitas cocok dengan master offline. Status Mine Permit perlu diverifikasi saat perangkat kembali online.',
+              style: TextStyle(
+                  fontSize: 11.5, height: 1.35, color: Color(0xFF475569)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _offlineEmployeeField(IconData icon, String label, String value) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 16, color: const Color(0xFF0D9488)),
+        const SizedBox(width: 9),
+        Expanded(
+          child: Text('$label\n$value',
+              style: const TextStyle(
+                  fontSize: 12, height: 1.35, color: Color(0xFF334155))),
+        ),
+      ],
     );
   }
 
@@ -5029,8 +5135,19 @@ class _ScanPageState extends State<ScanPage>
                                           (s) => s['id'] == selectedSanksiId,
                                           orElse: () => sanksiList.first,
                                         );
+                                        final activeProfile =
+                                            PreferenceService.getProfile();
 
                                         final payload = {
+                                          'enforcerName':
+                                              activeProfile?.namaLengkap ??
+                                                  'Petugas K3',
+                                          'enforcerNik':
+                                              activeProfile?.noNik ?? '-',
+                                          'enforcerPosition':
+                                              activeProfile?.jabatan ??
+                                                  activeProfile?.posisi ??
+                                                  '-',
                                           'violatorNik': violatorNik,
                                           'violatorName': violatorName,
                                           'violatorCompany': violatorCompany,
@@ -6591,65 +6708,17 @@ class _ScanPageState extends State<ScanPage>
                         letterSpacing: 0.2,
                       ),
                     ),
-                    const SizedBox(height: 2),
-                    SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      physics: const BouncingScrollPhysics(),
-                      child: Row(
-                        children: [
-                          if (_canScanMinePermit)
-                            _buildRolePill(
-                                'Mine Permit', const Color(0xFF10B981)),
-                          if (_canScanPermitPelanggaran) ...[
-                            if (_canScanMinePermit) const SizedBox(width: 4),
-                            _buildRolePill(
-                                'Pelanggaran', const Color(0xFFEF4444)),
-                          ],
-                          if (_canScanPermitKeluarMasuk) ...[
-                            if (_canScanMinePermit || _canScanPermitPelanggaran)
-                              const SizedBox(width: 4),
-                            _buildRolePill(
-                                'Keluar Masuk', const Color(0xFF0D9488)),
-                          ],
-                          if (_canScanSimper) ...[
-                            const SizedBox(width: 4),
-                            _buildRolePill('SIMPER', const Color(0xFF0EA5E9)),
-                          ],
-                          if (_canScanCommissioning) ...[
-                            const SizedBox(width: 4),
-                            _buildRolePill(
-                                'Commissioning', const Color(0xFFF59E0B)),
-                          ],
-                          if (_canScanSpecialPermit) ...[
-                            const SizedBox(width: 4),
-                            _buildRolePill(
-                                'Special Permit', const Color(0xFFA855F7)),
-                          ],
-                          if (_canScanOther) ...[
-                            const SizedBox(width: 4),
-                            _buildRolePill(
-                                'Custom Scan', const Color(0xFF0D9488)),
-                          ],
-                          if (!_canScanMinePermit &&
-                              !_canScanPermitPelanggaran &&
-                              !_canScanPermitKeluarMasuk &&
-                              !_canScanSimper &&
-                              !_canScanCommissioning &&
-                              !_canScanSpecialPermit &&
-                              !_canScanOther)
-                            Text(
-                              _canScanAcara
-                                  ? 'Scan QR Acara & Mine Permit'
-                                  : 'Akses Scan Terbatas',
-                              style: TextStyle(
-                                color: isDark
-                                    ? const Color(0xFF94A3B8)
-                                    : const Color(0xFF64748B),
-                                fontSize: 11.5,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                        ],
+                    const SizedBox(height: 3),
+                    Text(
+                      'Pemindaian operasional & presensi',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: isDark
+                            ? const Color(0xFF94A3B8)
+                            : const Color(0xFF64748B),
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                   ],
@@ -6702,7 +6771,54 @@ class _ScanPageState extends State<ScanPage>
               ),
             ],
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 11),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            physics: const BouncingScrollPhysics(),
+            child: Row(
+              children: [
+                if (_canScanMinePermit)
+                  _buildRolePill('Mine Permit', const Color(0xFF10B981)),
+                if (_canScanPermitPelanggaran) ...[
+                  if (_canScanMinePermit) const SizedBox(width: 6),
+                  _buildRolePill('Pelanggaran', const Color(0xFFEF4444)),
+                ],
+                if (_canScanPermitKeluarMasuk) ...[
+                  if (_canScanMinePermit || _canScanPermitPelanggaran)
+                    const SizedBox(width: 6),
+                  _buildRolePill('Keluar Masuk', const Color(0xFF0D9488)),
+                ],
+                if (_canScanSimper) ...[
+                  const SizedBox(width: 6),
+                  _buildRolePill('SIMPER', const Color(0xFF0EA5E9)),
+                ],
+                if (_canScanCommissioning) ...[
+                  const SizedBox(width: 6),
+                  _buildRolePill('Commissioning', const Color(0xFFF59E0B)),
+                ],
+                if (_canScanSpecialPermit) ...[
+                  const SizedBox(width: 6),
+                  _buildRolePill('Special Permit', const Color(0xFFA855F7)),
+                ],
+                if (_canScanOther) ...[
+                  const SizedBox(width: 6),
+                  _buildRolePill('Custom Scan', const Color(0xFF0D9488)),
+                ],
+                if (!_canScanMinePermit &&
+                    !_canScanPermitPelanggaran &&
+                    !_canScanPermitKeluarMasuk &&
+                    !_canScanSimper &&
+                    !_canScanCommissioning &&
+                    !_canScanSpecialPermit &&
+                    !_canScanOther)
+                  _buildRolePill(
+                    _canScanAcara ? 'Presensi Acara' : 'Akses Terbatas',
+                    isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
 
           // Modern Segmented Tab Selector
           Container(

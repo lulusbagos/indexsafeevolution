@@ -207,11 +207,18 @@ class _ViolationQueuePageState extends State<ViolationQueuePage> {
                             if (pdfPath.isNotEmpty) ...[
                               const SizedBox(height: 10),
                               OutlinedButton.icon(
-                                onPressed: () =>
-                                    ViolationReceiptPdfService.share(pdfPath),
+                                onPressed: () async {
+                                  // Selalu cetak ulang dari payload lokal agar
+                                  // bukti lama ikut memakai template PDF terbaru.
+                                  final latestPdf =
+                                      await ViolationReceiptPdfService.create(
+                                          data);
+                                  await ViolationReceiptPdfService.share(
+                                      latestPdf);
+                                },
                                 icon: const Icon(Icons.picture_as_pdf_outlined,
                                     size: 18),
-                                label: const Text('Bagikan bukti PDF'),
+                                label: const Text('Buat & bagikan PDF'),
                                 style: OutlinedButton.styleFrom(
                                     foregroundColor: const Color(0xFFB45309)),
                               ),
