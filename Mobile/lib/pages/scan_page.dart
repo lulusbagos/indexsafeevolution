@@ -1,5 +1,7 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:ui';
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:geolocator/geolocator.dart';
@@ -7,11 +9,14 @@ import 'package:intl/intl.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+import 'package:sqflite/sqflite.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../services/api.dart';
+import '../services/database.dart';
 import '../services/preference.dart';
 import 'login_page.dart';
+import 'violation_queue_page.dart';
 import '../widgets/professional_success_sheet.dart';
 
 class ScanPage extends StatefulWidget {
@@ -32,13 +37,16 @@ class _ScanPageState extends State<ScanPage>
   bool _isPermissionChecking = true;
   bool _isTorchOn = false;
   bool _isProcessingScan = false;
+  // CameraX rejects a second start while its first start/stop transition is
+  // still in flight. Keep every camera transition behind one small gate.
+  bool _isCameraTransition = false;
   double _zoomScale = 0.0; // 0.0 to 1.0
   double _zoomScaleAtGestureStart = 0.0;
   final String _selectedScanTarget =
       'auto'; // 'auto', 'permit', 'event', 'vehicle'
 
   // User Scan Permissions (from Web Admin)
-  bool _canScanAcara = true;
+  bool _canScanAcara = false;
   bool _canScanMinePermit = false;
   bool _canScanPermitPelanggaran = false;
   bool _canScanPermitKeluarMasuk = false;
@@ -74,6 +82,27 @@ class _ScanPageState extends State<ScanPage>
     _checkPermissionAndInit();
     _loadMyPermissions();
     _loadEvents();
+    _upgradeOfflineQrDatasetIfNeeded();
+  }
+
+  Future<void> _upgradeOfflineQrDatasetIfNeeded() async {
+    // V5 includes every active employee's physical-card QR, without photos.
+    const requiredVersion = 5;
+    if ((PreferenceService.prefs?.getInt('offlineQrDatasetVersion') ?? 0) >=
+        requiredVersion) {
+      return;
+    }
+    final connection = await Connectivity().checkConnectivity();
+    final online = connection.contains(ConnectivityResult.wifi) ||
+        connection.contains(ConnectivityResult.mobile) ||
+        connection.contains(ConnectivityResult.ethernet) ||
+        connection.contains(ConnectivityResult.vpn);
+    if (!online) return;
+    final updated = await _refreshOfflineScanDataset(silent: true);
+    if (updated) {
+      await PreferenceService.prefs
+          ?.setInt('offlineQrDatasetVersion', requiredVersion);
+    }
   }
 
   @override
@@ -108,6 +137,12 @@ class _ScanPageState extends State<ScanPage>
         });
       }
     }
+
+    if (mounted && _hasCameraPermission) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _startScannerSafely();
+      });
+    }
   }
 
   void _initScanner() {
@@ -116,14 +151,69 @@ class _ScanPageState extends State<ScanPage>
       detectionSpeed: DetectionSpeed.noDuplicates,
       facing: CameraFacing.back,
       torchEnabled: false,
+      autoStart: false,
     );
+  }
+
+  Future<void> _startScannerSafely() async {
+    final controller = _scannerController;
+    if (!mounted ||
+        !_hasCameraPermission ||
+        controller == null ||
+        _isCameraTransition ||
+        controller.value.isRunning) {
+      return;
+    }
+    _isCameraTransition = true;
+    try {
+      await controller.start();
+    } catch (_) {
+      // A lifecycle callback may win the race with this call. The next
+      // explicit retry will start the preview; never expose plugin errors.
+    } finally {
+      _isCameraTransition = false;
+    }
+  }
+
+  Future<void> _stopScannerSafely() async {
+    final controller = _scannerController;
+    if (controller == null ||
+        _isCameraTransition ||
+        !controller.value.isRunning) {
+      return;
+    }
+    _isCameraTransition = true;
+    try {
+      await controller.stop();
+    } catch (_) {
+      // Stopping an already-stopped preview is harmless.
+    } finally {
+      _isCameraTransition = false;
+    }
   }
 
   Future<void> _loadMyPermissions() async {
     final res = await _api.getMyScanPermissions();
     if (!mounted) return;
     res.fold(
-      (_) {},
+      (_) {
+        // Saat offline, gunakan hak yang terakhir dikonfirmasi server untuk
+        // NIK yang sama. Jika tidak ada cache, semua aksi sensitif tetap mati.
+        final cached = PreferenceService.getScanPermissions();
+        if (cached == null) return;
+        setState(() {
+          _canScanAcara = cached['can_scan_acara'] == true;
+          _canScanMinePermit = cached['can_scan_minepermit'] == true;
+          _canScanPermitPelanggaran =
+              cached['can_scan_permit_pelanggaran'] == true;
+          _canScanPermitKeluarMasuk =
+              cached['can_scan_permit_keluar_masuk'] == true;
+          _canScanSimper = cached['can_scan_simper'] == true;
+          _canScanCommissioning = cached['can_scan_commissioning'] == true;
+          _canScanSpecialPermit = cached['can_scan_special_permit'] == true;
+          _canScanOther = cached['can_scan_other'] == true;
+        });
+      },
       (data) {
         setState(() {
           _canScanAcara = data['can_scan_acara'] ?? true;
@@ -168,6 +258,70 @@ class _ScanPageState extends State<ScanPage>
         });
       },
     );
+  }
+
+  Future<bool> _refreshOfflineScanDataset({bool silent = false}) async {
+    final employeeRes = await _api.getMaster('employee');
+    final permitRes = await _api.getPermitOfflineDataset();
+    final simperRes = await _api.getSimperOfflineDataset();
+    var employees = 0;
+    var permits = 0;
+    var simpers = 0;
+    await employeeRes.fold((_) async {}, (response) async {
+      final items =
+          response['data'] is List ? response['data'] as List : <dynamic>[];
+      final db = await DatabaseService().database;
+      final batch = db.batch();
+      for (final item in items) {
+        if (item is! Map) continue;
+        final map = Map<String, dynamic>.from(item);
+        final id = map['id'];
+        if (id == null) continue;
+        final nik = (map['no_nik'] ?? map['nik'] ?? id).toString();
+        batch.insert(
+            'employees',
+            {
+              'id': id is num ? id.toInt() : int.tryParse(id.toString()) ?? 0,
+              'no_nik': nik,
+              'nama_lengkap':
+                  (map['nama_lengkap'] ?? map['nama'])?.toString() ?? '',
+              'depart': (map['departemen'] ?? map['depart'])?.toString() ?? '',
+              'departemen':
+                  (map['departemen'] ?? map['depart'])?.toString() ?? '',
+              'posisi': (map['posisi'] ?? map['jabatan'])?.toString() ?? '',
+              'jabatan': (map['jabatan'] ?? map['posisi'])?.toString() ?? '',
+              'perusahaan':
+                  (map['perusahaan'] ?? map['company'])?.toString() ?? '',
+              'company_id': map['company_id'] ?? map['companyId'] ?? 0,
+              // Avoid employee-photo downloads in the offline scanner cache.
+              'foto': '',
+              'qr_code': (map['qr_code'] ?? map['qrCode'])?.toString() ?? '',
+              'qr_encrypt': map['qr_encrypt']?.toString() ?? '',
+              'qr_decrypt': map['qr_decrypt']?.toString() ?? '',
+            },
+            conflictAlgorithm: ConflictAlgorithm.replace);
+        employees++;
+      }
+      await batch.commit(noResult: true);
+    });
+    await permitRes.fold((_) async {}, (items) async {
+      permits = await DatabaseService().saveOfflinePermits(items);
+    });
+    await simperRes.fold((_) async {}, (items) async {
+      simpers = await DatabaseService().saveOfflineSimpers(items);
+    });
+    final success = employees > 0 || permits > 0 || simpers > 0;
+    if (!mounted) return success;
+    if (!silent) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(success
+            ? 'Data scan diperbarui: $employees karyawan, $permits Mine Permit, dan $simpers SIMPER.'
+            : 'Data scan belum dapat diperbarui. Periksa koneksi internet.'),
+        backgroundColor:
+            success ? const Color(0xFF047857) : const Color(0xFFB45309),
+      ));
+    }
+    return success;
   }
 
   Future<Position?> _getCurrentLocation() async {
@@ -322,7 +476,7 @@ class _ScanPageState extends State<ScanPage>
     HapticFeedback.mediumImpact();
 
     // Hentikan camera sementara agar tidak frame-spam atau freeze di latar belakang
-    await _scannerController?.stop();
+    await _stopScannerSafely();
 
     if (!mounted) return;
     ScaffoldMessenger.of(context).hideCurrentSnackBar();
@@ -414,6 +568,18 @@ class _ScanPageState extends State<ScanPage>
             actionType: 'Simper',
             data: payload,
           );
+        } else if (actionType == 'EmployeeOffline' &&
+            isSuccess &&
+            payload != null) {
+          await _showResultDialog(
+            isSuccess: true,
+            title: 'Data Karyawan Ditemukan',
+            message: msg.isNotEmpty
+                ? msg
+                : 'Identitas karyawan tersedia pada master offline.',
+            actionType: 'EmployeeOffline',
+            data: payload,
+          );
         } else if (actionType == 'Denied') {
           // Penolakan akses perlu terasa jelas, tanpa mengganggu proses kamera.
           _triggerWarningVibration();
@@ -459,7 +625,7 @@ class _ScanPageState extends State<ScanPage>
       setState(() => _isProcessingScan = false);
       await Future.delayed(const Duration(milliseconds: 350));
       if (mounted) {
-        await _scannerController?.start();
+        await _startScannerSafely();
       }
     }
   }
@@ -1138,7 +1304,7 @@ class _ScanPageState extends State<ScanPage>
                           ),
                           onPressed: () {
                             Navigator.pop(ctx);
-                            _scannerController?.start();
+                            _startScannerSafely();
                           },
                           icon: const Icon(Icons.qr_code_scanner_rounded,
                               size: 18),
@@ -1270,7 +1436,7 @@ class _ScanPageState extends State<ScanPage>
                           ),
                           onPressed: () {
                             Navigator.pop(ctx);
-                            _scannerController?.start();
+                            _startScannerSafely();
                           },
                           icon: const Icon(Icons.qr_code_scanner_rounded,
                               size: 18),
@@ -1435,7 +1601,7 @@ class _ScanPageState extends State<ScanPage>
                 child: ElevatedButton.icon(
                   onPressed: () {
                     Navigator.pop(sheetContext);
-                    _scannerController?.start();
+                    _startScannerSafely();
                   },
                   style: ElevatedButton.styleFrom(
                     elevation: 0,
@@ -3299,11 +3465,14 @@ class _ScanPageState extends State<ScanPage>
         ? const Color(0xFFFEF2F2)
         : (isWarning ? const Color(0xFFFFFBEB) : const Color(0xFFECFDF5));
     final photoUrl = (data['photo_url'] ?? data['foto'] ?? '').toString();
-    final fullPhotoUrl = photoUrl.startsWith('http')
+    final isLocalPhoto = photoUrl.isNotEmpty && File(photoUrl).existsSync();
+    final fullPhotoUrl = isLocalPhoto
         ? photoUrl
-        : photoUrl.isNotEmpty
-            ? '${_api.baseUrl}$photoUrl'
-            : '';
+        : photoUrl.startsWith('http')
+            ? photoUrl
+            : photoUrl.isNotEmpty
+                ? '${_api.baseUrl}$photoUrl'
+                : '';
     final phone = data['no_hp']?.toString() ?? '';
     final email = data['email']?.toString() ?? '';
 
@@ -3456,17 +3625,19 @@ class _ScanPageState extends State<ScanPage>
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(15),
                     child: fullPhotoUrl.isNotEmpty
-                        ? Image.network(fullPhotoUrl,
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => Center(
-                                child: Text(
-                                    name.isNotEmpty
-                                        ? name[0].toUpperCase()
-                                        : '?',
-                                    style: const TextStyle(
-                                        fontSize: 24,
-                                        color: Color(0xFF2563EB),
-                                        fontWeight: FontWeight.w800))))
+                        ? (isLocalPhoto
+                            ? Image.file(File(fullPhotoUrl), fit: BoxFit.cover)
+                            : Image.network(fullPhotoUrl,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) => Center(
+                                    child: Text(
+                                        name.isNotEmpty
+                                            ? name[0].toUpperCase()
+                                            : '?',
+                                        style: const TextStyle(
+                                            fontSize: 24,
+                                            color: Color(0xFF2563EB),
+                                            fontWeight: FontWeight.w800)))))
                         : Center(
                             child: Text(
                                 name.isNotEmpty ? name[0].toUpperCase() : '?',
@@ -4505,7 +4676,7 @@ class _ScanPageState extends State<ScanPage>
                                       color: Color(0xFF0F172A)),
                                 ),
                                 Text(
-                                  'Safety Enforcement (ONE_DB_MITRA)',
+                                  'Pencatatan & tindak lanjut pelanggaran',
                                   style: TextStyle(
                                       fontSize: 11,
                                       color: Color(0xFF64748B),
@@ -4904,6 +5075,9 @@ class _ScanPageState extends State<ScanPage>
                                             Navigator.pop(modalCtx);
                                             HapticFeedback.heavyImpact();
                                             _showViolationRecordedDialog(
+                                              isQueuedOffline:
+                                                  success['queuedOffline'] ==
+                                                      true,
                                               violatorName: violatorName,
                                               violatorNik: violatorNik,
                                               company: violatorCompany,
@@ -4962,6 +5136,7 @@ class _ScanPageState extends State<ScanPage>
   }
 
   void _showViolationRecordedDialog({
+    bool isQueuedOffline = false,
     required String violatorName,
     required String violatorNik,
     required String company,
@@ -4972,14 +5147,18 @@ class _ScanPageState extends State<ScanPage>
   }) {
     showProfessionalSuccessSheet(
       context: context,
-      title: 'Pelanggaran K3 Berhasil Dicatat!',
-      subtitle:
-          'Laporan penegakan disiplin K3 telah resmi tercatat & disinkronkan ke database ONE_DB_MITRA.',
+      title: isQueuedOffline
+          ? 'Laporan Tersimpan di Perangkat'
+          : 'Pelanggaran K3 Berhasil Dicatat!',
+      subtitle: isQueuedOffline
+          ? 'Laporan akan dikirim otomatis saat jaringan tersedia.'
+          : 'Laporan penegakan disiplin K3 telah berhasil dicatat dan siap ditindaklanjuti.',
       referenceNumber:
           'PLG-${DateTime.now().millisecondsSinceEpoch.toString().substring(5)}',
       accentColor: const Color(0xFFDC2626),
       icon: Icons.gavel_rounded,
-      statusBadgeText: 'TERSIMPAN DI DATABASE PUSAT',
+      statusBadgeText:
+          isQueuedOffline ? 'MENUNGGU DIKIRIM' : 'BERHASIL DISIMPAN',
       receiptItems: [
         SuccessReceiptItem(
             label: 'Karyawan Pelanggar',
@@ -6477,17 +6656,38 @@ class _ScanPageState extends State<ScanPage>
                 ),
               ),
               const SizedBox(width: 10),
+              if (_canScanPermitPelanggaran)
+                IconButton(
+                  onPressed: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                        builder: (_) => const ViolationQueuePage()),
+                  ),
+                  tooltip: 'Antrean Pelanggaran',
+                  style: IconButton.styleFrom(
+                    backgroundColor: isDark
+                        ? const Color(0xFF1E293B)
+                        : const Color(0xFFF1F5F9),
+                    foregroundColor: isDark
+                        ? const Color(0xFFFBBF24)
+                        : const Color(0xFFB45309),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                  ),
+                  icon: const Icon(Icons.assignment_outlined, size: 20),
+                ),
+              if (_canScanPermitPelanggaran) const SizedBox(width: 8),
               // Refresh button
               IconButton(
-                onPressed: () {
+                onPressed: () async {
                   HapticFeedback.lightImpact();
                   _loadMyPermissions();
                   _loadEvents();
+                  await _refreshOfflineScanDataset();
                   if (_hasCameraPermission && _scannerController != null) {
-                    _scannerController?.start();
+                    _startScannerSafely();
                   }
                 },
-                tooltip: 'Refresh Izin & Acara',
+                tooltip: 'Perbarui data scan offline',
                 style: IconButton.styleFrom(
                   backgroundColor: isDark
                       ? const Color(0xFF1E293B)
@@ -6739,6 +6939,16 @@ class _ScanPageState extends State<ScanPage>
               MobileScanner(
                 controller: _scannerController!,
                 onDetect: _onDetectQr,
+                errorBuilder: (_, __) => const ColoredBox(
+                  color: Colors.black,
+                  child: Center(
+                    child: Icon(
+                      Icons.camera_alt_outlined,
+                      color: Color(0xFF38BDF8),
+                      size: 28,
+                    ),
+                  ),
+                ),
               ),
 
             // Target Reticle & Laser
@@ -7030,7 +7240,7 @@ class _ScanPageState extends State<ScanPage>
                             size: 12, color: Color(0xFF38BDF8)),
                         SizedBox(width: 4),
                         Text(
-                          'MBS API Link',
+                          'TERHUBUNG',
                           style: TextStyle(
                             fontSize: 10,
                             fontWeight: FontWeight.w700,

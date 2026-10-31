@@ -91,11 +91,13 @@ class DatabaseService {
     } catch (_) {}
   }
 
-  Future<List<NotificationItemModel>> getLocalNotifications({int months = 3}) async {
+  Future<List<NotificationItemModel>> getLocalNotifications(
+      {int months = 3}) async {
     final db = await database;
     try {
       final cutoffDate = DateTime.now().subtract(Duration(days: months * 30));
-      final cutoff = cutoffDate.toIso8601String().substring(0, 10); // 'YYYY-MM-DD'
+      final cutoff =
+          cutoffDate.toIso8601String().substring(0, 10); // 'YYYY-MM-DD'
       final rows = await db.rawQuery(
         'SELECT * FROM tbl_t_notifications '
         'WHERE (created_at IS NULL OR created_at = \'\' OR substr(created_at, 1, 10) >= ? OR replace(created_at, \'T\', \' \') >= ?) '
@@ -126,7 +128,8 @@ class DatabaseService {
         return (res.first['cnt'] as num).toInt();
       }
     } catch (e) {
-      debugPrint('[DatabaseService] Error getOfflineUnreadNotificationCount: \$e');
+      debugPrint(
+          '[DatabaseService] Error getOfflineUnreadNotificationCount: \$e');
     }
     return 0;
   }
@@ -144,7 +147,8 @@ class DatabaseService {
   Future<int> getMaxNotificationId() async {
     final db = await database;
     try {
-      final res = await db.rawQuery('SELECT MAX(id) as max_id FROM tbl_t_notifications');
+      final res = await db
+          .rawQuery('SELECT MAX(id) as max_id FROM tbl_t_notifications');
       if (res.isNotEmpty && res.first['max_id'] != null) {
         return (res.first['max_id'] as num).toInt();
       }
@@ -173,7 +177,9 @@ class DatabaseService {
   Future<void> purgeOldNotifications({int months = 3}) async {
     final db = await database;
     try {
-      final cutoff = DateTime.now().subtract(Duration(days: months * 30)).toIso8601String();
+      final cutoff = DateTime.now()
+          .subtract(Duration(days: months * 30))
+          .toIso8601String();
       await db.delete(
         'tbl_t_notifications',
         where: 'created_at < ?',
@@ -204,15 +210,20 @@ class DatabaseService {
           qr_decrypt TEXT,
           days_left INTEGER,
           is_expired INTEGER,
+          is_employee_only INTEGER DEFAULT 0,
           units_json TEXT,
           photo_url TEXT,
           updated_at TEXT
         );
       ''');
-      await db.execute('CREATE INDEX IF NOT EXISTS idx_simper_qr_enc ON tbl_m_simper_offline(qr_encrypt);');
-      await db.execute('CREATE INDEX IF NOT EXISTS idx_simper_qr_dec ON tbl_m_simper_offline(qr_decrypt);');
-      await db.execute('CREATE INDEX IF NOT EXISTS idx_simper_nomor ON tbl_m_simper_offline(nomor);');
-      await db.execute('CREATE INDEX IF NOT EXISTS idx_simper_emp ON tbl_m_simper_offline(employee_id);');
+      await db.execute(
+          'CREATE INDEX IF NOT EXISTS idx_simper_qr_enc ON tbl_m_simper_offline(qr_encrypt);');
+      await db.execute(
+          'CREATE INDEX IF NOT EXISTS idx_simper_qr_dec ON tbl_m_simper_offline(qr_decrypt);');
+      await db.execute(
+          'CREATE INDEX IF NOT EXISTS idx_simper_nomor ON tbl_m_simper_offline(nomor);');
+      await db.execute(
+          'CREATE INDEX IF NOT EXISTS idx_simper_emp ON tbl_m_simper_offline(employee_id);');
     } catch (e) {
       debugPrint('[DatabaseService] _ensureSimperOfflineTable error: $e');
     }
@@ -226,7 +237,8 @@ class DatabaseService {
       final nowStr = DateTime.now().toIso8601String();
       const batchSize = 500;
       for (var i = 0; i < items.length; i += batchSize) {
-        final end = (i + batchSize < items.length) ? i + batchSize : items.length;
+        final end =
+            (i + batchSize < items.length) ? i + batchSize : items.length;
         final chunk = items.sublist(i, end);
         final batch = db.batch();
         for (var item in chunk) {
@@ -236,7 +248,8 @@ class DatabaseService {
             if (id == null) continue;
 
             String unitsJson = '';
-            if (m['units_json'] != null && m['units_json'].toString().isNotEmpty) {
+            if (m['units_json'] != null &&
+                m['units_json'].toString().isNotEmpty) {
               unitsJson = m['units_json'].toString();
             } else if (m['units'] is List) {
               unitsJson = jsonEncode(m['units']);
@@ -259,8 +272,11 @@ class DatabaseService {
               'kacamata': m['kacamata']?.toString(),
               'qr_encrypt': m['qr_encrypt']?.toString(),
               'qr_decrypt': m['qr_decrypt']?.toString(),
-              'days_left': m['days_left'] is num ? (m['days_left'] as num).toInt() : int.tryParse(m['days_left']?.toString() ?? '0') ?? 0,
-              'is_expired': (m['is_expired'] == true || m['is_expired'] == 1) ? 1 : 0,
+              'days_left': m['days_left'] is num
+                  ? (m['days_left'] as num).toInt()
+                  : int.tryParse(m['days_left']?.toString() ?? '0') ?? 0,
+              'is_expired':
+                  (m['is_expired'] == true || m['is_expired'] == 1) ? 1 : 0,
               'units_json': unitsJson,
               'photo_url': m['photo_url']?.toString(),
               'updated_at': nowStr,
@@ -285,7 +301,8 @@ class DatabaseService {
   Future<int> getOfflineSimperCount() async {
     final db = await database;
     try {
-      final res = await db.rawQuery('SELECT count(*) as cnt FROM tbl_m_simper_offline');
+      final res =
+          await db.rawQuery('SELECT count(*) as cnt FROM tbl_m_simper_offline');
       if (res.isNotEmpty && res.first['cnt'] != null) {
         return (res.first['cnt'] as num).toInt();
       }
@@ -298,18 +315,24 @@ class DatabaseService {
     if (rawTrim.isEmpty) return null;
     var clean = rawTrim;
 
-    if ((clean.startsWith('http://') || clean.startsWith('https://')) && !clean.contains('/QrAttendance/Scan/')) {
-      final segs = clean.split('/').where((s) => s.isNotEmpty).toList();
-      if (segs.isNotEmpty) {
-        var last = segs.last.trim();
-        if (last.contains('?')) last = last.substring(0, last.indexOf('?')).trim();
-        if (last.isNotEmpty) clean = last;
+    if (clean.startsWith('http://') || clean.startsWith('https://')) {
+      final uri = Uri.tryParse(clean);
+      final queryCode = uri?.queryParameters['code'] ??
+          uri?.queryParameters['qr'] ??
+          uri?.queryParameters['token'];
+      if (queryCode != null && queryCode.trim().isNotEmpty) {
+        clean = queryCode.trim();
+      } else {
+        final segs =
+            uri?.pathSegments.where((s) => s.isNotEmpty).toList() ?? [];
+        if (segs.isNotEmpty) clean = segs.last.trim();
       }
     }
     if (clean.contains(':')) clean = clean.split(':').last.trim();
     if (clean.contains('|')) clean = clean.split('|').last.trim();
     if (RegExp(r'^IC-?\d+$', caseSensitive: false).hasMatch(clean)) {
-      clean = clean.replaceFirst(RegExp(r'^IC-?', caseSensitive: false), '').trim();
+      clean =
+          clean.replaceFirst(RegExp(r'^IC-?', caseSensitive: false), '').trim();
     }
 
     final cleanNoZero = clean.replaceFirst(RegExp(r'^0+'), '');
@@ -327,7 +350,18 @@ class DatabaseService {
         '   OR employee_id = ? '
         '   OR (? != \'\' AND (employee_id = ? OR ltrim(employee_id, \'0\') = ?)) '
         'ORDER BY id DESC LIMIT 1',
-        [rawTrim, rawTrim, clean, clean, rawTrim, clean, clean, cleanNoZero, cleanNoZero, cleanNoZero],
+        [
+          rawTrim,
+          rawTrim,
+          clean,
+          clean,
+          rawTrim,
+          clean,
+          clean,
+          cleanNoZero,
+          cleanNoZero,
+          cleanNoZero
+        ],
       );
 
       if (rows.isNotEmpty) {
@@ -339,12 +373,18 @@ class DatabaseService {
           try {
             final decoded = jsonDecode(unitsStr);
             if (decoded is List) {
-              units = decoded.map((u) => u is Map ? Map<String, dynamic>.from(u) : <String, dynamic>{}).toList();
+              units = decoded
+                  .map((u) => u is Map
+                      ? Map<String, dynamic>.from(u)
+                      : <String, dynamic>{})
+                  .toList();
             }
           } catch (_) {}
         }
 
-        final masaBerlakuStr = row['masa_berlaku']?.toString() ?? row['expired_date']?.toString() ?? '';
+        final masaBerlakuStr = row['masa_berlaku']?.toString() ??
+            row['expired_date']?.toString() ??
+            '';
         int daysLeft = 999;
         bool isExpired = false;
         if (masaBerlakuStr.isNotEmpty && masaBerlakuStr != '-') {
@@ -354,15 +394,18 @@ class DatabaseService {
               final parts = masaBerlakuStr.split('-');
               if (parts.length == 3) {
                 if (parts[0].length == 4) {
-                  expDate = DateTime(int.parse(parts[0]), int.parse(parts[1]), int.parse(parts[2]));
+                  expDate = DateTime(int.parse(parts[0]), int.parse(parts[1]),
+                      int.parse(parts[2]));
                 } else {
-                  expDate = DateTime(int.parse(parts[2]), int.parse(parts[1]), int.parse(parts[0]));
+                  expDate = DateTime(int.parse(parts[2]), int.parse(parts[1]),
+                      int.parse(parts[0]));
                 }
               }
             } else if (masaBerlakuStr.contains('/')) {
               final parts = masaBerlakuStr.split('/');
               if (parts.length == 3) {
-                expDate = DateTime(int.parse(parts[2]), int.parse(parts[1]), int.parse(parts[0]));
+                expDate = DateTime(int.parse(parts[2]), int.parse(parts[1]),
+                    int.parse(parts[0]));
               }
             }
             if (expDate != null) {
@@ -410,8 +453,6 @@ class DatabaseService {
           'simper_units': units,
           'photo_url': photoUrl,
           'foto': photoUrl,
-          'can_input_pelanggaran': true,
-          'can_input_keluar_masuk': true,
         };
 
         return result;
@@ -430,6 +471,8 @@ class DatabaseService {
           nomor TEXT,
           nik TEXT,
           qr_code TEXT,
+          qr_encrypt TEXT,
+          qr_decrypt TEXT,
           nama TEXT,
           perusahaan TEXT,
           departemen TEXT,
@@ -448,11 +491,31 @@ class DatabaseService {
         );
       ''');
       try {
-        await db.execute('ALTER TABLE tbl_m_permit_offline ADD COLUMN qr_code TEXT;');
+        await db.execute(
+            'ALTER TABLE tbl_m_permit_offline ADD COLUMN qr_code TEXT;');
       } catch (_) {}
-      await db.execute('CREATE INDEX IF NOT EXISTS idx_permit_qr ON tbl_m_permit_offline(qr_code);');
-      await db.execute('CREATE INDEX IF NOT EXISTS idx_permit_nik ON tbl_m_permit_offline(nik);');
-      await db.execute('CREATE INDEX IF NOT EXISTS idx_permit_nomor ON tbl_m_permit_offline(nomor);');
+      try {
+        await db.execute(
+            'ALTER TABLE tbl_m_permit_offline ADD COLUMN qr_encrypt TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute(
+            'ALTER TABLE tbl_m_permit_offline ADD COLUMN qr_decrypt TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute(
+            'ALTER TABLE tbl_m_permit_offline ADD COLUMN is_employee_only INTEGER DEFAULT 0;');
+      } catch (_) {}
+      await db.execute(
+          'CREATE INDEX IF NOT EXISTS idx_permit_qr ON tbl_m_permit_offline(qr_code);');
+      await db.execute(
+          'CREATE INDEX IF NOT EXISTS idx_permit_qr_enc ON tbl_m_permit_offline(qr_encrypt);');
+      await db.execute(
+          'CREATE INDEX IF NOT EXISTS idx_permit_qr_dec ON tbl_m_permit_offline(qr_decrypt);');
+      await db.execute(
+          'CREATE INDEX IF NOT EXISTS idx_permit_nik ON tbl_m_permit_offline(nik);');
+      await db.execute(
+          'CREATE INDEX IF NOT EXISTS idx_permit_nomor ON tbl_m_permit_offline(nomor);');
     } catch (e) {
       debugPrint('[DatabaseService] _ensurePermitOfflineTable error: $e');
     }
@@ -473,9 +536,14 @@ class DatabaseService {
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           payload TEXT,
           created_at TEXT,
-          is_synced INTEGER DEFAULT 0
+          is_synced INTEGER DEFAULT 0,
+          synced_at TEXT
         );
       ''');
+      try {
+        await db.execute(
+            'ALTER TABLE tbl_t_offline_violations ADD COLUMN synced_at TEXT;');
+      } catch (_) {}
     } catch (e) {
       debugPrint('[DatabaseService] _ensureOfflineQueues error: $e');
     }
@@ -489,7 +557,8 @@ class DatabaseService {
       final nowStr = DateTime.now().toIso8601String();
       const batchSize = 500;
       for (var i = 0; i < items.length; i += batchSize) {
-        final end = (i + batchSize < items.length) ? i + batchSize : items.length;
+        final end =
+            (i + batchSize < items.length) ? i + batchSize : items.length;
         final chunk = items.sublist(i, end);
         final batch = db.batch();
         for (var item in chunk) {
@@ -503,7 +572,13 @@ class DatabaseService {
               'id': id is num ? id.toInt() : int.tryParse(id.toString()) ?? 0,
               'nomor': m['nomor']?.toString(),
               'nik': nik,
-              'qr_code': m['qr_code']?.toString() ?? m['qrCode']?.toString() ?? '',
+              'qr_code': m['qr_code']?.toString() ??
+                  m['qrCode']?.toString() ??
+                  m['qr_encrypt']?.toString() ??
+                  m['qr_decrypt']?.toString() ??
+                  '',
+              'qr_encrypt': m['qr_encrypt']?.toString(),
+              'qr_decrypt': m['qr_decrypt']?.toString(),
               'nama': m['nama']?.toString(),
               'perusahaan': m['perusahaan']?.toString(),
               'departemen': m['departemen']?.toString(),
@@ -514,9 +589,18 @@ class DatabaseService {
               'mulai_kerja': m['mulai_kerja']?.toString(),
               'berakhir_kerja': m['berakhir_kerja']?.toString(),
               'last_expired': m['last_expired']?.toString(),
-              'masa_aktif_permit': m['masa_aktif_permit']?.toString() ?? m['berakhir_kerja']?.toString() ?? m['last_expired']?.toString(),
-              'days_left': m['days_left'] is num ? (m['days_left'] as num).toInt() : int.tryParse(m['days_left']?.toString() ?? '0') ?? 0,
-              'is_expired': (m['is_expired'] == true || m['is_expired'] == 1) ? 1 : 0,
+              'masa_aktif_permit': m['masa_aktif_permit']?.toString() ??
+                  m['berakhir_kerja']?.toString() ??
+                  m['last_expired']?.toString(),
+              'days_left': m['days_left'] is num
+                  ? (m['days_left'] as num).toInt()
+                  : int.tryParse(m['days_left']?.toString() ?? '0') ?? 0,
+              'is_expired':
+                  (m['is_expired'] == true || m['is_expired'] == 1) ? 1 : 0,
+              'is_employee_only':
+                  (m['is_employee_only'] == true || m['is_employee_only'] == 1)
+                      ? 1
+                      : 0,
               'photo_url': m['photo_url']?.toString(),
               'updated_at': nowStr,
             };
@@ -540,7 +624,8 @@ class DatabaseService {
   Future<int> getOfflinePermitCount() async {
     final db = await database;
     try {
-      final res = await db.rawQuery('SELECT count(*) as cnt FROM tbl_m_permit_offline');
+      final res =
+          await db.rawQuery('SELECT count(*) as cnt FROM tbl_m_permit_offline');
       if (res.isNotEmpty && res.first['cnt'] != null) {
         return (res.first['cnt'] as num).toInt();
       }
@@ -552,18 +637,24 @@ class DatabaseService {
     var clean = rawCode.trim();
     if (clean.isEmpty) return null;
 
-    if ((clean.startsWith('http://') || clean.startsWith('https://')) && !clean.contains('/QrAttendance/Scan/')) {
-      final segs = clean.split('/').where((s) => s.isNotEmpty).toList();
-      if (segs.isNotEmpty) {
-        var last = segs.last.trim();
-        if (last.contains('?')) last = last.substring(0, last.indexOf('?')).trim();
-        if (last.isNotEmpty) clean = last;
+    if (clean.startsWith('http://') || clean.startsWith('https://')) {
+      final uri = Uri.tryParse(clean);
+      final queryCode = uri?.queryParameters['code'] ??
+          uri?.queryParameters['qr'] ??
+          uri?.queryParameters['token'];
+      if (queryCode != null && queryCode.trim().isNotEmpty) {
+        clean = queryCode.trim();
+      } else {
+        final segs =
+            uri?.pathSegments.where((s) => s.isNotEmpty).toList() ?? [];
+        if (segs.isNotEmpty) clean = segs.last.trim();
       }
     }
     if (clean.contains(':')) clean = clean.split(':').last.trim();
     if (clean.contains('|')) clean = clean.split('|').last.trim();
     if (RegExp(r'^IC-?\d+$', caseSensitive: false).hasMatch(clean)) {
-      clean = clean.replaceFirst(RegExp(r'^IC-?', caseSensitive: false), '').trim();
+      clean =
+          clean.replaceFirst(RegExp(r'^IC-?', caseSensitive: false), '').trim();
     }
 
     final cleanNoZero = clean.replaceFirst(RegExp(r'^0+'), '');
@@ -575,19 +666,39 @@ class DatabaseService {
         'SELECT * FROM tbl_m_permit_offline '
         'WHERE qr_code = ? '
         '   OR qr_code = ? '
+        '   OR qr_encrypt = ? '
+        '   OR qr_encrypt = ? '
+        '   OR qr_decrypt = ? '
+        '   OR qr_decrypt = ? '
         '   OR nik = ? '
         '   OR nomor = ? '
         '   OR nomor = ? '
         '   OR (? != \'\' AND (nik = ? OR ltrim(nik, \'0\') = ?)) '
         'ORDER BY id DESC LIMIT 1',
-        [rawTrim, clean, clean, rawTrim, clean, cleanNoZero, cleanNoZero, cleanNoZero],
+        [
+          rawTrim,
+          clean,
+          rawTrim,
+          clean,
+          rawTrim,
+          clean,
+          clean,
+          rawTrim,
+          clean,
+          cleanNoZero,
+          cleanNoZero,
+          cleanNoZero
+        ],
       );
 
       if (rows.isNotEmpty) {
         final row = Map<String, dynamic>.from(rows.first);
         final nikVal = row['nik']?.toString() ?? clean;
 
-        final expStr = row['masa_aktif_permit']?.toString() ?? row['berakhir_kerja']?.toString() ?? row['last_expired']?.toString() ?? '';
+        final expStr = row['masa_aktif_permit']?.toString() ??
+            row['berakhir_kerja']?.toString() ??
+            row['last_expired']?.toString() ??
+            '';
         int daysLeft = 999;
         bool isExpired = false;
         if (expStr.isNotEmpty && expStr != '-') {
@@ -597,15 +708,18 @@ class DatabaseService {
               final parts = expStr.split('-');
               if (parts.length == 3) {
                 if (parts[0].length == 4) {
-                  expDate = DateTime(int.parse(parts[0]), int.parse(parts[1]), int.parse(parts[2]));
+                  expDate = DateTime(int.parse(parts[0]), int.parse(parts[1]),
+                      int.parse(parts[2]));
                 } else {
-                  expDate = DateTime(int.parse(parts[2]), int.parse(parts[1]), int.parse(parts[0]));
+                  expDate = DateTime(int.parse(parts[2]), int.parse(parts[1]),
+                      int.parse(parts[0]));
                 }
               }
             } else if (expStr.contains('/')) {
               final parts = expStr.split('/');
               if (parts.length == 3) {
-                expDate = DateTime(int.parse(parts[2]), int.parse(parts[1]), int.parse(parts[0]));
+                expDate = DateTime(int.parse(parts[2]), int.parse(parts[1]),
+                    int.parse(parts[0]));
               }
             }
             if (expDate != null) {
@@ -647,6 +761,7 @@ class DatabaseService {
           'photo_url': photoUrl,
           'foto': photoUrl,
           'is_offline_verified': true,
+          'is_employee_directory_only': row['is_employee_only'] == 1,
           'has_simper': offlineSimper != null,
           'simper_nomor': offlineSimper?['nomor'] ?? '-',
           'jenis_simper': offlineSimper?['jenis_simper'] ?? '-',
@@ -657,8 +772,6 @@ class DatabaseService {
           'simper_days_left': offlineSimper?['days_left'],
           'simper_is_expired': offlineSimper?['is_expired'] ?? false,
           'simper_units': offlineSimper?['units'] ?? [],
-          'can_input_pelanggaran': true,
-          'can_input_keluar_masuk': true,
         };
 
         return result;
@@ -667,6 +780,56 @@ class DatabaseService {
       debugPrint('[DatabaseService] Error getOfflinePermitByQr: $e');
     }
     return null;
+  }
+
+  /// Cadangan identifikasi dari master karyawan. Ini bukan pengganti
+  /// Mine Permit/SIMPER, namun membuat kartu dengan QR berisi NIK tetap dapat
+  /// dikenali saat dataset permit server belum memuat nomor kartunya.
+  Future<Map<String, dynamic>?> getOfflineEmployeeByQr(String rawCode) async {
+    var clean = rawCode.trim();
+    if (clean.isEmpty) return null;
+    if (clean.startsWith('http://') || clean.startsWith('https://')) {
+      final uri = Uri.tryParse(clean);
+      clean = (uri?.queryParameters['nik'] ??
+              uri?.queryParameters['code'] ??
+              uri?.queryParameters['qr'] ??
+              uri?.pathSegments.lastOrNull ??
+              clean)
+          .trim();
+    }
+    if (clean.contains(':')) clean = clean.split(':').last.trim();
+    if (clean.contains('|')) clean = clean.split('|').last.trim();
+    clean =
+        clean.replaceFirst(RegExp(r'^IC-?', caseSensitive: false), '').trim();
+    final noZero = clean.replaceFirst(RegExp(r'^0+'), '');
+    try {
+      final db = await database;
+      final rows = await db.rawQuery(
+        'SELECT * FROM employees WHERE '
+        'no_nik = ? OR id = ? OR qr_code = ? OR qr_encrypt = ? OR qr_decrypt = ? '
+        'OR (? != \'\' AND ltrim(no_nik, \'0\') = ?) LIMIT 1',
+        [clean, clean, clean, clean, clean, noZero, noZero],
+      );
+      if (rows.isEmpty) return null;
+      final row = Map<String, dynamic>.from(rows.first);
+      return {
+        'nik': row['no_nik']?.toString() ?? clean,
+        'employee_id': row['no_nik']?.toString() ?? clean,
+        'nama': row['nama_lengkap']?.toString() ?? 'Karyawan',
+        'perusahaan': row['perusahaan']?.toString() ?? '-',
+        'departemen':
+            row['departemen']?.toString() ?? row['depart']?.toString() ?? '-',
+        'jabatan':
+            row['jabatan']?.toString() ?? row['posisi']?.toString() ?? '-',
+        'posisi':
+            row['posisi']?.toString() ?? row['jabatan']?.toString() ?? '-',
+        'foto': row['foto']?.toString() ?? '',
+        'is_offline_verified': true,
+        'is_employee_directory_only': true,
+      };
+    } catch (_) {
+      return null;
+    }
   }
 
   Future<int> queueOfflineMovement(Map<String, dynamic> payload) async {
@@ -730,7 +893,8 @@ class DatabaseService {
   Future<int> deleteOfflineMovement(int id) async {
     final db = await database;
     try {
-      return await db.delete('tbl_t_offline_movements', where: 'id = ?', whereArgs: [id]);
+      return await db
+          .delete('tbl_t_offline_movements', where: 'id = ?', whereArgs: [id]);
     } catch (e) {
       return 0;
     }
@@ -739,9 +903,37 @@ class DatabaseService {
   Future<int> deleteOfflineViolation(int id) async {
     final db = await database;
     try {
-      return await db.delete('tbl_t_offline_violations', where: 'id = ?', whereArgs: [id]);
+      return await db
+          .delete('tbl_t_offline_violations', where: 'id = ?', whereArgs: [id]);
     } catch (e) {
       return 0;
+    }
+  }
+
+  Future<int> markOfflineViolationSynced(int id) async {
+    final db = await database;
+    try {
+      return await db.update(
+        'tbl_t_offline_violations',
+        {'is_synced': 1, 'synced_at': DateTime.now().toIso8601String()},
+        where: 'id = ?',
+        whereArgs: [id],
+      );
+    } catch (_) {
+      return 0;
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getOfflineViolationHistory() async {
+    final db = await database;
+    try {
+      return await db.query(
+        'tbl_t_offline_violations',
+        orderBy: 'id DESC',
+        limit: 100,
+      );
+    } catch (_) {
+      return [];
     }
   }
 
@@ -749,10 +941,14 @@ class DatabaseService {
     final db = await database;
     int count = 0;
     try {
-      final m = await db.rawQuery('SELECT count(*) as cnt FROM tbl_t_offline_movements WHERE is_synced = 0');
-      if (m.isNotEmpty && m.first['cnt'] != null) count += (m.first['cnt'] as num).toInt();
-      final v = await db.rawQuery('SELECT count(*) as cnt FROM tbl_t_offline_violations WHERE is_synced = 0');
-      if (v.isNotEmpty && v.first['cnt'] != null) count += (v.first['cnt'] as num).toInt();
+      final m = await db.rawQuery(
+          'SELECT count(*) as cnt FROM tbl_t_offline_movements WHERE is_synced = 0');
+      if (m.isNotEmpty && m.first['cnt'] != null)
+        count += (m.first['cnt'] as num).toInt();
+      final v = await db.rawQuery(
+          'SELECT count(*) as cnt FROM tbl_t_offline_violations WHERE is_synced = 0');
+      if (v.isNotEmpty && v.first['cnt'] != null)
+        count += (v.first['cnt'] as num).toInt();
     } catch (_) {}
     return count;
   }
@@ -987,7 +1183,8 @@ class DatabaseService {
     ];
     for (var col in detailCols) {
       try {
-        await db.execute('ALTER TABLE coaching_details ADD COLUMN `$col` TEXT;');
+        await db
+            .execute('ALTER TABLE coaching_details ADD COLUMN `$col` TEXT;');
       } catch (_) {}
     }
   }
@@ -1020,9 +1217,11 @@ class DatabaseService {
         );
       ''');
       try {
-        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN last_km REAL DEFAULT 0;');
+        await db.execute(
+            'ALTER TABLE p2h_vehicles ADD COLUMN last_km REAL DEFAULT 0;');
       } catch (_) {}
-      await db.execute('CREATE INDEX IF NOT EXISTS idx_p2h_veh_nl ON p2h_vehicles (no_lambung);');
+      await db.execute(
+          'CREATE INDEX IF NOT EXISTS idx_p2h_veh_nl ON p2h_vehicles (no_lambung);');
     } catch (_) {}
   }
 
@@ -1079,7 +1278,16 @@ class DatabaseService {
   }
 
   static Future<void> _ensureEmployeeColumns(Database db) async {
-    final cols = ['departemen', 'jabatan', 'perusahaan', 'company_id', 'foto'];
+    final cols = [
+      'departemen',
+      'jabatan',
+      'perusahaan',
+      'company_id',
+      'foto',
+      'qr_code',
+      'qr_encrypt',
+      'qr_decrypt',
+    ];
     for (var col in cols) {
       try {
         await db.execute('ALTER TABLE employees ADD COLUMN `$col` TEXT;');
@@ -1092,6 +1300,8 @@ class DatabaseService {
           'CREATE INDEX IF NOT EXISTS idx_emp_nama ON employees (nama_lengkap);');
       await db.execute(
           'CREATE INDEX IF NOT EXISTS idx_emp_company ON employees (perusahaan);');
+      await db.execute(
+          'CREATE INDEX IF NOT EXISTS idx_emp_qr ON employees (qr_code);');
     } catch (_) {}
   }
 
@@ -1365,6 +1575,9 @@ class DatabaseService {
 			`section` TEXT,
 			`posisi` TEXT,
 			`foto` TEXT,
+			`qr_code` TEXT,
+			`qr_encrypt` TEXT,
+			`qr_decrypt` TEXT,
 			`user_id` INTEGER,
 			`company_id` INTEGER,
 			`departemen` TEXT,

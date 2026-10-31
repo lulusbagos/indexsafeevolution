@@ -104,7 +104,7 @@ namespace Indexsafe.Api.Controllers
 
                 case "employee":
                 case "employees":
-                    var employees = await (from k in _context.Karyawans.AsNoTracking()
+                    var employeeRows = await (from k in _context.Karyawans.AsNoTracking()
                                            join p in _context.Personals.AsNoTracking() on k.IdPersonal equals p.IdPersonal
                                            join j in _context.Jabatans.AsNoTracking() on k.IdJabatan equals j.JabatanId into jg
                                            from j in jg.DefaultIfEmpty()
@@ -113,6 +113,7 @@ namespace Indexsafe.Api.Controllers
                                            join c in _context.Perusahaans.AsNoTracking() on k.IdPerusahaan equals c.PerusahaanId into cg
                                            from c in cg.DefaultIfEmpty()
                                            where k.StatusAktif && (accessibleCompanyIds.Contains(k.IdPerusahaan) || k.IdPerusahaan == 1)
+                                           orderby k.IdKaryawan
                                            select new
                                            {
                                                id = k.IdKaryawan,
@@ -122,10 +123,25 @@ namespace Indexsafe.Api.Controllers
                                                jabatan = j != null ? j.NamaJabatan : "Staff",
                                                perusahaan = c != null ? c.NamaPerusahaan : "PT INDEXIM COALINDO",
                                                company_id = k.IdPerusahaan,
-                                               foto = k.PathFoto
+                                               tanggal_lahir = p.TanggalLahir,
+                                               tanggal_masuk = k.TanggalMasuk
                                            })
                                            .Take(limit)
                                            .ToListAsync();
+                    // The QR is calculated with exactly the same format as the
+                    // physical employee card. No employee photo is included in
+                    // this master payload, keeping offline sync lightweight.
+                    var employees = employeeRows.Select(e => new
+                    {
+                        e.id,
+                        e.no_nik,
+                        e.nama_lengkap,
+                        e.departemen,
+                        e.jabatan,
+                        e.perusahaan,
+                        e.company_id,
+                        qr_code = $"{e.company_id}{e.tanggal_lahir:yyyyMMdd}{e.tanggal_masuk:ddMMyyyy}{e.nama_lengkap[..Math.Min(3, e.nama_lengkap.Length)]}"
+                    }).ToList();
                     return Ok(new { data = employees });
 
                 case "vehicle":

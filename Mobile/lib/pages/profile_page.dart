@@ -77,7 +77,9 @@ class _ProfilePageState extends State<ProfilePage> {
     try {
       final temp = '${(await getTemporaryDirectory()).path}/';
 
-      if (_profile != null && _profile!.foto != null && _profile!.foto!.isNotEmpty) {
+      if (_profile != null &&
+          _profile!.foto != null &&
+          _profile!.foto!.isNotEmpty) {
         final localFile = File(_profile!.foto!);
         final tempFile = File(temp + _profile!.foto!);
 
@@ -205,7 +207,8 @@ class _ProfilePageState extends State<ProfilePage> {
                       child: const Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.camera_alt_rounded, color: Color(0xFF009688), size: 28),
+                          Icon(Icons.camera_alt_rounded,
+                              color: Color(0xFF009688), size: 28),
                           SizedBox(height: 8),
                           Text(
                             'Kamera',
@@ -240,7 +243,8 @@ class _ProfilePageState extends State<ProfilePage> {
                       child: const Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.photo_library_rounded, color: Color(0xFF1D4ED8), size: 28),
+                          Icon(Icons.photo_library_rounded,
+                              color: Color(0xFF1D4ED8), size: 28),
                           SizedBox(height: 8),
                           Text(
                             'Galeri',
@@ -285,14 +289,16 @@ class _ProfilePageState extends State<ProfilePage> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Batal', style: TextStyle(color: Color(0xFF64748B))),
+            child:
+                const Text('Batal', style: TextStyle(color: Color(0xFF64748B))),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF009688),
               foregroundColor: Colors.white,
               elevation: 0,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10)),
             ),
             onPressed: () {
               globals.reSync = true;
@@ -323,20 +329,69 @@ class _ProfilePageState extends State<ProfilePage> {
             filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
             child: Container(
               padding: const EdgeInsets.all(22),
-              decoration: BoxDecoration(color: const Color(0xFFF8FBFF).withValues(alpha: .76), borderRadius: BorderRadius.circular(26), border: Border.all(color: Colors.white.withValues(alpha: .88), width: 1.2), boxShadow: [BoxShadow(color: const Color(0xFF0F172A).withValues(alpha: .16), blurRadius: 32, offset: const Offset(0, 14))]),
-              child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Container(width: 44, height: 44, decoration: BoxDecoration(color: const Color(0xFFFFE9EA), borderRadius: BorderRadius.circular(14)), child: const Icon(Icons.logout_rounded, color: Color(0xFFE11D48))),
-                const SizedBox(height: 16),
-                const Text('Keluar dari akun?', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: Color(0xFF0F172A))),
-                const SizedBox(height: 8),
-                const Text('Anda akan keluar dari sesi Indexsafe Evolution pada perangkat ini.', style: TextStyle(fontSize: 13, height: 1.45, color: Color(0xFF64748B))),
-                const SizedBox(height: 22),
-                Row(children: [
-                  Expanded(child: TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Batal', style: TextStyle(fontWeight: FontWeight.w700, color: Color(0xFF64748B))))),
-                  const SizedBox(width: 10),
-                  Expanded(child: FilledButton(onPressed: () { Navigator.pop(ctx); _performLogout(); }, style: FilledButton.styleFrom(backgroundColor: const Color(0xFFE11D48), padding: const EdgeInsets.symmetric(vertical: 14), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))), child: const Text('Ya, Keluar', style: TextStyle(fontWeight: FontWeight.w800)))),
-                ]),
-              ]),
+              decoration: BoxDecoration(
+                  color: const Color(0xFFF8FBFF).withValues(alpha: .76),
+                  borderRadius: BorderRadius.circular(26),
+                  border: Border.all(
+                      color: Colors.white.withValues(alpha: .88), width: 1.2),
+                  boxShadow: [
+                    BoxShadow(
+                        color: const Color(0xFF0F172A).withValues(alpha: .16),
+                        blurRadius: 32,
+                        offset: const Offset(0, 14))
+                  ]),
+              child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                            color: const Color(0xFFFFE9EA),
+                            borderRadius: BorderRadius.circular(14)),
+                        child: const Icon(Icons.logout_rounded,
+                            color: Color(0xFFE11D48))),
+                    const SizedBox(height: 16),
+                    const Text('Keluar dari akun?',
+                        style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w800,
+                            color: Color(0xFF0F172A))),
+                    const SizedBox(height: 8),
+                    const Text(
+                        'Anda akan keluar dari sesi Indexsafe Evolution pada perangkat ini.',
+                        style: TextStyle(
+                            fontSize: 13,
+                            height: 1.45,
+                            color: Color(0xFF64748B))),
+                    const SizedBox(height: 22),
+                    Row(children: [
+                      Expanded(
+                          child: TextButton(
+                              onPressed: () => Navigator.pop(ctx),
+                              child: const Text('Batal',
+                                  style: TextStyle(
+                                      fontWeight: FontWeight.w700,
+                                      color: Color(0xFF64748B))))),
+                      const SizedBox(width: 10),
+                      Expanded(
+                          child: FilledButton(
+                              onPressed: () {
+                                Navigator.pop(ctx);
+                                _performLogout();
+                              },
+                              style: FilledButton.styleFrom(
+                                  backgroundColor: const Color(0xFFE11D48),
+                                  padding:
+                                      const EdgeInsets.symmetric(vertical: 14),
+                                  shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(14))),
+                              child: const Text('Ya, Keluar',
+                                  style:
+                                      TextStyle(fontWeight: FontWeight.w800)))),
+                    ]),
+                  ]),
             ),
           ),
         ),
@@ -404,12 +459,14 @@ class _ProfilePageState extends State<ProfilePage> {
             final y = int.tryParse(parts[0]);
             final m = int.tryParse(parts[1]);
             final d = int.tryParse(parts[2]);
-            if (y != null && m != null && d != null) permitExpiryDate = DateTime(y, m, d);
+            if (y != null && m != null && d != null)
+              permitExpiryDate = DateTime(y, m, d);
           } else if (parts[2].length == 4) {
             final d = int.tryParse(parts[0]);
             final m = int.tryParse(parts[1]);
             final y = int.tryParse(parts[2]);
-            if (y != null && m != null && d != null) permitExpiryDate = DateTime(y, m, d);
+            if (y != null && m != null && d != null)
+              permitExpiryDate = DateTime(y, m, d);
           }
         }
       }
@@ -422,14 +479,17 @@ class _ProfilePageState extends State<ProfilePage> {
     if (permitExpiryDate != null) {
       final now = DateTime.now();
       final today = DateTime(now.year, now.month, now.day);
-      final expiryDay = DateTime(permitExpiryDate.year, permitExpiryDate.month, permitExpiryDate.day);
+      final expiryDay = DateTime(
+          permitExpiryDate.year, permitExpiryDate.month, permitExpiryDate.day);
       final diff = expiryDay.difference(today).inDays;
 
       if (diff < 0) {
         isPermitExpired = true;
         isPermitExpiringSoon = true;
-        permitWarningText = 'Masa berlaku permit telah kedaluwarsa (${diff.abs()} hari lalu). Segera lakukan perpanjangan permit!';
-      } else if (diff <= 90) { // 3 bulan (~90 hari)
+        permitWarningText =
+            'Masa berlaku permit telah kedaluwarsa (${diff.abs()} hari lalu). Segera lakukan perpanjangan permit!';
+      } else if (diff <= 90) {
+        // 3 bulan (~90 hari)
         isPermitExpiringSoon = true;
         final months = (diff / 30).ceil();
         permitWarningText = diff <= 30
@@ -446,811 +506,905 @@ class _ProfilePageState extends State<ProfilePage> {
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
           controller: _scrollCtrl,
-        child: Column(
-          children: [
-            _buildReferenceProfileHero(
-              nama: nama,
-              posisi: posisi,
-              jabatan: jabatan,
-              nik: nik,
-              company: company,
-              depart: depart,
-              permitNomor: permitNomor,
-              masaAktifPermit: masaAktifPermit,
-              isPermitExpiringSoon: isPermitExpiringSoon,
-              isPermitExpired: isPermitExpired,
-            ),
-            if (false)
-              // Legacy hero retained temporarily while the new composition is validated.
-              SafeArea(
-              bottom: false,
-              child: Padding(
-                padding: EdgeInsets.zero,
-                child: Container(
-                  width: double.infinity,
-                  clipBehavior: Clip.antiAlias,
-                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 18),
-                  decoration: BoxDecoration(
-                    borderRadius: const BorderRadius.vertical(
-                      bottom: Radius.circular(28),
-                    ),
-                    image: const DecorationImage(
-                      image: AssetImage('assets/images/profile-mine-sunset.png'),
-                      fit: BoxFit.cover,
-                      alignment: Alignment.center,
-                    ),
-                    border: Border(
-                      bottom: BorderSide(
-                        color: Color(0xFFFFEDD5),
-                        width: 1,
-                      ),
-                    ),
-                  ),
-                  child: Stack(
-                    clipBehavior: Clip.none,
-                    children: [
-                      Positioned.fill(
-                        child: IgnorePointer(
-                          child: DecoratedBox(
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                colors: [
-                                  Color(0xFF431407).withValues(alpha: .30),
-                                  Color(0xFF431407).withValues(alpha: .58),
-                                ],
-                                begin: Alignment.topCenter,
-                                end: Alignment.bottomCenter,
-                              ),
-                            ),
+          child: Column(
+            children: [
+              _buildReferenceProfileHero(
+                nama: nama,
+                posisi: posisi,
+                jabatan: jabatan,
+                nik: nik,
+                company: company,
+                depart: depart,
+                permitNomor: permitNomor,
+                masaAktifPermit: masaAktifPermit,
+                isPermitExpiringSoon: isPermitExpiringSoon,
+                isPermitExpired: isPermitExpired,
+              ),
+              if (false)
+                // Legacy hero retained temporarily while the new composition is validated.
+                SafeArea(
+                  bottom: false,
+                  child: Padding(
+                    padding: EdgeInsets.zero,
+                    child: Container(
+                      width: double.infinity,
+                      clipBehavior: Clip.antiAlias,
+                      padding: const EdgeInsets.fromLTRB(20, 16, 20, 18),
+                      decoration: BoxDecoration(
+                        borderRadius: const BorderRadius.vertical(
+                          bottom: Radius.circular(28),
+                        ),
+                        image: const DecorationImage(
+                          image: AssetImage(
+                              'assets/images/profile-mine-sunset.png'),
+                          fit: BoxFit.cover,
+                          alignment: Alignment.center,
+                        ),
+                        border: Border(
+                          bottom: BorderSide(
+                            color: Color(0xFFFFEDD5),
+                            width: 1,
                           ),
                         ),
                       ),
-                      Positioned(
-                        left: -58,
-                        bottom: -48,
-                        child: Transform.rotate(
-                          angle: -0.42,
-                          child: Container(
-                            width: 265,
-                            height: 98,
-                            color: const Color(0xFFC2410C).withValues(alpha: .78),
-                          ),
-                        ),
-                      ),
-                      Positioned(
-                        right: -76,
-                        bottom: -44,
-                        child: Transform.rotate(
-                          angle: 0.42,
-                          child: Container(
-                            width: 255,
-                            height: 90,
-                            color: const Color(0xFF431407).withValues(alpha: .56),
-                          ),
-                        ),
-                      ),
-                      // Unsur Kuning - Pendar Cahaya Hangat di Kanan Atas (Seamless Feathering)
-                      Positioned(
-                        top: -60,
-                        right: -50,
-                        child: IgnorePointer(
-                          child: Container(
-                            width: 220,
-                            height: 220,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              gradient: RadialGradient(
-                                colors: [
-                                  const Color(0xFFFDE047).withValues(alpha: 0.20),
-                                  const Color(0xFFFDE047).withValues(alpha: 0.08),
-                                  const Color(0xFFFDE047).withValues(alpha: 0.02),
-                                  Colors.transparent,
-                                ],
-                                stops: const [0.0, 0.35, 0.70, 1.0],
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                      // Unsur Biru Muda Sedikit - Pendar Cahaya Lembut di Bagian Atas
-                      Positioned(
-                        top: -30,
-                        left: 45,
-                        child: IgnorePointer(
-                          child: Container(
-                            width: 150,
-                            height: 150,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              gradient: RadialGradient(
-                                colors: [
-                                  const Color(0xFF38BDF8).withValues(alpha: 0.16),
-                                  const Color(0xFF38BDF8).withValues(alpha: 0.05),
-                                  Colors.transparent,
-                                ],
-                                stops: const [0.0, 0.50, 1.0],
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                      // Unsur Hijau Tipis - Pendar Cahaya Halus di Kiri Bawah
-                      Positioned(
-                        bottom: -45,
-                        left: -35,
-                        child: IgnorePointer(
-                          child: Container(
-                            width: 170,
-                            height: 170,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              gradient: RadialGradient(
-                                colors: [
-                                  const Color(0xFF34D399).withValues(alpha: 0.16),
-                                  const Color(0xFF34D399).withValues(alpha: 0.04),
-                                  Colors.transparent,
-                                ],
-                                stops: const [0.0, 0.50, 1.0],
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-
-                      Column(
+                      child: Stack(
+                        clipBehavior: Clip.none,
                         children: [
-                          // Tag Header Card: Company & Departemen (Frosted Glassmorphism Clean)
-                          Row(
-                            children: [
-                              // Company Pill
-                              Flexible(
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4.5),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white.withValues(alpha: 0.16),
-                                    borderRadius: BorderRadius.circular(8),
-                                    border: Border.all(
-                                      color: Colors.white.withValues(alpha: 0.28),
-                                    ),
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      const Icon(Icons.business_rounded, size: 12, color: Color(0xFF7DD3FC)),
-                                      const SizedBox(width: 5),
-                                      Flexible(
-                                        child: Text(
-                                          company.toUpperCase(),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: const TextStyle(
-                                            fontSize: 9.5,
-                                            fontWeight: FontWeight.w800,
-                                            color: Colors.white,
-                                            letterSpacing: 0.4,
-                                          ),
-                                        ),
-                                      ),
+                          Positioned.fill(
+                            child: IgnorePointer(
+                              child: DecoratedBox(
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    colors: [
+                                      Color(0xFF431407).withValues(alpha: .30),
+                                      Color(0xFF431407).withValues(alpha: .58),
                                     ],
+                                    begin: Alignment.topCenter,
+                                    end: Alignment.bottomCenter,
                                   ),
                                 ),
                               ),
-                              const SizedBox(width: 8),
-                              // Departemen Pill
-                              Flexible(
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4.5),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white.withValues(alpha: 0.16),
-                                    borderRadius: BorderRadius.circular(8),
-                                    border: Border.all(
-                                      color: Colors.white.withValues(alpha: 0.28),
-                                    ),
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      const Icon(Icons.work_outline_rounded, size: 12, color: Color(0xFF6EE7B7)),
-                                      const SizedBox(width: 4),
-                                      Flexible(
-                                        child: Text(
-                                          depart.toUpperCase(),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: const TextStyle(
-                                            fontSize: 9.5,
-                                            fontWeight: FontWeight.w800,
-                                            color: Colors.white,
-                                            letterSpacing: 0.4,
-                                          ),
-                                        ),
-                                      ),
+                            ),
+                          ),
+                          Positioned(
+                            left: -58,
+                            bottom: -48,
+                            child: Transform.rotate(
+                              angle: -0.42,
+                              child: Container(
+                                width: 265,
+                                height: 98,
+                                color: const Color(0xFFC2410C)
+                                    .withValues(alpha: .78),
+                              ),
+                            ),
+                          ),
+                          Positioned(
+                            right: -76,
+                            bottom: -44,
+                            child: Transform.rotate(
+                              angle: 0.42,
+                              child: Container(
+                                width: 255,
+                                height: 90,
+                                color: const Color(0xFF431407)
+                                    .withValues(alpha: .56),
+                              ),
+                            ),
+                          ),
+                          // Unsur Kuning - Pendar Cahaya Hangat di Kanan Atas (Seamless Feathering)
+                          Positioned(
+                            top: -60,
+                            right: -50,
+                            child: IgnorePointer(
+                              child: Container(
+                                width: 220,
+                                height: 220,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  gradient: RadialGradient(
+                                    colors: [
+                                      const Color(0xFFFDE047)
+                                          .withValues(alpha: 0.20),
+                                      const Color(0xFFFDE047)
+                                          .withValues(alpha: 0.08),
+                                      const Color(0xFFFDE047)
+                                          .withValues(alpha: 0.02),
+                                      Colors.transparent,
                                     ],
+                                    stops: const [0.0, 0.35, 0.70, 1.0],
                                   ),
                                 ),
                               ),
-                              const SizedBox(width: 8),
-                              // Tombol i (QR Code NIK Modal)
-                              Material(
-                                color: Colors.transparent,
-                                child: InkWell(
-                                  onTap: () => _showNikQrModal(
-                                    context: context,
-                                    nik: nik,
-                                    nama: nama,
-                                    posisi: posisi,
-                                    jabatan: jabatan,
-                                    company: company,
-                                    depart: depart,
-                                    permitNomor: permitNomor,
-                                    masaAktif: masaAktifPermit,
-                                    isPermitExpiringSoon: isPermitExpiringSoon,
-                                    isPermitExpired: isPermitExpired,
-                                    qrCode: _profile?.qrCode,
-                                  ),
-                                  borderRadius: BorderRadius.circular(20),
-                                  child: Container(
-                                    padding: const EdgeInsets.all(5),
-                                    decoration: BoxDecoration(
-                                      color: Colors.white.withValues(alpha: 0.15),
-                                      shape: BoxShape.circle,
-                                      border: Border.all(
-                                        color: Colors.white.withValues(alpha: 0.3),
-                                        width: 1.2,
-                                      ),
-                                    ),
-                                    child: const Icon(
-                                      Icons.info_outline_rounded,
-                                      size: 15,
-                                      color: Colors.white,
-                                    ),
+                            ),
+                          ),
+                          // Unsur Biru Muda Sedikit - Pendar Cahaya Lembut di Bagian Atas
+                          Positioned(
+                            top: -30,
+                            left: 45,
+                            child: IgnorePointer(
+                              child: Container(
+                                width: 150,
+                                height: 150,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  gradient: RadialGradient(
+                                    colors: [
+                                      const Color(0xFF38BDF8)
+                                          .withValues(alpha: 0.16),
+                                      const Color(0xFF38BDF8)
+                                          .withValues(alpha: 0.05),
+                                      Colors.transparent,
+                                    ],
+                                    stops: const [0.0, 0.50, 1.0],
                                   ),
                                 ),
                               ),
-                            ],
+                            ),
+                          ),
+                          // Unsur Hijau Tipis - Pendar Cahaya Halus di Kiri Bawah
+                          Positioned(
+                            bottom: -45,
+                            left: -35,
+                            child: IgnorePointer(
+                              child: Container(
+                                width: 170,
+                                height: 170,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  gradient: RadialGradient(
+                                    colors: [
+                                      const Color(0xFF34D399)
+                                          .withValues(alpha: 0.16),
+                                      const Color(0xFF34D399)
+                                          .withValues(alpha: 0.04),
+                                      Colors.transparent,
+                                    ],
+                                    stops: const [0.0, 0.50, 1.0],
+                                  ),
+                                ),
+                              ),
+                            ),
                           ),
 
-                          const SizedBox(height: 16),
-
-                          // Profil Horizontal: Foto di Kiri, Detail di Kanan
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.center,
+                          Column(
                             children: [
-                              // Avatar di sebelah kiri (radius 34)
-                              GestureDetector(
-                                onTap: _showPhotoOptions,
-                                child: Stack(
-                                  alignment: Alignment.bottomRight,
-                                  children: [
-                                    Container(
-                                      padding: const EdgeInsets.all(2.5),
+                              // Tag Header Card: Company & Departemen (Frosted Glassmorphism Clean)
+                              Row(
+                                children: [
+                                  // Company Pill
+                                  Flexible(
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 9, vertical: 4.5),
                                       decoration: BoxDecoration(
-                                        shape: BoxShape.circle,
-                                        border: Border.all(color: Colors.white, width: 2.2),
-                                        boxShadow: [
-                                          BoxShadow(
-                                            color: Colors.black.withValues(alpha: 0.3),
-                                            blurRadius: 10,
-                                            offset: const Offset(0, 3),
-                                          ),
-                                        ],
+                                        color: Colors.white
+                                            .withValues(alpha: 0.16),
+                                        borderRadius: BorderRadius.circular(8),
+                                        border: Border.all(
+                                          color: Colors.white
+                                              .withValues(alpha: 0.28),
+                                        ),
                                       ),
-                                      child: CircleAvatar(
-                                        radius: 34,
-                                        backgroundColor: const Color(0xFF1E293B),
-                                        child: _isUploading
-                                            ? const SizedBox(
-                                                width: 22,
-                                                height: 22,
-                                                child: CircularProgressIndicator(
-                                                  strokeWidth: 2,
-                                                  color: Colors.white,
-                                                ),
-                                              )
-                                            : _image != null
-                                                ? ClipOval(
-                                                    child: Image(
-                                                      image: _image!,
-                                                      width: 68,
-                                                      height: 68,
-                                                      fit: BoxFit.cover,
-                                                    ),
-                                                  )
-                                                : const Icon(
-                                                    Icons.person_rounded,
-                                                    size: 40,
-                                                    color: Color(0xFF94A3B8),
-                                                  ),
-                                      ),
-                                    ),
-                                    Container(
-                                      padding: const EdgeInsets.all(4.5),
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFFEA580C),
-                                        shape: BoxShape.circle,
-                                        border: Border.all(color: Colors.white, width: 1.6),
-                                      ),
-                                      child: const Icon(
-                                        Icons.camera_alt_rounded,
-                                        size: 11,
-                                        color: Colors.white,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-
-                              const SizedBox(width: 12),
-
-                              // Detail Identitas di Kanan
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      nama.toUpperCase(),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(
-                                        fontSize: 15,
-                                        fontWeight: FontWeight.w800,
-                                        color: Colors.white,
-                                        letterSpacing: 0.3,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 2),
-                                    Text(
-                                      posisi,
-                                      maxLines: 2,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w600,
-                                        color: Color(0xFFE2E8F0),
-                                        height: 1.2,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 6),
-                                    Wrap(
-                                      spacing: 6,
-                                      runSpacing: 4,
-                                      crossAxisAlignment: WrapCrossAlignment.center,
-                                      children: [
-                                        // Level / Jabatan Badge
-                                        if (jabatan.isNotEmpty && jabatan.trim().toUpperCase() != posisi.trim().toUpperCase())
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                                            decoration: BoxDecoration(
-                                              color: Colors.black.withValues(alpha: 0.22),
-                                              borderRadius: BorderRadius.circular(6),
-                                              border: Border.all(
-                                                color: const Color(0xFFFDE047).withValues(alpha: 0.35),
-                                                width: 0.8,
-                                              ),
-                                            ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          const Icon(Icons.business_rounded,
+                                              size: 12,
+                                              color: Color(0xFF7DD3FC)),
+                                          const SizedBox(width: 5),
+                                          Flexible(
                                             child: Text(
-                                              jabatan.toUpperCase(),
+                                              company.toUpperCase(),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
                                               style: const TextStyle(
-                                                fontSize: 9,
+                                                fontSize: 9.5,
                                                 fontWeight: FontWeight.w800,
-                                                color: Color(0xFFFDE047),
+                                                color: Colors.white,
                                                 letterSpacing: 0.4,
                                               ),
                                             ),
                                           ),
-                                        // NIK Chip (Tap untuk QR)
-                                        InkWell(
-                                          onTap: () => _showNikQrModal(
-                                            context: context,
-                                            nik: nik,
-                                            nama: nama,
-                                            posisi: posisi,
-                                            jabatan: jabatan,
-                                            company: company,
-                                            depart: depart,
-                                            permitNomor: permitNomor,
-                                            masaAktif: masaAktifPermit,
-                                            isPermitExpiringSoon: isPermitExpiringSoon,
-                                            isPermitExpired: isPermitExpired,
-                                            qrCode: _profile?.qrCode,
-                                          ),
-                                          borderRadius: BorderRadius.circular(6),
-                                          child: Container(
-                                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                            decoration: BoxDecoration(
-                                              color: const Color(0xFF38BDF8).withValues(alpha: 0.16),
-                                              borderRadius: BorderRadius.circular(6),
-                                              border: Border.all(
-                                                color: const Color(0xFF38BDF8).withValues(alpha: 0.35),
-                                                width: 0.8,
-                                              ),
-                                            ),
-                                            child: Row(
-                                              mainAxisSize: MainAxisSize.min,
-                                              children: [
-                                                const Icon(Icons.badge_outlined, size: 11, color: Color(0xFF38BDF8)),
-                                                const SizedBox(width: 4),
-                                                Text(
-                                                  nik,
-                                                  style: const TextStyle(
-                                                    fontSize: 10,
-                                                    fontWeight: FontWeight.w700,
-                                                    color: Colors.white,
-                                                    letterSpacing: 0.3,
-                                                  ),
-                                                ),
-                                                const SizedBox(width: 4),
-                                                const Icon(Icons.qr_code_rounded, size: 11, color: Color(0xFF38BDF8)),
-                                              ],
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-
-                          const SizedBox(height: 12),
-
-                          // Panel Digital Permit Tambang (Slim Horizontal Bar)
-                          InkWell(
-                            onTap: () => _showNikQrModal(
-                              context: context,
-                              nik: nik,
-                              nama: nama,
-                              posisi: posisi,
-                              jabatan: jabatan,
-                              company: company,
-                              depart: depart,
-                              permitNomor: permitNomor,
-                              masaAktif: masaAktifPermit,
-                              isPermitExpiringSoon: isPermitExpiringSoon,
-                              isPermitExpired: isPermitExpired,
-                              qrCode: _profile?.qrCode,
-                            ),
-                            borderRadius: BorderRadius.circular(18),
-                            child: Container(
-                              width: double.infinity,
-                              padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 11),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(18),
-                                border: Border.all(
-                                  color: isPermitExpiringSoon
-                                      ? const Color(0xFFFECACA)
-                                      : const Color(0xFFE2E8F0),
-                                  width: 1,
-                                ),
-                              ),
-                              child: Row(
-                                children: [
-                                  Container(
-                                    padding: const EdgeInsets.all(5),
-                                    decoration: BoxDecoration(
-                                      color: isPermitExpiringSoon
-                                          ? const Color(0xFFEF4444).withValues(alpha: 0.25)
-                                          : const Color(0xFF34D399).withValues(alpha: 0.2),
-                                      borderRadius: BorderRadius.circular(7),
-                                    ),
-                                    child: Icon(
-                                      isPermitExpiringSoon
-                                          ? Icons.notification_important_rounded
-                                          : Icons.verified_user_rounded,
-                                      size: 15,
-                                      color: isPermitExpiringSoon
-                                          ? const Color(0xFFDC2626)
-                                          : const Color(0xFF059669),
+                                        ],
+                                      ),
                                     ),
                                   ),
                                   const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          permitNomor.isNotEmpty ? permitNomor : 'TIDAK ADA PERMIT',
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: TextStyle(
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.w800,
-                                            letterSpacing: 0.4,
-                                            color: isPermitExpiringSoon ? const Color(0xFFB91C1C) : const Color(0xFF0F172A),
+                                  // Departemen Pill
+                                  Flexible(
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 8, vertical: 4.5),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white
+                                            .withValues(alpha: 0.16),
+                                        borderRadius: BorderRadius.circular(8),
+                                        border: Border.all(
+                                          color: Colors.white
+                                              .withValues(alpha: 0.28),
+                                        ),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          const Icon(Icons.work_outline_rounded,
+                                              size: 12,
+                                              color: Color(0xFF6EE7B7)),
+                                          const SizedBox(width: 4),
+                                          Flexible(
+                                            child: Text(
+                                              depart.toUpperCase(),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: const TextStyle(
+                                                fontSize: 9.5,
+                                                fontWeight: FontWeight.w800,
+                                                color: Colors.white,
+                                                letterSpacing: 0.4,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  // Tombol i (QR Code NIK Modal)
+                                  Material(
+                                    color: Colors.transparent,
+                                    child: InkWell(
+                                      onTap: () => _showNikQrModal(
+                                        context: context,
+                                        nik: nik,
+                                        nama: nama,
+                                        posisi: posisi,
+                                        jabatan: jabatan,
+                                        company: company,
+                                        depart: depart,
+                                        permitNomor: permitNomor,
+                                        masaAktif: masaAktifPermit,
+                                        isPermitExpiringSoon:
+                                            isPermitExpiringSoon,
+                                        isPermitExpired: isPermitExpired,
+                                        qrCode: _profile?.qrCode,
+                                      ),
+                                      borderRadius: BorderRadius.circular(20),
+                                      child: Container(
+                                        padding: const EdgeInsets.all(5),
+                                        decoration: BoxDecoration(
+                                          color: Colors.white
+                                              .withValues(alpha: 0.15),
+                                          shape: BoxShape.circle,
+                                          border: Border.all(
+                                            color: Colors.white
+                                                .withValues(alpha: 0.3),
+                                            width: 1.2,
                                           ),
                                         ),
-                                        Text(
-                                          masaAktifPermit.isNotEmpty ? 'Masa Berlaku : $masaAktifPermit' : 'Masa Berlaku : -',
-                                          style: TextStyle(
-                                            fontSize: 9.5,
-                                            fontWeight: FontWeight.w600,
-                                            color: isPermitExpiringSoon
-                                                ? const Color(0xFFB91C1C)
-                                                : const Color(0xFF64748B),
+                                        child: const Icon(
+                                          Icons.info_outline_rounded,
+                                          size: 15,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+
+                              const SizedBox(height: 16),
+
+                              // Profil Horizontal: Foto di Kiri, Detail di Kanan
+                              Row(
+                                crossAxisAlignment: CrossAxisAlignment.center,
+                                children: [
+                                  // Avatar di sebelah kiri (radius 34)
+                                  GestureDetector(
+                                    onTap: _showPhotoOptions,
+                                    child: Stack(
+                                      alignment: Alignment.bottomRight,
+                                      children: [
+                                        Container(
+                                          padding: const EdgeInsets.all(2.5),
+                                          decoration: BoxDecoration(
+                                            shape: BoxShape.circle,
+                                            border: Border.all(
+                                                color: Colors.white,
+                                                width: 2.2),
+                                            boxShadow: [
+                                              BoxShadow(
+                                                color: Colors.black
+                                                    .withValues(alpha: 0.3),
+                                                blurRadius: 10,
+                                                offset: const Offset(0, 3),
+                                              ),
+                                            ],
+                                          ),
+                                          child: CircleAvatar(
+                                            radius: 34,
+                                            backgroundColor:
+                                                const Color(0xFF1E293B),
+                                            child: _isUploading
+                                                ? const SizedBox(
+                                                    width: 22,
+                                                    height: 22,
+                                                    child:
+                                                        CircularProgressIndicator(
+                                                      strokeWidth: 2,
+                                                      color: Colors.white,
+                                                    ),
+                                                  )
+                                                : _image != null
+                                                    ? ClipOval(
+                                                        child: Image(
+                                                          image: _image!,
+                                                          width: 68,
+                                                          height: 68,
+                                                          fit: BoxFit.cover,
+                                                        ),
+                                                      )
+                                                    : const Icon(
+                                                        Icons.person_rounded,
+                                                        size: 40,
+                                                        color:
+                                                            Color(0xFF94A3B8),
+                                                      ),
+                                          ),
+                                        ),
+                                        Container(
+                                          padding: const EdgeInsets.all(4.5),
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFFEA580C),
+                                            shape: BoxShape.circle,
+                                            border: Border.all(
+                                                color: Colors.white,
+                                                width: 1.6),
+                                          ),
+                                          child: const Icon(
+                                            Icons.camera_alt_rounded,
+                                            size: 11,
+                                            color: Colors.white,
                                           ),
                                         ),
                                       ],
                                     ),
                                   ),
-                                  const SizedBox(width: 6),
-                                  // Status Badge (Aktif / Mau Habis / Kedaluwarsa)
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
-                                    decoration: BoxDecoration(
-                                      color: isPermitExpired
-                                          ? const Color(0xFFEF4444)
-                                          : (isPermitExpiringSoon
-                                              ? const Color(0xFFF59E0B)
-                                              : const Color(0xFF059669)),
-                                      borderRadius: BorderRadius.circular(20),
-                                    ),
-                                    child: Text(
-                                      isPermitExpired
-                                          ? 'KEDALUWARSA'
-                                          : (isPermitExpiringSoon
-                                              ? 'MAU HABIS'
-                                              : (permitNomor.isNotEmpty ? 'AKTIF ✓' : '-')),
-                                      style: TextStyle(
-                                        fontSize: 9.5,
-                                        fontWeight: FontWeight.w800,
-                                        letterSpacing: 0.3,
-                                        color: isPermitExpired
-                                            ? Colors.white
-                                            : Colors.white,
-                                      ),
+
+                                  const SizedBox(width: 12),
+
+                                  // Detail Identitas di Kanan
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          nama.toUpperCase(),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(
+                                            fontSize: 15,
+                                            fontWeight: FontWeight.w800,
+                                            color: Colors.white,
+                                            letterSpacing: 0.3,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          posisi,
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w600,
+                                            color: Color(0xFFE2E8F0),
+                                            height: 1.2,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 6),
+                                        Wrap(
+                                          spacing: 6,
+                                          runSpacing: 4,
+                                          crossAxisAlignment:
+                                              WrapCrossAlignment.center,
+                                          children: [
+                                            // Level / Jabatan Badge
+                                            if (jabatan.isNotEmpty &&
+                                                jabatan.trim().toUpperCase() !=
+                                                    posisi.trim().toUpperCase())
+                                              Container(
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                        horizontal: 7,
+                                                        vertical: 2),
+                                                decoration: BoxDecoration(
+                                                  color: Colors.black
+                                                      .withValues(alpha: 0.22),
+                                                  borderRadius:
+                                                      BorderRadius.circular(6),
+                                                  border: Border.all(
+                                                    color:
+                                                        const Color(0xFFFDE047)
+                                                            .withValues(
+                                                                alpha: 0.35),
+                                                    width: 0.8,
+                                                  ),
+                                                ),
+                                                child: Text(
+                                                  jabatan.toUpperCase(),
+                                                  style: const TextStyle(
+                                                    fontSize: 9,
+                                                    fontWeight: FontWeight.w800,
+                                                    color: Color(0xFFFDE047),
+                                                    letterSpacing: 0.4,
+                                                  ),
+                                                ),
+                                              ),
+                                            // NIK Chip (Tap untuk QR)
+                                            InkWell(
+                                              onTap: () => _showNikQrModal(
+                                                context: context,
+                                                nik: nik,
+                                                nama: nama,
+                                                posisi: posisi,
+                                                jabatan: jabatan,
+                                                company: company,
+                                                depart: depart,
+                                                permitNomor: permitNomor,
+                                                masaAktif: masaAktifPermit,
+                                                isPermitExpiringSoon:
+                                                    isPermitExpiringSoon,
+                                                isPermitExpired:
+                                                    isPermitExpired,
+                                                qrCode: _profile?.qrCode,
+                                              ),
+                                              borderRadius:
+                                                  BorderRadius.circular(6),
+                                              child: Container(
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                        horizontal: 6,
+                                                        vertical: 2),
+                                                decoration: BoxDecoration(
+                                                  color: const Color(0xFF38BDF8)
+                                                      .withValues(alpha: 0.16),
+                                                  borderRadius:
+                                                      BorderRadius.circular(6),
+                                                  border: Border.all(
+                                                    color:
+                                                        const Color(0xFF38BDF8)
+                                                            .withValues(
+                                                                alpha: 0.35),
+                                                    width: 0.8,
+                                                  ),
+                                                ),
+                                                child: Row(
+                                                  mainAxisSize:
+                                                      MainAxisSize.min,
+                                                  children: [
+                                                    const Icon(
+                                                        Icons.badge_outlined,
+                                                        size: 11,
+                                                        color:
+                                                            Color(0xFF38BDF8)),
+                                                    const SizedBox(width: 4),
+                                                    Text(
+                                                      nik,
+                                                      style: const TextStyle(
+                                                        fontSize: 10,
+                                                        fontWeight:
+                                                            FontWeight.w700,
+                                                        color: Colors.white,
+                                                        letterSpacing: 0.3,
+                                                      ),
+                                                    ),
+                                                    const SizedBox(width: 4),
+                                                    const Icon(
+                                                        Icons.qr_code_rounded,
+                                                        size: 11,
+                                                        color:
+                                                            Color(0xFF38BDF8)),
+                                                  ],
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
                                     ),
                                   ),
                                 ],
                               ),
-                            ),
-                          ),
 
-                          // Peringatan Merah jika permit expired / mau habis <= 3 bulan
-                          if (isPermitExpiringSoon) ...[
-                            const SizedBox(height: 8),
-                            Container(
-                              width: double.infinity,
-                              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFEF4444).withValues(alpha: 0.22),
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(
-                                  color: const Color(0xFFF87171).withValues(alpha: 0.6),
-                                  width: 0.8,
+                              const SizedBox(height: 12),
+
+                              // Panel Digital Permit Tambang (Slim Horizontal Bar)
+                              InkWell(
+                                onTap: () => _showNikQrModal(
+                                  context: context,
+                                  nik: nik,
+                                  nama: nama,
+                                  posisi: posisi,
+                                  jabatan: jabatan,
+                                  company: company,
+                                  depart: depart,
+                                  permitNomor: permitNomor,
+                                  masaAktif: masaAktifPermit,
+                                  isPermitExpiringSoon: isPermitExpiringSoon,
+                                  isPermitExpired: isPermitExpired,
+                                  qrCode: _profile?.qrCode,
+                                ),
+                                borderRadius: BorderRadius.circular(18),
+                                child: Container(
+                                  width: double.infinity,
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 13, vertical: 11),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(18),
+                                    border: Border.all(
+                                      color: isPermitExpiringSoon
+                                          ? const Color(0xFFFECACA)
+                                          : const Color(0xFFE2E8F0),
+                                      width: 1,
+                                    ),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.all(5),
+                                        decoration: BoxDecoration(
+                                          color: isPermitExpiringSoon
+                                              ? const Color(0xFFEF4444)
+                                                  .withValues(alpha: 0.25)
+                                              : const Color(0xFF34D399)
+                                                  .withValues(alpha: 0.2),
+                                          borderRadius:
+                                              BorderRadius.circular(7),
+                                        ),
+                                        child: Icon(
+                                          isPermitExpiringSoon
+                                              ? Icons
+                                                  .notification_important_rounded
+                                              : Icons.verified_user_rounded,
+                                          size: 15,
+                                          color: isPermitExpiringSoon
+                                              ? const Color(0xFFDC2626)
+                                              : const Color(0xFF059669),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              permitNomor.isNotEmpty
+                                                  ? permitNomor
+                                                  : 'TIDAK ADA PERMIT',
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: TextStyle(
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.w800,
+                                                letterSpacing: 0.4,
+                                                color: isPermitExpiringSoon
+                                                    ? const Color(0xFFB91C1C)
+                                                    : const Color(0xFF0F172A),
+                                              ),
+                                            ),
+                                            Text(
+                                              masaAktifPermit.isNotEmpty
+                                                  ? 'Masa Berlaku : $masaAktifPermit'
+                                                  : 'Masa Berlaku : -',
+                                              style: TextStyle(
+                                                fontSize: 9.5,
+                                                fontWeight: FontWeight.w600,
+                                                color: isPermitExpiringSoon
+                                                    ? const Color(0xFFB91C1C)
+                                                    : const Color(0xFF64748B),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      const SizedBox(width: 6),
+                                      // Status Badge (Aktif / Mau Habis / Kedaluwarsa)
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 8, vertical: 3.5),
+                                        decoration: BoxDecoration(
+                                          color: isPermitExpired
+                                              ? const Color(0xFFEF4444)
+                                              : (isPermitExpiringSoon
+                                                  ? const Color(0xFFF59E0B)
+                                                  : const Color(0xFF059669)),
+                                          borderRadius:
+                                              BorderRadius.circular(20),
+                                        ),
+                                        child: Text(
+                                          isPermitExpired
+                                              ? 'KEDALUWARSA'
+                                              : (isPermitExpiringSoon
+                                                  ? 'MAU HABIS'
+                                                  : (permitNomor.isNotEmpty
+                                                      ? 'AKTIF ✓'
+                                                      : '-')),
+                                          style: TextStyle(
+                                            fontSize: 9.5,
+                                            fontWeight: FontWeight.w800,
+                                            letterSpacing: 0.3,
+                                            color: isPermitExpired
+                                                ? Colors.white
+                                                : Colors.white,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               ),
-                              child: Row(
-                                children: [
-                                  const Icon(Icons.priority_high_rounded, color: Color(0xFFFCA5A5), size: 13),
-                                  const SizedBox(width: 6),
-                                  Expanded(
-                                    child: Text(
-                                      permitWarningText,
-                                      style: const TextStyle(
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.w700,
-                                        color: Color(0xFFFEE2E2),
-                                        height: 1.2,
-                                      ),
+
+                              // Peringatan Merah jika permit expired / mau habis <= 3 bulan
+                              if (isPermitExpiringSoon) ...[
+                                const SizedBox(height: 8),
+                                Container(
+                                  width: double.infinity,
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 9, vertical: 6),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFEF4444)
+                                        .withValues(alpha: 0.22),
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(
+                                      color: const Color(0xFFF87171)
+                                          .withValues(alpha: 0.6),
+                                      width: 0.8,
                                     ),
                                   ),
-                                ],
+                                  child: Row(
+                                    children: [
+                                      const Icon(Icons.priority_high_rounded,
+                                          color: Color(0xFFFCA5A5), size: 13),
+                                      const SizedBox(width: 6),
+                                      Expanded(
+                                        child: Text(
+                                          permitWarningText,
+                                          style: const TextStyle(
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.w700,
+                                            color: Color(0xFFFEE2E2),
+                                            height: 1.2,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+
+              // Main Body Content
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 40),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Section Target & Aktual SAP Periode Berjalan (1 s/d Akhir Bulan)
+                    _buildSapPerformanceCard(),
+
+                    const SizedBox(height: 22),
+
+                    // Section 1: Akun & Keamanan
+                    _buildSectionHeader('Akun & Keamanan'),
+                    const SizedBox(height: 8),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(18),
+                        border: Border.all(
+                            color: const Color(0xFFF1F5F9), width: 1.2),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.03),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        children: [
+                          _buildSettingTile(
+                            icon: Icons.lock_outline_rounded,
+                            iconColor: const Color(0xFF009688),
+                            title: 'Ganti Password',
+                            subtitle: 'Perbarui kata sandi login akun Anda',
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) =>
+                                      const ChangePasswordPage(),
+                                ),
+                              );
+                            },
+                          ),
+                          _buildDivider(),
+                          _buildSettingTile(
+                            icon: Icons.calendar_month_rounded,
+                            iconColor: const Color(0xFF1D4ED8),
+                            title: 'Pengaturan Roster Kerja',
+                            subtitle: 'Jadwal dinas reguler & penugasan',
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) =>
+                                      const RosterSettingsPage(),
+                                ),
+                              );
+                            },
+                          ),
+                          _buildDivider(),
+                          _buildSettingTile(
+                            icon: Icons.sync_rounded,
+                            iconColor: const Color(0xFF0284C7),
+                            title: 'Sinkronisasi Master Data',
+                            subtitle: 'Muat ulang data referensi & konfigurasi',
+                            onTap: _confirmSyncMaster,
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    const SizedBox(height: 22),
+
+                    // Section 2: Informasi & Legalitas
+                    _buildSectionHeader('Informasi & Legalitas'),
+                    const SizedBox(height: 8),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(18),
+                        border: Border.all(
+                            color: const Color(0xFFF1F5F9), width: 1.2),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.03),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        children: [
+                          _buildSettingTile(
+                            icon: Icons.info_outline_rounded,
+                            iconColor: const Color(0xFF4F46E5),
+                            title: 'Tentang Aplikasi',
+                            subtitle:
+                                'Informasi versi dan pengembang Indexsafe',
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => const AboutPage(),
+                                ),
+                              );
+                            },
+                          ),
+                          _buildDivider(),
+                          _buildSettingTile(
+                            icon: Icons.shield_outlined,
+                            iconColor: const Color(0xFF059669),
+                            title: 'Kebijakan Privasi',
+                            subtitle: 'Pedoman privasi dan perlindungan data',
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) =>
+                                      const PrivacyPolicyPage(),
+                                ),
+                              );
+                            },
+                          ),
+                          _buildDivider(),
+                          _buildSettingTile(
+                            icon: Icons.description_outlined,
+                            iconColor: const Color(0xFFD97706),
+                            title: 'Perjanjian Lisensi',
+                            subtitle: 'Syarat & ketentuan penggunaan sistem',
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) =>
+                                      const LicenseAgreementPage(),
+                                ),
+                              );
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    const SizedBox(height: 24),
+
+                    // Section 3: Sesi Keluar
+                    InkWell(
+                      onTap: _confirmLogout,
+                      borderRadius: BorderRadius.circular(16),
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(
+                            vertical: 14, horizontal: 16),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFEF2F2),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                              color: const Color(0xFFFECACA), width: 1),
+                        ),
+                        child: const Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.logout_rounded,
+                                color: Color(0xFFDC2626), size: 19),
+                            SizedBox(width: 8),
+                            Text(
+                              'Keluar dari Akun (Logout)',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFFDC2626),
                               ),
                             ),
                           ],
-                        ],
+                        ),
                       ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-
-            // Main Body Content
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 40),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Section Target & Aktual SAP Periode Berjalan (1 s/d Akhir Bulan)
-                  _buildSapPerformanceCard(),
-
-                  const SizedBox(height: 22),
-
-                  // Section 1: Akun & Keamanan
-                  _buildSectionHeader('Akun & Keamanan'),
-                  const SizedBox(height: 8),
-                  Container(
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(18),
-                      border: Border.all(color: const Color(0xFFF1F5F9), width: 1.2),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.03),
-                          blurRadius: 8,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
                     ),
-                    child: Column(
-                      children: [
-                        _buildSettingTile(
-                          icon: Icons.lock_outline_rounded,
-                          iconColor: const Color(0xFF009688),
-                          title: 'Ganti Password',
-                          subtitle: 'Perbarui kata sandi login akun Anda',
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => const ChangePasswordPage(),
-                              ),
-                            );
-                          },
-                        ),
-                        _buildDivider(),
-                        _buildSettingTile(
-                          icon: Icons.calendar_month_rounded,
-                          iconColor: const Color(0xFF1D4ED8),
-                          title: 'Pengaturan Roster Kerja',
-                          subtitle: 'Jadwal dinas reguler & penugasan',
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => const RosterSettingsPage(),
-                              ),
-                            );
-                          },
-                        ),
-                        _buildDivider(),
-                        _buildSettingTile(
-                          icon: Icons.sync_rounded,
-                          iconColor: const Color(0xFF0284C7),
-                          title: 'Sinkronisasi Master Data',
-                          subtitle: 'Unduh ulang database referensi & konfigurasi',
-                          onTap: _confirmSyncMaster,
-                        ),
-                      ],
-                    ),
-                  ),
 
-                  const SizedBox(height: 22),
+                    const SizedBox(height: 28),
 
-                  // Section 2: Informasi & Legalitas
-                  _buildSectionHeader('Informasi & Legalitas'),
-                  const SizedBox(height: 8),
-                  Container(
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(18),
-                      border: Border.all(color: const Color(0xFFF1F5F9), width: 1.2),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.03),
-                          blurRadius: 8,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      children: [
-                        _buildSettingTile(
-                          icon: Icons.info_outline_rounded,
-                          iconColor: const Color(0xFF4F46E5),
-                          title: 'Tentang Aplikasi',
-                          subtitle: 'Informasi versi dan pengembang Indexsafe',
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => const AboutPage(),
-                              ),
-                            );
-                          },
-                        ),
-                        _buildDivider(),
-                        _buildSettingTile(
-                          icon: Icons.shield_outlined,
-                          iconColor: const Color(0xFF059669),
-                          title: 'Kebijakan Privasi',
-                          subtitle: 'Pedoman privasi dan perlindungan data',
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => const PrivacyPolicyPage(),
-                              ),
-                            );
-                          },
-                        ),
-                        _buildDivider(),
-                        _buildSettingTile(
-                          icon: Icons.description_outlined,
-                          iconColor: const Color(0xFFD97706),
-                          title: 'Perjanjian Lisensi',
-                          subtitle: 'Syarat & ketentuan penggunaan sistem',
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => const LicenseAgreementPage(),
-                              ),
-                            );
-                          },
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: 24),
-
-                  // Section 3: Sesi Keluar
-                  InkWell(
-                    onTap: _confirmLogout,
-                    borderRadius: BorderRadius.circular(16),
-                    child: Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFEF2F2),
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: const Color(0xFFFECACA), width: 1),
-                      ),
-                      child: const Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
+                    // Footer Version
+                    const Center(
+                      child: Column(
                         children: [
-                          Icon(Icons.logout_rounded, color: Color(0xFFDC2626), size: 19),
-                          SizedBox(width: 8),
                           Text(
-                            'Keluar dari Akun (Logout)',
+                            'Indexsafe Evolution • Mobile v2.0',
                             style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w700,
-                              color: Color(0xFFDC2626),
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF94A3B8),
+                            ),
+                          ),
+                          SizedBox(height: 2),
+                          Text(
+                            'PT Indexim Coalindo HSE Integrated System',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w400,
+                              color: Color(0xFFCBD5E1),
                             ),
                           ),
                         ],
                       ),
                     ),
-                  ),
-
-                  const SizedBox(height: 28),
-
-                  // Footer Version
-                  const Center(
-                    child: Column(
-                      children: [
-                        Text(
-                          'Indexsafe Evolution • Mobile v2.0',
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                            color: Color(0xFF94A3B8),
-                          ),
-                        ),
-                        SizedBox(height: 2),
-                        Text(
-                          'PT Indexim Coalindo HSE Integrated System',
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w400,
-                            color: Color(0xFFCBD5E1),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 30),
-                ],
+                    const SizedBox(height: 30),
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
-      ),
       ),
     );
   }
@@ -1287,7 +1441,8 @@ class _ProfilePageState extends State<ProfilePage> {
             height: 244,
             width: double.infinity,
             decoration: BoxDecoration(
-              borderRadius: const BorderRadius.vertical(bottom: Radius.circular(24)),
+              borderRadius:
+                  const BorderRadius.vertical(bottom: Radius.circular(24)),
               image: const DecorationImage(
                 image: AssetImage('assets/images/profile-mine-sunset.png'),
                 fit: BoxFit.cover,
@@ -1346,10 +1501,21 @@ class _ProfilePageState extends State<ProfilePage> {
                             mainAxisSize: MainAxisSize.min,
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(company.toUpperCase(), maxLines: 1, overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w900)),
-                              Text(depart.toUpperCase(), maxLines: 1, overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(color: Color(0xFFFFEDD5), fontSize: 6.8, fontWeight: FontWeight.w700, letterSpacing: .35)),
+                              Text(company.toUpperCase(),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.w900)),
+                              Text(depart.toUpperCase(),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                      color: Color(0xFFFFEDD5),
+                                      fontSize: 6.8,
+                                      fontWeight: FontWeight.w700,
+                                      letterSpacing: .35)),
                             ],
                           ),
                         ),
@@ -1367,12 +1533,16 @@ class _ProfilePageState extends State<ProfilePage> {
                       children: [
                         Container(
                           padding: const EdgeInsets.all(3),
-                          decoration: const BoxDecoration(shape: BoxShape.circle, color: Colors.white),
+                          decoration: const BoxDecoration(
+                              shape: BoxShape.circle, color: Colors.white),
                           child: CircleAvatar(
                             radius: 43,
                             backgroundColor: const Color(0xFF334155),
                             backgroundImage: _image,
-                            child: _image == null ? const Icon(Icons.person_rounded, color: Color(0xFFCBD5E1), size: 48) : null,
+                            child: _image == null
+                                ? const Icon(Icons.person_rounded,
+                                    color: Color(0xFFCBD5E1), size: 48)
+                                : null,
                           ),
                         ),
                         Positioned(
@@ -1380,8 +1550,13 @@ class _ProfilePageState extends State<ProfilePage> {
                           bottom: 2,
                           child: Container(
                             padding: const EdgeInsets.all(6),
-                            decoration: BoxDecoration(shape: BoxShape.circle, color: const Color(0xFFEA580C), border: Border.all(color: Colors.white, width: 2)),
-                            child: const Icon(Icons.camera_alt_rounded, size: 14, color: Colors.white),
+                            decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: const Color(0xFFEA580C),
+                                border:
+                                    Border.all(color: Colors.white, width: 2)),
+                            child: const Icon(Icons.camera_alt_rounded,
+                                size: 14, color: Colors.white),
                           ),
                         ),
                       ],
@@ -1395,31 +1570,77 @@ class _ProfilePageState extends State<ProfilePage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('Selamat datang,', style: TextStyle(color: Color(0xFFFFEDD5), fontSize: 10, fontWeight: FontWeight.w600)),
-                      Text(nama, maxLines: 2, overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(color: Colors.white, fontSize: 14, height: 1.1, fontWeight: FontWeight.w900)),
-                      Text(posisi, maxLines: 2, overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(color: Color(0xFFFFEDD5), fontSize: 9, height: 1.15, fontWeight: FontWeight.w500)),
+                      const Text('Selamat datang,',
+                          style: TextStyle(
+                              color: Color(0xFFFFEDD5),
+                              fontSize: 10,
+                              fontWeight: FontWeight.w600)),
+                      Text(nama,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 14,
+                              height: 1.1,
+                              fontWeight: FontWeight.w900)),
+                      Text(posisi,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                              color: Color(0xFFFFEDD5),
+                              fontSize: 9,
+                              height: 1.15,
+                              fontWeight: FontWeight.w500)),
                       const SizedBox(height: 7),
                       if (jabatan.isNotEmpty)
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-                          decoration: BoxDecoration(color: const Color(0xFFB45309).withValues(alpha: .82), borderRadius: BorderRadius.circular(10)),
-                          child: Text(jabatan.toUpperCase(), maxLines: 1, overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(color: Color(0xFFFFEDD5), fontSize: 8, fontWeight: FontWeight.w900)),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 9, vertical: 4),
+                          decoration: BoxDecoration(
+                              color: const Color(0xFFB45309)
+                                  .withValues(alpha: .82),
+                              borderRadius: BorderRadius.circular(10)),
+                          child: Text(jabatan.toUpperCase(),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                  color: Color(0xFFFFEDD5),
+                                  fontSize: 8,
+                                  fontWeight: FontWeight.w900)),
                         ),
                       const SizedBox(height: 6),
                       InkWell(
-                        onTap: () => _showNikQrModal(context: context, nik: nik, nama: nama, posisi: posisi, jabatan: jabatan, company: company, depart: depart, permitNomor: permitNomor, masaAktif: masaAktifPermit, isPermitExpiringSoon: isPermitExpiringSoon, isPermitExpired: isPermitExpired, qrCode: _profile?.qrCode),
+                        onTap: () => _showNikQrModal(
+                            context: context,
+                            nik: nik,
+                            nama: nama,
+                            posisi: posisi,
+                            jabatan: jabatan,
+                            company: company,
+                            depart: depart,
+                            permitNomor: permitNomor,
+                            masaAktif: masaAktifPermit,
+                            isPermitExpiringSoon: isPermitExpiringSoon,
+                            isPermitExpired: isPermitExpired,
+                            qrCode: _profile?.qrCode),
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-                          decoration: BoxDecoration(color: Colors.black.withValues(alpha: .35), borderRadius: BorderRadius.circular(8)),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 5),
+                          decoration: BoxDecoration(
+                              color: Colors.black.withValues(alpha: .35),
+                              borderRadius: BorderRadius.circular(8)),
                           child: Row(mainAxisSize: MainAxisSize.min, children: [
-                            const Icon(Icons.badge_outlined, color: Color(0xFFE2E8F0), size: 13),
+                            const Icon(Icons.badge_outlined,
+                                color: Color(0xFFE2E8F0), size: 13),
                             const SizedBox(width: 5),
-                            Text(nik, style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w700)),
+                            Text(nik,
+                                style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.w700)),
                             const SizedBox(width: 8),
-                            const Icon(Icons.qr_code_rounded, color: Color(0xFFE2E8F0), size: 13),
+                            const Icon(Icons.qr_code_rounded,
+                                color: Color(0xFFE2E8F0), size: 13),
                           ]),
                         ),
                       ),
@@ -1434,20 +1655,79 @@ class _ProfilePageState extends State<ProfilePage> {
             left: 16,
             right: 16,
             child: InkWell(
-              onTap: () => _showNikQrModal(context: context, nik: nik, nama: nama, posisi: posisi, jabatan: jabatan, company: company, depart: depart, permitNomor: permitNomor, masaAktif: masaAktifPermit, isPermitExpiringSoon: isPermitExpiringSoon, isPermitExpired: isPermitExpired, qrCode: _profile?.qrCode),
+              onTap: () => _showNikQrModal(
+                  context: context,
+                  nik: nik,
+                  nama: nama,
+                  posisi: posisi,
+                  jabatan: jabatan,
+                  company: company,
+                  depart: depart,
+                  permitNomor: permitNomor,
+                  masaAktif: masaAktifPermit,
+                  isPermitExpiringSoon: isPermitExpiringSoon,
+                  isPermitExpired: isPermitExpired,
+                  qrCode: _profile?.qrCode),
               borderRadius: BorderRadius.circular(18),
               child: Container(
                 padding: const EdgeInsets.fromLTRB(14, 12, 12, 12),
-                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(18), boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: .12), blurRadius: 14, offset: const Offset(0, 5))]),
+                decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(18),
+                    boxShadow: [
+                      BoxShadow(
+                          color: Colors.black.withValues(alpha: .12),
+                          blurRadius: 14,
+                          offset: const Offset(0, 5))
+                    ]),
                 child: Row(children: [
-                  Container(width: 42, height: 42, decoration: BoxDecoration(color: const Color(0xFFECFDF5), borderRadius: BorderRadius.circular(12)), child: const Icon(Icons.verified_user_rounded, color: Color(0xFF059669), size: 23)),
+                  Container(
+                      width: 42,
+                      height: 42,
+                      decoration: BoxDecoration(
+                          color: const Color(0xFFECFDF5),
+                          borderRadius: BorderRadius.circular(12)),
+                      child: const Icon(Icons.verified_user_rounded,
+                          color: Color(0xFF059669), size: 23)),
                   const SizedBox(width: 11),
-                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text(permitNomor.isEmpty ? 'TIDAK ADA PERMIT' : permitNomor, style: const TextStyle(color: Color(0xFF1E293B), fontSize: 14, fontWeight: FontWeight.w900)),
-                    const SizedBox(height: 2),
-                    Text(masaAktifPermit.isEmpty ? 'Masa Berlaku: -' : 'Masa Berlaku: $masaAktifPermit', style: const TextStyle(color: Color(0xFF64748B), fontSize: 9.5, fontWeight: FontWeight.w600)),
-                  ])),
-                  Container(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7), decoration: BoxDecoration(color: statusColor, borderRadius: BorderRadius.circular(18)), child: Row(mainAxisSize: MainAxisSize.min, children: [Text(statusText, style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w900)), const SizedBox(width: 4), const Icon(Icons.keyboard_arrow_down_rounded, color: Colors.white, size: 14)])),
+                  Expanded(
+                      child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                        Text(
+                            permitNomor.isEmpty
+                                ? 'TIDAK ADA PERMIT'
+                                : permitNomor,
+                            style: const TextStyle(
+                                color: Color(0xFF1E293B),
+                                fontSize: 14,
+                                fontWeight: FontWeight.w900)),
+                        const SizedBox(height: 2),
+                        Text(
+                            masaAktifPermit.isEmpty
+                                ? 'Masa Berlaku: -'
+                                : 'Masa Berlaku: $masaAktifPermit',
+                            style: const TextStyle(
+                                color: Color(0xFF64748B),
+                                fontSize: 9.5,
+                                fontWeight: FontWeight.w600)),
+                      ])),
+                  Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 7),
+                      decoration: BoxDecoration(
+                          color: statusColor,
+                          borderRadius: BorderRadius.circular(18)),
+                      child: Row(mainAxisSize: MainAxisSize.min, children: [
+                        Text(statusText,
+                            style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 9,
+                                fontWeight: FontWeight.w900)),
+                        const SizedBox(width: 4),
+                        const Icon(Icons.keyboard_arrow_down_rounded,
+                            color: Colors.white, size: 14)
+                      ])),
                 ]),
               ),
             ),
@@ -1471,8 +1751,6 @@ class _ProfilePageState extends State<ProfilePage> {
       ),
     );
   }
-
-
 
   void _showNikQrModal({
     required BuildContext context,
@@ -1526,7 +1804,8 @@ class _ProfilePageState extends State<ProfilePage> {
                       Container(
                         padding: const EdgeInsets.all(7),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF009688).withValues(alpha: 0.12),
+                          color:
+                              const Color(0xFF009688).withValues(alpha: 0.12),
                           borderRadius: BorderRadius.circular(10),
                         ),
                         child: const Icon(
@@ -1569,7 +1848,8 @@ class _ProfilePageState extends State<ProfilePage> {
                         color: Color(0xFFF1F5F9),
                         shape: BoxShape.circle,
                       ),
-                      child: const Icon(Icons.close_rounded, size: 18, color: Color(0xFF64748B)),
+                      child: const Icon(Icons.close_rounded,
+                          size: 18, color: Color(0xFF64748B)),
                     ),
                   ),
                 ],
@@ -1580,7 +1860,8 @@ class _ProfilePageState extends State<ProfilePage> {
               // QR Code Showcase Box
               Container(
                 width: double.infinity,
-                padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+                padding:
+                    const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
                 decoration: BoxDecoration(
                   gradient: const LinearGradient(
                     colors: [Color(0xFF0F172A), Color(0xFF134E4A)],
@@ -1634,11 +1915,13 @@ class _ProfilePageState extends State<ProfilePage> {
                     InkWell(
                       onTap: () {
                         Clipboard.setData(ClipboardData(text: nik));
-                        SnackBarMsg.success(context, 'NIK $nik disalin ke clipboard');
+                        SnackBarMsg.success(
+                            context, 'NIK $nik disalin ke clipboard');
                       },
                       borderRadius: BorderRadius.circular(20),
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6.5),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 6.5),
                         decoration: BoxDecoration(
                           color: Colors.white.withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(20),
@@ -1725,7 +2008,8 @@ class _ProfilePageState extends State<ProfilePage> {
                     if (permitNomor.isNotEmpty) ...[
                       const SizedBox(height: 8),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 4),
                         decoration: BoxDecoration(
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(8),
@@ -1770,7 +2054,8 @@ class _ProfilePageState extends State<ProfilePage> {
               const Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.shield_outlined, size: 14, color: Color(0xFF009688)),
+                  Icon(Icons.shield_outlined,
+                      size: 14, color: Color(0xFF009688)),
                   SizedBox(width: 6),
                   Text(
                     'QR Code resmi untuk verifikasi NIK di operasional lapangan',
@@ -1861,8 +2146,19 @@ class _ProfilePageState extends State<ProfilePage> {
     final now = DateTime.now();
     final lastDay = DateTime(now.year, now.month + 1, 0).day;
     const months = [
-      '', 'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun',
-      'Jul', 'Ags', 'Sep', 'Okt', 'Nov', 'Des'
+      '',
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'Mei',
+      'Jun',
+      'Jul',
+      'Ags',
+      'Sep',
+      'Okt',
+      'Nov',
+      'Des'
     ];
     final periodStr = '1 - $lastDay ${months[now.month]} ${now.year}';
 
@@ -1885,17 +2181,31 @@ class _ProfilePageState extends State<ProfilePage> {
     final int actualP5m = _profile?.myP5ms ?? 0;
 
     final double compliance = _profile?.complianceRate ?? 0.0;
-    final int totalTarget = _profile?.totalTarget ?? (targetHazard + targetInspeksi + targetSafetyTalk + targetObservasi + targetCoaching + targetP5m);
-    final int totalActual = (actualHazard > targetHazard ? targetHazard : actualHazard)
-                          + (actualInspeksi > targetInspeksi ? targetInspeksi : actualInspeksi)
-                          + (actualSafetyTalk > targetSafetyTalk ? targetSafetyTalk : actualSafetyTalk)
-                          + (actualObservasi > targetObservasi ? targetObservasi : actualObservasi)
-                          + (actualCoaching > targetCoaching ? targetCoaching : actualCoaching)
-                          + (actualP5m > targetP5m ? targetP5m : actualP5m);
+    final int totalTarget = _profile?.totalTarget ??
+        (targetHazard +
+            targetInspeksi +
+            targetSafetyTalk +
+            targetObservasi +
+            targetCoaching +
+            targetP5m);
+    final int totalActual = (actualHazard > targetHazard
+            ? targetHazard
+            : actualHazard) +
+        (actualInspeksi > targetInspeksi ? targetInspeksi : actualInspeksi) +
+        (actualSafetyTalk > targetSafetyTalk
+            ? targetSafetyTalk
+            : actualSafetyTalk) +
+        (actualObservasi > targetObservasi
+            ? targetObservasi
+            : actualObservasi) +
+        (actualCoaching > targetCoaching ? targetCoaching : actualCoaching) +
+        (actualP5m > targetP5m ? targetP5m : actualP5m);
 
     final Color statusColor = compliance >= 100
         ? const Color(0xFF10B981)
-        : (compliance >= 75 ? const Color(0xFF009688) : const Color(0xFFF59E0B));
+        : (compliance >= 75
+            ? const Color(0xFF009688)
+            : const Color(0xFFF59E0B));
 
     return Container(
       padding: const EdgeInsets.all(14),
@@ -1954,11 +2264,13 @@ class _ProfilePageState extends State<ProfilePage> {
                 ),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
                 decoration: BoxDecoration(
                   color: statusColor.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: statusColor.withValues(alpha: 0.25)),
+                  border:
+                      Border.all(color: statusColor.withValues(alpha: 0.25)),
                 ),
                 child: Text(
                   '${compliance.toStringAsFixed(0)}% Tercapai',
@@ -1978,7 +2290,9 @@ class _ProfilePageState extends State<ProfilePage> {
           ClipRRect(
             borderRadius: BorderRadius.circular(6),
             child: LinearProgressIndicator(
-              value: totalTarget > 0 ? (totalActual / totalTarget).clamp(0.0, 1.0) : 1.0,
+              value: totalTarget > 0
+                  ? (totalActual / totalTarget).clamp(0.0, 1.0)
+                  : 1.0,
               minHeight: 5,
               backgroundColor: const Color(0xFFF1F5F9),
               valueColor: AlwaysStoppedAnimation<Color>(statusColor),
@@ -2056,7 +2370,8 @@ class _ProfilePageState extends State<ProfilePage> {
             ],
           ),
 
-          if (_profile?.kategoriPengawas != null && _profile!.kategoriPengawas!.isNotEmpty) ...[
+          if (_profile?.kategoriPengawas != null &&
+              _profile!.kategoriPengawas!.isNotEmpty) ...[
             const SizedBox(height: 10),
             Container(
               width: double.infinity,
@@ -2067,7 +2382,8 @@ class _ProfilePageState extends State<ProfilePage> {
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.shield_outlined, size: 12, color: Color(0xFF94A3B8)),
+                  const Icon(Icons.shield_outlined,
+                      size: 12, color: Color(0xFF94A3B8)),
                   const SizedBox(width: 5),
                   Expanded(
                     child: Text(
@@ -2103,7 +2419,8 @@ class _ProfilePageState extends State<ProfilePage> {
         color: const Color(0xFFF8FAFC),
         borderRadius: BorderRadius.circular(10),
         border: Border.all(
-          color: isDone ? color.withValues(alpha: 0.3) : const Color(0xFFF1F5F9),
+          color:
+              isDone ? color.withValues(alpha: 0.3) : const Color(0xFFF1F5F9),
           width: 1,
         ),
       ),
@@ -2143,7 +2460,9 @@ class _ProfilePageState extends State<ProfilePage> {
                   style: TextStyle(
                     fontSize: 12.5,
                     fontWeight: FontWeight.w800,
-                    color: isDone ? const Color(0xFF0F766E) : const Color(0xFF1E293B),
+                    color: isDone
+                        ? const Color(0xFF0F766E)
+                        : const Color(0xFF1E293B),
                   ),
                 ),
                 TextSpan(

@@ -1,4 +1,11 @@
+import 'dart:io';
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
+import 'package:dio/dio.dart';
+import 'package:image/image.dart' as img;
+import 'package:path/path.dart' as path;
+import 'package:path_provider/path_provider.dart';
 import 'package:percent_indicator/linear_percent_indicator.dart';
 
 import '../models/profile_model.dart';
@@ -65,6 +72,68 @@ class _SyncPageState extends State<SyncPage> {
 
   String _table = '...';
   int _currentStep = 1;
+  bool _offlineScanDataMissing = false;
+
+  Future<void> _cacheOfflinePhotos() async {
+    final db = await _db.database;
+    final root = await getApplicationDocumentsDirectory();
+    final folder = Directory(path.join(root.path, 'offline_employee_photos'));
+    if (!await folder.exists()) await folder.create(recursive: true);
+    final client = Dio(BaseOptions(
+        connectTimeout: const Duration(seconds: 8),
+        receiveTimeout: const Duration(seconds: 15)));
+
+    Future<void> cacheTable(
+        String table, String idColumn, String photoColumn) async {
+      final rows = await db.query(table, columns: [idColumn, photoColumn]);
+      for (final row in rows) {
+        final raw = row[photoColumn]?.toString() ?? '';
+        if (raw.isEmpty) continue;
+        if (raw.startsWith('/') && File(raw).existsSync()) {
+          // Cache lama dari versi sebelumnya ikut diperkecil saat sync ulang.
+          try {
+            final local = File(raw);
+            final source = img.decodeImage(await local.readAsBytes());
+            if (source != null && (source.width > 256 || source.height > 256)) {
+              await local.writeAsBytes(
+                img.encodeJpg(img.copyResize(source, width: 256), quality: 72),
+                flush: true,
+              );
+            }
+          } catch (_) {}
+          continue;
+        }
+        final url = raw.startsWith('http')
+            ? raw
+            : '${_api.baseUrl}${raw.startsWith('/') ? '' : '/'}$raw';
+        final id = row[idColumn]?.toString() ?? '';
+        if (id.isEmpty) continue;
+        try {
+          final file = File(path.join(folder.path, '${table}_$id.jpg'));
+          final res = await client.get<List<int>>(url,
+              options: Options(responseType: ResponseType.bytes));
+          if (res.data != null && res.data!.isNotEmpty) {
+            // Avatar scan hanya tampil kecil. Simpan thumbnail 256px, bukan
+            // foto kamera asli, supaya sinkron awal tetap ringan.
+            final source = img.decodeImage(Uint8List.fromList(res.data!));
+            final bytes = source == null
+                ? res.data!
+                : img.encodeJpg(img.copyResize(source, width: 256),
+                    quality: 72);
+            await file.writeAsBytes(bytes, flush: true);
+            await db.update(table, {photoColumn: file.path},
+                where: '$idColumn = ?', whereArgs: [row[idColumn]]);
+          }
+        } catch (_) {}
+      }
+    }
+
+    // Jangan tarik seluruh foto direktori karyawan (bisa puluhan ribu dan
+    // memperlambat login pertama). Cache hanya foto pada credential yang
+    // benar-benar dipakai hasil scanner offline.
+    await cacheTable('tbl_m_permit_offline', 'id', 'photo_url');
+    await cacheTable('tbl_m_simper_offline', 'id', 'photo_url');
+  }
 
   @override
   void initState() {
@@ -81,7 +150,9 @@ class _SyncPageState extends State<SyncPage> {
           final name = _masters[mIdx];
           final friendly = _friendlyNames[name] ?? name;
 
-          if (_dataSync != null && (_dataSync![name] ?? 0) == 1 && globals.reSync != true) {
+          if (_dataSync != null &&
+              (_dataSync![name] ?? 0) == 1 &&
+              globals.reSync != true) {
             master[name] = 1;
             PreferenceService.setDataSync(master);
             continue;
@@ -109,23 +180,48 @@ class _SyncPageState extends State<SyncPage> {
                   final batch = sqldb.batch();
                   for (var item in items) {
                     if (name == 'areas') {
-                      final areaName = (item is Map ? (item['name'] ?? item['namaArea']) : item)?.toString().trim() ?? '';
-                      final compId = item is Map ? (item['company_id'] as int? ?? 1) : 1;
-                      if (areaName.isNotEmpty && !areaName.toUpperCase().contains('CAMP EKSPLORASI')) {
+                      final areaName = (item is Map
+                                  ? (item['name'] ?? item['namaArea'])
+                                  : item)
+                              ?.toString()
+                              .trim() ??
+                          '';
+                      final compId =
+                          item is Map ? (item['company_id'] as int? ?? 1) : 1;
+                      if (areaName.isNotEmpty &&
+                          !areaName.toUpperCase().contains('CAMP EKSPLORASI')) {
                         batch.rawInsert(
                           'INSERT OR IGNORE INTO tbl_m_benchmark (perusahaan_id, area_utama, nama_benchmark, created_at) VALUES (?, ?, ?, ?)',
-                          [compId, areaName, '', DateTime.now().toIso8601String()],
+                          [
+                            compId,
+                            areaName,
+                            '',
+                            DateTime.now().toIso8601String()
+                          ],
                         );
                       }
                     } else {
                       if (item is Map) {
-                        final benchName = (item['namaBenchmark'] ?? item['name'])?.toString().trim() ?? '';
-                        final areaName = (item['areaUtama'] ?? item['area'])?.toString().trim() ?? '';
-                        final compId = item['perusahaanId'] as int? ?? (item['company_id'] as int? ?? 1);
+                        final benchName =
+                            (item['namaBenchmark'] ?? item['name'])
+                                    ?.toString()
+                                    .trim() ??
+                                '';
+                        final areaName = (item['areaUtama'] ?? item['area'])
+                                ?.toString()
+                                .trim() ??
+                            '';
+                        final compId = item['perusahaanId'] as int? ??
+                            (item['company_id'] as int? ?? 1);
                         if (benchName.isNotEmpty) {
                           batch.rawInsert(
                             'INSERT OR IGNORE INTO tbl_m_benchmark (perusahaan_id, area_utama, nama_benchmark, created_at) VALUES (?, ?, ?, ?)',
-                            [compId, areaName, benchName, DateTime.now().toIso8601String()],
+                            [
+                              compId,
+                              areaName,
+                              benchName,
+                              DateTime.now().toIso8601String()
+                            ],
                           );
                         }
                       }
@@ -149,21 +245,31 @@ class _SyncPageState extends State<SyncPage> {
               await res.fold(
                 (err) async {
                   debugPrint('[SyncPage] Error simper: ${err['message']}');
-                  master[name] = 1;
-                  PreferenceService.setDataSync(master);
+                  if (mounted) {
+                    setState(() {
+                      _offlineScanDataMissing = true;
+                      _table = 'Data SIMPER belum berhasil diunduh';
+                    });
+                  }
                 },
                 (response) async {
                   final count = await _db.saveOfflineSimpers(response);
                   debugPrint('[SyncPage] Saved $count offline SIMPERs');
-                  _progress.value = 100;
-                  master[name] = 1;
-                  PreferenceService.setDataSync(master);
+                  if (count > 0) {
+                    _progress.value = 100;
+                    master[name] = 1;
+                    PreferenceService.setDataSync(master);
+                  } else if (mounted) {
+                    setState(() {
+                      _offlineScanDataMissing = true;
+                      _table = 'Data SIMPER kosong, sinkronisasi perlu diulang';
+                    });
+                  }
                 },
               );
             } catch (e) {
               debugPrint('[SyncPage] Error syncing simper: $e');
-              master[name] = 1;
-              PreferenceService.setDataSync(master);
+              if (mounted) setState(() => _offlineScanDataMissing = true);
             }
             continue;
           }
@@ -174,21 +280,32 @@ class _SyncPageState extends State<SyncPage> {
               await res.fold(
                 (err) async {
                   debugPrint('[SyncPage] Error permit: ${err['message']}');
-                  master[name] = 1;
-                  PreferenceService.setDataSync(master);
+                  if (mounted) {
+                    setState(() {
+                      _offlineScanDataMissing = true;
+                      _table = 'Data Mine Permit belum berhasil diunduh';
+                    });
+                  }
                 },
                 (response) async {
                   final count = await _db.saveOfflinePermits(response);
                   debugPrint('[SyncPage] Saved $count offline Mine Permits');
-                  _progress.value = 100;
-                  master[name] = 1;
-                  PreferenceService.setDataSync(master);
+                  if (count > 0) {
+                    _progress.value = 100;
+                    master[name] = 1;
+                    PreferenceService.setDataSync(master);
+                  } else if (mounted) {
+                    setState(() {
+                      _offlineScanDataMissing = true;
+                      _table =
+                          'Data Mine Permit kosong, sinkronisasi perlu diulang';
+                    });
+                  }
                 },
               );
             } catch (e) {
               debugPrint('[SyncPage] Error syncing permit: $e');
-              master[name] = 1;
-              PreferenceService.setDataSync(master);
+              if (mounted) setState(() => _offlineScanDataMissing = true);
             }
             continue;
           }
@@ -215,9 +332,11 @@ class _SyncPageState extends State<SyncPage> {
             final res = await _api.getMaster(name);
             await res.fold(
               (error) async {
-                debugPrint('[SyncPage] Sync Data $name Error: ${error['message']}');
+                debugPrint(
+                    '[SyncPage] Sync Data $name Error: ${error['message']}');
                 if (mounted) {
-                  SnackBarMsg.danger(context, titleCase('Sync Data $name Gagal!'));
+                  SnackBarMsg.danger(
+                      context, titleCase('Sync Data $name Gagal!'));
                 }
                 master[name] = 1;
                 PreferenceService.setDataSync(master);
@@ -248,12 +367,23 @@ class _SyncPageState extends State<SyncPage> {
                     row.remove('deleted_by');
 
                     if (name == 'employee' || name == 'employees') {
-                      final dept = (row['departemen'] ?? row['depart'])?.toString() ?? 'GENERAL';
-                      final jab = (row['jabatan'] ?? row['posisi'])?.toString() ?? 'Karyawan';
-                      final perush = (row['perusahaan'] ?? row['company'])?.toString() ?? 'PT INDEXIM COALINDO';
-                      final nikVal = (row['no_nik'] ?? row['nik'] ?? row['id'])?.toString() ?? '';
-                      final namaVal = (row['nama_lengkap'] ?? row['nama'])?.toString() ?? '';
-                      final compIdVal = row['company_id'] ?? row['companyId'] ?? 1;
+                      final dept =
+                          (row['departemen'] ?? row['depart'])?.toString() ??
+                              'GENERAL';
+                      final jab =
+                          (row['jabatan'] ?? row['posisi'])?.toString() ??
+                              'Karyawan';
+                      final perush =
+                          (row['perusahaan'] ?? row['company'])?.toString() ??
+                              'PT INDEXIM COALINDO';
+                      final nikVal = (row['no_nik'] ?? row['nik'] ?? row['id'])
+                              ?.toString() ??
+                          '';
+                      final namaVal =
+                          (row['nama_lengkap'] ?? row['nama'])?.toString() ??
+                              '';
+                      final compIdVal =
+                          row['company_id'] ?? row['companyId'] ?? 1;
 
                       row = <String, dynamic>{
                         'no_nik': nikVal,
@@ -265,13 +395,22 @@ class _SyncPageState extends State<SyncPage> {
                         'jabatan': jab,
                         'perusahaan': perush,
                         'company_id': compIdVal,
+                        // Do not cache employee photos in the offline scanner
+                        // dataset; only the identity and QR mapping are needed.
+                        'foto': '',
+                        'qr_code':
+                            (item['qr_code'] ?? item['qrCode'])?.toString() ??
+                                '',
+                        'qr_encrypt': item['qr_encrypt']?.toString() ?? '',
+                        'qr_decrypt': item['qr_decrypt']?.toString() ?? '',
                       };
                       if (item['id'] != null && item['id'] is int) {
                         row['id'] = item['id'];
                       }
                     }
 
-                    batch.insert(table, row, conflictAlgorithm: ConflictAlgorithm.replace);
+                    batch.insert(table, row,
+                        conflictAlgorithm: ConflictAlgorithm.replace);
                     count++;
 
                     if (count % 400 == 0) {
@@ -294,6 +433,20 @@ class _SyncPageState extends State<SyncPage> {
           }
 
           await Future.delayed(const Duration(milliseconds: 150));
+        }
+
+        // Mine Permit & SIMPER adalah data wajib agar scanner dapat bekerja
+        // tanpa jaringan sejak pemakaian pertama.
+        final permitCount = await _db.getOfflinePermitCount();
+        final simperCount = await _db.getOfflineSimperCount();
+        if (permitCount == 0 || simperCount == 0) {
+          if (mounted) {
+            setState(() {
+              _offlineScanDataMissing = true;
+              _table = 'Data scan offline belum lengkap';
+            });
+          }
+          return;
         }
 
         // Selesai seluruh master data
@@ -339,16 +492,20 @@ class _SyncPageState extends State<SyncPage> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
                     decoration: BoxDecoration(
                       color: const Color(0xFF0D5C75).withValues(alpha: 0.08),
                       borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: const Color(0xFF0D5C75).withValues(alpha: 0.2)),
+                      border: Border.all(
+                          color:
+                              const Color(0xFF0D5C75).withValues(alpha: 0.2)),
                     ),
                     child: const Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.shield_rounded, size: 16, color: Color(0xFF0D5C75)),
+                        Icon(Icons.shield_rounded,
+                            size: 16, color: Color(0xFF0D5C75)),
                         SizedBox(width: 8),
                         Text(
                           'MBS SAP • MINING SAFETY SYSTEM',
@@ -412,7 +569,8 @@ class _SyncPageState extends State<SyncPage> {
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: const Color(0xFFCBD5E1), width: 1.2),
+                      border: Border.all(
+                          color: const Color(0xFFCBD5E1), width: 1.2),
                       boxShadow: const [
                         BoxShadow(
                           color: Color(0x08000000),
@@ -433,7 +591,8 @@ class _SyncPageState extends State<SyncPage> {
                                 Container(
                                   padding: const EdgeInsets.all(6),
                                   decoration: BoxDecoration(
-                                    color: const Color(0xFF0D5C75).withValues(alpha: 0.12),
+                                    color: const Color(0xFF0D5C75)
+                                        .withValues(alpha: 0.12),
                                     borderRadius: BorderRadius.circular(8),
                                   ),
                                   child: const Icon(
@@ -455,11 +614,13 @@ class _SyncPageState extends State<SyncPage> {
                               ],
                             ),
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 10, vertical: 4),
                               decoration: BoxDecoration(
                                 color: const Color(0xFFF1F5F9),
                                 borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: const Color(0xFFE2E8F0)),
+                                border:
+                                    Border.all(color: const Color(0xFFE2E8F0)),
                               ),
                               child: Text(
                                 'Tahap $_currentStep dari ${_masters.length}',
@@ -524,11 +685,15 @@ class _SyncPageState extends State<SyncPage> {
                               ),
                             ),
                             Text(
-                              _progress.value == 100 ? 'Selesai' : 'Sedang Memproses...',
+                              _progress.value == 100
+                                  ? 'Selesai'
+                                  : 'Sedang Memproses...',
                               style: TextStyle(
                                 fontSize: 11.5,
                                 fontWeight: FontWeight.w600,
-                                color: _progress.value == 100 ? const Color(0xFF10B981) : const Color(0xFF0D5C75),
+                                color: _progress.value == 100
+                                    ? const Color(0xFF10B981)
+                                    : const Color(0xFF0D5C75),
                               ),
                             ),
                           ],
@@ -540,6 +705,30 @@ class _SyncPageState extends State<SyncPage> {
               ),
 
               const SizedBox(height: 12),
+              if (_offlineScanDataMissing)
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      Navigator.pushReplacement(
+                        context,
+                        MaterialPageRoute(
+                            builder: (_) => SyncPage(widget.profile)),
+                      );
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF2563EB),
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(vertical: 13),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(13)),
+                    ),
+                    icon: const Icon(Icons.refresh_rounded, size: 18),
+                    label: const Text('Coba sinkronisasi lagi',
+                        style: TextStyle(fontWeight: FontWeight.w800)),
+                  ),
+                ),
             ],
           ),
         ),

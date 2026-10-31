@@ -162,12 +162,14 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
       _CheckpointItem(
         key: '1_1',
         moduleTitle: 'Modul 1: Kepatuhan & Sistem',
-        question: 'Apakah pekerjaan yang diamati dilakukan sesuai prosedur yang berlaku?',
+        question:
+            'Apakah pekerjaan yang diamati dilakukan sesuai prosedur yang berlaku?',
       ),
       _CheckpointItem(
         key: '1_2',
         moduleTitle: 'Modul 1: Kepatuhan & Sistem',
-        question: 'Apakah dokumen/izin yang diperlukan tersedia dan masih berlaku?',
+        question:
+            'Apakah dokumen/izin yang diperlukan tersedia dan masih berlaku?',
       ),
       _CheckpointItem(
         key: '1_3',
@@ -179,68 +181,80 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
       _CheckpointItem(
         key: '2_1',
         moduleTitle: 'Modul 2: Risiko & Keselamatan',
-        question: 'Apakah risiko utama pekerjaan telah diidentifikasi sebelum pekerjaan dilakukan?',
+        question:
+            'Apakah risiko utama pekerjaan telah diidentifikasi sebelum pekerjaan dilakukan?',
       ),
       _CheckpointItem(
         key: '2_2',
         moduleTitle: 'Modul 2: Risiko & Keselamatan',
-        question: 'Apakah pengendali risiko kritis telah diterapkan secara efektif?',
+        question:
+            'Apakah pengendali risiko kritis telah diterapkan secara efektif?',
       ),
       _CheckpointItem(
         key: '2_3',
         moduleTitle: 'Modul 2: Risiko & Keselamatan',
-        question: 'Apakah pekerja memahami risiko dan langkah mitigasi saat terjadi bahaya?',
+        question:
+            'Apakah pekerja memahami risiko dan langkah mitigasi saat terjadi bahaya?',
       ),
 
       // Modul 3. Lingkungan Kerja & Housekeeping
       _CheckpointItem(
         key: '3_1',
         moduleTitle: 'Modul 3: Lingkungan Kerja & Housekeeping',
-        question: 'Apakah area kerja bersih, rapi, dan bebas dari bahaya tersandung atau terpeleset?',
+        question:
+            'Apakah area kerja bersih, rapi, dan bebas dari bahaya tersandung atau terpeleset?',
       ),
       _CheckpointItem(
         key: '3_2',
         moduleTitle: 'Modul 3: Lingkungan Kerja & Housekeeping',
-        question: 'Apakah pencahayaan dan ventilasi di area kerja memadai untuk aktivitas yang dilakukan?',
+        question:
+            'Apakah pencahayaan dan ventilasi di area kerja memadai untuk aktivitas yang dilakukan?',
       ),
       _CheckpointItem(
         key: '3_3',
         moduleTitle: 'Modul 3: Lingkungan Kerja & Housekeeping',
-        question: 'Apakah limbah B3 dan sampah operasional dikelola dan dipisahkan dengan benar?',
+        question:
+            'Apakah limbah B3 dan sampah operasional dikelola dan dipisahkan dengan benar?',
       ),
 
       // Modul 4. Peralatan & APD
       _CheckpointItem(
         key: '4_1',
         moduleTitle: 'Modul 4: Peralatan & APD',
-        question: 'Apakah alat pelindung diri (APD) yang dipersyaratkan digunakan secara lengkap dan benar?',
+        question:
+            'Apakah alat pelindung diri (APD) yang dipersyaratkan digunakan secara lengkap dan benar?',
       ),
       _CheckpointItem(
         key: '4_2',
         moduleTitle: 'Modul 4: Peralatan & APD',
-        question: 'Apakah peralatan kerja dan unit telah diinspeksi (P2H) sebelum dioperasikan?',
+        question:
+            'Apakah peralatan kerja dan unit telah diinspeksi (P2H) sebelum dioperasikan?',
       ),
       _CheckpointItem(
         key: '4_3',
         moduleTitle: 'Modul 4: Peralatan & APD',
-        question: 'Apakah pengaman mesin / safety device berfungsi dengan baik tanpa modifikasi terlarang?',
+        question:
+            'Apakah pengaman mesin / safety device berfungsi dengan baik tanpa modifikasi terlarang?',
       ),
 
       // Modul 5. Monitoring & Perbaikan
       _CheckpointItem(
         key: '5_1',
         moduleTitle: 'Modul 5: Monitoring & Perbaikan',
-        question: 'Apakah pengawas melakukan interaksi keselamatan / observasi secara berkala?',
+        question:
+            'Apakah pengawas melakukan interaksi keselamatan / observasi secara berkala?',
       ),
       _CheckpointItem(
         key: '5_2',
         moduleTitle: 'Modul 5: Monitoring & Perbaikan',
-        question: 'Apakah temuan K3 dicatat dan ditindaklanjuti rencana perbaikannya?',
+        question:
+            'Apakah temuan K3 dicatat dan ditindaklanjuti rencana perbaikannya?',
       ),
       _CheckpointItem(
         key: '5_3',
         moduleTitle: 'Modul 5: Monitoring & Perbaikan',
-        question: 'Apakah tersedia bukti bahwa tindakan perbaikan telah dilakukan dan efektif?',
+        question:
+            'Apakah tersedia bukti bahwa tindakan perbaikan telah dilakukan dan efektif?',
       ),
     ];
   }
@@ -250,11 +264,19 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
     setState(() => _isLoadingAreas = true);
     try {
       final db = await _db.database;
-      final rows = await db.rawQuery('SELECT DISTINCT area FROM locations WHERE area IS NOT NULL ORDER BY area');
-      final list = rows.map((r) => r['area']?.toString() ?? '').where((s) => s.isNotEmpty).toList();
+      final rows = await db.rawQuery(
+          'SELECT DISTINCT area FROM locations WHERE area IS NOT NULL ORDER BY area');
+      final list = rows
+          .map((r) => r['area']?.toString() ?? '')
+          .where((s) => s.isNotEmpty)
+          .toList();
 
-      final subRows = await db.rawQuery('SELECT DISTINCT area FROM sublocations WHERE area IS NOT NULL ORDER BY area');
-      final subList = subRows.map((r) => r['area']?.toString() ?? '').where((s) => s.isNotEmpty).toList();
+      final subRows = await db.rawQuery(
+          'SELECT DISTINCT area FROM sublocations WHERE area IS NOT NULL ORDER BY area');
+      final subList = subRows
+          .map((r) => r['area']?.toString() ?? '')
+          .where((s) => s.isNotEmpty)
+          .toList();
 
       final combined = {..._defaultAreas, ...list, ...subList}.toList()..sort();
       setState(() {
@@ -283,18 +305,26 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
         'SELECT nama_benchmark FROM tbl_m_benchmark WHERE area_utama = ? ORDER BY nama_benchmark',
         [areaName],
       );
-      final fromBench = rows.map((r) => r['nama_benchmark']?.toString() ?? '').where((s) => s.isNotEmpty).toList();
+      final fromBench = rows
+          .map((r) => r['nama_benchmark']?.toString() ?? '')
+          .where((s) => s.isNotEmpty)
+          .toList();
 
       final subRows = await db.rawQuery(
         'SELECT DISTINCT sublocation FROM sublocations WHERE area = ? AND sublocation IS NOT NULL ORDER BY sublocation',
         [areaName],
       );
-      final fromSub = subRows.map((r) => r['sublocation']?.toString() ?? '').where((s) => s.isNotEmpty).toList();
+      final fromSub = subRows
+          .map((r) => r['sublocation']?.toString() ?? '')
+          .where((s) => s.isNotEmpty)
+          .toList();
 
       final combined = {...fromBench, ...fromSub}.toList()..sort();
       setState(() {
         _benchmarksList = combined;
-        if (_benchmarksList.isNotEmpty && (_selectedBenchmark == null || !_benchmarksList.contains(_selectedBenchmark))) {
+        if (_benchmarksList.isNotEmpty &&
+            (_selectedBenchmark == null ||
+                !_benchmarksList.contains(_selectedBenchmark))) {
           _selectedBenchmark = _benchmarksList.first;
           _detilLokasiCtrl.text = _selectedBenchmark!;
         }
@@ -364,38 +394,62 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
     final source = await showModalBottomSheet<ImageSource>(
       context: context,
       backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
       builder: (ctx) => SafeArea(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Container(width: 40, height: 4, decoration: BoxDecoration(color: const Color(0xFFCBD5E1), borderRadius: BorderRadius.circular(2))),
+              Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                      color: const Color(0xFFCBD5E1),
+                      borderRadius: BorderRadius.circular(2))),
               const SizedBox(height: 14),
-              const Text('Unggah Foto Bukti Temuan', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+              const Text('Unggah Foto Bukti Temuan',
+                  style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF0F172A))),
               const SizedBox(height: 4),
-              const Text('Wajib menyertakan foto kondisi tidak sesuai untuk temuan K3', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+              const Text(
+                  'Wajib menyertakan foto kondisi tidak sesuai untuk temuan K3',
+                  style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
               const SizedBox(height: 16),
               ListTile(
                 leading: Container(
                   padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(color: const Color(0xFFEFF6FF), borderRadius: BorderRadius.circular(10)),
-                  child: const Icon(Icons.camera_alt_rounded, color: Color(0xFF2563EB)),
+                  decoration: BoxDecoration(
+                      color: const Color(0xFFEFF6FF),
+                      borderRadius: BorderRadius.circular(10)),
+                  child: const Icon(Icons.camera_alt_rounded,
+                      color: Color(0xFF2563EB)),
                 ),
-                title: const Text('Kamera Lapangan', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                subtitle: const Text('Ambil foto langsung di lokasi temuan', style: TextStyle(fontSize: 11)),
+                title: const Text('Kamera Lapangan',
+                    style:
+                        TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                subtitle: const Text('Ambil foto langsung di lokasi temuan',
+                    style: TextStyle(fontSize: 11)),
                 onTap: () => Navigator.pop(ctx, ImageSource.camera),
               ),
               const Divider(height: 1),
               ListTile(
                 leading: Container(
                   padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(color: const Color(0xFFF0FDF4), borderRadius: BorderRadius.circular(10)),
-                  child: const Icon(Icons.photo_library_rounded, color: Color(0xFF16A34A)),
+                  decoration: BoxDecoration(
+                      color: const Color(0xFFF0FDF4),
+                      borderRadius: BorderRadius.circular(10)),
+                  child: const Icon(Icons.photo_library_rounded,
+                      color: Color(0xFF16A34A)),
                 ),
-                title: const Text('Galeri Gambar', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                subtitle: const Text('Pilih dari media penyimpanan perangkat', style: TextStyle(fontSize: 11)),
+                title: const Text('Galeri Gambar',
+                    style:
+                        TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                subtitle: const Text('Pilih dari media penyimpanan perangkat',
+                    style: TextStyle(fontSize: 11)),
                 onTap: () => Navigator.pop(ctx, ImageSource.gallery),
               ),
             ],
@@ -417,25 +471,39 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
     final source = await showModalBottomSheet<ImageSource>(
       context: context,
       backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
       builder: (ctx) => SafeArea(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Container(width: 40, height: 4, decoration: BoxDecoration(color: const Color(0xFFCBD5E1), borderRadius: BorderRadius.circular(2))),
+              Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                      color: const Color(0xFFCBD5E1),
+                      borderRadius: BorderRadius.circular(2))),
               const SizedBox(height: 14),
-              const Text('Unggah Foto Bukti Pertanyaan', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+              const Text('Unggah Foto Bukti Pertanyaan',
+                  style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF0F172A))),
               const SizedBox(height: 16),
               ListTile(
-                leading: const Icon(Icons.camera_alt_rounded, color: Color(0xFF2563EB)),
-                title: const Text('Kamera Lapangan', style: TextStyle(fontWeight: FontWeight.bold)),
+                leading: const Icon(Icons.camera_alt_rounded,
+                    color: Color(0xFF2563EB)),
+                title: const Text('Kamera Lapangan',
+                    style: TextStyle(fontWeight: FontWeight.bold)),
                 onTap: () => Navigator.pop(ctx, ImageSource.camera),
               ),
               ListTile(
-                leading: const Icon(Icons.photo_library_rounded, color: Color(0xFF16A34A)),
-                title: const Text('Galeri Gambar', style: TextStyle(fontWeight: FontWeight.bold)),
+                leading: const Icon(Icons.photo_library_rounded,
+                    color: Color(0xFF16A34A)),
+                title: const Text('Galeri Gambar',
+                    style: TextStyle(fontWeight: FontWeight.bold)),
                 onTap: () => Navigator.pop(ctx, ImageSource.gallery),
               ),
             ],
@@ -462,8 +530,11 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
         String filter = '';
         return StatefulBuilder(
           builder: (modalCtx, setModalState) {
-            final filtered = _masterAreas.where((a) => a.toLowerCase().contains(filter.toLowerCase())).toList();
-            final hasExactMatch = _masterAreas.any((a) => a.toLowerCase() == filter.trim().toLowerCase());
+            final filtered = _masterAreas
+                .where((a) => a.toLowerCase().contains(filter.toLowerCase()))
+                .toList();
+            final hasExactMatch = _masterAreas
+                .any((a) => a.toLowerCase() == filter.trim().toLowerCase());
             final canAddCustom = filter.trim().isNotEmpty && !hasExactMatch;
 
             return Container(
@@ -475,9 +546,13 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
               child: Column(
                 children: [
                   const SizedBox(height: 12),
-                  Container(width: 40, height: 4, decoration: BoxDecoration(color: const Color(0xFFCBD5E1), borderRadius: BorderRadius.circular(2))),
+                  Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                          color: const Color(0xFFCBD5E1),
+                          borderRadius: BorderRadius.circular(2))),
                   const SizedBox(height: 14),
-
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 20),
                     child: Row(
@@ -488,22 +563,26 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
                           children: [
                             Text(
                               'Pilih Area Utama',
-                              style: TextStyle(color: Color(0xFF0F172A), fontSize: 17, fontWeight: FontWeight.bold),
+                              style: TextStyle(
+                                  color: Color(0xFF0F172A),
+                                  fontSize: 17,
+                                  fontWeight: FontWeight.bold),
                             ),
                             SizedBox(height: 2),
-                            Text('Pilih area lokasi kerja atau ketik area baru', style: TextStyle(color: Color(0xFF64748B), fontSize: 12)),
+                            Text('Pilih area lokasi kerja atau ketik area baru',
+                                style: TextStyle(
+                                    color: Color(0xFF64748B), fontSize: 12)),
                           ],
                         ),
                         IconButton(
                           onPressed: () => Navigator.pop(modalCtx),
-                          icon: const Icon(Icons.close_rounded, color: Color(0xFF64748B)),
+                          icon: const Icon(Icons.close_rounded,
+                              color: Color(0xFF64748B)),
                         ),
                       ],
                     ),
                   ),
-
                   const SizedBox(height: 12),
-
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 20),
                     child: Container(
@@ -515,18 +594,19 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
                         onChanged: (val) => setModalState(() => filter = val),
                         decoration: const InputDecoration(
                           hintText: 'Cari atau ketik nama area...',
-                          hintStyle: TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
-                          prefixIcon: Icon(Icons.search_rounded, color: Color(0xFF64748B), size: 20),
+                          hintStyle:
+                              TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
+                          prefixIcon: Icon(Icons.search_rounded,
+                              color: Color(0xFF64748B), size: 20),
                           border: InputBorder.none,
-                          contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                          contentPadding: EdgeInsets.symmetric(
+                              horizontal: 14, vertical: 12),
                         ),
                         style: const TextStyle(fontSize: 13),
                       ),
                     ),
                   ),
-
                   const SizedBox(height: 12),
-
                   if (canAddCustom)
                     Padding(
                       padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
@@ -554,23 +634,29 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
                           ),
                           child: Row(
                             children: [
-                              const Icon(Icons.add_circle_outline_rounded, color: primaryGreen, size: 20),
+                              const Icon(Icons.add_circle_outline_rounded,
+                                  color: primaryGreen, size: 20),
                               const SizedBox(width: 8),
                               Expanded(
-                                child: Text('Gunakan Area Baru: "${filter.trim().toUpperCase()}"',
-                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: primaryGreen)),
+                                child: Text(
+                                    'Gunakan Area Baru: "${filter.trim().toUpperCase()}"',
+                                    style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 12,
+                                        color: primaryGreen)),
                               ),
                             ],
                           ),
                         ),
                       ),
                     ),
-
                   Expanded(
                     child: ListView.separated(
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 20, vertical: 8),
                       itemCount: filtered.length,
-                      separatorBuilder: (_, __) => const Divider(color: Color(0xFFF1F5F9), height: 1),
+                      separatorBuilder: (_, __) =>
+                          const Divider(color: Color(0xFFF1F5F9), height: 1),
                       itemBuilder: (ctx, idx) {
                         final a = filtered[idx];
                         final isSel = a == _area;
@@ -587,13 +673,29 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
                             width: 34,
                             height: 34,
                             decoration: BoxDecoration(
-                              color: isSel ? primaryGreen : const Color(0xFFF1F5F9),
+                              color: isSel
+                                  ? primaryGreen
+                                  : const Color(0xFFF1F5F9),
                               shape: BoxShape.circle,
                             ),
-                            child: Icon(Icons.layers_rounded, size: 18, color: isSel ? Colors.white : const Color(0xFF64748B)),
+                            child: Icon(Icons.layers_rounded,
+                                size: 18,
+                                color: isSel
+                                    ? Colors.white
+                                    : const Color(0xFF64748B)),
                           ),
-                          title: Text(a, style: TextStyle(fontWeight: isSel ? FontWeight.bold : FontWeight.w600, fontSize: 13, color: isSel ? primaryGreen : const Color(0xFF0F172A))),
-                          trailing: isSel ? const Icon(Icons.check_rounded, color: primaryGreen, size: 20) : null,
+                          title: Text(a,
+                              style: TextStyle(
+                                  fontWeight:
+                                      isSel ? FontWeight.bold : FontWeight.w600,
+                                  fontSize: 13,
+                                  color: isSel
+                                      ? primaryGreen
+                                      : const Color(0xFF0F172A))),
+                          trailing: isSel
+                              ? const Icon(Icons.check_rounded,
+                                  color: primaryGreen, size: 20)
+                              : null,
                         );
                       },
                     ),
@@ -616,8 +718,11 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
         String filter = '';
         return StatefulBuilder(
           builder: (modalCtx, setModalState) {
-            final filtered = _benchmarksList.where((b) => b.toLowerCase().contains(filter.toLowerCase())).toList();
-            final hasExactMatch = _benchmarksList.any((b) => b.toLowerCase() == filter.trim().toLowerCase());
+            final filtered = _benchmarksList
+                .where((b) => b.toLowerCase().contains(filter.toLowerCase()))
+                .toList();
+            final hasExactMatch = _benchmarksList
+                .any((b) => b.toLowerCase() == filter.trim().toLowerCase());
             final canAddCustom = filter.trim().isNotEmpty && !hasExactMatch;
 
             return Container(
@@ -629,9 +734,13 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
               child: Column(
                 children: [
                   const SizedBox(height: 12),
-                  Container(width: 40, height: 4, decoration: BoxDecoration(color: const Color(0xFFCBD5E1), borderRadius: BorderRadius.circular(2))),
+                  Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                          color: const Color(0xFFCBD5E1),
+                          borderRadius: BorderRadius.circular(2))),
                   const SizedBox(height: 14),
-
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 20),
                     child: Row(
@@ -641,22 +750,29 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text('Detail Lokasi / Benchmark', style: TextStyle(color: Color(0xFF0F172A), fontSize: 17, fontWeight: FontWeight.bold)),
+                              const Text('Detail Lokasi / Benchmark',
+                                  style: TextStyle(
+                                      color: Color(0xFF0F172A),
+                                      fontSize: 17,
+                                      fontWeight: FontWeight.bold)),
                               const SizedBox(height: 2),
-                              Text('Area: $_area', style: const TextStyle(color: primaryGreen, fontSize: 12, fontWeight: FontWeight.w600)),
+                              Text('Area: $_area',
+                                  style: const TextStyle(
+                                      color: primaryGreen,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600)),
                             ],
                           ),
                         ),
                         IconButton(
                           onPressed: () => Navigator.pop(modalCtx),
-                          icon: const Icon(Icons.close_rounded, color: Color(0xFF64748B)),
+                          icon: const Icon(Icons.close_rounded,
+                              color: Color(0xFF64748B)),
                         ),
                       ],
                     ),
                   ),
-
                   const SizedBox(height: 12),
-
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 20),
                     child: Container(
@@ -668,18 +784,19 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
                         onChanged: (val) => setModalState(() => filter = val),
                         decoration: const InputDecoration(
                           hintText: 'Cari atau ketik benchmark baru...',
-                          hintStyle: TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
-                          prefixIcon: Icon(Icons.search_rounded, color: Color(0xFF64748B), size: 20),
+                          hintStyle:
+                              TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
+                          prefixIcon: Icon(Icons.search_rounded,
+                              color: Color(0xFF64748B), size: 20),
                           border: InputBorder.none,
-                          contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                          contentPadding: EdgeInsets.symmetric(
+                              horizontal: 14, vertical: 12),
                         ),
                         style: const TextStyle(fontSize: 13),
                       ),
                     ),
                   ),
-
                   const SizedBox(height: 12),
-
                   if (canAddCustom)
                     Padding(
                       padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
@@ -691,7 +808,14 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
                             await db.rawInsert(
                               '''INSERT INTO tbl_m_benchmark (perusahaan_id, area_utama, nama_benchmark, created_by_nik, created_by_name, created_at)
                                  VALUES (?, ?, ?, ?, ?, ?)''',
-                              [_profile?.companyId ?? 1, _area, newBench, _profile?.noNik ?? '', _profile?.namaLengkap ?? '', DateTime.now().toIso8601String()],
+                              [
+                                _profile?.companyId ?? 1,
+                                _area,
+                                newBench,
+                                _profile?.noNik ?? '',
+                                _profile?.namaLengkap ?? '',
+                                DateTime.now().toIso8601String()
+                              ],
                             );
                           } catch (_) {}
 
@@ -715,18 +839,22 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
                           ),
                           child: Row(
                             children: [
-                              const Icon(Icons.add_location_alt_rounded, color: primaryGreen, size: 20),
+                              const Icon(Icons.add_location_alt_rounded,
+                                  color: primaryGreen, size: 20),
                               const SizedBox(width: 8),
                               Expanded(
-                                child: Text('Simpan Benchmark Baru Offline: "$filter"',
-                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: primaryGreen)),
+                                child: Text(
+                                    'Simpan Benchmark Baru Offline: "$filter"',
+                                    style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 12,
+                                        color: primaryGreen)),
                               ),
                             ],
                           ),
                         ),
                       ),
                     ),
-
                   Expanded(
                     child: _benchmarksList.isEmpty
                         ? const Center(
@@ -735,14 +863,17 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
                               child: Text(
                                 'Belum ada data benchmark di area ini.\nKetik nama titik di atas untuk menambahkan secara offline.',
                                 textAlign: TextAlign.center,
-                                style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
+                                style: TextStyle(
+                                    fontSize: 12, color: Color(0xFF94A3B8)),
                               ),
                             ),
                           )
                         : ListView.separated(
-                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 20, vertical: 8),
                             itemCount: filtered.length,
-                            separatorBuilder: (_, __) => const Divider(color: Color(0xFFF1F5F9), height: 1),
+                            separatorBuilder: (_, __) => const Divider(
+                                color: Color(0xFFF1F5F9), height: 1),
                             itemBuilder: (ctx, idx) {
                               final b = filtered[idx];
                               final isSel = b == _selectedBenchmark;
@@ -758,13 +889,30 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
                                   width: 34,
                                   height: 34,
                                   decoration: BoxDecoration(
-                                    color: isSel ? primaryGreen : const Color(0xFFF1F5F9),
+                                    color: isSel
+                                        ? primaryGreen
+                                        : const Color(0xFFF1F5F9),
                                     shape: BoxShape.circle,
                                   ),
-                                  child: Icon(Icons.place_rounded, size: 18, color: isSel ? Colors.white : const Color(0xFF64748B)),
+                                  child: Icon(Icons.place_rounded,
+                                      size: 18,
+                                      color: isSel
+                                          ? Colors.white
+                                          : const Color(0xFF64748B)),
                                 ),
-                                title: Text(b, style: TextStyle(fontWeight: isSel ? FontWeight.bold : FontWeight.w600, fontSize: 13, color: isSel ? primaryGreen : const Color(0xFF0F172A))),
-                                trailing: isSel ? const Icon(Icons.check_rounded, color: primaryGreen, size: 20) : null,
+                                title: Text(b,
+                                    style: TextStyle(
+                                        fontWeight: isSel
+                                            ? FontWeight.bold
+                                            : FontWeight.w600,
+                                        fontSize: 13,
+                                        color: isSel
+                                            ? primaryGreen
+                                            : const Color(0xFF0F172A))),
+                                trailing: isSel
+                                    ? const Icon(Icons.check_rounded,
+                                        color: primaryGreen, size: 20)
+                                    : null,
                               );
                             },
                           ),
@@ -786,13 +934,16 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (dialogCtx, setDialogState) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
           title: const Row(
             children: [
               Icon(Icons.add_task_rounded, color: primaryGreen),
               SizedBox(width: 10),
               Expanded(
-                child: Text('Tambah Pertanyaan Kustom', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+                child: Text('Tambah Pertanyaan Kustom',
+                    style:
+                        TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
               ),
             ],
           ),
@@ -800,25 +951,38 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('Pertanyaan / Checkpoint Baru', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF334155))),
+              const Text('Pertanyaan / Checkpoint Baru',
+                  style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF334155))),
               const SizedBox(height: 6),
               TextField(
                 controller: qCtrl,
                 maxLines: 2,
                 decoration: InputDecoration(
                   hintText: 'Misal: Apakah APD khusus ketinggian tersedia?',
-                  hintStyle: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
+                  hintStyle:
+                      const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
                   filled: true,
                   fillColor: const Color(0xFFF8FAFC),
                   contentPadding: const EdgeInsets.all(12),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
-                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                  enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
                 ),
                 style: const TextStyle(fontSize: 13),
                 autofocus: true,
               ),
               const SizedBox(height: 14),
-              const Text('Tipe Pilihan Jawaban', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF334155))),
+              const Text('Tipe Pilihan Jawaban',
+                  style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF334155))),
               const SizedBox(height: 8),
               Row(
                 children: [
@@ -829,9 +993,14 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
                       child: Container(
                         padding: const EdgeInsets.symmetric(vertical: 10),
                         decoration: BoxDecoration(
-                          color: optionType == 3 ? primaryGreen : const Color(0xFFF1F5F9),
+                          color: optionType == 3
+                              ? primaryGreen
+                              : const Color(0xFFF1F5F9),
                           borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: optionType == 3 ? primaryGreen : const Color(0xFFCBD5E1)),
+                          border: Border.all(
+                              color: optionType == 3
+                                  ? primaryGreen
+                                  : const Color(0xFFCBD5E1)),
                         ),
                         alignment: Alignment.center,
                         child: Text(
@@ -840,7 +1009,9 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
                           style: TextStyle(
                             fontSize: 10.5,
                             fontWeight: FontWeight.bold,
-                            color: optionType == 3 ? Colors.white : const Color(0xFF64748B),
+                            color: optionType == 3
+                                ? Colors.white
+                                : const Color(0xFF64748B),
                           ),
                         ),
                       ),
@@ -854,9 +1025,14 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
                       child: Container(
                         padding: const EdgeInsets.symmetric(vertical: 10),
                         decoration: BoxDecoration(
-                          color: optionType == 2 ? primaryGreen : const Color(0xFFF1F5F9),
+                          color: optionType == 2
+                              ? primaryGreen
+                              : const Color(0xFFF1F5F9),
                           borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: optionType == 2 ? primaryGreen : const Color(0xFFCBD5E1)),
+                          border: Border.all(
+                              color: optionType == 2
+                                  ? primaryGreen
+                                  : const Color(0xFFCBD5E1)),
                         ),
                         alignment: Alignment.center,
                         child: Text(
@@ -865,7 +1041,9 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
                           style: TextStyle(
                             fontSize: 10.5,
                             fontWeight: FontWeight.bold,
-                            color: optionType == 2 ? Colors.white : const Color(0xFF64748B),
+                            color: optionType == 2
+                                ? Colors.white
+                                : const Color(0xFF64748B),
                           ),
                         ),
                       ),
@@ -878,19 +1056,23 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(dialogCtx),
-              child: const Text('Batal', style: TextStyle(color: Color(0xFF64748B))),
+              child: const Text('Batal',
+                  style: TextStyle(color: Color(0xFF64748B))),
             ),
             ElevatedButton(
               style: ElevatedButton.styleFrom(
                 backgroundColor: primaryGreen,
                 foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10)),
               ),
               onPressed: () {
                 if (qCtrl.text.trim().isEmpty) return;
-                Navigator.pop(dialogCtx, (question: qCtrl.text.trim(), optionType: optionType));
+                Navigator.pop(dialogCtx,
+                    (question: qCtrl.text.trim(), optionType: optionType));
               },
-              child: const Text('Tambahkan', style: TextStyle(fontWeight: FontWeight.bold)),
+              child: const Text('Tambahkan',
+                  style: TextStyle(fontWeight: FontWeight.bold)),
             ),
           ],
         ),
@@ -920,21 +1102,24 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
 
     // 2. Validasi PJA
     if (_selectedPja == null && _pjaSearchCtrl.text.trim().isEmpty) {
-      SnackBarMsg.danger(context, 'Harap tetapkan Penanggung Jawab Area (PJA).');
+      SnackBarMsg.danger(
+          context, 'Harap tetapkan Penanggung Jawab Area (PJA).');
       return;
     }
 
     // 3. Validasi foto jika ada temuan (skor 0 / TIDAK)
     for (var cp in _checkpoints) {
       if (cp.score == 0 && cp.photo == null) {
-        SnackBarMsg.danger(context, 'Temuan pada "${cp.question}" wajib melampirkan foto bukti kondisi.');
+        SnackBarMsg.danger(context,
+            'Temuan pada "${cp.question}" wajib melampirkan foto bukti kondisi.');
         return;
       }
     }
 
     for (var cq in _customQuestions) {
       if (cq.score == 0 && cq.photo == null) {
-        SnackBarMsg.danger(context, 'Temuan pada pertanyaan kustom wajib melampirkan foto bukti kondisi.');
+        SnackBarMsg.danger(context,
+            'Temuan pada pertanyaan kustom wajib melampirkan foto bukti kondisi.');
         return;
       }
     }
@@ -967,7 +1152,8 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
       final Map<String, dynamic> insertValues = {
         'employee_id': profileId,
         'tanggal': DateFormat('yyyy-MM-dd').format(_tanggal),
-        'waktu': '${_waktu.hour.toString().padLeft(2, '0')}:${_waktu.minute.toString().padLeft(2, '0')}',
+        'waktu':
+            '${_waktu.hour.toString().padLeft(2, '0')}:${_waktu.minute.toString().padLeft(2, '0')}',
         'jenis_inspeksi': _jenisInspeksi,
         'area': _area,
         'lokasi': _selectedBenchmark ?? _detilLokasiCtrl.text.trim(),
@@ -1029,18 +1215,35 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
     await showProfessionalSuccessSheet(
       context: context,
       title: 'Laporan Inspeksi Berhasil Disimpan!',
-      subtitle: 'Hasil checklist inspeksi telah tersimpan di database lokal HP & siap disinkronkan ke server pusat.',
+      subtitle:
+          'Hasil checklist inspeksi tersimpan di perangkat dan siap dikirim saat terhubung ke internet.',
       referenceNumber: 'INSP-${localId.toString().padLeft(5, '0')}',
       accentColor: primaryGreen,
       icon: Icons.fact_check_rounded,
       isOffline: true,
-      statusBadgeText: 'OFFLINE STORAGE (SIAP SINKRON)',
+      statusBadgeText: 'TERSIMPAN DI PERANGKAT',
       receiptItems: [
-        SuccessReceiptItem(label: 'Jenis Inspeksi', value: widget.module.name.toUpperCase(), isHighlight: true),
-        SuccessReceiptItem(label: 'Area Inspeksi', value: _area.isNotEmpty ? _area : 'Area Tambang'),
-        SuccessReceiptItem(label: 'Auditor / Pemeriksa', value: '${profile?.namaLengkap ?? "Auditor"} (${profile?.noNik ?? "-"})'),
-        SuccessReceiptItem(label: 'Penanggung Jawab (PJA)', value: _selectedPja?.nama ?? (_pjaSearchCtrl.text.trim().isEmpty ? '-' : _pjaSearchCtrl.text.trim())),
-        SuccessReceiptItem(label: 'Butir Checklist', value: '${_checkpoints.length + _customQuestions.length} Item Pemeriksaan'),
+        SuccessReceiptItem(
+            label: 'Jenis Inspeksi',
+            value: widget.module.name.toUpperCase(),
+            isHighlight: true),
+        SuccessReceiptItem(
+            label: 'Area Inspeksi',
+            value: _area.isNotEmpty ? _area : 'Area Tambang'),
+        SuccessReceiptItem(
+            label: 'Auditor / Pemeriksa',
+            value:
+                '${profile?.namaLengkap ?? "Auditor"} (${profile?.noNik ?? "-"})'),
+        SuccessReceiptItem(
+            label: 'Penanggung Jawab (PJA)',
+            value: _selectedPja?.nama ??
+                (_pjaSearchCtrl.text.trim().isEmpty
+                    ? '-'
+                    : _pjaSearchCtrl.text.trim())),
+        SuccessReceiptItem(
+            label: 'Butir Checklist',
+            value:
+                '${_checkpoints.length + _customQuestions.length} Item Pemeriksaan'),
       ],
       primaryButtonText: 'Kembali ke Hub Inspeksi',
     );
@@ -1085,7 +1288,8 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
                   decoration: BoxDecoration(
                     color: accentColor.withValues(alpha: 0.12),
                     shape: BoxShape.circle,
-                    border: Border.all(color: accentColor.withValues(alpha: 0.3)),
+                    border:
+                        Border.all(color: accentColor.withValues(alpha: 0.3)),
                   ),
                   alignment: Alignment.center,
                   child: Text(
@@ -1122,7 +1326,8 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
                       const SizedBox(height: 2),
                       Text(
                         subtitle,
-                        style: const TextStyle(color: Color(0xFF64748B), fontSize: 10.5),
+                        style: const TextStyle(
+                            color: Color(0xFF64748B), fontSize: 10.5),
                       ),
                     ],
                   ),
@@ -1143,15 +1348,26 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
     );
   }
 
-  Widget _buildDatePicker({required String label, required DateTime date, required VoidCallback onTap}) {
+  Widget _buildDatePicker(
+      {required String label,
+      required DateTime date,
+      required VoidCallback onTap}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(label, style: const TextStyle(color: Color(0xFF0F172A), fontSize: 12, fontWeight: FontWeight.w600)),
-            const Text('Aktual', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 10.5, fontWeight: FontWeight.w500)),
+            Text(label,
+                style: const TextStyle(
+                    color: Color(0xFF0F172A),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600)),
+            const Text('Aktual',
+                style: TextStyle(
+                    color: Color(0xFF94A3B8),
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w500)),
           ],
         ),
         const SizedBox(height: 6),
@@ -1167,12 +1383,16 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
             ),
             child: Row(
               children: [
-                const Icon(Icons.calendar_month_rounded, color: primaryGreen, size: 18),
+                const Icon(Icons.calendar_month_rounded,
+                    color: primaryGreen, size: 18),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     DateFormat('dd/MM/yyyy').format(date),
-                    style: const TextStyle(color: Color(0xFF0F172A), fontSize: 12, fontWeight: FontWeight.w600),
+                    style: const TextStyle(
+                        color: Color(0xFF0F172A),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600),
                   ),
                 ),
               ],
@@ -1183,11 +1403,18 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
     );
   }
 
-  Widget _buildTimePicker({required String label, required TimeOfDay time, required VoidCallback onTap}) {
+  Widget _buildTimePicker(
+      {required String label,
+      required TimeOfDay time,
+      required VoidCallback onTap}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: const TextStyle(color: Color(0xFF0F172A), fontSize: 12, fontWeight: FontWeight.w600)),
+        Text(label,
+            style: const TextStyle(
+                color: Color(0xFF0F172A),
+                fontSize: 12,
+                fontWeight: FontWeight.w600)),
         const SizedBox(height: 6),
         InkWell(
           onTap: onTap,
@@ -1201,12 +1428,16 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
             ),
             child: Row(
               children: [
-                const Icon(Icons.schedule_rounded, color: primaryGreen, size: 18),
+                const Icon(Icons.schedule_rounded,
+                    color: primaryGreen, size: 18),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}',
-                    style: const TextStyle(color: Color(0xFF0F172A), fontSize: 12, fontWeight: FontWeight.w600),
+                    style: const TextStyle(
+                        color: Color(0xFF0F172A),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600),
                   ),
                 ),
               ],
@@ -1254,7 +1485,9 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
     completed++; // default 15 pertanyaan sudah memiliki nilai default
 
     final double pct = completed / totalSteps;
-    final Color barColor = pct >= 1.0 ? primaryGreen : (pct >= 0.5 ? const Color(0xFF0284C7) : const Color(0xFFEA580C));
+    final Color barColor = pct >= 1.0
+        ? primaryGreen
+        : (pct >= 0.5 ? const Color(0xFF0284C7) : const Color(0xFFEA580C));
 
     return Container(
       margin: const EdgeInsets.only(bottom: 14),
@@ -1273,7 +1506,9 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
               Row(
                 children: [
                   Icon(
-                    pct >= 1.0 ? Icons.check_circle_rounded : Icons.pending_actions_rounded,
+                    pct >= 1.0
+                        ? Icons.check_circle_rounded
+                        : Icons.pending_actions_rounded,
                     color: barColor,
                     size: 16,
                   ),
@@ -1319,7 +1554,10 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
             const SizedBox(height: 6),
             Text(
               'Belum lengkap: ${missing.join(', ')}',
-              style: const TextStyle(color: Color(0xFFDC2626), fontSize: 10.5, fontWeight: FontWeight.w500),
+              style: const TextStyle(
+                  color: Color(0xFFDC2626),
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w500),
             ),
           ],
         ],
@@ -1375,7 +1613,8 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(color: borderGreen),
                       ),
-                      child: const Icon(Icons.assignment_turned_in_rounded, color: primaryGreen, size: 24),
+                      child: const Icon(Icons.assignment_turned_in_rounded,
+                          color: primaryGreen, size: 24),
                     ),
                     const SizedBox(width: 12),
                     const Expanded(
@@ -1384,12 +1623,16 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
                         children: [
                           Text(
                             'Formulir Pemeriksaan Inspeksi',
-                            style: TextStyle(color: Color(0xFF0F172A), fontSize: 14, fontWeight: FontWeight.bold),
+                            style: TextStyle(
+                                color: Color(0xFF0F172A),
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold),
                           ),
                           SizedBox(height: 2),
                           Text(
                             'Evaluasi kepatuhan operasional K3 dan pantau temuan di lapangan.',
-                            style: TextStyle(color: Color(0xFF64748B), fontSize: 11),
+                            style: TextStyle(
+                                color: Color(0xFF64748B), fontSize: 11),
                           ),
                         ],
                       ),
@@ -1422,10 +1665,12 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
                             final picked = await showDatePicker(
                               context: context,
                               initialDate: _tanggal,
-                              firstDate: DateTime.now().subtract(const Duration(days: 30)),
+                              firstDate: DateTime.now()
+                                  .subtract(const Duration(days: 30)),
                               lastDate: DateTime.now(),
                             );
-                            if (picked != null) setState(() => _tanggal = picked);
+                            if (picked != null)
+                              setState(() => _tanggal = picked);
                           },
                         ),
                       ),
@@ -1449,7 +1694,12 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
                   const SizedBox(height: 14),
 
                   // Jenis Inspeksi Segmented Pills
-                  const Text('JENIS INSPEKSI *', style: TextStyle(color: Color(0xFF0F172A), fontSize: 11.5, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+                  const Text('JENIS INSPEKSI *',
+                      style: TextStyle(
+                          color: Color(0xFF0F172A),
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 0.5)),
                   const SizedBox(height: 6),
                   Wrap(
                     spacing: 8,
@@ -1466,18 +1716,26 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
                         onTap: () => setState(() => _jenisInspeksi = j),
                         borderRadius: BorderRadius.circular(10),
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 8),
                           decoration: BoxDecoration(
-                            color: isSel ? primaryGreen : const Color(0xFFF8FAFC),
+                            color:
+                                isSel ? primaryGreen : const Color(0xFFF8FAFC),
                             borderRadius: BorderRadius.circular(10),
-                            border: Border.all(color: isSel ? primaryGreen : const Color(0xFFE2E8F0)),
+                            border: Border.all(
+                                color: isSel
+                                    ? primaryGreen
+                                    : const Color(0xFFE2E8F0)),
                           ),
                           child: Text(
                             j,
                             style: TextStyle(
                               fontSize: 11,
-                              fontWeight: isSel ? FontWeight.bold : FontWeight.w500,
-                              color: isSel ? Colors.white : const Color(0xFF475569),
+                              fontWeight:
+                                  isSel ? FontWeight.bold : FontWeight.w500,
+                              color: isSel
+                                  ? Colors.white
+                                  : const Color(0xFF475569),
                             ),
                           ),
                         ),
@@ -1488,33 +1746,48 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
                   const SizedBox(height: 14),
 
                   // Area Utama Picker Modal
-                  const Text('AREA UTAMA *', style: TextStyle(color: Color(0xFF0F172A), fontSize: 11.5, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+                  const Text('AREA UTAMA *',
+                      style: TextStyle(
+                          color: Color(0xFF0F172A),
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 0.5)),
                   const SizedBox(height: 6),
                   InkWell(
                     onTap: _showAreaPickerModal,
                     borderRadius: BorderRadius.circular(12),
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 14),
                       decoration: BoxDecoration(
                         color: const Color(0xFFF8FAFC),
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: _area.isNotEmpty ? const Color(0xFFBAE6FD) : const Color(0xFFE2E8F0)),
+                        border: Border.all(
+                            color: _area.isNotEmpty
+                                ? const Color(0xFFBAE6FD)
+                                : const Color(0xFFE2E8F0)),
                       ),
                       child: Row(
                         children: [
-                          const Icon(Icons.layers_rounded, color: Color(0xFF0284C7), size: 20),
+                          const Icon(Icons.layers_rounded,
+                              color: Color(0xFF0284C7), size: 20),
                           const SizedBox(width: 10),
                           Expanded(
                             child: Text(
                               _area.isNotEmpty ? _area : 'Pilih Area Utama...',
                               style: TextStyle(
-                                color: _area.isNotEmpty ? const Color(0xFF0F172A) : const Color(0xFF94A3B8),
+                                color: _area.isNotEmpty
+                                    ? const Color(0xFF0F172A)
+                                    : const Color(0xFF94A3B8),
                                 fontSize: 13,
-                                fontWeight: _area.isNotEmpty ? FontWeight.bold : FontWeight.normal,
+                                fontWeight: _area.isNotEmpty
+                                    ? FontWeight.bold
+                                    : FontWeight.normal,
                               ),
                             ),
                           ),
-                          const Icon(Icons.keyboard_arrow_down_rounded, color: Color(0xFF64748B)),
+                          const Icon(Icons.keyboard_arrow_down_rounded,
+                              color: Color(0xFF64748B)),
                         ],
                       ),
                     ),
@@ -1526,11 +1799,17 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text('DETAIL LOKASI / BENCHMARK *', style: TextStyle(color: Color(0xFF0F172A), fontSize: 11.5, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+                      const Text('DETAIL LOKASI / BENCHMARK *',
+                          style: TextStyle(
+                              color: Color(0xFF0F172A),
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 0.5)),
                       if (_area.isNotEmpty)
                         Text(
                           '${_benchmarksList.length} titik',
-                          style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                          style: const TextStyle(
+                              fontSize: 11, color: Color(0xFF64748B)),
                         ),
                     ],
                   ),
@@ -1539,27 +1818,39 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
                     onTap: _showBenchmarkPickerModal,
                     borderRadius: BorderRadius.circular(12),
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 14),
                       decoration: BoxDecoration(
                         color: const Color(0xFFF8FAFC),
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: _detilLokasiCtrl.text.isNotEmpty ? const Color(0xFFBAE6FD) : const Color(0xFFE2E8F0)),
+                        border: Border.all(
+                            color: _detilLokasiCtrl.text.isNotEmpty
+                                ? const Color(0xFFBAE6FD)
+                                : const Color(0xFFE2E8F0)),
                       ),
                       child: Row(
                         children: [
-                          const Icon(Icons.place_rounded, color: Color(0xFF0284C7), size: 20),
+                          const Icon(Icons.place_rounded,
+                              color: Color(0xFF0284C7), size: 20),
                           const SizedBox(width: 10),
                           Expanded(
                             child: Text(
-                              _detilLokasiCtrl.text.isNotEmpty ? _detilLokasiCtrl.text : 'Pilih atau buat titik benchmark...',
+                              _detilLokasiCtrl.text.isNotEmpty
+                                  ? _detilLokasiCtrl.text
+                                  : 'Pilih atau buat titik benchmark...',
                               style: TextStyle(
-                                color: _detilLokasiCtrl.text.isNotEmpty ? const Color(0xFF0F172A) : const Color(0xFF94A3B8),
+                                color: _detilLokasiCtrl.text.isNotEmpty
+                                    ? const Color(0xFF0F172A)
+                                    : const Color(0xFF94A3B8),
                                 fontSize: 13,
-                                fontWeight: _detilLokasiCtrl.text.isNotEmpty ? FontWeight.bold : FontWeight.normal,
+                                fontWeight: _detilLokasiCtrl.text.isNotEmpty
+                                    ? FontWeight.bold
+                                    : FontWeight.normal,
                               ),
                             ),
                           ),
-                          const Icon(Icons.keyboard_arrow_down_rounded, color: Color(0xFF64748B)),
+                          const Icon(Icons.keyboard_arrow_down_rounded,
+                              color: Color(0xFF64748B)),
                         ],
                       ),
                     ),
@@ -1584,18 +1875,27 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
                             color: const Color(0xFFE0F2FE),
                             borderRadius: BorderRadius.circular(10),
                           ),
-                          child: const Icon(Icons.my_location_rounded, color: Color(0xFF0284C7), size: 20),
+                          child: const Icon(Icons.my_location_rounded,
+                              color: Color(0xFF0284C7), size: 20),
                         ),
                         const SizedBox(width: 10),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text('Koordinat Satelit Perangkat', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                              const Text('Koordinat Satelit Perangkat',
+                                  style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold,
+                                      color: Color(0xFF0F172A))),
                               const SizedBox(height: 2),
                               Text(
-                                _detilLokasiCtrl.text.startsWith('-') || _detilLokasiCtrl.text.contains('.') ? _detilLokasiCtrl.text : 'GPS Aktual terdeteksi',
-                                style: const TextStyle(fontSize: 10.5, color: Color(0xFF64748B)),
+                                _detilLokasiCtrl.text.startsWith('-') ||
+                                        _detilLokasiCtrl.text.contains('.')
+                                    ? _detilLokasiCtrl.text
+                                    : 'GPS Aktual terdeteksi',
+                                style: const TextStyle(
+                                    fontSize: 10.5, color: Color(0xFF64748B)),
                               ),
                             ],
                           ),
@@ -1603,8 +1903,11 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
                         TextButton.icon(
                           onPressed: () => _fillGpsFromDevice(silent: false),
                           icon: const Icon(Icons.refresh_rounded, size: 16),
-                          label: const Text('Update GPS', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                          style: TextButton.styleFrom(foregroundColor: const Color(0xFF0284C7)),
+                          label: const Text('Update GPS',
+                              style: TextStyle(
+                                  fontSize: 11, fontWeight: FontWeight.bold)),
+                          style: TextButton.styleFrom(
+                              foregroundColor: const Color(0xFF0284C7)),
                         ),
                       ],
                     ),
@@ -1613,7 +1916,12 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
                   const SizedBox(height: 14),
 
                   // Lokasi Spesifik
-                  const Text('LOKASI SPESIFIK / DETAIL KERJA', style: TextStyle(color: Color(0xFF0F172A), fontSize: 11.5, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+                  const Text('LOKASI SPESIFIK / DETAIL KERJA',
+                      style: TextStyle(
+                          color: Color(0xFF0F172A),
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 0.5)),
                   const SizedBox(height: 6),
                   Container(
                     decoration: BoxDecoration(
@@ -1625,8 +1933,10 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
                     child: TextField(
                       controller: _lokasiSpesifikCtrl,
                       decoration: const InputDecoration(
-                        hintText: 'Misal: Area Front Loading 02, Sisi Timur Pit',
-                        hintStyle: TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
+                        hintText:
+                            'Misal: Area Front Loading 02, Sisi Timur Pit',
+                        hintStyle:
+                            TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
                         border: InputBorder.none,
                       ),
                       style: const TextStyle(fontSize: 13),
@@ -1639,17 +1949,25 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
               _buildSectionCard(
                 stepNumber: '2',
                 title: 'PENANGGUNG JAWAB AREA (PJA)',
-                subtitle: 'Delegasi pengawas yang bertanggung jawab di lokasi kerja',
+                subtitle:
+                    'Delegasi pengawas yang bertanggung jawab di lokasi kerja',
                 icon: Icons.person_pin_rounded,
                 accentColor: primaryGreen,
                 children: [
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text('STATUS PJA MITRA', style: TextStyle(color: Color(0xFF0F172A), fontSize: 11.5, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+                      const Text('STATUS PJA MITRA',
+                          style: TextStyle(
+                              color: Color(0xFF0F172A),
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 0.5)),
                       Row(
                         children: [
-                          const Text('Lintas Mitra / Bebas Ketik', style: TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                          const Text('Lintas Mitra / Bebas Ketik',
+                              style: TextStyle(
+                                  fontSize: 11, color: Color(0xFF64748B))),
                           const SizedBox(width: 6),
                           Switch(
                             value: _isMitraMode,
@@ -1666,7 +1984,6 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
                     ],
                   ),
                   const SizedBox(height: 6),
-
                   if (_selectedPja != null)
                     Container(
                       padding: const EdgeInsets.all(12),
@@ -1681,8 +1998,12 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
                             radius: 20,
                             backgroundColor: primaryGreen,
                             child: Text(
-                              _selectedPja!.nama.isNotEmpty ? _selectedPja!.nama[0].toUpperCase() : 'P',
-                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                              _selectedPja!.nama.isNotEmpty
+                                  ? _selectedPja!.nama[0].toUpperCase()
+                                  : 'P',
+                              style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold),
                             ),
                           ),
                           const SizedBox(width: 12),
@@ -1690,16 +2011,30 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(_selectedPja!.nama, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF0F172A))),
+                                Text(_selectedPja!.nama,
+                                    style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 13,
+                                        color: Color(0xFF0F172A))),
                                 const SizedBox(height: 2),
-                                Text('${_selectedPja!.nik} • ${_selectedPja!.departemen}', style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
-                                Text(_selectedPja!.perusahaan, style: const TextStyle(fontSize: 10.5, color: primaryGreen, fontWeight: FontWeight.w600)),
+                                Text(
+                                    '${_selectedPja!.nik} • ${_selectedPja!.departemen}',
+                                    style: const TextStyle(
+                                        fontSize: 11,
+                                        color: Color(0xFF64748B))),
+                                Text(_selectedPja!.perusahaan,
+                                    style: const TextStyle(
+                                        fontSize: 10.5,
+                                        color: primaryGreen,
+                                        fontWeight: FontWeight.w600)),
                               ],
                             ),
                           ),
                           IconButton(
-                            icon: const Icon(Icons.close_rounded, color: Color(0xFFDC2626), size: 20),
-                            onPressed: () => setState(() => _selectedPja = null),
+                            icon: const Icon(Icons.close_rounded,
+                                color: Color(0xFFDC2626), size: 20),
+                            onPressed: () =>
+                                setState(() => _selectedPja = null),
                           ),
                         ],
                       ),
@@ -1716,19 +2051,29 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
                         controller: _pjaSearchCtrl,
                         onChanged: _searchPja,
                         decoration: InputDecoration(
-                          hintText: _isMitraMode ? 'Ketik nama PJA / Pengawas Mitra...' : 'Ketik nama atau NIK pengawas...',
-                          hintStyle: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
-                          icon: const Icon(Icons.search_rounded, color: primaryGreen, size: 20),
+                          hintText: _isMitraMode
+                              ? 'Ketik nama PJA / Pengawas Mitra...'
+                              : 'Ketik nama atau NIK pengawas...',
+                          hintStyle: const TextStyle(
+                              fontSize: 13, color: Color(0xFF94A3B8)),
+                          icon: const Icon(Icons.search_rounded,
+                              color: primaryGreen, size: 20),
                           border: InputBorder.none,
                           suffixIcon: _isSearchingPja
-                              ? const SizedBox(width: 16, height: 16, child: Padding(padding: EdgeInsets.all(12), child: CircularProgressIndicator(strokeWidth: 2, color: primaryGreen)))
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: Padding(
+                                      padding: EdgeInsets.all(12),
+                                      child: CircularProgressIndicator(
+                                          strokeWidth: 2, color: primaryGreen)))
                               : null,
                         ),
                         style: const TextStyle(fontSize: 13),
                       ),
                     ),
-
-                    if (_pjaSearchCtrl.text.trim().isNotEmpty && _isMitraMode) ...[
+                    if (_pjaSearchCtrl.text.trim().isNotEmpty &&
+                        _isMitraMode) ...[
                       const SizedBox(height: 8),
                       InkWell(
                         onTap: () {
@@ -1754,18 +2099,22 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
                           ),
                           child: Row(
                             children: [
-                              const Icon(Icons.check_circle_rounded, color: Color(0xFF2563EB), size: 18),
+                              const Icon(Icons.check_circle_rounded,
+                                  color: Color(0xFF2563EB), size: 18),
                               const SizedBox(width: 8),
                               Expanded(
-                                child: Text('Gunakan: "${_pjaSearchCtrl.text.trim()}" sebagai PJA Mitra',
-                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11.5, color: Color(0xFF1D4ED8))),
+                                child: Text(
+                                    'Gunakan: "${_pjaSearchCtrl.text.trim()}" sebagai PJA Mitra',
+                                    style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 11.5,
+                                        color: Color(0xFF1D4ED8))),
                               ),
                             ],
                           ),
                         ),
                       ),
                     ],
-
                     if (_pjaSearchResults.isNotEmpty) ...[
                       const SizedBox(height: 8),
                       Container(
@@ -1778,13 +2127,19 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
                         child: ListView.separated(
                           shrinkWrap: true,
                           itemCount: _pjaSearchResults.length,
-                          separatorBuilder: (_, __) => const Divider(height: 1, color: Color(0xFFF1F5F9)),
+                          separatorBuilder: (_, __) => const Divider(
+                              height: 1, color: Color(0xFFF1F5F9)),
                           itemBuilder: (ctx, idx) {
                             final p = _pjaSearchResults[idx];
                             return ListTile(
                               dense: true,
-                              title: Text(p.nama, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5)),
-                              subtitle: Text('${p.nik} • ${p.departemen}', style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                              title: Text(p.nama,
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 12.5)),
+                              subtitle: Text('${p.nik} • ${p.departemen}',
+                                  style: const TextStyle(
+                                      fontSize: 11, color: Color(0xFF64748B))),
                               onTap: () {
                                 setState(() {
                                   _selectedPja = p;
@@ -1811,7 +2166,8 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
                 children: [
                   const Text(
                     'Pilih YA jika sesuai, N/A jika tidak berlaku, atau TIDAK jika ditemukan penyimpangan (wajib sertakan foto).',
-                    style: TextStyle(fontSize: 11, color: Color(0xFF64748B), height: 1.4),
+                    style: TextStyle(
+                        fontSize: 11, color: Color(0xFF64748B), height: 1.4),
                   ),
                   const SizedBox(height: 14),
 
@@ -1824,7 +2180,8 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
               _buildSectionCard(
                 stepNumber: '4',
                 title: 'STANDARDISASI FORM INSPEKSI',
-                subtitle: 'Fitur dinamis tambah pertanyaan custom lapangan seperti di web',
+                subtitle:
+                    'Fitur dinamis tambah pertanyaan custom lapangan seperti di web',
                 icon: Icons.tune_rounded,
                 accentColor: const Color(0xFF7C3AED),
                 children: [
@@ -1837,35 +2194,42 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
                     ),
                     child: const Row(
                       children: [
-                        Icon(Icons.lightbulb_outline_rounded, color: Color(0xFF7C3AED), size: 22),
+                        Icon(Icons.lightbulb_outline_rounded,
+                            color: Color(0xFF7C3AED), size: 22),
                         SizedBox(width: 10),
                         Expanded(
                           child: Text(
                             'Perlu item evaluasi khusus? Anda dapat membuat form pertanyaan tambahan yang langsung tersimpan di laporan.',
-                            style: TextStyle(fontSize: 11, color: Color(0xFF5B21B6), height: 1.3),
+                            style: TextStyle(
+                                fontSize: 11,
+                                color: Color(0xFF5B21B6),
+                                height: 1.3),
                           ),
                         ),
                       ],
                     ),
                   ),
-
                   const SizedBox(height: 12),
-
                   if (_customQuestions.isNotEmpty) ...[
-                    ..._customQuestions.map((cq) => _buildCustomQuestionItem(cq)),
+                    ..._customQuestions
+                        .map((cq) => _buildCustomQuestionItem(cq)),
                     const SizedBox(height: 8),
                   ],
-
                   OutlinedButton.icon(
                     style: OutlinedButton.styleFrom(
                       foregroundColor: const Color(0xFF7C3AED),
                       side: const BorderSide(color: Color(0xFF7C3AED)),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 12),
                       minimumSize: const Size(double.infinity, 44),
                     ),
-                    icon: const Icon(Icons.add_circle_outline_rounded, size: 20),
-                    label: const Text('Tambah Pertanyaan Kustom', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                    icon:
+                        const Icon(Icons.add_circle_outline_rounded, size: 20),
+                    label: const Text('Tambah Pertanyaan Kustom',
+                        style: TextStyle(
+                            fontWeight: FontWeight.bold, fontSize: 13)),
                     onPressed: _showAddCustomQuestionDialog,
                   ),
                 ],
@@ -1875,11 +2239,17 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
               _buildSectionCard(
                 stepNumber: '5',
                 title: 'CATATAN AKHIR & PENGIRIMAN',
-                subtitle: 'Catatan umum, rekomendasi perbaikan & simpan draf offline',
+                subtitle:
+                    'Catatan umum, rekomendasi perbaikan & simpan draf offline',
                 icon: Icons.send_rounded,
                 accentColor: const Color(0xFF10B981),
                 children: [
-                  const Text('CATATAN TEMUAN / REKOMENDASI', style: TextStyle(color: Color(0xFF0F172A), fontSize: 11.5, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+                  const Text('CATATAN TEMUAN / REKOMENDASI',
+                      style: TextStyle(
+                          color: Color(0xFF0F172A),
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 0.5)),
                   const SizedBox(height: 6),
                   Container(
                     decoration: BoxDecoration(
@@ -1892,22 +2262,23 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
                       controller: _catatanCtrl,
                       maxLines: 3,
                       decoration: const InputDecoration(
-                        hintText: 'Tuliskan catatan umum, temuan khusus, atau saran perbaikan tindak lanjut...',
-                        hintStyle: TextStyle(fontSize: 12.5, color: Color(0xFF94A3B8)),
+                        hintText:
+                            'Tuliskan catatan umum, temuan khusus, atau saran perbaikan tindak lanjut...',
+                        hintStyle:
+                            TextStyle(fontSize: 12.5, color: Color(0xFF94A3B8)),
                         border: InputBorder.none,
                       ),
                       style: const TextStyle(fontSize: 13),
                     ),
                   ),
-
                   const SizedBox(height: 18),
-
                   ElevatedButton(
                     style: ElevatedButton.styleFrom(
                       backgroundColor: primaryGreen,
                       foregroundColor: Colors.white,
                       minimumSize: const Size(double.infinity, 50),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14)),
                       elevation: 3,
                     ),
                     onPressed: _isSaving ? null : _submitInspection,
@@ -1915,7 +2286,11 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
                         ? const Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)),
+                              SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                      strokeWidth: 2, color: Colors.white)),
                               SizedBox(width: 10),
                               Text('Menyimpan Laporan...'),
                             ],
@@ -1925,7 +2300,11 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
                             children: [
                               Icon(Icons.check_circle_rounded, size: 20),
                               SizedBox(width: 8),
-                              Text('KIRIM LAPORAN INSPEKSI', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5, letterSpacing: 0.5)),
+                              Text('KIRIM LAPORAN INSPEKSI',
+                                  style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 13.5,
+                                      letterSpacing: 0.5)),
                             ],
                           ),
                   ),
@@ -1954,12 +2333,17 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
                 Container(
                   width: 4,
                   height: 16,
-                  decoration: BoxDecoration(color: primaryGreen, borderRadius: BorderRadius.circular(2)),
+                  decoration: BoxDecoration(
+                      color: primaryGreen,
+                      borderRadius: BorderRadius.circular(2)),
                 ),
                 const SizedBox(width: 8),
                 Text(
                   currentModule,
-                  style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: Color(0xFF0F172A)),
+                  style: const TextStyle(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 13,
+                      color: Color(0xFF0F172A)),
                 ),
               ],
             ),
@@ -1981,7 +2365,8 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
         color: const Color(0xFFF8FAFC),
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
-          color: cp.score == 0 ? const Color(0xFFFECACA) : const Color(0xFFE2E8F0),
+          color:
+              cp.score == 0 ? const Color(0xFFFECACA) : const Color(0xFFE2E8F0),
           width: cp.score == 0 ? 1.5 : 1,
         ),
       ),
@@ -1999,13 +2384,21 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
                   shape: BoxShape.circle,
                 ),
                 alignment: Alignment.center,
-                child: Text('$number', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: primaryGreen)),
+                child: Text('$number',
+                    style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: primaryGreen)),
               ),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   cp.question,
-                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12.5, color: Color(0xFF0F172A), height: 1.3),
+                  style: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 12.5,
+                      color: Color(0xFF0F172A),
+                      height: 1.3),
                 ),
               ),
             ],
@@ -2062,9 +2455,14 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
                 children: [
                   const Row(
                     children: [
-                      Icon(Icons.warning_amber_rounded, color: Color(0xFFDC2626), size: 16),
+                      Icon(Icons.warning_amber_rounded,
+                          color: Color(0xFFDC2626), size: 16),
                       SizedBox(width: 6),
-                      Text('Temuan K3 - Wajib Sertakan Bukti Foto', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: Color(0xFFB91C1C))),
+                      Text('Temuan K3 - Wajib Sertakan Bukti Foto',
+                          style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 11,
+                              color: Color(0xFFB91C1C))),
                     ],
                   ),
                   const SizedBox(height: 8),
@@ -2073,7 +2471,10 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
                       children: [
                         ClipRRect(
                           borderRadius: BorderRadius.circular(8),
-                          child: Image.file(cp.photo!, height: 120, width: double.infinity, fit: BoxFit.cover),
+                          child: Image.file(cp.photo!,
+                              height: 120,
+                              width: double.infinity,
+                              fit: BoxFit.cover),
                         ),
                         Positioned(
                           top: 4,
@@ -2082,8 +2483,11 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
                             onTap: () => setState(() => cp.photo = null),
                             child: Container(
                               padding: const EdgeInsets.all(4),
-                              decoration: const BoxDecoration(color: Colors.black54, shape: BoxShape.circle),
-                              child: const Icon(Icons.close_rounded, size: 16, color: Colors.white),
+                              decoration: const BoxDecoration(
+                                  color: Colors.black54,
+                                  shape: BoxShape.circle),
+                              child: const Icon(Icons.close_rounded,
+                                  size: 16, color: Colors.white),
                             ),
                           ),
                         ),
@@ -2098,14 +2502,21 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
                         decoration: BoxDecoration(
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: const Color(0xFFFCA5A5), style: BorderStyle.solid),
+                          border: Border.all(
+                              color: const Color(0xFFFCA5A5),
+                              style: BorderStyle.solid),
                         ),
                         child: const Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.camera_alt_rounded, color: Color(0xFFDC2626), size: 18),
+                            Icon(Icons.camera_alt_rounded,
+                                color: Color(0xFFDC2626), size: 18),
                             SizedBox(width: 6),
-                            Text('Ambil / Pilih Foto Bukti', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11.5, color: Color(0xFFDC2626))),
+                            Text('Ambil / Pilih Foto Bukti',
+                                style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 11.5,
+                                    color: Color(0xFFDC2626))),
                           ],
                         ),
                       ),
@@ -2122,7 +2533,8 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
                       onChanged: (v) => cp.remark = v,
                       decoration: const InputDecoration(
                         hintText: 'Rencana tindakan perbaikan temuan ini...',
-                        hintStyle: TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
+                        hintStyle:
+                            TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
                         border: InputBorder.none,
                       ),
                       style: const TextStyle(fontSize: 11.5),
@@ -2153,15 +2565,26 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
             children: [
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(color: const Color(0xFF7C3AED), borderRadius: BorderRadius.circular(6)),
-                child: const Text('KUSTOM', style: TextStyle(color: Colors.white, fontSize: 9.5, fontWeight: FontWeight.bold)),
+                decoration: BoxDecoration(
+                    color: const Color(0xFF7C3AED),
+                    borderRadius: BorderRadius.circular(6)),
+                child: const Text('KUSTOM',
+                    style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 9.5,
+                        fontWeight: FontWeight.bold)),
               ),
               const SizedBox(width: 8),
               Expanded(
-                child: Text(cq.question, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5, color: Color(0xFF0F172A))),
+                child: Text(cq.question,
+                    style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12.5,
+                        color: Color(0xFF0F172A))),
               ),
               IconButton(
-                icon: const Icon(Icons.delete_outline_rounded, color: Color(0xFFDC2626), size: 18),
+                icon: const Icon(Icons.delete_outline_rounded,
+                    color: Color(0xFFDC2626), size: 18),
                 onPressed: () => setState(() => _customQuestions.remove(cq)),
               ),
             ],
@@ -2207,7 +2630,8 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
             if (cq.photo != null)
               ClipRRect(
                 borderRadius: BorderRadius.circular(8),
-                child: Image.file(cq.photo!, height: 100, width: double.infinity, fit: BoxFit.cover),
+                child: Image.file(cq.photo!,
+                    height: 100, width: double.infinity, fit: BoxFit.cover),
               )
             else
               OutlinedButton.icon(
@@ -2217,7 +2641,8 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
                   minimumSize: const Size(double.infinity, 36),
                 ),
                 icon: const Icon(Icons.camera_alt_rounded, size: 16),
-                label: const Text('Foto Bukti Temuan Kustom', style: TextStyle(fontSize: 11)),
+                label: const Text('Foto Bukti Temuan Kustom',
+                    style: TextStyle(fontSize: 11)),
                 onPressed: () => _pickImageForCustomQuestion(cq),
               ),
           ],
