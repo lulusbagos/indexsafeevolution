@@ -5,7 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/foundation.dart';
 
 import '../models/auth_model.dart';
-import '../models/incident_news_model.dart';
+import '../models/incident_news_model.dart';
 import '../models/profile_model.dart';
 import '../utils/crypto_util.dart';
 
@@ -137,6 +137,39 @@ class PreferenceService {
     await prefs?.remove('dataSync');
   }
 
+  /// Hak pemindaian terakhir yang diberikan server. Cache ini hanya dipakai
+  /// untuk memblokir akses saat perangkat benar-benar offline; ia selalu
+  /// terikat pada NIK akun yang sedang masuk.
+  static Future<void> setScanPermissions(Map<String, dynamic> value) async {
+    final nik = getProfile()?.noNik ?? getOfflineNik();
+    if (nik == null || nik.trim().isEmpty) return;
+    await prefs?.setString(
+      'scanPermissions',
+      CryptoUtil.encrypt(jsonEncode({
+        'nik': nik.trim(),
+        'savedAt': DateTime.now().millisecondsSinceEpoch,
+        'permissions': value,
+      })),
+    );
+  }
+
+  static Map<String, dynamic>? getScanPermissions() {
+    final raw = prefs?.getString('scanPermissions');
+    if (raw == null || raw.isEmpty) return null;
+    try {
+      final decoded = jsonDecode(CryptoUtil.decrypt(raw));
+      if (decoded is! Map) return null;
+      final nik = (getProfile()?.noNik ?? getOfflineNik())?.trim();
+      if (nik == null || nik.isEmpty || decoded['nik']?.toString() != nik) {
+        return null;
+      }
+      final permissions = decoded['permissions'];
+      return permissions is Map ? Map<String, dynamic>.from(permissions) : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
   static Future<void> setNotif(int total) async {
     await prefs?.setInt('notif', total);
   }
@@ -179,6 +212,7 @@ class PreferenceService {
   static Future<void> removeAuth() async {
     await prefs?.remove('authJson');
     await prefs?.remove('mbsSessionCookie');
+    await prefs?.remove('scanPermissions');
   }
 
   static Future<void> removeProfile() async {
@@ -318,18 +352,22 @@ class PreferenceService {
       final decoded = jsonDecode(raw);
       if (decoded is List) {
         return decoded
-            .map((item) => IncidentNewsModel.fromJson(Map<String, dynamic>.from(item as Map)))
+            .map((item) => IncidentNewsModel.fromJson(
+                Map<String, dynamic>.from(item as Map)))
             .toList();
       }
     } catch (_) {}
     return [];
   }
 
-  static Future<void> setCachedSafetyUpdates(List<IncidentNewsModel> list) async {
+  static Future<void> setCachedSafetyUpdates(
+      List<IncidentNewsModel> list) async {
     try {
       final jsonList = list.map((item) => item.toJson()).toList();
-      await prefs?.setString('cached_safety_updates_json', jsonEncode(jsonList));
-      await prefs?.setString('cached_safety_updates_timestamp', DateTime.now().toIso8601String());
+      await prefs?.setString(
+          'cached_safety_updates_json', jsonEncode(jsonList));
+      await prefs?.setString(
+          'cached_safety_updates_timestamp', DateTime.now().toIso8601String());
     } catch (_) {}
   }
 
@@ -341,7 +379,8 @@ class PreferenceService {
       final decoded = jsonDecode(raw);
       if (decoded is List) {
         return decoded
-            .map((item) => IncidentNewsModel.fromJson(Map<String, dynamic>.from(item as Map)))
+            .map((item) => IncidentNewsModel.fromJson(
+                Map<String, dynamic>.from(item as Map)))
             .toList();
       }
     } catch (_) {}

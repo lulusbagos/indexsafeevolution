@@ -54,6 +54,8 @@ dependencies:
   flutter_email_sender: ^6.0.3
   connectivity_plus: ^6.0.3
   image_picker: ^1.1.2
+  image_cropper: ^9.1.0
+  image: ^4.5.4
   file_picker: ^8.0.5
   video_player: ^2.9.1
   date_time_picker: ^2.1.0
