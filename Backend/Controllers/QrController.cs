@@ -929,52 +929,12 @@ namespace Indexsafe.Api.Controllers
                 }
             });
         }
-
         /// <summary>
-        /// POST /api/qr/permit/violation
-        /// Records a safety violation against an employee into [ONE_DB_MITRA].[dbo].[tbl_t_karyawan_pelanggaran]
+        /// Inserts an approved violation into [ONE_DB_MITRA].[dbo].[tbl_t_karyawan_pelanggaran]
+        /// Only executed once ALL assigned PJAs have approved the violation.
         /// </summary>
-        [HttpPost("permit/violation")]
-        public async Task<IActionResult> RecordPermitViolation([FromBody] CreatePermitViolationRequest req)
+        private async Task<int?> InsertMitraPelanggaranAsync(PermitViolation violation)
         {
-            if (string.IsNullOrWhiteSpace(req.ViolatorNik) || string.IsNullOrWhiteSpace(req.ViolationDescription))
-            {
-                return BadRequest(new { status = false, message = "NIK Pelanggar dan Deskripsi Pelanggaran wajib diisi." });
-            }
-
-            var userNik = GetCurrentNik();
-            var userName = GetCurrentName();
-
-            var userPerm = await _context.UserScanPermissions
-                .AsNoTracking()
-                .FirstOrDefaultAsync(p => p.Nik == userNik);
-
-            bool canPelanggaran = userPerm?.CanScanPermitPelanggaran ?? false;
-            if (!canPelanggaran)
-            {
-                return StatusCode(StatusCodes.Status403Forbidden, new
-                {
-                    status = false,
-                    message = "Otorisasi Terbatas: Anda belum memiliki wewenang untuk mencatat pelanggaran K3 Mine Permit. Silakan hubungi Administrator K3 untuk pengajuan otorisasi."
-                });
-            }
-
-            // Validasi Hierarki Perusahaan: Pemeriksa dilarang mencatat pelanggaran terhadap Parent Company
-            var hierCheck = await CheckViolationHierarchyPermissionAsync(userNik, req.ViolatorNik);
-            if (!hierCheck.CanViolate)
-            {
-                return StatusCode(StatusCodes.Status403Forbidden, new
-                {
-                    status = false,
-                    message = hierCheck.Reason
-                });
-            }
-
-            int? newMitraPelanggaranId = null;
-            DateTime tglKejadian = req.TanggalKejadian ?? DateTime.Today;
-            DateTime? tglKadaluarsa = null;
-            int idPelanggaranJenis = req.IdPelanggaranJenis ?? 6; // default Lubang 1 / SP-1 (6)
-
             try
             {
                 var conn = _context.Database.GetDbConnection();
@@ -983,7 +943,6 @@ namespace Indexsafe.Api.Controllers
                     await conn.OpenAsync();
                 }
 
-                // 1. Resolve id_karyawan from ONE_DB_MITRA
                 int? idKaryawan = null;
                 using (var cmd = conn.CreateCommand())
                 {
@@ -994,7 +953,7 @@ namespace Indexsafe.Api.Controllers
                         ORDER BY status_aktif DESC, id_karyawan DESC;";
                     var pNik = cmd.CreateParameter();
                     pNik.ParameterName = "@nik";
-                    pNik.Value = req.ViolatorNik.Trim();
+                    pNik.Value = violation.ViolatorNik.Trim();
                     cmd.Parameters.Add(pNik);
 
                     var scalar = await cmd.ExecuteScalarAsync();
@@ -1014,7 +973,7 @@ namespace Indexsafe.Api.Controllers
                             WHERE no_nik = @nik;";
                         var pNik = cmd.CreateParameter();
                         pNik.ParameterName = "@nik";
-                        pNik.Value = req.ViolatorNik.Trim();
+                        pNik.Value = violation.ViolatorNik.Trim();
                         cmd.Parameters.Add(pNik);
 
                         var scalar = await cmd.ExecuteScalarAsync();
@@ -1025,8 +984,11 @@ namespace Indexsafe.Api.Controllers
                     }
                 }
 
-                // 2. Resolve id_pelanggaran_jenis duration & calculate tanggal_kadaluarsa
+                int idPelanggaranJenis = violation.IdPelanggaranJenis ?? 6;
+                DateTime tglKejadian = violation.TanggalKejadian ?? DateTime.Today;
+                DateTime? tglKadaluarsa = null;
                 int durasiBulan = 0;
+
                 using (var cmd = conn.CreateCommand())
                 {
                     cmd.CommandText = @"
@@ -1061,26 +1023,24 @@ namespace Indexsafe.Api.Controllers
                     tglKadaluarsa = tglKejadian.AddMonths(durasiBulan);
                 }
 
-                // 3. Format keterangan
-                var kriteria = !string.IsNullOrWhiteSpace(req.KriteriaNama)
-                    ? req.KriteriaNama.Trim()
-                    : (!string.IsNullOrWhiteSpace(req.ViolationType) ? req.ViolationType.Trim() : "Pelanggaran Safety");
+                var kriteria = !string.IsNullOrWhiteSpace(violation.ViolationType)
+                    ? violation.ViolationType.Trim()
+                    : "Pelanggaran Safety";
 
                 var sbKet = new System.Text.StringBuilder();
                 sbKet.Append($"Kriteria: {kriteria}");
-                if (!string.IsNullOrWhiteSpace(req.ViolationLocation))
-                    sbKet.Append($" | Lokasi: {req.ViolationLocation.Trim()}");
-                if (!string.IsNullOrWhiteSpace(req.ViolationDescription))
-                    sbKet.Append($" | Remark: {req.ViolationDescription.Trim()}");
-                if (!string.IsNullOrWhiteSpace(req.ActionTaken))
-                    sbKet.Append($" | Penindakan: {req.ActionTaken.Trim()}");
-                if (!string.IsNullOrWhiteSpace(req.PermitNumber))
-                    sbKet.Append($" | No Permit: {req.PermitNumber.Trim()}");
+                if (!string.IsNullOrWhiteSpace(violation.ViolationLocation))
+                    sbKet.Append($" | Lokasi: {violation.ViolationLocation.Trim()}");
+                if (!string.IsNullOrWhiteSpace(violation.ViolationDescription))
+                    sbKet.Append($" | Remark: {violation.ViolationDescription.Trim()}");
+                if (!string.IsNullOrWhiteSpace(violation.ActionTaken))
+                    sbKet.Append($" | Penindakan: {violation.ActionTaken.Trim()}");
+                if (!string.IsNullOrWhiteSpace(violation.PermitNumber))
+                    sbKet.Append($" | No Permit: {violation.PermitNumber.Trim()}");
 
-                var createdBy = $"{userNik} | mobile";
+                var createdBy = $"{violation.ReportedByNik} | approved";
                 var createdAt = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
 
-                // 4. Insert into [ONE_DB_MITRA].[dbo].[tbl_t_karyawan_pelanggaran]
                 using (var cmd = conn.CreateCommand())
                 {
                     cmd.CommandText = @"
@@ -1113,23 +1073,111 @@ namespace Indexsafe.Api.Controllers
                     var p4 = cmd.CreateParameter(); p4.ParameterName = "@tanggal_kadaluarsa"; p4.Value = (object?)tglKadaluarsa?.Date ?? DBNull.Value; cmd.Parameters.Add(p4);
                     var p5 = cmd.CreateParameter(); p5.ParameterName = "@id_pelanggaran_jenis"; p5.Value = idPelanggaranJenis; cmd.Parameters.Add(p5);
                     var p6 = cmd.CreateParameter(); p6.ParameterName = "@keterangan"; p6.Value = sbKet.ToString(); cmd.Parameters.Add(p6);
-                    var p7 = cmd.CreateParameter(); p7.ParameterName = "@file_pendukung"; p7.Value = (object?)req.PhotoUrl ?? DBNull.Value; cmd.Parameters.Add(p7);
+                    var p7 = cmd.CreateParameter(); p7.ParameterName = "@file_pendukung"; p7.Value = (object?)violation.PhotoUrl ?? DBNull.Value; cmd.Parameters.Add(p7);
                     var p8 = cmd.CreateParameter(); p8.ParameterName = "@created_by"; p8.Value = createdBy; cmd.Parameters.Add(p8);
                     var p9 = cmd.CreateParameter(); p9.ParameterName = "@created_at"; p9.Value = createdAt; cmd.Parameters.Add(p9);
 
                     var idScalar = await cmd.ExecuteScalarAsync();
                     if (idScalar != null && idScalar != DBNull.Value)
                     {
-                        newMitraPelanggaranId = Convert.ToInt32(idScalar);
+                        return Convert.ToInt32(idScalar);
                     }
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[RecordPermitViolation] Error writing to ONE_DB_MITRA: {ex.Message}");
+                Console.WriteLine($"[InsertMitraPelanggaranAsync] Error writing to ONE_DB_MITRA: {ex.Message}");
+            }
+            return null;
+        }
+
+        /// <summary>
+        /// POST /api/qr/permit/violation
+        /// Submits a safety violation pending multi-PJA approval.
+        /// Violation is NOT written to active database (ONE_DB_MITRA) until ALL assigned PJAs approve.
+        /// </summary>
+        [HttpPost("permit/violation")]
+        public async Task<IActionResult> RecordPermitViolation([FromBody] CreatePermitViolationRequest req)
+        {
+            if (string.IsNullOrWhiteSpace(req.ViolatorNik) || string.IsNullOrWhiteSpace(req.ViolationDescription))
+            {
+                return BadRequest(new { status = false, message = "NIK Pelanggar dan Deskripsi Pelanggaran wajib diisi." });
             }
 
-            // Also keep local audit log
+            var userNik = GetCurrentNik();
+            var userName = GetCurrentName();
+
+            var userPerm = await _context.UserScanPermissions
+                .AsNoTracking()
+                .FirstOrDefaultAsync(p => p.Nik == userNik);
+
+            bool canPelanggaran = userPerm?.CanScanPermitPelanggaran ?? false;
+            if (!canPelanggaran)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, new
+                {
+                    status = false,
+                    message = "Otorisasi Terbatas: Anda belum memiliki wewenang untuk mencatat pelanggaran K3 Mine Permit. Silakan hubungi Administrator K3 untuk pengajuan otorisasi."
+                });
+            }
+
+            // Validasi Hierarki Perusahaan
+            var hierCheck = await CheckViolationHierarchyPermissionAsync(userNik, req.ViolatorNik);
+            if (!hierCheck.CanViolate)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, new
+                {
+                    status = false,
+                    message = hierCheck.Reason
+                });
+            }
+
+            // Validate Approvers (PJA / Pengawas Lapangan)
+            var approverList = new List<ApproverItemRequest>();
+            if (req.Approvers != null && req.Approvers.Count > 0)
+            {
+                foreach (var app in req.Approvers)
+                {
+                    if (!string.IsNullOrWhiteSpace(app.Nik) && !approverList.Any(x => x.Nik.Equals(app.Nik.Trim(), StringComparison.OrdinalIgnoreCase)))
+                    {
+                        approverList.Add(new ApproverItemRequest
+                        {
+                            Nik = app.Nik.Trim(),
+                            Nama = app.Nama?.Trim() ?? app.Nik.Trim(),
+                            Jabatan = app.Jabatan?.Trim(),
+                            Departemen = app.Departemen?.Trim(),
+                            Perusahaan = app.Perusahaan?.Trim()
+                        });
+                    }
+                }
+            }
+            else if (req.ApproverNiks != null && req.ApproverNiks.Count > 0)
+            {
+                foreach (var nik in req.ApproverNiks)
+                {
+                    if (!string.IsNullOrWhiteSpace(nik) && !approverList.Any(x => x.Nik.Equals(nik.Trim(), StringComparison.OrdinalIgnoreCase)))
+                    {
+                        var cleanNik = nik.Trim();
+                        var user = await _context.AppUsers.AsNoTracking().FirstOrDefaultAsync(u => u.Nik == cleanNik);
+                        approverList.Add(new ApproverItemRequest
+                        {
+                            Nik = cleanNik,
+                            Nama = user?.Nama ?? cleanNik,
+                            Jabatan = null,
+                            Departemen = null,
+                            Perusahaan = null
+                        });
+                    }
+                }
+            }
+
+            if (approverList.Count == 0)
+            {
+                return BadRequest(new { status = false, message = "PJA / Pengawas Lapangan wajib dipilih minimal 1 orang untuk persetujuan pelanggaran." });
+            }
+
+            DateTime tglKejadian = req.TanggalKejadian ?? DateTime.Today;
+
             var violation = new PermitViolation
             {
                 ViolatorNik = req.ViolatorNik.Trim(),
@@ -1145,55 +1193,421 @@ namespace Indexsafe.Api.Controllers
                 ActionTaken = req.ActionTaken,
                 ReportedByNik = $"{userNik} | mobile",
                 ReportedByName = userName,
+                Status = "PENDING",
+                TotalApprovers = approverList.Count,
+                ApprovedCount = 0,
+                IdPelanggaranJenis = req.IdPelanggaranJenis,
+                IdKriteria = req.IdKriteria,
+                TanggalKejadian = tglKejadian,
                 CreatedAt = DateTime.Now
             };
 
             _context.PermitViolations.Add(violation);
             await _context.SaveChangesAsync();
 
-            // Create in-app notification for the scanned employee
-            try
+            // Insert assigned approvers and send them notifications
+            foreach (var app in approverList)
             {
-                var notifViolation = new Notification
+                var appEntity = new PermitViolationApprover
                 {
-                    RecipientNik = req.ViolatorNik.Trim(),
-                    Title = "Peringatan Catatan Pelanggaran K3",
-                    Message = $"Anda tercatat melakukan pelanggaran K3: '{violation.ViolationType}' di {violation.ViolationLocation ?? "Area Operasional"}. Tindakan: {violation.ActionTaken ?? "Teguran & Pencatatan"}. Dicatat oleh Petugas {violation.ReportedByName} ({violation.ReportedByNik}).",
+                    ViolationId = violation.Id,
+                    ApproverNik = app.Nik,
+                    ApproverName = app.Nama,
+                    ApproverPosition = app.Jabatan,
+                    ApproverDepartment = app.Departemen,
+                    ApproverCompany = app.Perusahaan,
+                    Status = "PENDING",
+                    CreatedAt = DateTime.Now
+                };
+                _context.PermitViolationApprovers.Add(appEntity);
+
+                // Notification to PJA
+                _context.Notifications.Add(new Notification
+                {
+                    RecipientNik = app.Nik,
+                    Title = "Persetujuan Pelanggaran K3 (PJA)",
+                    Message = $"Laporan pelanggaran K3 atas nama {violation.ViolatorName} ({violation.ViolatorNik}) dilaporkan oleh {violation.ReportedByName}. Mohon periksa dan berikan persetujuan Anda sebagai PJA / Pengawas.",
                     Url = $"/Permit/Violation/{violation.Id}",
-                    NotifType = "permit_violation",
-                    Category = "violation",
-                    SenderName = violation.ReportedByName ?? "Petugas K3 / Security",
+                    NotifType = "permit_violation_approval",
+                    Category = "approval",
+                    SenderName = violation.ReportedByName ?? "Pengawas K3",
                     Priority = "urgent",
-                    ActionText = "Lihat Detail",
+                    ActionText = "Review Laporan",
                     IsRead = false,
                     IsActioned = false,
                     CreatedAt = DateTime.Now
-                };
-                _context.Notifications.Add(notifViolation);
-                await _context.SaveChangesAsync();
+                });
             }
-            catch (Exception notifEx)
+
+            // Notification to reporter (pelapor)
+            _context.Notifications.Add(new Notification
             {
-                Console.WriteLine($"[RecordPermitViolation] Failed to create notification: {notifEx.Message}");
-            }
+                RecipientNik = userNik,
+                Title = "Laporan Pelanggaran Dalam Proses",
+                Message = $"Laporan pelanggaran atas nama {violation.ViolatorName} berhasil diajukan dan sedang menunggu persetujuan dari {violation.TotalApprovers} PJA / Pengawas Lapangan.",
+                Url = $"/Permit/Violation/{violation.Id}",
+                NotifType = "permit_violation_status",
+                Category = "violation",
+                Priority = "normal",
+                ActionText = "Lihat Status",
+                IsRead = false,
+                CreatedAt = DateTime.Now
+            });
+
+            await _context.SaveChangesAsync();
 
             return Ok(new
             {
                 status = true,
-                message = "Pelanggaran K3 berhasil dicatat resmi ke database karyawan.",
+                message = $"Laporan pelanggaran berhasil diajukan dan diteruskan ke {violation.TotalApprovers} PJA / Pengawas untuk persetujuan.",
                 data = new
                 {
-                    id = newMitraPelanggaranId ?? violation.Id,
-                    mitra_pelanggaran_id = newMitraPelanggaranId,
+                    id = violation.Id,
+                    status = violation.Status,
+                    total_approvers = violation.TotalApprovers,
+                    approved_count = 0,
                     violator_nik = violation.ViolatorNik,
                     violator_name = violation.ViolatorName,
                     violation_type = violation.ViolationType,
                     severity = violation.Severity,
-                    created_by = $"{userNik} | mobile",
-                    created_at = violation.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss")
+                    created_by = violation.ReportedByName,
+                    created_at = violation.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss"),
+                    approvers = approverList.Select(a => new { a.Nik, a.Nama, a.Jabatan, a.Departemen, a.Perusahaan })
                 }
             });
         }
+
+        /// <summary>
+        /// GET /api/qr/permit/my-violations
+        /// Returns violations reported by the logged-in user with their PJA approval statuses.
+        /// </summary>
+        [HttpGet("permit/my-violations")]
+        public async Task<IActionResult> GetMyViolations([FromQuery] int limit = 50)
+        {
+            var userNik = GetCurrentNik();
+            if (string.IsNullOrWhiteSpace(userNik) || userNik == "0000")
+            {
+                return Unauthorized(new { status = false, message = "Sesi tidak valid." });
+            }
+
+            var list = await _context.PermitViolations
+                .AsNoTracking()
+                .Include(v => v.Approvers)
+                .Where(v => v.ReportedByNik.StartsWith(userNik) || v.ReportedByNik == userNik)
+                .OrderByDescending(v => v.Id)
+                .Take(limit)
+                .Select(v => new
+                {
+                    id = v.Id,
+                    violator_nik = v.ViolatorNik,
+                    violator_name = v.ViolatorName,
+                    violator_company = v.ViolatorCompany,
+                    violator_department = v.ViolatorDepartment,
+                    permit_number = v.PermitNumber,
+                    violation_type = v.ViolationType,
+                    violation_description = v.ViolationDescription,
+                    violation_location = v.ViolationLocation,
+                    photo_url = v.PhotoUrl,
+                    severity = v.Severity,
+                    action_taken = v.ActionTaken,
+                    status = v.Status,
+                    total_approvers = v.TotalApprovers,
+                    approved_count = v.ApprovedCount,
+                    rejection_reason = v.RejectionReason,
+                    created_at = v.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss"),
+                    updated_at = v.UpdatedAt.HasValue ? v.UpdatedAt.Value.ToString("yyyy-MM-dd HH:mm:ss") : null,
+                    approvers = v.Approvers.Select(a => new
+                    {
+                        id = a.Id,
+                        approver_nik = a.ApproverNik,
+                        approver_name = a.ApproverName,
+                        approver_position = a.ApproverPosition,
+                        approver_department = a.ApproverDepartment,
+                        approver_company = a.ApproverCompany,
+                        status = a.Status,
+                        notes = a.Notes,
+                        action_at = a.ActionAt.HasValue ? a.ActionAt.Value.ToString("yyyy-MM-dd HH:mm:ss") : null
+                    }).ToList()
+                })
+                .ToListAsync();
+
+            return Ok(new { status = true, data = list });
+        }
+
+        /// <summary>
+        /// GET /api/qr/permit/pending-approvals
+        /// Returns violations waiting for the logged-in user's approval as a PJA.
+        /// </summary>
+        [HttpGet("permit/pending-approvals")]
+        public async Task<IActionResult> GetPendingApprovals([FromQuery] int limit = 50)
+        {
+            var userNik = GetCurrentNik();
+            if (string.IsNullOrWhiteSpace(userNik) || userNik == "0000")
+            {
+                return Unauthorized(new { status = false, message = "Sesi tidak valid." });
+            }
+
+            var list = await _context.PermitViolationApprovers
+                .AsNoTracking()
+                .Include(a => a.Violation)
+                .Where(a => a.ApproverNik == userNik && a.Status == "PENDING" && a.Violation != null && a.Violation.Status == "PENDING")
+                .OrderByDescending(a => a.ViolationId)
+                .Take(limit)
+                .Select(a => new
+                {
+                    approver_id = a.Id,
+                    violation_id = a.Violation!.Id,
+                    violator_nik = a.Violation.ViolatorNik,
+                    violator_name = a.Violation.ViolatorName,
+                    violator_company = a.Violation.ViolatorCompany,
+                    violator_department = a.Violation.ViolatorDepartment,
+                    permit_number = a.Violation.PermitNumber,
+                    violation_type = a.Violation.ViolationType,
+                    violation_description = a.Violation.ViolationDescription,
+                    violation_location = a.Violation.ViolationLocation,
+                    photo_url = a.Violation.PhotoUrl,
+                    severity = a.Violation.Severity,
+                    action_taken = a.Violation.ActionTaken,
+                    reported_by_nik = a.Violation.ReportedByNik,
+                    reported_by_name = a.Violation.ReportedByName,
+                    total_approvers = a.Violation.TotalApprovers,
+                    approved_count = a.Violation.ApprovedCount,
+                    created_at = a.Violation.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss")
+                })
+                .ToListAsync();
+
+            return Ok(new { status = true, data = list });
+        }
+
+        /// <summary>
+        /// GET /api/qr/permit/violation/{id}
+        /// Returns detailed violation and all approver states.
+        /// </summary>
+        [HttpGet("permit/violation/{id:int}")]
+        public async Task<IActionResult> GetViolationDetail(int id)
+        {
+            var userNik = GetCurrentNik();
+            var v = await _context.PermitViolations
+                .AsNoTracking()
+                .Include(x => x.Approvers)
+                .FirstOrDefaultAsync(x => x.Id == id);
+
+            if (v == null)
+            {
+                return NotFound(new { status = false, message = "Data pelanggaran tidak ditemukan." });
+            }
+
+            bool canApprove = v.Status == "PENDING" && v.Approvers.Any(a => a.ApproverNik == userNik && a.Status == "PENDING");
+
+            return Ok(new
+            {
+                status = true,
+                can_approve = canApprove,
+                data = new
+                {
+                    id = v.Id,
+                    violator_nik = v.ViolatorNik,
+                    violator_name = v.ViolatorName,
+                    violator_company = v.ViolatorCompany,
+                    violator_department = v.ViolatorDepartment,
+                    permit_number = v.PermitNumber,
+                    violation_type = v.ViolationType,
+                    violation_description = v.ViolationDescription,
+                    violation_location = v.ViolationLocation,
+                    photo_url = v.PhotoUrl,
+                    severity = v.Severity,
+                    action_taken = v.ActionTaken,
+                    status = v.Status,
+                    total_approvers = v.TotalApprovers,
+                    approved_count = v.ApprovedCount,
+                    rejection_reason = v.RejectionReason,
+                    reported_by_nik = v.ReportedByNik,
+                    reported_by_name = v.ReportedByName,
+                    created_at = v.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss"),
+                    updated_at = v.UpdatedAt.HasValue ? v.UpdatedAt.Value.ToString("yyyy-MM-dd HH:mm:ss") : null,
+                    approvers = v.Approvers.Select(a => new
+                    {
+                        id = a.Id,
+                        approver_nik = a.ApproverNik,
+                        approver_name = a.ApproverName,
+                        approver_position = a.ApproverPosition,
+                        approver_department = a.ApproverDepartment,
+                        approver_company = a.ApproverCompany,
+                        status = a.Status,
+                        notes = a.Notes,
+                        action_at = a.ActionAt.HasValue ? a.ActionAt.Value.ToString("yyyy-MM-dd HH:mm:ss") : null
+                    }).ToList()
+                }
+            });
+        }
+
+        /// <summary>
+        /// POST /api/qr/permit/violation/action
+        /// PJA executes Approve or Reject action.
+        /// If all assigned PJAs approve, violation is formally inserted into ONE_DB_MITRA.
+        /// </summary>
+        [HttpPost("permit/violation/action")]
+        public async Task<IActionResult> ActionViolationApproval([FromBody] ViolationApprovalActionRequest req)
+        {
+            var userNik = GetCurrentNik();
+            var userName = GetCurrentName();
+
+            var violation = await _context.PermitViolations
+                .Include(v => v.Approvers)
+                .FirstOrDefaultAsync(v => v.Id == req.ViolationId);
+
+            if (violation == null)
+            {
+                return NotFound(new { status = false, message = "Data pelanggaran tidak ditemukan." });
+            }
+
+            if (violation.Status != "PENDING")
+            {
+                return BadRequest(new { status = false, message = $"Pelanggaran ini sudah berstatus '{violation.Status}' dan tidak dapat diubah lagi." });
+            }
+
+            var approverRow = violation.Approvers.FirstOrDefault(a => a.ApproverNik == userNik);
+            if (approverRow == null)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, new
+                {
+                    status = false,
+                    message = "Anda tidak terdaftar sebagai PJA / Pengawas yang ditunjuk untuk laporan pelanggaran ini."
+                });
+            }
+
+            if (approverRow.Status != "PENDING")
+            {
+                return BadRequest(new { status = false, message = $"Anda sudah memberikan keputusan '{approverRow.Status}' sebelumnya." });
+            }
+
+            bool isReject = string.Equals(req.Action, "REJECT", StringComparison.OrdinalIgnoreCase);
+
+            if (isReject)
+            {
+                approverRow.Status = "REJECTED";
+                approverRow.Notes = req.Notes;
+                approverRow.ActionAt = DateTime.Now;
+
+                violation.Status = "REJECTED";
+                violation.RejectionReason = !string.IsNullOrWhiteSpace(req.Notes) ? req.Notes : $"Ditolak oleh PJA {userName} ({userNik})";
+                violation.UpdatedAt = DateTime.Now;
+
+                // Notify reporter
+                var reporterNik = violation.ReportedByNik.Split(new[] { '|', ' ' }, StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? violation.ReportedByNik;
+                _context.Notifications.Add(new Notification
+                {
+                    RecipientNik = reporterNik,
+                    Title = "Laporan Pelanggaran Ditolak PJA",
+                    Message = $"Laporan pelanggaran atas nama {violation.ViolatorName} ditolak oleh PJA {userName}. Catatan: {req.Notes ?? "-"}",
+                    Url = $"/Permit/Violation/{violation.Id}",
+                    NotifType = "permit_violation_status",
+                    Category = "violation",
+                    Priority = "urgent",
+                    ActionText = "Lihat Detail",
+                    IsRead = false,
+                    CreatedAt = DateTime.Now
+                });
+
+                await _context.SaveChangesAsync();
+
+                return Ok(new
+                {
+                    status = true,
+                    message = "Laporan pelanggaran berhasil ditolak.",
+                    data = new { violation_id = violation.Id, status = "REJECTED" }
+                });
+            }
+            else
+            {
+                approverRow.Status = "APPROVED";
+                approverRow.Notes = req.Notes;
+                approverRow.ActionAt = DateTime.Now;
+
+                int approvedCount = violation.Approvers.Count(a => a.Status == "APPROVED");
+                violation.ApprovedCount = approvedCount;
+                violation.UpdatedAt = DateTime.Now;
+
+                var reporterNik = violation.ReportedByNik.Split(new[] { '|', ' ' }, StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? violation.ReportedByNik;
+
+                // Check if ALL approvers have approved
+                if (approvedCount >= violation.TotalApprovers)
+                {
+                    violation.Status = "APPROVED";
+
+                    // Insert into [ONE_DB_MITRA].[dbo].[tbl_t_karyawan_pelanggaran]
+                    var mitraId = await InsertMitraPelanggaranAsync(violation);
+                    violation.MitraPelanggaranId = mitraId;
+
+                    // Notify Violator
+                    _context.Notifications.Add(new Notification
+                    {
+                        RecipientNik = violation.ViolatorNik.Trim(),
+                        Title = "Peringatan Catatan Pelanggaran K3 Resmi",
+                        Message = $"Anda tercatat melakukan pelanggaran K3: '{violation.ViolationType}' di {violation.ViolationLocation ?? "Area Operasional"}. Laporan telah diverifikasi dan disetujui penuh oleh seluruh PJA / Pengawas Lapangan.",
+                        Url = $"/Permit/Violation/{violation.Id}",
+                        NotifType = "permit_violation",
+                        Category = "violation",
+                        SenderName = "Departemen K3 / HSE",
+                        Priority = "urgent",
+                        ActionText = "Lihat Detail",
+                        IsRead = false,
+                        CreatedAt = DateTime.Now
+                    });
+
+                    // Notify Reporter
+                    _context.Notifications.Add(new Notification
+                    {
+                        RecipientNik = reporterNik,
+                        Title = "Laporan Pelanggaran Disetujui Penuh",
+                        Message = $"Laporan pelanggaran atas nama {violation.ViolatorName} telah disetujui oleh seluruh PJA ({approvedCount}/{violation.TotalApprovers}) dan resmi tercatat ke database sistem.",
+                        Url = $"/Permit/Violation/{violation.Id}",
+                        NotifType = "permit_violation_status",
+                        Category = "violation",
+                        Priority = "normal",
+                        ActionText = "Lihat Detail",
+                        IsRead = false,
+                        CreatedAt = DateTime.Now
+                    });
+                }
+                else
+                {
+                    // Partial approval notification
+                    _context.Notifications.Add(new Notification
+                    {
+                        RecipientNik = reporterNik,
+                        Title = "Update Persetujuan Pelanggaran K3",
+                        Message = $"PJA {userName} telah menyetujui laporan pelanggaran atas nama {violation.ViolatorName} ({approvedCount}/{violation.TotalApprovers} disetujui).",
+                        Url = $"/Permit/Violation/{violation.Id}",
+                        NotifType = "permit_violation_status",
+                        Category = "violation",
+                        Priority = "normal",
+                        ActionText = "Lihat Status",
+                        IsRead = false,
+                        CreatedAt = DateTime.Now
+                    });
+                }
+
+                await _context.SaveChangesAsync();
+
+                return Ok(new
+                {
+                    status = true,
+                    message = violation.Status == "APPROVED"
+                        ? "Laporan pelanggaran telah disetujui penuh oleh seluruh PJA dan resmi tercatat ke database!"
+                        : $"Persetujuan Anda berhasil disimpan ({approvedCount}/{violation.TotalApprovers} disetujui).",
+                    data = new
+                    {
+                        violation_id = violation.Id,
+                        status = violation.Status,
+                        total_approvers = violation.TotalApprovers,
+                        approved_count = approvedCount,
+                        mitra_pelanggaran_id = violation.MitraPelanggaranId
+                    }
+                });
+            }
+        }
+
 
         /// <summary>
         /// POST /api/qr/permit/movement
@@ -1761,6 +2175,15 @@ namespace Indexsafe.Api.Controllers
         public string? DetilLokasi { get; set; }
     }
 
+    public class ApproverItemRequest
+    {
+        public string Nik { get; set; } = string.Empty;
+        public string? Nama { get; set; }
+        public string? Jabatan { get; set; }
+        public string? Departemen { get; set; }
+        public string? Perusahaan { get; set; }
+    }
+
     public class CreatePermitViolationRequest
     {
         public string ViolatorNik { get; set; } = string.Empty;
@@ -1779,5 +2202,14 @@ namespace Indexsafe.Api.Controllers
         public string Severity { get; set; } = "Medium";
         public string? ActionTaken { get; set; }
         public DateTime? TanggalKejadian { get; set; }
+        public List<ApproverItemRequest>? Approvers { get; set; }
+        public List<string>? ApproverNiks { get; set; }
+    }
+
+    public class ViolationApprovalActionRequest
+    {
+        public int ViolationId { get; set; }
+        public string Action { get; set; } = "APPROVE"; // "APPROVE" or "REJECT"
+        public string? Notes { get; set; }
     }
 }

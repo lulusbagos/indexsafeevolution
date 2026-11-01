@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
@@ -67,7 +68,38 @@ namespace Indexsafe.Api.Models
         [Column("reported_by_name")]
         public string? ReportedByName { get; set; }
 
+        [MaxLength(30)]
+        [Column("status")]
+        public string Status { get; set; } = "PENDING"; // PENDING, APPROVED, REJECTED
+
+        [Column("total_approvers")]
+        public int TotalApprovers { get; set; } = 0;
+
+        [Column("approved_count")]
+        public int ApprovedCount { get; set; } = 0;
+
+        [Column("mitra_pelanggaran_id")]
+        public int? MitraPelanggaranId { get; set; }
+
+        [Column("id_pelanggaran_jenis")]
+        public int? IdPelanggaranJenis { get; set; }
+
+        [Column("id_kriteria")]
+        public int? IdKriteria { get; set; }
+
+        [Column("tanggal_kejadian")]
+        public DateTime? TanggalKejadian { get; set; }
+
+        [Column("rejection_reason")]
+        [MaxLength(500)]
+        public string? RejectionReason { get; set; }
+
+        [Column("updated_at")]
+        public DateTime? UpdatedAt { get; set; }
+
         [Column("created_at")]
         public DateTime CreatedAt { get; set; } = DateTime.Now;
+
+        public virtual ICollection<PermitViolationApprover> Approvers { get; set; } = new List<PermitViolationApprover>();
     }
 }

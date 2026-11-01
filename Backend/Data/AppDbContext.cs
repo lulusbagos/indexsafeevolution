@@ -41,6 +41,7 @@ namespace Indexsafe.Api.Data
         public DbSet<AttendanceRecord> AttendanceRecords { get; set; } = null!;
         public DbSet<UserScanPermission> UserScanPermissions { get; set; } = null!;
         public DbSet<PermitViolation> PermitViolations { get; set; } = null!;
+        public DbSet<PermitViolationApprover> PermitViolationApprovers { get; set; } = null!;
         public DbSet<PermitGateLog> PermitGateLogs { get; set; } = null!;
         public DbSet<Coaching> Coachings { get; set; } = null!;
         public DbSet<CoachingParticipant> CoachingParticipants { get; set; } = null!;
