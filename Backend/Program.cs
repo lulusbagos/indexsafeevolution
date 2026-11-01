@@ -40,7 +40,9 @@ builder.WebHost.ConfigureKestrel(serverOptions =>
 
 
 // 1. Connection string & SQL Server DbContext
-var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+var connectionString = Environment.GetEnvironmentVariable("DATABASE_CONNECTION_STRING")
+    ?? Environment.GetEnvironmentVariable("ConnectionStrings__DefaultConnection")
+    ?? builder.Configuration.GetConnectionString("DefaultConnection");
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlServer(connectionString, sqlServerOptionsAction =>
         sqlServerOptionsAction.EnableRetryOnFailure(
@@ -49,9 +51,16 @@ builder.Services.AddDbContext<AppDbContext>(options =>
             errorNumbersToAdd: null)));
 
 // 2. JWT Bearer Authentication
-var jwtSecret = builder.Configuration["Jwt:Secret"] ?? "Indexsafe_Evolution_Secret_Key_2026_Enterprise_K3_Mining_Auth_Tokens_Min32Chars!";
-var jwtIssuer = builder.Configuration["Jwt:Issuer"] ?? "Indexsafe.Api";
-var jwtAudience = builder.Configuration["Jwt:Audience"] ?? "Indexsafe.Mobile";
+var jwtSecret = Environment.GetEnvironmentVariable("JWT_SECRET")
+    ?? Environment.GetEnvironmentVariable("Jwt__Secret")
+    ?? builder.Configuration["Jwt:Secret"]
+    ?? "Indexsafe_Evolution_Secret_Key_2026_Enterprise_K3_Mining_Auth_Tokens_Min32Chars!";
+var jwtIssuer = Environment.GetEnvironmentVariable("JWT_ISSUER")
+    ?? builder.Configuration["Jwt:Issuer"]
+    ?? "Indexsafe.Api";
+var jwtAudience = Environment.GetEnvironmentVariable("JWT_AUDIENCE")
+    ?? builder.Configuration["Jwt:Audience"]
+    ?? "Indexsafe.Mobile";
 
 builder.Services.AddAuthentication(options =>
 {
