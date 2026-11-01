@@ -21,6 +21,7 @@ class ApiService {
   // Release builds may only communicate with HTTPS endpoints. Local HTTP
   // endpoints are available exclusively to an explicitly opted-in debug build.
   static const List<String> _productionUrls = [
+    'https://api-mbs.indexim.id',
     'https://api_mbs.indexim.id',
     'https://api_mbs.idcoal.id',
   ];
@@ -31,7 +32,7 @@ class ApiService {
   ];
   static const String _configuredBaseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'https://api_mbs.indexim.id',
+    defaultValue: 'https://api-mbs.indexim.id',
   );
   static bool get _allowInsecureDevelopment =>
       !kReleaseMode &&
