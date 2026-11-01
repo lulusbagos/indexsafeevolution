@@ -27,9 +27,16 @@ namespace Indexsafe.Api.Services
             string jobTitle,
             int? employeeId = null)
         {
-            var secretKey = _config["Jwt:Secret"] ?? "Indexsafe_Evolution_Secret_Key_2026_Enterprise_K3_Mining_Auth_Tokens_Min32Chars!";
-            var issuer = _config["Jwt:Issuer"] ?? "Indexsafe.Api";
-            var audience = _config["Jwt:Audience"] ?? "Indexsafe.Mobile";
+            var secretKey = Environment.GetEnvironmentVariable("JWT_SECRET")
+                ?? Environment.GetEnvironmentVariable("Jwt__Secret")
+                ?? _config["Jwt:Secret"]
+                ?? "Indexsafe_Evolution_Secret_Key_2026_Enterprise_K3_Mining_Auth_Tokens_Min32Chars!";
+            var issuer = Environment.GetEnvironmentVariable("JWT_ISSUER")
+                ?? _config["Jwt:Issuer"]
+                ?? "Indexsafe.Api";
+            var audience = Environment.GetEnvironmentVariable("JWT_AUDIENCE")
+                ?? _config["Jwt:Audience"]
+                ?? "Indexsafe.Mobile";
             var expiryDays = int.TryParse(_config["Jwt:ExpiryDays"], out var days) ? days : 30;
 
             var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey));
