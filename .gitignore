@@ -26,6 +26,11 @@ Desktop.ini
 **/captures/
 *.apk
 *.aab
+**/android/key.properties
+**/*.jks
+**/*.keystore
+Backend/appsettings.Production.json
+Backend/appsettings.Local.json
 
 # iOS
 **/ios/Pods/

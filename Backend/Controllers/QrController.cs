@@ -32,7 +32,7 @@ namespace Indexsafe.Api.Controllers
 
     [ApiController]
     [Route("api/qr")]
-    [AllowAnonymous]
+    [Authorize]
     public class QrController : ControllerBase
     {
         private readonly AppDbContext _context;
@@ -803,7 +803,6 @@ namespace Indexsafe.Api.Controllers
         /// GET /api/qr/simper/offline-dataset
         /// </summary>
         [HttpGet("simper/offline-dataset")]
-        [AllowAnonymous]
         public async Task<IActionResult> GetSimperOfflineDataset()
         {
             try
@@ -827,7 +826,6 @@ namespace Indexsafe.Api.Controllers
         /// GET /api/qr/permit/offline-dataset
         /// </summary>
         [HttpGet("permit/offline-dataset")]
-        [AllowAnonymous]
         public async Task<IActionResult> GetPermitOfflineDataset()
         {
             try

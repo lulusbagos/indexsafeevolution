@@ -62,8 +62,8 @@ android {
         // For more information, see: https://docs.flutter.dev/deployment/android#reviewing-the-gradle-build-configuration.
         // minSdkVersion flutter.minSdkVersion
         minSdkVersion flutter.minSdkVersion
-        // targetSdkVersion flutter.targetSdkVersion
-        targetSdkVersion 34
+        // Google Play requires Android 16 / API 36 for new submissions.
+        targetSdkVersion 36
         versionCode flutterVersionCode.toInteger()
         versionName flutterVersionName
         ndk {
@@ -84,10 +84,21 @@ android {
         release {
             if (keystoreProperties['storeFile'] != null && file(keystoreProperties['storeFile']).exists()) {
                 signingConfig signingConfigs.release
-            } else {
-                signingConfig signingConfigs.debug
             }
         }
+    }
+}
+
+// Keep debug builds usable, but never allow a Play release to fall back to the
+// Android debug certificate.
+gradle.taskGraph.whenReady { graph ->
+    def isReleaseBuild = graph.allTasks.any { task ->
+        task.name.toLowerCase().contains('release')
+    }
+    def hasReleaseKey = keystoreProperties['storeFile'] != null &&
+        file(keystoreProperties['storeFile']).exists()
+    if (isReleaseBuild && !hasReleaseKey) {
+        throw new GradleException('Missing production upload keystore. Create android/key.properties before building a release bundle.')
     }
 }
 

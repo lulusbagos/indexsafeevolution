@@ -729,6 +729,10 @@ Future<bool> syncAllMasterData({
     'p5m',
     'safety',
     'employee',
+    // Wajib tersedia bahkan sebelum login agar scanner siap offline sejak
+    // pemakaian pertama. Payload tidak membawa foto karyawan.
+    'permit',
+    'simper',
     'vehicle',
     'areas',
     'benchmarks',
@@ -746,6 +750,8 @@ Future<bool> syncAllMasterData({
     'p5m': 'Topik Keselamatan P5M',
     'safety': 'Aturan & Regulasi Safety',
     'employee': 'Otoritas & Pengawas Lapangan',
+    'permit': 'Kartu Mine Permit untuk Scan Offline',
+    'simper': 'Kartu SIMPER untuk Scan Offline',
     'vehicle': 'Daftar Alat Berat & Kendaraan',
     'areas': 'Area Utama Kerja Tambang',
     'benchmarks': 'Detail Lokasi & Benchmark',
@@ -770,6 +776,44 @@ Future<bool> syncAllMasterData({
       final percent = (((i + 1) / total) * 100).toInt();
 
       onProgress?.call(name, percent, 'Sinkronisasi $friendly...');
+
+      if (name == 'permit') {
+        try {
+          final res = await api.getPermitOfflineDataset();
+          await res.fold(
+            (err) async =>
+                debugPrint('[Sync] Dataset Mine Permit: ${err['message']}'),
+            (items) async {
+              await db.saveOfflinePermits(items);
+              dataSync[name] = 1;
+              await PreferenceService.setDataSync(dataSync);
+              completed++;
+            },
+          );
+        } catch (e) {
+          debugPrint('[Sync] Error syncing Mine Permit: $e');
+        }
+        continue;
+      }
+
+      if (name == 'simper') {
+        try {
+          final res = await api.getSimperOfflineDataset();
+          await res.fold(
+            (err) async =>
+                debugPrint('[Sync] Dataset SIMPER: ${err['message']}'),
+            (items) async {
+              await db.saveOfflineSimpers(items);
+              dataSync[name] = 1;
+              await PreferenceService.setDataSync(dataSync);
+              completed++;
+            },
+          );
+        } catch (e) {
+          debugPrint('[Sync] Error syncing SIMPER: $e');
+        }
+        continue;
+      }
 
       if (name == 'areas' || name == 'benchmarks') {
         try {

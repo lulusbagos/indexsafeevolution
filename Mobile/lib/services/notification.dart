@@ -41,7 +41,8 @@ class NotificationService {
   }
 
   static Future<void> init() async {
-    const androidSettings = AndroidInitializationSettings('@mipmap/launcher_icon');
+    const androidSettings =
+        AndroidInitializationSettings('@mipmap/launcher_icon');
     const darwinSettings = DarwinInitializationSettings(
       requestAlertPermission: true,
       requestBadgePermission: true,
@@ -68,8 +69,11 @@ class NotificationService {
 
     // Deteksi jika aplikasi dibuka dari kondisi mati (terminated) via tap notifikasi
     try {
-      final details = await _localNotifications.getNotificationAppLaunchDetails();
-      if (details != null && details.didNotificationLaunchApp && details.notificationResponse != null) {
+      final details =
+          await _localNotifications.getNotificationAppLaunchDetails();
+      if (details != null &&
+          details.didNotificationLaunchApp &&
+          details.notificationResponse != null) {
         final p = details.notificationResponse?.payload;
         if (p != null && p.isNotEmpty) {
           _pendingPayload = p;
@@ -78,11 +82,10 @@ class NotificationService {
     } catch (_) {}
 
     // Create Android Notification Channels: Normal & Urgent Long Vibration for Findings
-    final androidImplementation = _localNotifications
-        .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+    final androidImplementation =
+        _localNotifications.resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin>();
     if (androidImplementation != null) {
-      await androidImplementation.requestNotificationsPermission();
-
       // Channel 1: Notifikasi Biasa
       final regularChannel = AndroidNotificationChannel(
         'indexsafe_notification_channel',
@@ -99,15 +102,26 @@ class NotificationService {
       final urgentTemuanChannel = AndroidNotificationChannel(
         'indexsafe_temuan_urgent_channel',
         'Temuan K3 Ditugaskan ke Anda (Urgent)',
-        description: 'Peringatan Temuan Bahaya & Action Plan K3 Yang Diarahkan ke Anda (Getar Panjang)',
+        description:
+            'Peringatan Temuan Bahaya & Action Plan K3 Yang Diarahkan ke Anda (Getar Panjang)',
         importance: Importance.max,
         enableVibration: true,
         // Pola getar panjang: jeda 0ms, getar 1000ms, jeda 250ms, getar 1200ms, jeda 250ms, getar 1500ms
         vibrationPattern: Int64List.fromList([0, 1000, 250, 1200, 250, 1500]),
         playSound: true,
       );
-      await androidImplementation.createNotificationChannel(urgentTemuanChannel);
+      await androidImplementation
+          .createNotificationChannel(urgentTemuanChannel);
     }
+  }
+
+  /// Called from an explicit, user-facing notification preference.
+  static Future<bool> requestPermissionFromUser() async {
+    final androidImplementation =
+        _localNotifications.resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin>();
+    return await androidImplementation?.requestNotificationsPermission() ??
+        true;
   }
 
   /// Getaran fisik berulang & intensif khusus ketika login / deteksi user ditugaskan sebagai PIC/PJA Hazard, Inspeksi, Action Plan, dll.
@@ -182,8 +196,12 @@ class NotificationService {
 
     final notificationDetails = NotificationDetails(
       android: AndroidNotificationDetails(
-        isTemuanK3 ? 'indexsafe_temuan_urgent_channel' : 'indexsafe_notification_channel',
-        isTemuanK3 ? 'Temuan K3 Ditugaskan ke Anda (Urgent)' : 'MBS SAP Notifications',
+        isTemuanK3
+            ? 'indexsafe_temuan_urgent_channel'
+            : 'indexsafe_notification_channel',
+        isTemuanK3
+            ? 'Temuan K3 Ditugaskan ke Anda (Urgent)'
+            : 'MBS SAP Notifications',
         channelDescription: isTemuanK3
             ? 'Peringatan Temuan Bahaya & Action Plan K3 Yang Diarahkan ke Anda (Getar Panjang)'
             : 'Notifikasi Real-time Keselamatan Kerja MBS SAP',
@@ -222,11 +240,13 @@ class NotificationService {
     if (url.trim().isEmpty) return;
     final nav = rootNavigatorKey.currentState;
     if (nav == null) {
-      debugPrint('[NotificationService] Navigator belum siap untuk url: $url. Mengantrekan retry...');
+      debugPrint(
+          '[NotificationService] Navigator belum siap untuk url: $url. Mengantrekan retry...');
       _pendingPayload = url;
       for (final delay in [200, 500, 1000, 1800]) {
         Future.delayed(Duration(milliseconds: delay), () {
-          if (_pendingPayload != null && rootNavigatorKey.currentState != null) {
+          if (_pendingPayload != null &&
+              rootNavigatorKey.currentState != null) {
             final p = _pendingPayload!;
             _pendingPayload = null;
             navigateToUrl(p);
@@ -253,13 +273,18 @@ class NotificationService {
 
     if (lower.contains('roster')) {
       nav.push(MaterialPageRoute(builder: (_) => const RosterSettingsPage()));
-    } else if (lower.contains('incident') || lower.contains('insiden') || lower.contains('safety')) {
+    } else if (lower.contains('incident') ||
+        lower.contains('insiden') ||
+        lower.contains('safety')) {
       nav.push(MaterialPageRoute(builder: (_) => const SafetyUpdatesPage()));
     } else if (lower.contains('hazard')) {
       nav.push(MaterialPageRoute(builder: (_) => const HazardPage()));
     } else if (lower.contains('inspect') || lower.contains('inspeksi')) {
-      nav.push(MaterialPageRoute(builder: (_) => const InspeksiPage(Module.inspection)));
-    } else if (lower.contains('performance') || lower.contains('achievement') || lower.contains('pencapaian')) {
+      nav.push(MaterialPageRoute(
+          builder: (_) => const InspeksiPage(Module.inspection)));
+    } else if (lower.contains('performance') ||
+        lower.contains('achievement') ||
+        lower.contains('pencapaian')) {
       nav.push(MaterialPageRoute(builder: (_) => const AchievementSapPage()));
     } else if (lower.contains('league') || lower.contains('liga')) {
       nav.push(MaterialPageRoute(builder: (_) => const SapLeaguePage()));
@@ -269,7 +294,8 @@ class NotificationService {
       nav.push(MaterialPageRoute(builder: (_) => const ProfilePage()));
     } else if (lower.contains('action') || lower.contains('actionplan')) {
       nav.push(MaterialPageRoute(builder: (_) => const ActionTrackerPage()));
-    } else if (lower.contains('approval') || lower.contains('approval_center')) {
+    } else if (lower.contains('approval') ||
+        lower.contains('approval_center')) {
       nav.push(MaterialPageRoute(builder: (_) => const ApprovalCenterPage()));
     } else {
       nav.push(MaterialPageRoute(builder: (_) => const NotifPage()));
@@ -278,18 +304,36 @@ class NotificationService {
 
   static bool _isPermitAssignedToUser(Map<String, dynamic> permit) {
     final profile = PreferenceService.getProfile();
-    final rawUserNik = (profile?.noNik ?? PreferenceService.getUser() ?? PreferenceService.getOfflineNik() ?? '').trim();
+    final rawUserNik = (profile?.noNik ??
+            PreferenceService.getUser() ??
+            PreferenceService.getOfflineNik() ??
+            '')
+        .trim();
     final cleanUserNik = rawUserNik.replaceAll(RegExp(r'[^0-9]'), '');
     if (cleanUserNik.isEmpty) return false;
 
-    final pjoNik = (permit['pjoNik'] ?? permit['pjo_nik'] ?? '').toString().trim().replaceAll(RegExp(r'[^0-9]'), '');
-    final inspectorNik = (permit['inspectorNik'] ?? permit['inspector_nik'] ?? '').toString().trim().replaceAll(RegExp(r'[^0-9]'), '');
+    final pjoNik = (permit['pjoNik'] ?? permit['pjo_nik'] ?? '')
+        .toString()
+        .trim()
+        .replaceAll(RegExp(r'[^0-9]'), '');
+    final inspectorNik =
+        (permit['inspectorNik'] ?? permit['inspector_nik'] ?? '')
+            .toString()
+            .trim()
+            .replaceAll(RegExp(r'[^0-9]'), '');
 
-    return (pjoNik.isNotEmpty && (cleanUserNik == pjoNik || cleanUserNik.endsWith(pjoNik) || pjoNik.endsWith(cleanUserNik))) ||
-           (inspectorNik.isNotEmpty && (cleanUserNik == inspectorNik || cleanUserNik.endsWith(inspectorNik) || inspectorNik.endsWith(cleanUserNik)));
+    return (pjoNik.isNotEmpty &&
+            (cleanUserNik == pjoNik ||
+                cleanUserNik.endsWith(pjoNik) ||
+                pjoNik.endsWith(cleanUserNik))) ||
+        (inspectorNik.isNotEmpty &&
+            (cleanUserNik == inspectorNik ||
+                cleanUserNik.endsWith(inspectorNik) ||
+                inspectorNik.endsWith(cleanUserNik)));
   }
 
-  static Future<void> _openSpecialPermitObservation(String payload, NavigatorState nav) async {
+  static Future<void> _openSpecialPermitObservation(
+      String payload, NavigatorState nav) async {
     // 1. Jika payload berisi ID permit: "special_permit_id:<guid>"
     if (payload.contains('special_permit_id:')) {
       final id = payload.split('special_permit_id:').last.trim();
@@ -306,7 +350,8 @@ class NotificationService {
                   builder: (_) => SpecialPermitFollowupPage(permit: p),
                 ));
               } else {
-                nav.push(MaterialPageRoute(builder: (_) => const SpecialPermitListPage()));
+                nav.push(MaterialPageRoute(
+                    builder: (_) => const SpecialPermitListPage()));
               }
               handled = true;
             }
@@ -327,12 +372,14 @@ class NotificationService {
               builder: (_) => SpecialPermitFollowupPage(permit: map),
             ));
           } else {
-            nav.push(MaterialPageRoute(builder: (_) => const SpecialPermitListPage()));
+            nav.push(MaterialPageRoute(
+                builder: (_) => const SpecialPermitListPage()));
           }
           return;
         }
       } catch (e) {
-        debugPrint('[NotificationService] Gagal parse JSON permit dari payload: $e');
+        debugPrint(
+            '[NotificationService] Gagal parse JSON permit dari payload: $e');
       }
     }
 
