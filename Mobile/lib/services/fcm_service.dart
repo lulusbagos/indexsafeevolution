@@ -9,11 +9,10 @@ import 'preference.dart';
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp();
-  debugPrint('[FCM Background] Message ID: ${message.messageId}');
-  debugPrint('[FCM Background] Data: ${message.data}');
-  debugPrint('[FCM Background] Notification: ${message.notification?.title} - ${message.notification?.body}');
 
-  final title = message.notification?.title ?? message.data['title'] ?? 'MBS Notification';
+  final title = message.notification?.title ??
+      message.data['title'] ??
+      'MBS Notification';
   final body = message.notification?.body ?? message.data['body'] ?? '';
   final payload = message.data['payload'] ?? message.data['url'] ?? '';
 
@@ -38,24 +37,12 @@ class FCMService {
 
       FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
 
-      // Request notification permissions
-      NotificationSettings settings = await _messaging.requestPermission(
-        alert: true,
-        announcement: false,
-        badge: true,
-        carPlay: false,
-        criticalAlert: false,
-        provisional: false,
-        sound: true,
-      );
-      debugPrint('[FCM] Authorization status: ${settings.authorizationStatus}');
-
-      // Get FCM Token
+      // Do not show a permission prompt on app startup. Android permission is
+      // requested only after the user explicitly enables notifications.
       await updateToken();
 
       // Listen for token refreshes
       _messaging.onTokenRefresh.listen((newToken) {
-        debugPrint('[FCM] Token refreshed: $newToken');
         PreferenceService.setFcmToken(newToken);
         if (PreferenceService.getAuth() != null) {
           ApiService().updateFcmToken(newToken);
@@ -64,8 +51,9 @@ class FCMService {
 
       // Foreground message handler
       FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-        debugPrint('[FCM Foreground] Received: ${message.notification?.title} - ${message.notification?.body}');
-        final title = message.notification?.title ?? message.data['title'] ?? 'MBS Notification';
+        final title = message.notification?.title ??
+            message.data['title'] ??
+            'MBS Notification';
         final body = message.notification?.body ?? message.data['body'] ?? '';
         final payload = message.data['payload'] ?? message.data['url'] ?? '';
 
@@ -80,7 +68,6 @@ class FCMService {
 
       // User tapped notification from background
       FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
-        debugPrint('[FCM OpenedApp] User tapped notification');
         final payload = message.data['payload'] ?? message.data['url'] ?? '';
         if (payload.isNotEmpty) {
           NotificationService.navigateToUrl(payload);
@@ -92,8 +79,8 @@ class FCMService {
       // Check if app was opened from terminated state via notification
       final initialMessage = await _messaging.getInitialMessage();
       if (initialMessage != null) {
-        debugPrint('[FCM InitialMessage] App launched from notification');
-        final payload = initialMessage.data['payload'] ?? initialMessage.data['url'] ?? '';
+        final payload =
+            initialMessage.data['payload'] ?? initialMessage.data['url'] ?? '';
         if (payload.isNotEmpty) {
           NotificationService.navigateToUrl(payload);
         }
@@ -107,7 +94,6 @@ class FCMService {
     try {
       String? token = await _messaging.getToken();
       if (token != null) {
-        debugPrint('[FCM] Current Token: $token');
         await PreferenceService.setFcmToken(token);
         if (PreferenceService.getAuth() != null) {
           ApiService().updateFcmToken(token);
@@ -121,4 +107,22 @@ class FCMService {
   }
 
   static String? get savedToken => PreferenceService.getFcmToken();
+
+  /// Call only from a clear user action, for example the notification setting.
+  static Future<bool> requestPermissionFromUser() async {
+    final settings = await _messaging.requestPermission(
+      alert: true,
+      announcement: false,
+      badge: true,
+      carPlay: false,
+      criticalAlert: false,
+      provisional: false,
+      sound: true,
+    );
+    final granted =
+        settings.authorizationStatus == AuthorizationStatus.authorized ||
+            settings.authorizationStatus == AuthorizationStatus.provisional;
+    if (granted) await updateToken();
+    return granted;
+  }
 }

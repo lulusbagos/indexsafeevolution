@@ -78,7 +78,7 @@ namespace Indexsafe.Api.Controllers
 
             if (overridePwd != null)
             {
-                if (overridePwd.KataSandi == req.Password || req.Password == "123456")
+                if (overridePwd.KataSandi == req.Password)
                 {
                     isValid = true;
                 }
@@ -96,30 +96,6 @@ namespace Indexsafe.Api.Controllers
                         idPerusahaan = pengguna.PerusahaanId;
                         idDepartemen = pengguna.DepartemenId;
                         idJabatan = pengguna.JabatanId;
-                    }
-                    else if (req.Password == "123456") // Fallback default password
-                    {
-                        var karyawan = await _context.Karyawans.FirstOrDefaultAsync(k => k.NoNik == nrp && k.StatusAktif);
-                        if (karyawan != null)
-                        {
-                            isValid = true;
-                            fullName = pengguna.NamaLengkap;
-                            idPerusahaan = karyawan.IdPerusahaan;
-                            idDepartemen = karyawan.IdDepartemen;
-                            idJabatan = karyawan.IdJabatan;
-                        }
-                    }
-                }
-                else
-                {
-                    // 3. Fallback default password for active employees
-                    var karyawan = await _context.Karyawans.FirstOrDefaultAsync(k => k.NoNik == nrp && k.StatusAktif);
-                    if (karyawan != null && req.Password == "123456")
-                    {
-                        isValid = true;
-                        idPerusahaan = karyawan.IdPerusahaan;
-                        idDepartemen = karyawan.IdDepartemen;
-                        idJabatan = karyawan.IdJabatan;
                     }
                 }
             }

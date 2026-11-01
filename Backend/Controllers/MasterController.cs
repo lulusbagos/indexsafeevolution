@@ -39,7 +39,6 @@ namespace Indexsafe.Api.Controllers
         /// Master data download endpoint used by Flutter Mobile sync service:
         /// GET /api/master/{name}?limit=10000
         /// </summary>
-        [AllowAnonymous]
         [HttpGet("master/{name}")]
         public async Task<IActionResult> GetMasterByName(string name, [FromQuery] int limit = 10000)
         {
@@ -299,7 +298,6 @@ namespace Indexsafe.Api.Controllers
         /// GET /api/companies
         /// Returns all active partner companies.
         /// </summary>
-        [AllowAnonymous]
         [HttpGet("companies")]
         public async Task<IActionResult> GetAllCompanies()
         {
@@ -361,7 +359,6 @@ namespace Indexsafe.Api.Controllers
         /// Retrieves departments for a specific company matching web ObservationController.
         /// Source: [ONE_DB_MITRA].dbo.vw_m_departemen_dropdown
         /// </summary>
-        [AllowAnonymous]
         [HttpGet("observation/departments")]
         [HttpGet("departments")]
         public async Task<IActionResult> GetDepartmentsByCompany([FromQuery] int companyId)
@@ -374,7 +371,6 @@ namespace Indexsafe.Api.Controllers
         /// Mobile Observation dropdown source. Values are read from the shared
         /// MBS tables/views; no sample enum values are returned here.
         /// </summary>
-        [AllowAnonymous]
         [HttpGet("observation/options")]
         public async Task<IActionResult> GetObservationOptions([FromQuery] int? perusahaanId)
         {
@@ -488,7 +484,6 @@ namespace Indexsafe.Api.Controllers
             return Ok(list);
         }
 
-        [AllowAnonymous]
         [HttpGet("bbs/workers")]
         public async Task<IActionResult> GetBbsWorkers([FromQuery] string? q, [FromQuery] int? companyId, [FromQuery] int limit = 30)
         {
@@ -529,7 +524,6 @@ namespace Indexsafe.Api.Controllers
             return Ok(workers);
         }
 
-        [AllowAnonymous]
         [HttpGet("master/areas", Order = -1)]
         public async Task<IActionResult> GetAreas([FromQuery] int? perusahaanId)
         {
@@ -565,7 +559,6 @@ namespace Indexsafe.Api.Controllers
             return Ok(areas);
         }
 
-        [AllowAnonymous]
         [HttpGet("master/benchmarks", Order = -1)]
         public async Task<IActionResult> GetBenchmarks([FromQuery] string? areaUtama, [FromQuery] int? perusahaanId)
         {
@@ -616,7 +609,6 @@ namespace Indexsafe.Api.Controllers
             public string? CreatedByName { get; set; }
         }
 
-        [AllowAnonymous]
         [HttpPost("master/benchmarks", Order = -1)]
         public async Task<IActionResult> CreateBenchmark([FromBody] CreateBenchmarkRequest request)
         {
@@ -668,7 +660,6 @@ namespace Indexsafe.Api.Controllers
             public string? CreatedByName { get; set; }
         }
 
-        [AllowAnonymous]
         [HttpPost("master/areas", Order = -1)]
         public async Task<IActionResult> CreateArea([FromBody] CreateAreaRequest request)
         {

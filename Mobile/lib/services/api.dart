@@ -4,7 +4,7 @@ import 'dart:io';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:dartz/dartz.dart';
 import 'package:dio/dio.dart';
-import 'package:dio/io.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../models/auth_model.dart';
@@ -18,18 +18,37 @@ import 'preference.dart';
 import 'violation_receipt_pdf_service.dart';
 
 class ApiService {
-  // Production Public API & Fallbacks
-  static const List<String> _candidateUrls = [
+  // Release builds may only communicate with HTTPS endpoints. Local HTTP
+  // endpoints are available exclusively to an explicitly opted-in debug build.
+  static const List<String> _productionUrls = [
     'https://api_mbs.indexim.id',
     'https://api_mbs.idcoal.id',
+  ];
+  static const List<String> _developmentUrls = [
     'http://192.168.130.236:7302',
     'http://127.0.0.1:7302',
     'http://10.0.2.2:7302',
   ];
-  static String _activeBaseUrl = const String.fromEnvironment(
+  static const String _configuredBaseUrl = String.fromEnvironment(
     'API_BASE_URL',
     defaultValue: 'https://api_mbs.indexim.id',
   );
+  static bool get _allowInsecureDevelopment =>
+      !kReleaseMode &&
+      const bool.fromEnvironment('ALLOW_INSECURE_DEV', defaultValue: false);
+  static bool _isHttpsUrl(String value) =>
+      Uri.tryParse(value)?.scheme.toLowerCase() == 'https';
+  static String _safeInitialBaseUrl() =>
+      _isHttpsUrl(_configuredBaseUrl) || _allowInsecureDevelopment
+          ? _configuredBaseUrl
+          : _productionUrls.first;
+  static String _activeBaseUrl = _safeInitialBaseUrl();
+  static List<String> get _candidateUrls => [
+        _activeBaseUrl,
+        ..._productionUrls.where((url) => url != _activeBaseUrl),
+        if (_allowInsecureDevelopment)
+          ..._developmentUrls.where((url) => url != _activeBaseUrl),
+      ];
   String get baseUrl => _activeBaseUrl;
   static String get activeBaseUrl => _activeBaseUrl;
 
@@ -55,14 +74,6 @@ class ApiService {
     return list;
   }
 
-  static const List<String> _specialPermitCandidateUrls = [
-    'https://api_mbs.indexim.id',
-    'https://api_mbs.idcoal.id',
-    'http://192.168.130.236:7302',
-    'http://10.0.2.2:7302',
-    'http://127.0.0.1:7302',
-  ];
-
   /// Khusus Special Permit: prioritaskan public endpoint terlebih dahulu
   static List<String> _buildSpecialPermitCandidateUrls(String cleanPath) {
     final List<String> list = [];
@@ -74,7 +85,7 @@ class ApiService {
       if (!list.contains(withoutApi)) list.add(withoutApi);
     }
 
-    for (final candidate in _specialPermitCandidateUrls) {
+    for (final candidate in _candidateUrls) {
       addTarget(candidate);
     }
     return list;
@@ -134,15 +145,6 @@ class ApiService {
       ),
     );
 
-    dio.httpClientAdapter = IOHttpClientAdapter(
-      createHttpClient: () {
-        final client = HttpClient();
-        client.badCertificateCallback =
-            (X509Certificate cert, String host, int port) => true;
-        return client;
-      },
-    );
-
     dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) {
@@ -180,14 +182,6 @@ class ApiService {
                   connectTimeout: const Duration(seconds: 8),
                   receiveTimeout: const Duration(seconds: 10),
                 ));
-                loginDio.httpClientAdapter = IOHttpClientAdapter(
-                  createHttpClient: () {
-                    final client = HttpClient();
-                    client.badCertificateCallback =
-                        (X509Certificate cert, String host, int port) => true;
-                    return client;
-                  },
-                );
                 final loginPayload = <String, dynamic>{
                   'email': savedNik,
                   'nik': savedNik,
@@ -714,11 +708,10 @@ class ApiService {
 
       // The offline scanner keeps the whole employee directory (metadata and
       // QR only). Employee records already exceed 10,000.
-      final masterLimit =
-          (name.toString().toLowerCase() == 'employee' ||
-                  name.toString().toLowerCase() == 'employees')
-              ? 30000
-              : 10000;
+      final masterLimit = (name.toString().toLowerCase() == 'employee' ||
+              name.toString().toLowerCase() == 'employees')
+          ? 30000
+          : 10000;
       final allTargets =
           _buildCandidateUrls('/master/$name?limit=$masterLimit');
       final targets = allTargets;

@@ -12,6 +12,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/profile_model.dart';
 import '../services/api.dart';
 import '../services/background.dart';
+import '../services/fcm_service.dart';
 import '../services/notification.dart';
 import '../services/preference.dart';
 import '../utils/globals.dart' as globals;
@@ -419,6 +420,37 @@ class _ProfilePageState extends State<ProfilePage> {
         (route) => false,
       );
     });
+  }
+
+  Future<void> _requestNotificationPermission() async {
+    final enable = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Aktifkan notifikasi keselamatan?'),
+        content: const Text(
+          'Notifikasi digunakan untuk penugasan, approval, pembaruan safety, dan status tindak lanjut. Anda dapat mengubahnya kapan saja di Pengaturan Android.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Nanti saja'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Aktifkan'),
+          ),
+        ],
+      ),
+    );
+    if (enable != true) return;
+    final granted = await FCMService.requestPermissionFromUser();
+    if (!mounted) return;
+    SnackBarMsg.success(
+      context,
+      granted
+          ? 'Notifikasi keselamatan telah diaktifkan'
+          : 'Izin notifikasi belum diberikan',
+    );
   }
 
   @override
@@ -1236,6 +1268,15 @@ class _ProfilePageState extends State<ProfilePage> {
                                 ),
                               );
                             },
+                          ),
+                          _buildDivider(),
+                          _buildSettingTile(
+                            icon: Icons.notifications_active_outlined,
+                            iconColor: const Color(0xFF7C3AED),
+                            title: 'Notifikasi Keselamatan',
+                            subtitle:
+                                'Aktifkan pemberitahuan penugasan dan safety',
+                            onTap: _requestNotificationPermission,
                           ),
                           _buildDivider(),
                           _buildSettingTile(

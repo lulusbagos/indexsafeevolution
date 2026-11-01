@@ -4,7 +4,6 @@ import 'package:package_info_plus/package_info_plus.dart';
 
 import '../services/api.dart';
 import '../services/database.dart';
-import '../services/notification.dart';
 import '../services/preference.dart';
 import '../services/sync.dart';
 import '../utils/globals.dart' as globals;
@@ -20,8 +19,7 @@ class SplashPage extends StatefulWidget {
   State<SplashPage> createState() => _SplashPageState();
 }
 
-class _SplashPageState extends State<SplashPage>
-    with TickerProviderStateMixin {
+class _SplashPageState extends State<SplashPage> with TickerProviderStateMixin {
   final _api = ApiService();
   final _db = DatabaseService();
   final _auth = PreferenceService.getAuth();
@@ -97,19 +95,26 @@ class _SplashPageState extends State<SplashPage>
         final versionConfig = await _api.checkAppVersion();
         if (versionConfig != null) {
           final bool forceUpdate = versionConfig['force_update'] == true;
-          final String minVer = versionConfig['min_version']?.toString() ?? '1.0.1';
-          final String latestVer = versionConfig['latest_version']?.toString() ?? '1.0.1';
+          final String minVer =
+              versionConfig['min_version']?.toString() ?? '1.0.1';
+          final String latestVer =
+              versionConfig['latest_version']?.toString() ?? '1.0.1';
           final int minBuild = (versionConfig['min_build'] is int)
               ? versionConfig['min_build'] as int
-              : int.tryParse(versionConfig['min_build']?.toString() ?? '0') ?? 0;
+              : int.tryParse(versionConfig['min_build']?.toString() ?? '0') ??
+                  0;
           final int currentBuild = int.tryParse(globals.buildNumber) ?? 0;
-          final String currentVer = (globals.version.isNotEmpty) ? globals.version : '1.0.1';
-          final String playStoreUrl = versionConfig['playstore_url']?.toString() ??
+          final String currentVer =
+              (globals.version.isNotEmpty) ? globals.version : '1.0.1';
+          final String playStoreUrl = versionConfig['playstore_url']
+                  ?.toString() ??
               'https://play.google.com/store/apps/details?id=id.indexim.mbs';
-          final String dialogTitle = versionConfig['title']?.toString() ?? 'Update Aplikasi Diperlukan';
+          final String dialogTitle = versionConfig['title']?.toString() ??
+              'Update Aplikasi Diperlukan';
           final String dialogMsg = versionConfig['message']?.toString() ??
               'Versi aplikasi Anda saat ini sudah usang. Harap perbarui ke versi terbaru di Google Play Store untuk dapat melanjutkan penggunaan MBS SAP.';
-          final String releaseNotes = versionConfig['release_notes']?.toString() ?? '';
+          final String releaseNotes =
+              versionConfig['release_notes']?.toString() ?? '';
 
           final bool isOutdated = _isVersionLower(currentVer, minVer) ||
               (currentBuild > 0 && minBuild > 0 && currentBuild < minBuild) ||
@@ -138,13 +143,20 @@ class _SplashPageState extends State<SplashPage>
         });
       }
 
-      // Periksa apakah data master sudah tersinkronisasi
+      // Dataset kartu berisi data personal karyawan. Sinkronisasi penuh hanya
+      // boleh dilakukan setelah sesi akun tervalidasi, bukan dari endpoint
+      // anonim sebelum login. Setelah sekali login, cache tetap dipakai penuh
+      // ketika perangkat offline.
       final isSynced = PreferenceService.isMasterDataSynced();
-      if (!isSynced) {
+      final hasAuthenticatedSession = _auth?.token != null &&
+          _auth!.token!.isNotEmpty &&
+          !_auth!.token!.startsWith('offline_token_');
+      if (!isSynced && hasAuthenticatedSession) {
         if (mounted) {
           setState(() {
             _syncProgress = 0.18;
-            _syncStatus = 'Mengunduh data master keselamatan untuk offline mode...';
+            _syncStatus =
+                'Mengunduh data master keselamatan untuk offline mode...';
           });
         }
 
@@ -161,7 +173,7 @@ class _SplashPageState extends State<SplashPage>
             }
           },
         );
-      } else {
+      } else if (isSynced) {
         if (mounted) {
           setState(() {
             _syncProgress = 0.80;
@@ -169,6 +181,11 @@ class _SplashPageState extends State<SplashPage>
           });
         }
         await Future.delayed(const Duration(milliseconds: 350));
+      } else if (mounted) {
+        setState(() {
+          _syncProgress = 0.80;
+          _syncStatus = 'Login diperlukan untuk menyiapkan data offline';
+        });
       }
 
       // Validasi akun & profil login untuk persiapan offline
@@ -176,7 +193,8 @@ class _SplashPageState extends State<SplashPage>
         if (mounted) {
           setState(() {
             _syncProgress = 0.90;
-            _syncStatus = 'Sedang melakukan sinkronisasi data awal sebelum aplikasi berjalan...';
+            _syncStatus =
+                'Sedang melakukan sinkronisasi data awal sebelum aplikasi berjalan...';
           });
         }
 
@@ -262,8 +280,10 @@ class _SplashPageState extends State<SplashPage>
 
   bool _isVersionLower(String current, String target) {
     try {
-      final cParts = current.split('.').map((e) => int.tryParse(e) ?? 0).toList();
-      final tParts = target.split('.').map((e) => int.tryParse(e) ?? 0).toList();
+      final cParts =
+          current.split('.').map((e) => int.tryParse(e) ?? 0).toList();
+      final tParts =
+          target.split('.').map((e) => int.tryParse(e) ?? 0).toList();
       for (int i = 0; i < 3; i++) {
         final c = i < cParts.length ? cParts[i] : 0;
         final t = i < tParts.length ? tParts[i] : 0;
@@ -289,7 +309,8 @@ class _SplashPageState extends State<SplashPage>
         return PopScope(
           canPop: false,
           child: Dialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
             elevation: 16,
             backgroundColor: Colors.white,
             child: Padding(
@@ -309,7 +330,8 @@ class _SplashPageState extends State<SplashPage>
                       ),
                       boxShadow: [
                         BoxShadow(
-                          color: const Color(0xFF2563EB).withValues(alpha: 0.35),
+                          color:
+                              const Color(0xFF2563EB).withValues(alpha: 0.35),
                           blurRadius: 18,
                           offset: const Offset(0, 8),
                         ),
@@ -333,7 +355,8 @@ class _SplashPageState extends State<SplashPage>
                   ),
                   const SizedBox(height: 8),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     decoration: BoxDecoration(
                       color: const Color(0xFFEFF6FF),
                       borderRadius: BorderRadius.circular(12),
@@ -399,13 +422,17 @@ class _SplashPageState extends State<SplashPage>
                       onPressed: () async {
                         try {
                           final uri = Uri.parse(playStoreUrl);
-                          await launchUrl(uri, mode: LaunchMode.externalApplication);
+                          await launchUrl(uri,
+                              mode: LaunchMode.externalApplication);
                         } catch (_) {
-                          final fallbackUri = Uri.parse('https://play.google.com/store/apps/details?id=id.indexim.mbs');
-                          await launchUrl(fallbackUri, mode: LaunchMode.externalApplication);
+                          final fallbackUri = Uri.parse(
+                              'https://play.google.com/store/apps/details?id=id.indexim.mbs');
+                          await launchUrl(fallbackUri,
+                              mode: LaunchMode.externalApplication);
                         }
                       },
-                      icon: const Icon(Icons.shop_2_rounded, color: Colors.white, size: 20),
+                      icon: const Icon(Icons.shop_2_rounded,
+                          color: Colors.white, size: 20),
                       label: const Text(
                         'Update Sekarang di Play Store',
                         style: TextStyle(
@@ -502,7 +529,8 @@ class _SplashPageState extends State<SplashPage>
                           shape: BoxShape.circle,
                           boxShadow: [
                             BoxShadow(
-                              color: const Color(0xFF0F766E).withValues(alpha: 0.14),
+                              color: const Color(0xFF0F766E)
+                                  .withValues(alpha: 0.14),
                               blurRadius: 36,
                               spreadRadius: 8,
                               offset: const Offset(0, 8),
