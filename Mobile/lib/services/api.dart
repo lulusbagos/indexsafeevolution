@@ -2249,7 +2249,7 @@ class ApiService {
     }
   }
 
-  Future<Either<Map, List<dynamic>>> getSimperOfflineDataset() async {
+  Future<Either<Map, List<dynamic>>> getSimperOfflineDataset({void Function(int count, int total)? onReceiveProgress}) async {
     final token = getToken;
     final headers = <String, dynamic>{
       'Accept': 'application/json',
@@ -2265,11 +2265,11 @@ class ApiService {
         debugPrint('[ApiService] Mengunduh SIMPER offline dari: ' + url);
         final client = Dio(BaseOptions(
           headers: headers,
-          connectTimeout: const Duration(seconds: 3),
-          receiveTimeout: const Duration(seconds: 30),
+          connectTimeout: const Duration(seconds: 15),
+          receiveTimeout: const Duration(seconds: 60),
           responseType: ResponseType.json,
         ));
-        final res = await client.get(url);
+        final res = await client.get(url, onReceiveProgress: onReceiveProgress);
         if (res.statusCode == 200 &&
             res.data is Map &&
             res.data['data'] is List) {
@@ -2288,7 +2288,7 @@ class ApiService {
     return const Left({'message': 'Gagal mengunduh dataset SIMPER offline'});
   }
 
-  Future<Either<Map, List<dynamic>>> getPermitOfflineDataset() async {
+  Future<Either<Map, List<dynamic>>> getPermitOfflineDataset({void Function(int count, int total)? onReceiveProgress}) async {
     final token = getToken;
     final headers = <String, dynamic>{
       'Accept': 'application/json',
@@ -2302,11 +2302,11 @@ class ApiService {
         debugPrint('[ApiService] Mengunduh Permit offline dari: ' + url);
         final client = Dio(BaseOptions(
           headers: headers,
-          connectTimeout: const Duration(seconds: 3),
-          receiveTimeout: const Duration(seconds: 40),
+          connectTimeout: const Duration(seconds: 15),
+          receiveTimeout: const Duration(seconds: 90),
           responseType: ResponseType.json,
         ));
-        final res = await client.get(url);
+        final res = await client.get(url, onReceiveProgress: onReceiveProgress);
         if (res.statusCode == 200 &&
             res.data is Map &&
             res.data['data'] is List) {

@@ -1,11 +1,4 @@
-import 'dart:io';
-import 'dart:typed_data';
-
 import 'package:flutter/material.dart';
-import 'package:dio/dio.dart';
-import 'package:image/image.dart' as img;
-import 'package:path/path.dart' as path;
-import 'package:path_provider/path_provider.dart';
 import 'package:percent_indicator/linear_percent_indicator.dart';
 
 import '../models/profile_model.dart';
@@ -73,67 +66,6 @@ class _SyncPageState extends State<SyncPage> {
   String _table = '...';
   int _currentStep = 1;
   bool _offlineScanDataMissing = false;
-
-  Future<void> _cacheOfflinePhotos() async {
-    final db = await _db.database;
-    final root = await getApplicationDocumentsDirectory();
-    final folder = Directory(path.join(root.path, 'offline_employee_photos'));
-    if (!await folder.exists()) await folder.create(recursive: true);
-    final client = Dio(BaseOptions(
-        connectTimeout: const Duration(seconds: 8),
-        receiveTimeout: const Duration(seconds: 15)));
-
-    Future<void> cacheTable(
-        String table, String idColumn, String photoColumn) async {
-      final rows = await db.query(table, columns: [idColumn, photoColumn]);
-      for (final row in rows) {
-        final raw = row[photoColumn]?.toString() ?? '';
-        if (raw.isEmpty) continue;
-        if (raw.startsWith('/') && File(raw).existsSync()) {
-          // Cache lama dari versi sebelumnya ikut diperkecil saat sync ulang.
-          try {
-            final local = File(raw);
-            final source = img.decodeImage(await local.readAsBytes());
-            if (source != null && (source.width > 256 || source.height > 256)) {
-              await local.writeAsBytes(
-                img.encodeJpg(img.copyResize(source, width: 256), quality: 72),
-                flush: true,
-              );
-            }
-          } catch (_) {}
-          continue;
-        }
-        final url = raw.startsWith('http')
-            ? raw
-            : '${_api.baseUrl}${raw.startsWith('/') ? '' : '/'}$raw';
-        final id = row[idColumn]?.toString() ?? '';
-        if (id.isEmpty) continue;
-        try {
-          final file = File(path.join(folder.path, '${table}_$id.jpg'));
-          final res = await client.get<List<int>>(url,
-              options: Options(responseType: ResponseType.bytes));
-          if (res.data != null && res.data!.isNotEmpty) {
-            // Avatar scan hanya tampil kecil. Simpan thumbnail 256px, bukan
-            // foto kamera asli, supaya sinkron awal tetap ringan.
-            final source = img.decodeImage(Uint8List.fromList(res.data!));
-            final bytes = source == null
-                ? res.data!
-                : img.encodeJpg(img.copyResize(source, width: 256),
-                    quality: 72);
-            await file.writeAsBytes(bytes, flush: true);
-            await db.update(table, {photoColumn: file.path},
-                where: '$idColumn = ?', whereArgs: [row[idColumn]]);
-          }
-        } catch (_) {}
-      }
-    }
-
-    // Jangan tarik seluruh foto direktori karyawan (bisa puluhan ribu dan
-    // memperlambat login pertama). Cache hanya foto pada credential yang
-    // benar-benar dipakai hasil scanner offline.
-    await cacheTable('tbl_m_permit_offline', 'id', 'photo_url');
-    await cacheTable('tbl_m_simper_offline', 'id', 'photo_url');
-  }
 
   @override
   void initState() {
@@ -241,7 +173,13 @@ class _SyncPageState extends State<SyncPage> {
 
           if (name == 'simper') {
             try {
-              final res = await _api.getSimperOfflineDataset();
+              final res = await _api.getSimperOfflineDataset(
+                onReceiveProgress: (received, total) {
+                  if (mounted && total > 0) {
+                    _progress.value = (received / total * 30).floor();
+                  }
+                },
+              );
               await res.fold(
                 (err) async {
                   debugPrint('[SyncPage] Error simper: ${err['message']}');
@@ -253,7 +191,14 @@ class _SyncPageState extends State<SyncPage> {
                   }
                 },
                 (response) async {
-                  final count = await _db.saveOfflineSimpers(response);
+                  final count = await _db.saveOfflineSimpers(
+                    response,
+                    onProgress: (current, total) {
+                      if (mounted && total > 0) {
+                        _progress.value = 30 + (current / total * 70).floor();
+                      }
+                    },
+                  );
                   debugPrint('[SyncPage] Saved $count offline SIMPERs');
                   if (count > 0) {
                     _progress.value = 100;
@@ -276,7 +221,13 @@ class _SyncPageState extends State<SyncPage> {
 
           if (name == 'permit') {
             try {
-              final res = await _api.getPermitOfflineDataset();
+              final res = await _api.getPermitOfflineDataset(
+                onReceiveProgress: (received, total) {
+                  if (mounted && total > 0) {
+                    _progress.value = (received / total * 30).floor();
+                  }
+                },
+              );
               await res.fold(
                 (err) async {
                   debugPrint('[SyncPage] Error permit: ${err['message']}');
@@ -288,7 +239,14 @@ class _SyncPageState extends State<SyncPage> {
                   }
                 },
                 (response) async {
-                  final count = await _db.saveOfflinePermits(response);
+                  final count = await _db.saveOfflinePermits(
+                    response,
+                    onProgress: (current, total) {
+                      if (mounted && total > 0) {
+                        _progress.value = 30 + (current / total * 70).floor();
+                      }
+                    },
+                  );
                   debugPrint('[SyncPage] Saved $count offline Mine Permits');
                   if (count > 0) {
                     _progress.value = 100;
