@@ -1149,20 +1149,63 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
         'custom_questions': _customQuestions.map((q) => q.toJson()).toList(),
       };
 
+      // Pastikan semua kolom inspection_trans ada di SQLite lokal sebelum insert
+      final requiredColumns = [
+        'tanggal',
+        'waktu',
+        'detil_lokasi',
+        'catatan',
+        'jenis_inspeksi',
+        'area',
+        'lokasi',
+        'pja',
+        'nik_pja',
+        'departemen_pja',
+        'pja_id',
+        'payload_json',
+        'image',
+        'date',
+        'time',
+        'location_detail',
+        'remark',
+        'title',
+        'q1_1', 'q1_2', 'q1_3',
+        'q2_1', 'q2_2', 'q2_3',
+        'q3_1', 'q3_2', 'q3_3',
+        'q4_1', 'q4_2', 'q4_3',
+        'q5_1', 'q5_2', 'q5_3',
+      ];
+      for (final col in requiredColumns) {
+        try {
+          await db.execute('ALTER TABLE inspection_trans ADD COLUMN `$col` TEXT;');
+        } catch (_) {}
+      }
+
+      final tanggalFormatted = DateFormat('yyyy-MM-dd').format(_tanggal);
+      final waktuFormatted =
+          '${_waktu.hour.toString().padLeft(2, '0')}:${_waktu.minute.toString().padLeft(2, '0')}';
+      final lokasiFormatted = _selectedBenchmark ?? _detilLokasiCtrl.text.trim();
+      final detilLokasiFormatted = _lokasiSpesifikCtrl.text.trim();
+      final catatanFormatted = _catatanCtrl.text.trim();
+
       final Map<String, dynamic> insertValues = {
         'employee_id': profileId,
-        'tanggal': DateFormat('yyyy-MM-dd').format(_tanggal),
-        'waktu':
-            '${_waktu.hour.toString().padLeft(2, '0')}:${_waktu.minute.toString().padLeft(2, '0')}',
+        'tanggal': tanggalFormatted,
+        'date': tanggalFormatted,
+        'waktu': waktuFormatted,
+        'time': waktuFormatted,
         'jenis_inspeksi': _jenisInspeksi,
+        'title': '$_jenisInspeksi: $_area',
         'area': _area,
-        'lokasi': _selectedBenchmark ?? _detilLokasiCtrl.text.trim(),
-        'detil_lokasi': _lokasiSpesifikCtrl.text.trim(),
+        'lokasi': lokasiFormatted,
+        'detil_lokasi': detilLokasiFormatted,
+        'location_detail': detilLokasiFormatted,
         'pja': pjaName,
         'nik_pja': pjaNik,
         'departemen_pja': pjaDept,
         'pja_id': pjaId,
-        'catatan': _catatanCtrl.text.trim(),
+        'catatan': catatanFormatted,
+        'remark': catatanFormatted,
         'payload_json': jsonEncode(payload),
         'created_at': nowStr,
         'sync_id': null, // Mode Offline
