@@ -46,6 +46,7 @@ namespace Indexsafe.Api.Data
         public DbSet<Coaching> Coachings { get; set; } = null!;
         public DbSet<CoachingParticipant> CoachingParticipants { get; set; } = null!;
         public DbSet<Roster> Rosters { get; set; } = null!;
+        public DbSet<Reinduksi> Reinduksis { get; set; } = null!;
         public DbSet<MitraRosterView> MitraRosters { get; set; } = null!;
         public DbSet<MitraDepartmentDropdownView> MitraDepartmentDropdowns { get; set; } = null!;
         public DbSet<SapQualityAssessment> SapQualityAssessments { get; set; } = null!;

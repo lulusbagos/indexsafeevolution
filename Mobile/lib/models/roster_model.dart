@@ -15,6 +15,10 @@ class RosterItem {
   final int hariDinas;
   final int hariCuti;
   final String status;
+  final String approvalStatus; // "APPROVED", "PENDING_APPROVAL", "REJECTED"
+  final int? idReinduksi;
+  final String? nikPengawas;
+  final String? namaPengawas;
 
   RosterItem({
     required this.id,
@@ -33,6 +37,10 @@ class RosterItem {
     required this.hariDinas,
     required this.hariCuti,
     required this.status,
+    this.approvalStatus = 'APPROVED',
+    this.idReinduksi,
+    this.nikPengawas,
+    this.namaPengawas,
   });
 
   bool get isTugas => tipeRoster.toUpperCase() == 'TUGAS';
@@ -55,6 +63,10 @@ class RosterItem {
       hariDinas: json['hariDinas'] is int ? json['hariDinas'] : int.tryParse('${json['hariDinas']}') ?? 0,
       hariCuti: json['hariCuti'] is int ? json['hariCuti'] : int.tryParse('${json['hariCuti']}') ?? 0,
       status: json['status']?.toString() ?? 'Selesai',
+      approvalStatus: json['approvalStatus']?.toString() ?? (json['status']?.toString() ?? 'APPROVED'),
+      idReinduksi: json['idReinduksi'] is int ? json['idReinduksi'] : int.tryParse('${json['idReinduksi']}'),
+      nikPengawas: json['nikPengawas']?.toString(),
+      namaPengawas: json['namaPengawas']?.toString(),
     );
   }
 }
@@ -68,6 +80,7 @@ class RosterInfoResponse {
   final int totalDaysInMonth;
   final double ratio;
   final int defaultOnsite;
+  final bool hasConfiguredRoster;
 
   RosterInfoResponse({
     required this.history,
@@ -78,6 +91,7 @@ class RosterInfoResponse {
     required this.totalDaysInMonth,
     required this.ratio,
     required this.defaultOnsite,
+    this.hasConfiguredRoster = true,
   });
 
   factory RosterInfoResponse.fromJson(Map<String, dynamic> json) {
@@ -91,6 +105,7 @@ class RosterInfoResponse {
       totalDaysInMonth: json['totalDaysInMonth'] is int ? json['totalDaysInMonth'] : int.tryParse('${json['totalDaysInMonth']}') ?? 30,
       ratio: (json['ratio'] is num) ? (json['ratio'] as num).toDouble() : 1.0,
       defaultOnsite: json['defaultOnsite'] is int ? json['defaultOnsite'] : int.tryParse('${json['defaultOnsite']}') ?? 42,
+      hasConfiguredRoster: json['hasConfiguredRoster'] == true,
     );
   }
 }

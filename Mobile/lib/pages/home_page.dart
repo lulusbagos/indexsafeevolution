@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../services/api.dart';
 import '../services/popup_ad_service.dart';
+import '../widgets/roster_prompt_dialog.dart';
 import '../widgets/web_campaign_dialog.dart';
 import '../services/preference.dart';
 import '../utils/globals.dart' as globals;
@@ -45,6 +46,12 @@ class _HomePageState extends State<HomePage> {
           if (!mounted) return;
           try {
             await PopupAdService.checkAndShowPopupAd(context);
+          } catch (_) {}
+
+          // Cek dan tampilkan pop up pengaturan roster jika belum disetting
+          if (!mounted) return;
+          try {
+            await RosterPromptDialog.checkAndPromptRoster(context);
           } catch (_) {}
 
           if (!mounted) return;

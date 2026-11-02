@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import '../models/roster_model.dart';
+import '../services/preference.dart';
+import 'reinduction_form_page.dart';
+import 'reinduction_approval_page.dart';
 import '../services/api.dart';
 import '../services/notification.dart';
 
@@ -222,59 +225,32 @@ class _RosterSettingsPageState extends State<RosterSettingsPage>
       }
     }
 
-    setState(() => _isSaving = true);
-
     final isTugas = _selectedTab == 1;
-    final res = await _api.saveRoster(
-      id: _editingId,
-      tipeRoster: isTugas ? 'TUGAS' : 'REGULER',
-      awalDinas: isTugas ? _dateFormat.format(_awalTugas) : _dateFormat.format(_awalDinas),
-      akhirDinas: isTugas ? _dateFormat.format(_akhirTugas) : _dateFormat.format(_akhirDinas),
-      awalCuti: isTugas ? _dateFormat.format(_akhirTugas) : _dateFormat.format(_awalCuti),
-      akhirCuti: isTugas ? _dateFormat.format(_akhirTugas) : _dateFormat.format(_akhirCuti),
-      keterangan: isTugas ? _keteranganTugasController.text.trim() : null,
+    final rosterData = <String, dynamic>{
+      'id': _editingId,
+      'tipeRoster': isTugas ? 'TUGAS' : 'REGULER',
+      'awalDinas': isTugas ? _dateFormat.format(_awalTugas) : _dateFormat.format(_awalDinas),
+      'akhirDinas': isTugas ? _dateFormat.format(_akhirTugas) : _dateFormat.format(_akhirDinas),
+      'awalCuti': isTugas ? _dateFormat.format(_akhirTugas) : _dateFormat.format(_awalCuti),
+      'akhirCuti': isTugas ? _dateFormat.format(_akhirTugas) : _dateFormat.format(_akhirCuti),
+      'keterangan': isTugas ? _keteranganTugasController.text.trim() : null,
+    };
+
+    final profile = PreferenceService.getProfile();
+
+    final saved = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => ReinductionFormPage(
+          rosterData: rosterData,
+          profile: profile,
+        ),
+      ),
     );
 
-    if (!mounted) return;
-    setState(() => _isSaving = false);
-
-    res.fold(
-      (err) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(err['message'] ?? 'Gagal menyimpan pengaturan roster'),
-            backgroundColor: const Color(0xFFDC2626),
-          ),
-        );
-      },
-      (successData) {
-        final hariDinas = _akhirDinas.difference(_awalDinas).inDays + 1;
-        final hariCuti = _akhirCuti.difference(_awalCuti).inDays + 1;
-        final hariTugas = _akhirTugas.difference(_awalTugas).inDays + 1;
-
-        // Tampilkan Heads-Up Notification & Getaran
-        NotificationService.display(
-          title: isTugas
-              ? (_editingId != null ? 'Periode Tugas Diperbarui' : 'Periode Tugas Berhasil Disimpan')
-              : (_editingId != null ? 'Pengaturan Roster Diperbarui' : 'Pengaturan Roster Berhasil Disimpan'),
-          body: isTugas
-              ? 'Periode tugas aktif (${_displayFormat.format(_awalTugas)} - ${_displayFormat.format(_akhirTugas)}, $hariTugas hari). Bebas target SAP selama bertugas.'
-              : 'Jadwal onsite $hariDinas hari & cuti $hariCuti hari aktif. Target kepatuhan SAP disesuaikan proporsional.',
-          payload: '/roster',
-          notifType: isTugas ? 'roster_tugas' : 'roster_reguler',
-        );
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(successData['message'] ?? 'Roster berhasil disimpan!'),
-            backgroundColor: const Color(0xFF10B981),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-        _editingId = null;
-        _fetchRosterData();
-      },
-    );
+    if (saved == true) {
+      _editingId = null;
+      _fetchRosterData();
+    }
   }
 
   Future<void> _deleteRosterItem(RosterItem item) async {
@@ -1171,7 +1147,7 @@ class _RosterSettingsPageState extends State<RosterSettingsPage>
             : Text(
                 _editingId != null
                     ? (_selectedTab == 1 ? 'Perbarui Periode Tugas' : 'Perbarui Pengaturan Roster')
-                    : (_selectedTab == 1 ? 'Simpan Periode Tugas' : 'Simpan Pengaturan Roster'),
+                    : ('Lanjut ke Form Re-Induksi & Simpan Roster'),
                 style: const TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w800,
@@ -1331,8 +1307,82 @@ class _RosterSettingsPageState extends State<RosterSettingsPage>
                             ),
                           ),
                         ),
+                        if (item.approvalStatus.isNotEmpty) ...[
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: item.approvalStatus == 'APPROVED'
+                                  ? const Color(0xFFECFDF5)
+                                  : item.approvalStatus == 'REJECTED'
+                                      ? const Color(0xFFFEF2F2)
+                                      : const Color(0xFFFFFBEB),
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(
+                                color: item.approvalStatus == 'APPROVED'
+                                    ? const Color(0xFFA7F3D0)
+                                    : item.approvalStatus == 'REJECTED'
+                                        ? const Color(0xFFFECACA)
+                                        : const Color(0xFFFDE68A),
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  item.approvalStatus == 'APPROVED'
+                                      ? Icons.check_circle_rounded
+                                      : item.approvalStatus == 'REJECTED'
+                                          ? Icons.cancel_rounded
+                                          : Icons.hourglass_top_rounded,
+                                  size: 10,
+                                  color: item.approvalStatus == 'APPROVED'
+                                      ? const Color(0xFF059669)
+                                      : item.approvalStatus == 'REJECTED'
+                                          ? const Color(0xFFDC2626)
+                                          : const Color(0xFFD97706),
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  item.approvalStatus == 'APPROVED'
+                                      ? 'Re-Induksi Disetujui'
+                                      : item.approvalStatus == 'REJECTED'
+                                          ? 'Re-Induksi Ditolak'
+                                          : 'Menunggu Pengawas',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w800,
+                                    color: item.approvalStatus == 'APPROVED'
+                                        ? const Color(0xFF059669)
+                                        : item.approvalStatus == 'REJECTED'
+                                            ? const Color(0xFFDC2626)
+                                            : const Color(0xFFD97706),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                         const Spacer(),
                         // Action buttons
+                        if (item.idReinduksi != null) ...[
+                          IconButton(
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(),
+                            icon: const Icon(Icons.description_outlined,
+                                size: 18, color: Color(0xFF0F766E)),
+                            tooltip: 'Lihat Form Re-Induksi',
+                            onPressed: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => ReinductionApprovalPage(reinduksiId: item.idReinduksi),
+                                ),
+                              );
+                            },
+                          ),
+                          const SizedBox(width: 8),
+                        ],
                         IconButton(
                           padding: EdgeInsets.zero,
                           constraints: const BoxConstraints(),
