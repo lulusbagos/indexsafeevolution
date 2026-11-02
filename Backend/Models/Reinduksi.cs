@@ -153,3 +153,4 @@ namespace Indexsafe.Api.Models
         public bool IsDeleted { get; set; } = false;
     }
 }
+
