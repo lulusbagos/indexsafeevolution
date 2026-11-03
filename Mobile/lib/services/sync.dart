@@ -12,17 +12,108 @@ import 'preference.dart';
 
 Future<bool> _hasVerifiedInternet() async {
   try {
-    final client = HttpClient()..connectionTimeout = const Duration(seconds: 4);
-    final request = await client
-        .getUrl(Uri.parse('https://clients3.google.com/generate_204'));
-    final response = await request.close().timeout(const Duration(seconds: 5));
-    final ok = response.statusCode >= 200 && response.statusCode < 400;
-    await response.drain();
-    client.close(force: true);
-    return ok;
+    final activeBase = ApiService.activeBaseUrl;
+    final targetUrls = [
+      if (activeBase.isNotEmpty) activeBase,
+      'https://api-mbs.indexim.id',
+      'https://clients3.google.com/generate_204',
+    ];
+    for (final url in targetUrls) {
+      try {
+        final client = HttpClient()..connectionTimeout = const Duration(seconds: 3);
+        final request = await client.headUrl(Uri.parse(url));
+        final response = await request.close().timeout(const Duration(seconds: 3));
+        await response.drain();
+        client.close(force: true);
+        if (response.statusCode >= 200 && response.statusCode < 500) {
+          return true;
+        }
+      } catch (_) {}
+    }
+    return true; // Don't block active transports if probes fail
   } catch (_) {
-    return false;
+    return true;
   }
+}
+
+Future<Response?> _postWithFallback({
+  required ApiService api,
+  required String path,
+  required Map<String, dynamic> fields,
+  Map<String, String> files = const {},
+}) async {
+  if (api.getToken.isEmpty || api.getToken.startsWith('offline_token_')) {
+    final auth = PreferenceService.getAuth();
+    if (auth != null &&
+        auth.token != null &&
+        auth.token!.isNotEmpty &&
+        !auth.token!.startsWith('offline_token_')) {
+      api.setToken = auth.token!;
+    } else {
+      final bg = PreferenceService.getBgToken();
+      if (bg != null && bg.isNotEmpty) {
+        api.setToken = bg;
+      }
+    }
+  }
+
+  final candidateUrls = ApiService.buildCandidateUrls(path);
+  if (!candidateUrls.contains(path)) {
+    candidateUrls.add(path);
+  }
+
+  Response? lastResponse;
+  dynamic lastError;
+
+  for (final targetUrl in candidateUrls) {
+    try {
+      final map = Map<String, dynamic>.from(fields);
+      for (final entry in files.entries) {
+        if (entry.value.isNotEmpty) {
+          final f = File(entry.value);
+          if (await f.exists()) {
+            map[entry.key] = await MultipartFile.fromFile(f.path);
+          }
+        }
+      }
+
+      final response = await api.dio.post(
+        targetUrl,
+        data: FormData.fromMap(map),
+        options: Options(
+          headers: {
+            if (api.getToken.isNotEmpty && !api.getToken.startsWith('offline_token_'))
+              'Authorization': 'Bearer ${api.getToken}',
+          },
+          sendTimeout: const Duration(seconds: 30),
+          receiveTimeout: const Duration(seconds: 30),
+        ),
+      );
+
+      if (response.statusCode != null &&
+          response.statusCode! >= 200 &&
+          response.statusCode! < 300) {
+        return response;
+      }
+      lastResponse = response;
+    } on DioException catch (e) {
+      lastError = e;
+      debugPrint('[syncTran] POST $targetUrl failed (${e.response?.statusCode}): ${e.message}');
+      if (e.response?.statusCode == 404 ||
+          e.type == DioExceptionType.connectionError ||
+          e.type == DioExceptionType.connectionTimeout) {
+        continue;
+      }
+      break;
+    } catch (e) {
+      lastError = e;
+      debugPrint('[syncTran] POST $targetUrl error: $e');
+    }
+  }
+
+  if (lastResponse != null) return lastResponse;
+  if (lastError != null) throw lastError;
+  return null;
 }
 
 Future<bool> syncTran(
@@ -65,11 +156,11 @@ Future<bool> syncTran(
         con.contains(ConnectivityResult.vpn);
     // Never send an offline draft merely because a USB/localhost backend is
     // reachable. The user must have an actual network transport first.
-    if (!hasNet || !await _hasVerifiedInternet()) {
-      debugPrint(
-          '[syncTran] Offline/unverified network: transaction remains in local outbox.');
+    if (!hasNet) {
+      debugPrint('[syncTran] Offline: no network transport.');
       return false;
     }
+    await _hasVerifiedInternet();
 
     if (api.getToken.isEmpty || api.getToken.startsWith('offline_token_')) {
       final auth = PreferenceService.getAuth();
@@ -377,33 +468,34 @@ Future<bool> syncTran(
       cleanMap['waktu'] = (row['time'] ?? '08:00').toString();
       cleanMap['area'] = (row['area'] ?? row['area_name'] ?? 'AREA OPERASIONAL').toString();
       cleanMap['lokasi'] = (row['lokasi'] ?? row['location_name'] ?? row['location_detail'] ?? 'LOKASI KERJA').toString();
-      cleanMap['detil_lokasi'] = (row['location_detail'] ?? '').toString();
+      cleanMap['detil_lokasi'] = (row['detil_lokasi'] ?? row['location_detail'] ?? '').toString();
+      cleanMap['location_detail'] = (row['detil_lokasi'] ?? row['location_detail'] ?? '').toString();
       cleanMap['judul'] = (row['judul'] ?? row['title'] ?? 'Safety Talk Rutin').toString();
+      cleanMap['title'] = cleanMap['judul'];
       cleanMap['keterangan'] = (row['keterangan'] ?? row['remark'] ?? '').toString();
+      cleanMap['remark'] = cleanMap['keterangan'];
+      if (row['company_id'] != null) cleanMap['company_id'] = row['company_id'].toString();
+      if (row['employee_id'] != null) cleanMap['employee_id'] = row['employee_id'].toString();
+      if (row['nik'] != null) cleanMap['nik'] = row['nik'].toString();
+      if (row['nama'] != null) cleanMap['nama'] = row['nama'].toString();
 
+      final files = <String, String>{};
       final selfImg = row['self_image'] ?? row['foto_diri'] ?? row['image'];
       if (selfImg != null && selfImg.toString().isNotEmpty) {
-        final f = File(selfImg.toString());
-        if (await f.exists()) {
-          cleanMap['foto_diri'] = await MultipartFile.fromFile(f.path);
-        }
+        files['foto_diri'] = selfImg.toString();
+        files['image'] = selfImg.toString();
       }
       final evtImg = row['event_image'] ?? row['foto_kegiatan'] ?? row['repair_image'];
       if (evtImg != null && evtImg.toString().isNotEmpty) {
-        final f = File(evtImg.toString());
-        if (await f.exists()) {
-          cleanMap['foto_kegiatan'] = await MultipartFile.fromFile(f.path);
-        }
+        files['foto_kegiatan'] = evtImg.toString();
+        files['repair_image'] = evtImg.toString();
       }
 
-      res = await api.dio.post(
-        '/tran/safety',
-        data: FormData.fromMap(cleanMap),
-        options: Options(
-          headers: {
-            'Authorization': 'Bearer ${api.getToken}',
-          },
-        ),
+      res = await _postWithFallback(
+        api: api,
+        path: '/tran/safety',
+        fields: cleanMap,
+        files: files,
       );
     } else if (name == 'coaching') {
       final cleanMap = <String, dynamic>{};
@@ -453,32 +545,33 @@ Future<bool> syncTran(
         }
       }
 
-      res = await api.dio.post(
-        '/tran/coaching',
-        data: FormData.fromMap(cleanMap),
-        options: Options(
-          headers: {
-            'Authorization': 'Bearer ${api.getToken}',
-          },
-        ),
+      res = await _postWithFallback(
+        api: api,
+        path: '/tran/coaching',
+        fields: cleanMap,
       );
     } else {
-      res = await api.dio.post(
-        '/tran/$name',
-        data: FormData.fromMap(req),
-        options: Options(
-          headers: {
-            'Authorization': 'Bearer ${api.getToken}',
-          },
-        ),
+      res = await _postWithFallback(
+        api: api,
+        path: '/tran/$name',
+        fields: req,
       );
     }
 
+    if (res == null || (res.statusCode != null && (res.statusCode! < 200 || res.statusCode! >= 300))) {
+      debugPrint('[syncTran] Sync $name failed: status ${res?.statusCode}');
+      return false;
+    }
+
     int? syncedId;
-    if (res?.data is Map) {
-      final dataObj = res!.data['data'];
-      if (dataObj is Map && dataObj['id'] != null) {
-        syncedId = int.tryParse(dataObj['id'].toString());
+    if (res.data is Map) {
+      final mapData = res.data as Map;
+      final dataObj = mapData['data'] ?? mapData;
+      if (dataObj is Map) {
+        final rawId = dataObj['id'] ?? dataObj['Id'];
+        if (rawId != null) {
+          syncedId = int.tryParse(rawId.toString());
+        }
       }
     }
 
@@ -579,21 +672,21 @@ Future<bool> syncDetail(
   }
   try {
     var con = await Connectivity().checkConnectivity();
-    if (con.contains(ConnectivityResult.wifi) == false &&
-        con.contains(ConnectivityResult.mobile) == false) {
+    final hasNet = con.contains(ConnectivityResult.wifi) ||
+        con.contains(ConnectivityResult.mobile) ||
+        con.contains(ConnectivityResult.ethernet) ||
+        con.contains(ConnectivityResult.vpn);
+    if (!hasNet) {
       debugPrint('No internet access!');
       return false;
     }
 
-    var res = await api.dio.post(
-      '/detail/$name',
-      data: FormData.fromMap(req),
-      options: Options(
-        headers: {
-          'Authorization': 'Bearer ${api.getToken}',
-        },
-      ),
+    var res = await _postWithFallback(
+      api: api,
+      path: '/detail/$name',
+      fields: req,
     );
+    if (res == null || res.data == null) return false;
     var src = Map<String, dynamic>.from(res.data['data'] as Map);
     var sync =
         await db.update('${name}_details', {...row, 'sync_id': src['id']}, id);
@@ -623,21 +716,21 @@ Future<bool> syncAction(
   }
   try {
     var con = await Connectivity().checkConnectivity();
-    if (con.contains(ConnectivityResult.wifi) == false &&
-        con.contains(ConnectivityResult.mobile) == false) {
+    final hasNet = con.contains(ConnectivityResult.wifi) ||
+        con.contains(ConnectivityResult.mobile) ||
+        con.contains(ConnectivityResult.ethernet) ||
+        con.contains(ConnectivityResult.vpn);
+    if (!hasNet) {
       debugPrint('No internet access!');
       return false;
     }
 
-    var res = await api.dio.post(
-      '/action/$name',
-      data: FormData.fromMap(req),
-      options: Options(
-        headers: {
-          'Authorization': 'Bearer ${api.getToken}',
-        },
-      ),
+    var res = await _postWithFallback(
+      api: api,
+      path: '/action/$name',
+      fields: req,
     );
+    if (res == null || res.data == null) return false;
     var src = Map<String, dynamic>.from(res.data['data'] as Map);
     var sync = await db.update(
         'action_plans', {...row, 'updated_at': src['updated_at']}, id);
@@ -682,21 +775,21 @@ Future<bool> syncFiles(
 
   try {
     var con = await Connectivity().checkConnectivity();
-    if (con.contains(ConnectivityResult.wifi) == false &&
-        con.contains(ConnectivityResult.mobile) == false) {
+    final hasNet = con.contains(ConnectivityResult.wifi) ||
+        con.contains(ConnectivityResult.mobile) ||
+        con.contains(ConnectivityResult.ethernet) ||
+        con.contains(ConnectivityResult.vpn);
+    if (!hasNet) {
       debugPrint('No internet access!');
       return false;
     }
 
-    var res = await api.dio.post(
-      '/files',
-      data: FormData.fromMap(req),
-      options: Options(
-        headers: {
-          'Authorization': 'Bearer ${api.getToken}',
-        },
-      ),
+    var res = await _postWithFallback(
+      api: api,
+      path: '/files',
+      fields: req,
     );
+    if (res == null || res.data == null) return false;
     var src = Map<String, dynamic>.from(res.data['data'] as Map);
     var sync = await db.update('files', {...row, 'sync_id': src['id']}, id);
     if (sync > 0) {
@@ -759,8 +852,11 @@ Future<bool> syncAllMasterData({
 
   try {
     var con = await Connectivity().checkConnectivity();
-    if (con.contains(ConnectivityResult.wifi) == false &&
-        con.contains(ConnectivityResult.mobile) == false) {
+    final hasNet = con.contains(ConnectivityResult.wifi) ||
+        con.contains(ConnectivityResult.mobile) ||
+        con.contains(ConnectivityResult.ethernet) ||
+        con.contains(ConnectivityResult.vpn);
+    if (!hasNet) {
       debugPrint(
           '[Sync] Offline: tidak ada koneksi internet untuk download master data.');
       return false;
