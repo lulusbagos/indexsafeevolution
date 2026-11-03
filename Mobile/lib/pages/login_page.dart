@@ -111,7 +111,9 @@ class _LoginPageState extends State<LoginPage> {
 
       if (!isAccountValid && profile != null) {
         final pNik = profile.noNik?.replaceAll(RegExp(r'[^0-9]'), '') ?? '';
-        if (pNik == cleanNik || profile.noNik == rawNik || (cleanNik.isNotEmpty && pNik.contains(cleanNik))) {
+        if (pNik == cleanNik ||
+            profile.noNik == rawNik ||
+            (cleanNik.isNotEmpty && pNik.contains(cleanNik))) {
           isAccountValid = true;
           accountName = profile.namaLengkap ?? '';
           accountId = profile.id ?? 1;
@@ -123,9 +125,12 @@ class _LoginPageState extends State<LoginPage> {
 
       if (!isAccountValid && offlineNik != null && offlineNik.isNotEmpty) {
         final offNik = offlineNik.replaceAll(RegExp(r'[^0-9]'), '');
-        if (offNik == cleanNik || offlineNik == rawNik || (cleanNik.isNotEmpty && offNik.contains(cleanNik))) {
+        if (offNik == cleanNik ||
+            offlineNik == rawNik ||
+            (cleanNik.isNotEmpty && offNik.contains(cleanNik))) {
           isAccountValid = true;
-          accountName = PreferenceService.getOfflineName() ?? 'Pengguna Offline';
+          accountName =
+              PreferenceService.getOfflineName() ?? 'Pengguna Offline';
         }
       }
 
@@ -133,26 +138,26 @@ class _LoginPageState extends State<LoginPage> {
         if (!mounted) return;
         setState(() => _isLoading = false);
         if (isExplicitOffline) {
-          SnackBarMsg.danger(
-              context, 'Data otentikasi lokal belum tersedia. Silakan hubungkan internet & lakukan sinkronisasi data awal.');
+          SnackBarMsg.danger(context,
+              'Data otentikasi lokal belum tersedia. Silakan hubungkan internet & lakukan sinkronisasi data awal.');
         } else {
-          SnackBarMsg.danger(
-              context, 'Server tidak aktif & data otentikasi lokal belum tersedia. Lakukan sinkronisasi data awal minimal 1x.');
+          SnackBarMsg.danger(context,
+              'Server tidak aktif & data otentikasi lokal belum tersedia. Lakukan sinkronisasi data awal minimal 1x.');
         }
         return;
       }
 
       // Verifikasi password offline jika sebelumnya tersimpan
-      final validPass = (savedPass != null && savedPass.isNotEmpty)
-          ? savedPass
-          : offlinePass;
+      final validPass =
+          (savedPass != null && savedPass.isNotEmpty) ? savedPass : offlinePass;
       if (validPass != null &&
           validPass.isNotEmpty &&
           currentPassword != validPass &&
           currentPassword != '123456') {
         if (!mounted) return;
         setState(() => _isLoading = false);
-        SnackBarMsg.danger(context, 'Kata sandi yang Anda masukkan salah. Silakan periksa kembali!');
+        SnackBarMsg.danger(context,
+            'Kata sandi yang Anda masukkan salah. Silakan periksa kembali!');
         return;
       }
 
@@ -170,7 +175,9 @@ class _LoginPageState extends State<LoginPage> {
 
       // Pastikan ada AuthModel offline agar sesi aplikasi aktif
       final currentAuth = PreferenceService.getAuth();
-      if (currentAuth == null || currentAuth.token == null || currentAuth.token!.isEmpty) {
+      if (currentAuth == null ||
+          currentAuth.token == null ||
+          currentAuth.token!.isEmpty) {
         await PreferenceService.setAuth(AuthModel(
           user: User(
             id: accountId,
@@ -221,17 +228,10 @@ class _LoginPageState extends State<LoginPage> {
           if (mounted) setState(() => _isLoading = false);
 
           final errMsg = error['message']?.toString() ?? '';
-          final isOffline = error['isOffline'] == true ||
-              errMsg == 'No internet access!' ||
-              errMsg == 'Connect timeout' ||
-              errMsg == 'Receive timeout' ||
-              errMsg.toLowerCase().contains('timeout') ||
-              errMsg.toLowerCase().contains('connection') ||
-              errMsg.toLowerCase().contains('socket') ||
-              errMsg.toLowerCase().contains('network') ||
-              errMsg.toLowerCase().contains('unreachable') ||
-              errMsg.toLowerCase().contains('refused') ||
-              errMsg.toLowerCase().contains('server');
+          // Only ApiService may label a request as offline. Do not infer this
+          // from words in a server response (for example, a database
+          // connection error), otherwise real backend errors are hidden.
+          final isOffline = error['isOffline'] == true;
 
           final lowerErr = errMsg.toLowerCase();
           final isPermitOrInactive = lowerErr.contains('permit') ||
@@ -248,7 +248,8 @@ class _LoginPageState extends State<LoginPage> {
             showDialog(
               context: context,
               builder: (ctx) => AlertDialog(
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20)),
                 title: Row(
                   children: [
                     Icon(
@@ -263,15 +264,19 @@ class _LoginPageState extends State<LoginPage> {
                     const SizedBox(width: 10),
                     Expanded(
                       child: Text(
-                        isPermitOrInactive ? 'Status Permit / Akun' : 'Akses Ditolak',
-                        style: const TextStyle(fontSize: 16.5, fontWeight: FontWeight.w700),
+                        isPermitOrInactive
+                            ? 'Status Permit / Akun'
+                            : 'Akses Ditolak',
+                        style: const TextStyle(
+                            fontSize: 16.5, fontWeight: FontWeight.w700),
                       ),
                     ),
                   ],
                 ),
                 content: Text(
                   errMsg,
-                  style: const TextStyle(fontSize: 13.5, height: 1.45, color: Color(0xFF475569)),
+                  style: const TextStyle(
+                      fontSize: 13.5, height: 1.45, color: Color(0xFF475569)),
                 ),
                 actions: [
                   ElevatedButton(
@@ -280,7 +285,8 @@ class _LoginPageState extends State<LoginPage> {
                           ? const Color(0xFFD97706)
                           : const Color(0xFFDC2626),
                       foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10)),
                     ),
                     onPressed: () => Navigator.pop(ctx),
                     child: const Text('Mengerti'),
@@ -292,7 +298,12 @@ class _LoginPageState extends State<LoginPage> {
           }
 
           if (isOffline) {
-            await _performOfflineLogin(isExplicitOffline: false);
+            // A first-time install has no verified local credentials. Do not
+            // disguise the real transport error as an offline-login failure.
+            SnackBarMsg.danger(
+              context,
+              'Tidak dapat terhubung ke server. Periksa jaringan lalu coba lagi.',
+            );
           } else {
             SnackBarMsg.danger(context, errMsg);
           }
@@ -319,27 +330,32 @@ class _LoginPageState extends State<LoginPage> {
               showDialog(
                 context: context,
                 builder: (ctx) => AlertDialog(
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20)),
                   title: const Row(
                     children: [
-                      Icon(Icons.gpp_bad_rounded, color: Color(0xFFDC2626), size: 24),
+                      Icon(Icons.gpp_bad_rounded,
+                          color: Color(0xFFDC2626), size: 24),
                       SizedBox(width: 10),
                       Text(
                         'Akses Ditolak',
-                        style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
+                        style: TextStyle(
+                            fontSize: 17, fontWeight: FontWeight.w700),
                       ),
                     ],
                   ),
                   content: Text(
                     pErr,
-                    style: const TextStyle(fontSize: 13, height: 1.4, color: Color(0xFF475569)),
+                    style: const TextStyle(
+                        fontSize: 13, height: 1.4, color: Color(0xFF475569)),
                   ),
                   actions: [
                     ElevatedButton(
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFFDC2626),
                         foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10)),
                       ),
                       onPressed: () => Navigator.pop(ctx),
                       child: const Text('Tutup'),
@@ -432,7 +448,8 @@ class _LoginPageState extends State<LoginPage> {
       icon: Icons.lock_reset_rounded,
       statusBadgeText: 'PASSWORD RESET SUKSES (123456)',
       receiptItems: [
-        SuccessReceiptItem(label: 'NIK Pengguna', value: nik, isHighlight: true),
+        SuccessReceiptItem(
+            label: 'NIK Pengguna', value: nik, isHighlight: true),
         const SuccessReceiptItem(
             label: 'Kata Sandi Baru',
             value: '123456',
@@ -674,7 +691,8 @@ class _LoginPageState extends State<LoginPage> {
                                         focusedBorder: InputBorder.none,
                                       ),
                                       validator: validator,
-                                      onChanged: (String val) => setState(() {}),
+                                      onChanged: (String val) =>
+                                          setState(() {}),
                                     ),
                                   ),
                                   const SizedBox(height: 16),
@@ -776,7 +794,8 @@ class _LoginPageState extends State<LoginPage> {
                                         focusedBorder: InputBorder.none,
                                       ),
                                       validator: validator,
-                                      onChanged: (String val) => setState(() {}),
+                                      onChanged: (String val) =>
+                                          setState(() {}),
                                     ),
                                   ),
                                   const SizedBox(height: 14),
@@ -788,7 +807,8 @@ class _LoginPageState extends State<LoginPage> {
                                     children: [
                                       InkWell(
                                         onTap: () {
-                                          setState(() => _remember = !_remember);
+                                          setState(
+                                              () => _remember = !_remember);
                                         },
                                         borderRadius: BorderRadius.circular(6),
                                         child: Padding(
@@ -808,17 +828,19 @@ class _LoginPageState extends State<LoginPage> {
                                                       const Color(0xFF2563EB),
                                                   shape: RoundedRectangleBorder(
                                                     borderRadius:
-                                                        BorderRadius.circular(4),
+                                                        BorderRadius.circular(
+                                                            4),
                                                   ),
                                                   side: BorderSide(
                                                     color: _remember
-                                                        ? const Color(0xFF2563EB)
+                                                        ? const Color(
+                                                            0xFF2563EB)
                                                         : Colors.grey.shade400,
                                                     width: 1.5,
                                                   ),
                                                   onChanged: (bool? val) {
-                                                    setState(() =>
-                                                        _remember = val ?? true);
+                                                    setState(() => _remember =
+                                                        val ?? true);
                                                   },
                                                 ),
                                               ),
@@ -867,7 +889,7 @@ class _LoginPageState extends State<LoginPage> {
                                 ],
                               ),
                             ),
-const Spacer(flex: 1),
+                            const Spacer(flex: 1),
                             const SizedBox(height: 16),
 
                             // Version & Copyright Footer
@@ -955,8 +977,8 @@ class _DynamicCorporateBackgroundPainter extends CustomPainter {
           const Color(0xFF0D9488).withValues(alpha: 0.16),
           const Color(0xFF0D9488).withValues(alpha: 0.0),
         ],
-      ).createShader(Rect.fromCircle(
-          center: Offset(blob1X, blob1Y), radius: blob1Radius));
+      ).createShader(
+          Rect.fromCircle(center: Offset(blob1X, blob1Y), radius: blob1Radius));
     canvas.drawCircle(Offset(blob1X, blob1Y), blob1Radius, paint1);
 
     // Blob 2: Warm Amber (MBS Safety)
@@ -969,8 +991,8 @@ class _DynamicCorporateBackgroundPainter extends CustomPainter {
           const Color(0xFFF59E0B).withValues(alpha: 0.14),
           const Color(0xFFF59E0B).withValues(alpha: 0.0),
         ],
-      ).createShader(Rect.fromCircle(
-          center: Offset(blob2X, blob2Y), radius: blob2Radius));
+      ).createShader(
+          Rect.fromCircle(center: Offset(blob2X, blob2Y), radius: blob2Radius));
     canvas.drawCircle(Offset(blob2X, blob2Y), blob2Radius, paint2);
 
     // Blob 3: Sapphire Blue (Corporate Depth)
@@ -983,8 +1005,8 @@ class _DynamicCorporateBackgroundPainter extends CustomPainter {
           const Color(0xFF1E40AF).withValues(alpha: 0.13),
           const Color(0xFF1E40AF).withValues(alpha: 0.0),
         ],
-      ).createShader(Rect.fromCircle(
-          center: Offset(blob3X, blob3Y), radius: blob3Radius));
+      ).createShader(
+          Rect.fromCircle(center: Offset(blob3X, blob3Y), radius: blob3Radius));
     canvas.drawCircle(Offset(blob3X, blob3Y), blob3Radius, paint3);
 
     // Blob 4: Cyan Light (Modern Accent)
@@ -997,8 +1019,8 @@ class _DynamicCorporateBackgroundPainter extends CustomPainter {
           const Color(0xFF0284C7).withValues(alpha: 0.12),
           const Color(0xFF0284C7).withValues(alpha: 0.0),
         ],
-      ).createShader(Rect.fromCircle(
-          center: Offset(blob4X, blob4Y), radius: blob4Radius));
+      ).createShader(
+          Rect.fromCircle(center: Offset(blob4X, blob4Y), radius: blob4Radius));
     canvas.drawCircle(Offset(blob4X, blob4Y), blob4Radius, paint4);
 
     // 3. Floating Geometric Elements (Hexagons & Rings)
@@ -1190,7 +1212,8 @@ class _ResetPasswordBottomSheetState extends State<_ResetPasswordBottomSheet> {
       final dd = picked.day.toString().padLeft(2, '0');
       setState(() {
         _dobCtrl.text = '$yyyy$mm$dd';
-        _formattedDobDisplay = DateFormat('dd MMMM yyyy', 'id_ID').format(picked);
+        _formattedDobDisplay =
+            DateFormat('dd MMMM yyyy', 'id_ID').format(picked);
         _errorMessage = null;
       });
     }
@@ -1451,7 +1474,8 @@ class _ResetPasswordBottomSheetState extends State<_ResetPasswordBottomSheet> {
                 const SizedBox(height: 6),
                 Container(
                   width: double.infinity,
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   decoration: BoxDecoration(
                     color: const Color(0xFFEFF6FF),
                     borderRadius: BorderRadius.circular(8),
@@ -1459,7 +1483,8 @@ class _ResetPasswordBottomSheetState extends State<_ResetPasswordBottomSheet> {
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.check_circle_rounded, size: 16, color: Color(0xFF2563EB)),
+                      const Icon(Icons.check_circle_rounded,
+                          size: 16, color: Color(0xFF2563EB)),
                       const SizedBox(width: 8),
                       Text(
                         'Tanggal Terpilih: $_formattedDobDisplay',
@@ -1564,9 +1589,6 @@ class _ResetPasswordBottomSheetState extends State<_ResetPasswordBottomSheet> {
     );
   }
 }
-
-
-
 
 /// Custom Pressable 3D Tactile Button with Mechanical Keycap Travel & Haptics
 class _Tactile3DButton extends StatefulWidget {

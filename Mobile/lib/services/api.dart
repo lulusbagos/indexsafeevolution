@@ -21,8 +21,8 @@ class ApiService {
   // Release builds may only communicate with HTTPS endpoints. Local HTTP
   // endpoints are available exclusively to an explicitly opted-in debug build.
   static const List<String> _productionUrls = [
-    'https://api_mbs.indexim.id',
-    'https://api_mbs.idcoal.id',
+    'https://apimbs.indexim.id',
+    'https://apimbs.idccoal.id',
   ];
   static const List<String> _developmentUrls = [
     'http://192.168.130.236:7302',
@@ -31,7 +31,7 @@ class ApiService {
   ];
   static const String _configuredBaseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'https://api_mbs.indexim.id',
+    defaultValue: 'https://apimbs.indexim.id',
   );
   static bool get _allowInsecureDevelopment =>
       !kReleaseMode &&
@@ -391,13 +391,6 @@ class ApiService {
 
   Future<Either<Map, AuthModel>> login(user, pswd) async {
     try {
-      var con = await Connectivity().checkConnectivity();
-      if (con.contains(ConnectivityResult.wifi) == false &&
-          con.contains(ConnectivityResult.mobile) == false &&
-          con.contains(ConnectivityResult.ethernet) == false) {
-        return const Left({'message': 'No internet access!'});
-      }
-
       final userStr = user.toString().trim();
       final emailParam = userStr.toUpperCase().startsWith(company.toUpperCase())
           ? userStr.toUpperCase()
@@ -477,7 +470,31 @@ class ApiService {
       await _loginMbsWeb(userStr, pswd.toString());
       return Right(data);
     } on DioException catch (err) {
-      return Left(errorHandler(err));
+      // Do not redirect a first-time user to offline login for an HTTP
+      // response from the server. Preserve the real backend message instead.
+      final responseData = err.response?.data;
+      final serverMessage = responseData is Map
+          ? (responseData['message'] ?? responseData['error'] ?? '')
+              .toString()
+              .trim()
+          : '';
+      final isNetworkFailure = err.response == null &&
+          (err.type == DioExceptionType.connectionError ||
+              err.type == DioExceptionType.connectionTimeout ||
+              err.type == DioExceptionType.sendTimeout ||
+              err.type == DioExceptionType.receiveTimeout ||
+              err.type == DioExceptionType.unknown);
+      return Left({
+        'message': serverMessage.isNotEmpty
+            ? serverMessage
+            : (isNetworkFailure
+                ? 'Tidak dapat terhubung ke server. Periksa jaringan Anda.'
+                : 'Login gagal. Silakan coba kembali.'),
+        'isOffline': isNetworkFailure,
+        'diagnostic': '${err.type}: ${err.error ?? err.message ?? ''}',
+        if (err.response?.statusCode != null)
+          'statusCode': err.response!.statusCode,
+      });
     }
   }
 
@@ -630,12 +647,6 @@ class ApiService {
       dio.options.headers['Authorization'] = 'Bearer $token';
     }
     try {
-      var con = await Connectivity().checkConnectivity();
-      if (con.contains(ConnectivityResult.wifi) == false &&
-          con.contains(ConnectivityResult.mobile) == false) {
-        return const Left({'message': 'No internet access!'});
-      }
-
       var res = await dio.get('/profile');
       return Right(
           ProfileModel.fromJson(Map<String, dynamic>.from(res.data as Map)));
@@ -2249,7 +2260,8 @@ class ApiService {
     }
   }
 
-  Future<Either<Map, List<dynamic>>> getSimperOfflineDataset({void Function(int count, int total)? onReceiveProgress}) async {
+  Future<Either<Map, List<dynamic>>> getSimperOfflineDataset(
+      {void Function(int count, int total)? onReceiveProgress}) async {
     final token = getToken;
     final headers = <String, dynamic>{
       'Accept': 'application/json',
@@ -2288,7 +2300,8 @@ class ApiService {
     return const Left({'message': 'Gagal mengunduh dataset SIMPER offline'});
   }
 
-  Future<Either<Map, List<dynamic>>> getPermitOfflineDataset({void Function(int count, int total)? onReceiveProgress}) async {
+  Future<Either<Map, List<dynamic>>> getPermitOfflineDataset(
+      {void Function(int count, int total)? onReceiveProgress}) async {
     final token = getToken;
     final headers = <String, dynamic>{
       'Accept': 'application/json',

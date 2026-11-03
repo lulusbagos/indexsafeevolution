@@ -79,7 +79,8 @@ class _SplashPageState extends State<SplashPage> with TickerProviderStateMixin {
     try {
       final con = await Connectivity().checkConnectivity();
       isOnline = con.contains(ConnectivityResult.wifi) ||
-          con.contains(ConnectivityResult.mobile);
+          con.contains(ConnectivityResult.mobile) ||
+          con.contains(ConnectivityResult.vpn);
     } catch (_) {}
 
     if (isOnline) {
