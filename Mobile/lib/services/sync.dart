@@ -15,7 +15,7 @@ Future<bool> _hasVerifiedInternet() async {
     final activeBase = ApiService.activeBaseUrl;
     final targetUrls = [
       if (activeBase.isNotEmpty) activeBase,
-      'https://api-mbs.indexim.id',
+      'https://apimbs.indexim.id',
       'https://clients3.google.com/generate_204',
     ];
     for (final url in targetUrls) {

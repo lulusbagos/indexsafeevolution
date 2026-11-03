@@ -5612,7 +5612,7 @@ String buildHazardMapHtml({
   String mapMode = 'heatmap',
   Position? userPosition,
   List<MapHazardItem> hazards = const [],
-  String baseUrl = 'https://api_mbs.indexim.id',
+  String baseUrl = 'https://apimbs.indexim.id',
 }) {
   final hasUserPos = userPosition != null;
   final userLat = userPosition?.latitude ?? 1.2057;
