@@ -4791,216 +4791,201 @@ class ApiService {
 
 
   Future<Either<Map, Map<String, dynamic>>> getRosterStatus() async {
-
     try {
-
       final nik = (PreferenceService.getUser() ?? PreferenceService.getOfflineNik() ?? '').trim();
-
-      if (getToken.isNotEmpty) {
-
-        dio.options.headers['Authorization'] = 'Bearer ';
-
+      final token = getToken;
+      if (token.isNotEmpty) {
+        dio.options.headers['Authorization'] = 'Bearer $token';
+      }
+      if (nik.isNotEmpty) {
+        dio.options.headers['X-User-Nik'] = nik;
       }
 
-      var res = await dio.get('/roster/status', queryParameters: {
-
-        if (nik.isNotEmpty) 'nik': nik,
-
-      });
+      Response? res;
+      try {
+        // Coba GET /roster terlebih dahulu (didukung penuh oleh server produksi live)
+        res = await dio.get('/roster', queryParameters: {
+          if (nik.isNotEmpty) 'nik': nik,
+        });
+      } on DioException catch (dioErr) {
+        if (dioErr.response?.statusCode == 404 || dioErr.response?.statusCode == 405) {
+          // Fallback ke /roster/status jika server versi baru
+          res = await dio.get('/roster/status', queryParameters: {
+            if (nik.isNotEmpty) 'nik': nik,
+          });
+        } else {
+          rethrow;
+        }
+      }
 
       if (res.data is Map) {
+        final data = Map<String, dynamic>.from(res.data as Map);
 
-        return Right(Map<String, dynamic>.from(res.data as Map));
+        // Jika server sudah menyertakan field hasConfiguredRoster
+        if (data.containsKey('hasConfiguredRoster') && data['hasConfiguredRoster'] != null) {
+          return Right(data);
+        }
 
+        // Kalkulasi fallback hasConfiguredRoster jika server belum menyertakan flag ini:
+        // Karyawan dinyatakan sudah setting jika memiliki activeRoster atau roster terbaru belum kadaluarsa
+        final today = DateTime.now();
+        final todayDate = DateTime(today.year, today.month, today.day);
+
+        bool hasConfigured = false;
+        final activeRoster = data['activeRoster'];
+        final latestRoster = data['latestRoster'];
+
+        if (activeRoster != null && activeRoster is Map && activeRoster.isNotEmpty) {
+          hasConfigured = true;
+        } else if (latestRoster != null && latestRoster is Map && latestRoster['akhirCuti'] != null) {
+          final akhirCutiStr = latestRoster['akhirCuti'].toString();
+          final akhirCuti = DateTime.tryParse(akhirCutiStr);
+          if (akhirCuti != null && !akhirCuti.isBefore(todayDate)) {
+            hasConfigured = true;
+          }
+        } else if (data['history'] is List && (data['history'] as List).isNotEmpty) {
+          for (final item in (data['history'] as List)) {
+            if (item is Map) {
+              final status = (item['status'] ?? item['approvalStatus'] ?? '').toString().toUpperCase();
+              if (status == 'REJECTED') continue;
+              final akhirCutiStr = (item['akhirCuti'] ?? '').toString();
+              final akhirCuti = DateTime.tryParse(akhirCutiStr);
+              if (akhirCuti != null && !akhirCuti.isBefore(todayDate)) {
+                hasConfigured = true;
+                break;
+              }
+            }
+          }
+        }
+
+        data['hasConfiguredRoster'] = hasConfigured;
+        return Right(data);
       }
-
       return const Left({'message': 'Format respons status roster tidak valid'});
-
     } on DioException catch (err) {
-
       return Left(errorHandler(err));
-
     }
-
   }
-
-
 
   Future<Either<Map, Map<String, dynamic>>> saveRosterWithReinduksi(
-
       Map<String, dynamic> payload) async {
-
     try {
-
       final nik = (PreferenceService.getUser() ?? PreferenceService.getOfflineNik() ?? '').trim();
-
-      if (getToken.isNotEmpty) {
-
-        dio.options.headers['Authorization'] = 'Bearer ';
-
+      final token = getToken;
+      if (token.isNotEmpty) {
+        dio.options.headers['Authorization'] = 'Bearer $token';
+      }
+      if (nik.isNotEmpty) {
+        dio.options.headers['X-User-Nik'] = nik;
       }
 
-      var res = await dio.post('/roster/save-with-reinduksi',
-
-          data: payload,
-
-          queryParameters: {
-
-            if (nik.isNotEmpty) 'nik': nik,
-
-          });
+      Response? res;
+      try {
+        res = await dio.post('/roster/save-with-reinduksi',
+            data: payload,
+            queryParameters: {
+              if (nik.isNotEmpty) 'nik': nik,
+            });
+      } on DioException catch (dioErr) {
+        if (dioErr.response?.statusCode == 404 || dioErr.response?.statusCode == 405) {
+          // Fallback ke POST /roster
+          res = await dio.post('/roster',
+              data: payload,
+              queryParameters: {
+                if (nik.isNotEmpty) 'nik': nik,
+              });
+        } else {
+          rethrow;
+        }
+      }
 
       if (res.data is Map) {
-
         return Right(Map<String, dynamic>.from(res.data as Map));
-
       }
-
       return const Right(
-
           {'success': true, 'message': 'Roster dan Re-Induksi berhasil disimpan'});
-
     } on DioException catch (err) {
-
       return Left(errorHandler(err));
-
     }
-
   }
-
-
 
   Future<Either<Map, List<dynamic>>> getPendingReinduksiApprovals() async {
-
     try {
-
       final nik = (PreferenceService.getUser() ?? PreferenceService.getOfflineNik() ?? '').trim();
-
-      if (getToken.isNotEmpty) {
-
-        dio.options.headers['Authorization'] = 'Bearer ';
-
+      final token = getToken;
+      if (token.isNotEmpty) {
+        dio.options.headers['Authorization'] = 'Bearer $token';
       }
-
+      if (nik.isNotEmpty) {
+        dio.options.headers['X-User-Nik'] = nik;
+      }
       var res = await dio.get('/roster/reinduksi/pending-approvals', queryParameters: {
-
         if (nik.isNotEmpty) 'nik': nik,
-
       });
-
       if (res.data is Map && res.data['data'] is List) {
-
         return Right(res.data['data'] as List<dynamic>);
-
       }
-
       return const Right([]);
-
     } on DioException catch (err) {
-
       return Left(errorHandler(err));
-
     }
-
   }
-
-
 
   Future<Either<Map, Map<String, dynamic>>> getReinduksiDetail(int id) async {
-
     try {
-
       final nik = (PreferenceService.getUser() ?? PreferenceService.getOfflineNik() ?? '').trim();
-
-      if (getToken.isNotEmpty) {
-
-        dio.options.headers['Authorization'] = 'Bearer ';
-
+      final token = getToken;
+      if (token.isNotEmpty) {
+        dio.options.headers['Authorization'] = 'Bearer $token';
       }
-
-      var res = await dio.get('/roster/reinduksi/', queryParameters: {
-
+      if (nik.isNotEmpty) {
+        dio.options.headers['X-User-Nik'] = nik;
+      }
+      var res = await dio.get('/roster/reinduksi/$id', queryParameters: {
         if (nik.isNotEmpty) 'nik': nik,
-
       });
-
       if (res.data is Map && res.data['data'] is Map) {
-
         return Right(Map<String, dynamic>.from(res.data['data'] as Map));
-
       }
-
       return const Left({'message': 'Data Re-Induksi tidak ditemukan'});
-
     } on DioException catch (err) {
-
       return Left(errorHandler(err));
-
     }
-
   }
-
-
 
   Future<Either<Map, Map<String, dynamic>>> actionReinduksi({
-
     required int reinduksiId,
-
     required String action,
-
     String? notes,
-
     String? signaturePengawas,
-
   }) async {
-
     try {
-
       final nik = (PreferenceService.getUser() ?? PreferenceService.getOfflineNik() ?? '').trim();
-
-      if (getToken.isNotEmpty) {
-
-        dio.options.headers['Authorization'] = 'Bearer ';
-
+      final token = getToken;
+      if (token.isNotEmpty) {
+        dio.options.headers['Authorization'] = 'Bearer $token';
       }
-
+      if (nik.isNotEmpty) {
+        dio.options.headers['X-User-Nik'] = nik;
+      }
       var res = await dio.post('/roster/reinduksi/action',
-
           data: {
-
             'reinduksiId': reinduksiId,
-
             'action': action,
-
             'notes': notes,
-
             'signaturePengawas': signaturePengawas,
-
           },
-
           queryParameters: {
-
             if (nik.isNotEmpty) 'nik': nik,
-
           });
-
       if (res.data is Map) {
-
         return Right(Map<String, dynamic>.from(res.data as Map));
-
       }
-
       return const Right({'success': true, 'message': 'Persetujuan berhasil diproses'});
-
     } on DioException catch (err) {
-
       return Left(errorHandler(err));
-
     }
-
   }
-
-
 
   Future<Either<Map, Map<String, dynamic>>> getSafeMapPoints(
 
@@ -6579,13 +6564,7 @@ class ApiService {
 
 
       if (getToken.isNotEmpty && !getToken.startsWith('offline_token_')) {
-
-
-
-        dio.options.headers['Authorization'] = 'Bearer ';
-
-
-
+        dio.options.headers['Authorization'] = 'Bearer $getToken';
       }
 
 
@@ -10078,7 +10057,7 @@ class ApiService {
 
 
 
-      dio.options.headers['Authorization'] = 'Bearer ';
+      dio.options.headers['Authorization'] = 'Bearer $token';
 
 
 
@@ -10162,7 +10141,7 @@ class ApiService {
 
 
 
-      dio.options.headers['Authorization'] = 'Bearer ';
+      dio.options.headers['Authorization'] = 'Bearer $token';
 
 
 
@@ -10246,7 +10225,7 @@ class ApiService {
 
 
 
-      dio.options.headers['Authorization'] = 'Bearer ';
+      dio.options.headers['Authorization'] = 'Bearer $token';
 
 
 
@@ -10334,7 +10313,7 @@ class ApiService {
 
 
 
-      dio.options.headers['Authorization'] = 'Bearer ';
+      dio.options.headers['Authorization'] = 'Bearer $token';
 
 
 
