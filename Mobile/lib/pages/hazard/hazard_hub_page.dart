@@ -2097,11 +2097,12 @@ class _HazardHubPageState extends State<HazardHubPage> {
         maxHeight: 560,
       ),
       builder: (_) {
-        return Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
+        return SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
               ListTile(
                 title: const Text(
                   'Tampilkan',
@@ -2279,8 +2280,9 @@ class _HazardHubPageState extends State<HazardHubPage> {
               ),
             ],
           ),
-        );
-      },
+        ),
+      );
+    },
     );
   }
 

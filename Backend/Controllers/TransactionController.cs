@@ -417,6 +417,60 @@ namespace Indexsafe.Api.Controllers
 
 
 
+                // BBS (BEHAVIOR BASED SAFETY)
+                if (targetName == "bbs" || targetName == "bbs_observation")
+                {
+                    var classification = form["classification"].FirstOrDefault() ?? form["klasifikasi"].FirstOrDefault() ?? "Perilaku Aman";
+                    var riskLevel = form["risk_level"].FirstOrDefault() ?? form["tingkat_risiko"].FirstOrDefault() ?? "Rendah";
+                    var observedPerson = form["observed_person"].FirstOrDefault() ?? form["observed_nama"].FirstOrDefault();
+                    var observedNik = form["observed_nik"].FirstOrDefault();
+                    var observedDept = form["observed_dept"].FirstOrDefault() ?? form["department"].FirstOrDefault() ?? "LAPANGAN";
+                    var observedPosition = form["observed_position"].FirstOrDefault() ?? form["observed_jabatan"].FirstOrDefault() ?? "Karyawan";
+                    var workerResp = form["worker_response"].FirstOrDefault() ?? form["respons_pekerja"].FirstOrDefault() ?? "Positif";
+                    var coachingNotes = form["coaching_notes"].FirstOrDefault() ?? form["catatan_coaching"].FirstOrDefault() ?? form["keterangan"].FirstOrDefault();
+                    var actions = form["immediate_actions"].FirstOrDefault() ?? form["tindakan_dilakukan"].FirstOrDefault();
+                    var behaviorsJson = form["behaviors"].FirstOrDefault() ?? form["selected_behaviors_json"].FirstOrDefault();
+
+                    var imageFile = form.Files["image"] ?? form.Files["foto"];
+                    string? fotoUrl = null;
+                    if (imageFile != null)
+                    {
+                        fotoUrl = await _imageUploadService.UploadAndCompressImageAsync(imageFile, "bbs", "bbs");
+                    }
+
+                    var bbs = new BbsObservation
+                    {
+                        ObservationNo = $"BBS-{DateTime.Now:yyyyMMddHHmmss}",
+                        Tanggal = tanggal,
+                        Waktu = waktuStr,
+                        ObserverNik = userNik,
+                        ObserverNama = userName,
+                        ObserverDept = dept,
+                        ObserverPerusahaanId = companyId,
+                        ObserverPerusahaan = User.FindFirst("Company")?.Value ?? "PT INDEXIM COALINDO",
+                        Area = area,
+                        DetilLokasi = detilLokasi,
+                        ObservedNik = observedNik,
+                        ObservedNama = observedPerson,
+                        ObservedJabatan = observedPosition,
+                        ObservedDept = observedDept,
+                        CategoryName = form["category"].FirstOrDefault() ?? "BBS",
+                        TopicName = form["topic"].FirstOrDefault() ?? "Keselamatan Kerja",
+                        SelectedBehaviorsJson = behaviorsJson,
+                        Klasifikasi = classification,
+                        TingkatRisiko = riskLevel,
+                        ResponsPekerja = workerResp,
+                        TindakanDilakukan = actions,
+                        CatatanCoaching = coachingNotes,
+                        FotoUrl = fotoUrl,
+                        CreatedAt = DateTime.Now
+                    };
+
+                    await _context.BbsObservations.AddAsync(bbs);
+                    await _context.SaveChangesAsync();
+                    return Ok(new { status = true, message = "BBS berhasil disimpan", id = bbs.Id });
+                }
+
                 // 1. HAZARD REPORT
 
                 if (targetName == "hazard" || targetName == "hazard_report")
@@ -2564,6 +2618,17 @@ namespace Indexsafe.Api.Controllers
 
 
 
+            if (targetName == "bbs" || targetName == "bbs_observation")
+            {
+                var list = await _context.BbsObservations
+                    .AsNoTracking()
+                    .Where(b => !b.IsDeleted && (b.ObserverNik == userNik || b.ObservedNik == userNik || (b.ObserverPerusahaanId.HasValue && allowedCompanyIds.Contains(b.ObserverPerusahaanId.Value))))
+                    .OrderByDescending(b => b.CreatedAt)
+                    .Take(limit)
+                    .ToListAsync();
+                return Ok(new { status = true, data = list });
+            }
+
             if (targetName == "safety" || targetName == "safety_talk")
 
             {
@@ -4349,6 +4414,16 @@ namespace Indexsafe.Api.Controllers
 
             }
 
+            else if (targetName == "bbs" || targetName == "bbs_observation")
+            {
+                var item = await _context.BbsObservations.FindAsync(id);
+                if (item != null)
+                {
+                    item.IsDeleted = true;
+                    await _context.SaveChangesAsync();
+                    return Ok(new { status = true, message = "BBS berhasil dihapus" });
+                }
+            }
             else if (targetName == "p2h")
 
             {
