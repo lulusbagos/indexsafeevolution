@@ -19,7 +19,7 @@ class RciPdfPage extends StatelessWidget {
     final title = 'Laporan RCI #${item.id > 0 ? item.id : 'DRAFT'}';
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
-      appBar: TopBar(title: title, back: 2),
+      appBar: TopBar(title: title, back: 1),
       body: PdfPreview(
         build: _buildPdf,
         canChangePageFormat: false,

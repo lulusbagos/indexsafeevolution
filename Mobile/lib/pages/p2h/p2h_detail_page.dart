@@ -80,9 +80,9 @@ class _P2HDetailPageState extends State<P2HDetailPage> {
   @override
   Widget build(BuildContext context) {
     return PopScope(
-      canPop: false,
+      canPop: true,
       child: Scaffold(
-        appBar: const TopBar(title: 'Checklist P2H', back: 2),
+        appBar: const TopBar(title: 'Checklist P2H', back: 1),
         body: Column(
           children: [
             Container(

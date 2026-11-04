@@ -56,9 +56,9 @@ class _HazardDetailPageState extends State<HazardDetailPage> {
   @override
   Widget build(BuildContext context) {
     return PopScope(
-      canPop: false,
+      canPop: true,
       child: Scaffold(
-        appBar: const TopBar(title: 'Detail Temuan Hazard', back: 2),
+        appBar: const TopBar(title: 'Detail Temuan Hazard', back: 1),
         body: SingleChildScrollView(
           controller: _scrollCtrl,
           padding: const EdgeInsets.all(20),

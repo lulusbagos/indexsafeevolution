@@ -241,7 +241,7 @@ class _SafetyTalkPageState extends State<SafetyTalkPage> {
 
     return Scaffold(
       backgroundColor: _stBackground,
-      appBar: const TopBar(title: 'Safety Talk', back: 2),
+      appBar: const TopBar(title: 'Safety Talk', back: 1),
       floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       floatingActionButton: FloatingActionButton.extended(
         backgroundColor: _stRed,

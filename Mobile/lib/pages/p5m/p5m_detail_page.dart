@@ -93,9 +93,9 @@ class _P5MDetailPageState extends State<P5MDetailPage> {
   @override
   Widget build(BuildContext context) {
     return PopScope(
-      canPop: false,
+      canPop: true,
       child: Scaffold(
-        appBar: const TopBar(title: 'Checklist P5M', back: 2),
+        appBar: const TopBar(title: 'Checklist P5M', back: 1),
         body: Column(
           children: [
             Container(

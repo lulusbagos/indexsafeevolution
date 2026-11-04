@@ -111,63 +111,86 @@ class _TopBarState extends State<TopBar> {
   Future<bool> _showBackDialog() async {
     final result = await showDialog<bool>(
       context: context,
+      barrierColor: Colors.black.withValues(alpha: 0.4),
       builder: (BuildContext context) {
         return Dialog(
-          insetPadding: const EdgeInsets.symmetric(horizontal: 28),
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          elevation: 8,
+          backgroundColor: Colors.white,
+          insetPadding: const EdgeInsets.symmetric(horizontal: 24),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(24, 24, 24, 20),
+            padding: const EdgeInsets.all(24),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Container(
-                  width: 48,
-                  height: 48,
-                  decoration: const BoxDecoration(
-                    color: Color(0xFFFFF1F2),
-                    shape: BoxShape.circle,
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF1F5F9),
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                  child: const Icon(Icons.edit_off_rounded,
-                      color: Color(0xFFE11D48), size: 25),
+                  child: const Icon(
+                    Icons.arrow_back_rounded,
+                    color: Color(0xFF1E293B),
+                    size: 22,
+                  ),
                 ),
-                const SizedBox(height: 18),
-                const Text('Batalkan entri?',
-                    style:
-                        TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
+                const SizedBox(height: 16),
+                const Text(
+                  'Keluar dari Halaman?',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF0F172A),
+                    letterSpacing: -0.2,
+                  ),
+                ),
                 const SizedBox(height: 8),
                 const Text(
-                  'Data yang belum disimpan akan hilang. Anda yakin ingin keluar dari form ini?',
-                  style: TextStyle(color: Color(0xFF64748B), height: 1.45),
+                  'Perubahan data yang belum disimpan mungkin tidak akan tersimpan. Yakin ingin keluar?',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Color(0xFF64748B),
+                    height: 1.45,
+                  ),
                 ),
                 const SizedBox(height: 24),
                 Row(
                   children: [
                     Expanded(
                       child: OutlinedButton(
-                        onPressed: () => Navigator.of(context).pop(false),
+                        onPressed: () => Navigator.of(context).pop(true),
                         style: OutlinedButton.styleFrom(
-                          minimumSize: const Size.fromHeight(46),
-                          foregroundColor: const Color(0xFF334155),
-                          side: const BorderSide(color: Color(0xFFCBD5E1)),
+                          minimumSize: const Size.fromHeight(44),
+                          foregroundColor: const Color(0xFF64748B),
+                          side: const BorderSide(color: Color(0xFFE2E8F0)),
                           shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12)),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
                         ),
-                        child: const Text('Tetap Isi'),
+                        child: const Text(
+                          'Keluar',
+                          style: TextStyle(fontWeight: FontWeight.w600),
+                        ),
                       ),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: FilledButton(
-                        onPressed: () => Navigator.of(context).pop(true),
+                        onPressed: () => Navigator.of(context).pop(false),
                         style: FilledButton.styleFrom(
-                          minimumSize: const Size.fromHeight(46),
-                          backgroundColor: const Color(0xFFE11D48),
+                          minimumSize: const Size.fromHeight(44),
+                          backgroundColor: const Color(0xFF0F172A),
                           shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12)),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
                         ),
-                        child: const Text('Batalkan'),
+                        child: const Text(
+                          'Lanjut Mengisi',
+                          style: TextStyle(fontWeight: FontWeight.w700),
+                        ),
                       ),
                     ),
                   ],

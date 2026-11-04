@@ -117,9 +117,9 @@ class _ActionPlanPageState extends State<ActionPlanPage> {
   @override
   Widget build(BuildContext context) {
     return PopScope(
-      canPop: false,
+      canPop: true,
       child: Scaffold(
-        appBar: TopBar(title: 'Action ${pageTitle(widget.module)}', back: 2),
+        appBar: TopBar(title: 'Action ${pageTitle(widget.module)}', back: 1),
         body: SingleChildScrollView(
           controller: _scrollCtrl,
           padding: const EdgeInsets.all(20),

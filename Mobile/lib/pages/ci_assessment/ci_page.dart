@@ -870,7 +870,7 @@ class CiHistoryPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Scaffold(
         backgroundColor: _ciBg,
-        appBar: const TopBar(title: 'Riwayat Condition Index', back: 2),
+        appBar: const TopBar(title: 'Riwayat Condition Index', back: 1),
         body: ListView.separated(
           padding: const EdgeInsets.all(16),
           itemCount: items.length,
@@ -935,7 +935,7 @@ class _CiDetailPageState extends State<CiDetailPage> {
     final params = CiCatalog.forType(_item.type);
     return Scaffold(
         backgroundColor: _ciBg,
-        appBar: TopBar(title: 'Hasil ${_typeLong(_item.type)}', back: 2),
+        appBar: TopBar(title: 'Hasil ${_typeLong(_item.type)}', back: 1),
         body: ListView(
             padding: const EdgeInsets.fromLTRB(16, 14, 16, 30),
             children: [
@@ -1075,7 +1075,7 @@ class CiPdfPage extends StatelessWidget {
   final CiAssessment item;
   @override
   Widget build(BuildContext context) => Scaffold(
-      appBar: TopBar(title: 'Laporan ${_typeLong(item.type)}', back: 2),
+      appBar: TopBar(title: 'Laporan ${_typeLong(item.type)}', back: 1),
       body: PdfPreview(
           build: _buildPdf,
           canChangePageFormat: false,

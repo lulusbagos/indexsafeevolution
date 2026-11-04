@@ -187,9 +187,9 @@ class _CoachingDetailPageState extends State<CoachingDetailPage>
   @override
   Widget build(BuildContext context) {
     return PopScope(
-      canPop: false,
+      canPop: true,
       child: Scaffold(
-        appBar: const TopBar(title: 'Peserta Coaching', back: 2),
+        appBar: const TopBar(title: 'Peserta Coaching', back: 1),
         body: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20),
           child: ListView.builder(

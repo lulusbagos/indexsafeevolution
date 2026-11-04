@@ -433,9 +433,9 @@ class _ObservationDetailPageState extends State<ObservationDetailPage> {
   @override
   Widget build(BuildContext context) {
     return PopScope(
-      canPop: false,
+      canPop: true,
       child: Scaffold(
-        appBar: const TopBar(title: 'Detail Observation', back: 2),
+        appBar: const TopBar(title: 'Detail Observation', back: 1),
         body: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20),
           child: ListView.builder(
