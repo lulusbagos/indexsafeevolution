@@ -287,6 +287,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin, Widg
   }
 
   void _onTabSelected(int index) {
+    debugPrint('[NAVBAR] _onTabSelected: target=$index, current=$_currentPage');
     if (index == _currentPage) return;
     try {
       HapticFeedback.selectionClick();
@@ -539,7 +540,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin, Widg
                         }
 
                         return Stack(
-                          alignment: Alignment.center,
+                          fit: StackFit.expand,
                           children: [
                             // 1. Sliding Pill Indicator ke kiri kanannya!
                             AnimatedPositioned(
@@ -686,9 +687,8 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin, Widg
       onTap: () => _onTabSelected(index),
       splashColor: Colors.transparent,
       highlightColor: Colors.transparent,
-      child: Container(
-        height: double.infinity,
-        alignment: Alignment.center,
+      child: SizedBox(
+        height: 58,
         child: Column(
         mainAxisSize: MainAxisSize.min,
         mainAxisAlignment: MainAxisAlignment.center,
