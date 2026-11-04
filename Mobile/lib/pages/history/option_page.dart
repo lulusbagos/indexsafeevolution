@@ -67,13 +67,19 @@ class _OptionPageState extends State<OptionPage> {
       case Module.p2h:
         summaryQry = '''
         select count(1) as jml from p2h_trans tr
-        where tr.deleted_at is null and (tr.employee_id=$profileId or tr.employee_id is null or tr.employee_id=0)
+        where tr.deleted_at is null and (tr.employee_id=$profileId or (tr.sync_id is null and (tr.employee_id is null or tr.employee_id=0)))
+        ''';
+        break;
+      case Module.observation:
+        summaryQry = '''
+        select count(1) as jml from observation_trans tr
+        where tr.deleted_at is null and (tr.employee_id=$profileId or (tr.sync_id is null and (tr.employee_id is null or tr.employee_id=0)))
         ''';
         break;
       default:
         summaryQry = '''
         select count(1) as jml from hazard_trans tr
-        where tr.deleted_at is null and (tr.employee_id=$profileId or tr.employee_id is null or tr.employee_id=0)
+        where tr.deleted_at is null and (tr.employee_id=$profileId or (tr.sync_id is null and (tr.employee_id is null or tr.employee_id=0)))
         ''';
         break;
     }

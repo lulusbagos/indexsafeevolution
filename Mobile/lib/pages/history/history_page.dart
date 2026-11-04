@@ -98,11 +98,18 @@ class _HistoryPageState extends State<HistoryPage> {
         try {
           final res = await _api.dio.get('/tran/hazard?limit=100');
           if (res.data != null && res.data['data'] is List) {
+            final myNik = userNik.trim();
+            final myName = (_profile?.namaLengkap ?? '').trim().toUpperCase();
             for (var raw in (res.data['data'] as List)) {
               if (raw is Map) {
                 final item = Map<String, dynamic>.from(raw);
                 final id = item['id'];
                 if (id is int) {
+                  final itemNik = (item['nik'] ?? '').toString().trim();
+                  final itemNama = (item['nama'] ?? '').toString().trim().toUpperCase();
+                  final isReporter = (myNik.isNotEmpty && itemNik == myNik) ||
+                                     (myName.isNotEmpty && itemNama.isNotEmpty && itemNama == myName);
+                  final isPja = (myNik.isNotEmpty && (item['nik_pja'] ?? '').toString().trim() == myNik);
                   final row = <String, dynamic>{
                     'id': id,
                     'code': item['code'] ?? 'HZ-$id',
@@ -116,8 +123,8 @@ class _HistoryPageState extends State<HistoryPage> {
                     'repair': item['repair'] is int ? item['repair'] : 0,
                     'repair_remark': item['repair_remark'] ?? item['perbaikan'],
                     'repair_image': item['repair_image'] ?? item['foto_perbaikan'],
-                    'pja_id': (item['nik_pja'] == userNik) ? profileId : (item['pja_id'] ?? 0),
-                    'employee_id': (item['nik'] == userNik) ? profileId : (item['employee_id'] ?? profileId),
+                    'pja_id': isPja ? profileId : (item['pja_id'] ?? 0),
+                    'employee_id': isReporter ? profileId : (item['employee_id'] ?? -1),
                     'sync_id': id,
                     'created_at': item['created_at'] ?? DateTime.now().toString(),
                   };
@@ -179,13 +186,29 @@ class _HistoryPageState extends State<HistoryPage> {
       } else if (widget.history == History.summary &&
           widget.module == Module.observation) {
         try {
-          final res = await _api.dio.get('/tran/observation?limit=100');
+          // Bersihkan data riwayat observasi lama dari server yang bukan milik user login (id < 0)
+          await _db.execute('DELETE FROM observation_trans WHERE id < 0');
+          await _db.execute('DELETE FROM observation_details WHERE tran_id < 0');
+
+          final res = await _api.dio.get('/tran/observation?limit=300');
           if (res.data is Map && res.data['data'] is List) {
+            final myNik = userNik.trim();
+            final myName = (_profile?.namaLengkap ?? '').trim().toUpperCase();
             for (final raw in res.data['data'] as List) {
               if (raw is! Map) continue;
               final item = Map<String, dynamic>.from(raw);
               final serverId = int.tryParse(item['id'].toString());
               if (serverId == null) continue;
+
+              final itemNik = (item['nik'] ?? '').toString().trim();
+              final itemNama = (item['nama'] ?? '').toString().trim().toUpperCase();
+
+              final isMine = (myNik.isNotEmpty && itemNik == myNik) ||
+                             (myName.isNotEmpty && itemNama.isNotEmpty && itemNama == myName);
+
+              // PASTIKAN HANYA OBSERVASI MILIK USER SENDIRI YANG DISIMPAN KE LIST OBSERVASI LOKAL
+              if (!isMine) continue;
+
               // Keep server history separate from locally generated IDs.
               final localId = -serverId;
               final row = <String, dynamic>{
@@ -208,6 +231,8 @@ class _HistoryPageState extends State<HistoryPage> {
                 'photo_url': item['fotoUrl'] ?? '',
                 'employee_id': profileId,
                 'sync_id': serverId,
+                'nik': itemNik,
+                'nama': itemNama,
                 'created_at': item['createdAt'] ?? DateTime.now().toString(),
               };
               final existing = await _db.get('observation_trans', localId);
@@ -366,12 +391,12 @@ class _HistoryPageState extends State<HistoryPage> {
         (select hm."name" from hazard_masters hm where hm."type"='subtype' and hm.id=tr.hazard_subtype_id) as jenis_ketidaksesuaian,
         (select e.nama_lengkap from employees e where e.id=tr.pja_id) as pja_name
         from hazard_trans tr $joinArea
-        where tr.deleted_at is null and (tr.employee_id=$profileId or tr.employee_id=0 or tr.employee_id is null) order by tr.id desc''';
+        where tr.deleted_at is null and (tr.employee_id=$profileId or (tr.sync_id is null and (tr.employee_id=0 or tr.employee_id is null))) order by tr.id desc''';
         _table = 'hazard_trans';
         break;
       case Module.coaching:
         qry = '''$select from coaching_trans tr $joinArea
-        where tr.deleted_at is null and (tr.employee_id=$profileId or tr.employee_id=0 or tr.employee_id is null) order by tr.id desc''';
+        where tr.deleted_at is null and (tr.employee_id=$profileId or (tr.sync_id is null and (tr.employee_id=0 or tr.employee_id is null))) order by tr.id desc''';
         _table = 'coaching_trans';
         break;
       case Module.observation:
@@ -380,7 +405,7 @@ class _HistoryPageState extends State<HistoryPage> {
         (select om."name" from observation_masters om where om."type"='document' and om.id=tr.doc_id) as dokumen_pendukung,
         (select om."name" from observation_masters om where om."type"='risk' and om.id=tr.risk_id) as resiko_kritis
         from observation_trans tr $joinArea
-        where tr.deleted_at is null and (tr.employee_id=$profileId or tr.employee_id=0 or tr.employee_id is null) order by tr.id desc''';
+        where tr.deleted_at is null and (tr.employee_id=$profileId or (tr.sync_id is null and (tr.employee_id=0 or tr.employee_id is null))) order by tr.id desc''';
         _table = 'observation_trans';
         break;
       case Module.p2h:
@@ -406,12 +431,12 @@ class _HistoryPageState extends State<HistoryPage> {
         break;
       case Module.safety:
         qry = '''$select from safety_trans tr $joinArea
-        where tr.deleted_at is null and (tr.employee_id=$profileId or tr.employee_id=0 or tr.employee_id is null) order by tr.id desc''';
+        where tr.deleted_at is null and (tr.employee_id=$profileId or (tr.sync_id is null and (tr.employee_id=0 or tr.employee_id is null))) order by tr.id desc''';
         _table = 'safety_trans';
         break;
       case Module.induction:
         qry = '''$select from k3_trans tr $joinArea
-        where tr.deleted_at is null and (tr.employee_id=$profileId or tr.employee_id=0 or tr.employee_id is null) order by tr.id desc''';
+        where tr.deleted_at is null and (tr.employee_id=$profileId or (tr.sync_id is null and (tr.employee_id=0 or tr.employee_id is null))) order by tr.id desc''';
         _table = 'k3_trans';
         break;
     }
@@ -445,7 +470,14 @@ class _HistoryPageState extends State<HistoryPage> {
     }
 
     if (qry != '') {
-      _db.rawQuery(qry).then((val) {
+      () async {
+        if (widget.module == Module.observation) {
+          try {
+            await _db.execute('DELETE FROM observation_trans WHERE id < 0');
+            await _db.execute('DELETE FROM observation_details WHERE tran_id < 0');
+          } catch (_) {}
+        }
+        final val = await _db.rawQuery(qry);
         if (!mounted) return;
         if (val.isNotEmpty) {
           debugPrint('--- $_table : ${val.length} ---');
@@ -471,7 +503,7 @@ class _HistoryPageState extends State<HistoryPage> {
         } else {
           setState(() => _rawData = []);
         }
-      });
+      }();
     }
   }
 

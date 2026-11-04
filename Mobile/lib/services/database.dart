@@ -4547,6 +4547,8 @@ class DatabaseService {
 
 
       'image',
+      'nik',
+      'nama',
 
 
 
