@@ -1051,23 +1051,26 @@ Future<bool> syncAllMasterData({
                 }
 
                 if (name == 'vehicle' || name == 'vehicles') {
-                  final exp = (row['commissioning_expired'] ?? 
+                  final exp = (row['tanggal_komisioning'] ??
+                               row['commissioning_expired'] ?? 
                                row['commissioningExpired'] ?? 
                                row['commissioning_date'] ?? 
                                row['tgl_komisioning'] ?? 
                                row['expired_komisioning'] ?? 
                                row['exp_komisioning'] ?? 
                                row['masa_berlaku_komisioning'] ??
-                               row['tgl_expired_komisioning'])?.toString();
-                  if (exp != null && exp.isNotEmpty) {
-                    row['commissioning_expired'] = exp;
-                  }
+                               row['tgl_expired_komisioning'])?.toString().trim();
+                  final finalExp = (exp != null && exp.isNotEmpty && exp != 'null') ? exp : '-';
+                  row['tanggal_komisioning'] = finalExp;
+                  row['commissioning_expired'] = finalExp;
+                  row['commissioning_date'] = finalExp;
+
                   final commNo = (row['commissioning_no'] ?? 
                                   row['commissioningNo'] ?? 
                                   row['no_komisioning'] ?? 
                                   row['nomor_komisioning'] ??
-                                  row['stiker_komisioning'])?.toString();
-                  if (commNo != null && commNo.isNotEmpty) {
+                                  row['stiker_komisioning'])?.toString().trim();
+                  if (commNo != null && commNo.isNotEmpty && commNo != 'null') {
                     row['commissioning_no'] = commNo;
                   }
                 }

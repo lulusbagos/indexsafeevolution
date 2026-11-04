@@ -330,7 +330,7 @@ class _P2HFormPageState extends State<P2HFormPage> {
 
   
   int? _calcRemainingDays(String? raw) {
-    if (raw == null || raw.trim().isEmpty) return null;
+    if (raw == null || raw.trim().isEmpty || raw.trim() == '-' || raw.trim().toLowerCase() == 'null') return null;
     final str = raw.trim();
     DateTime? dt;
     try {
@@ -428,7 +428,7 @@ class _P2HFormPageState extends State<P2HFormPage> {
 
       final cached = await _db.rawQuery('''
 
-        SELECT code, name, type, commissioning_expired, commissioning_no FROM vehicle_masters 
+        SELECT code, name, type, tanggal_komisioning, commissioning_expired, commissioning_no FROM vehicle_masters 
 
         WHERE deleted_at IS NULL 
 
@@ -451,7 +451,7 @@ class _P2HFormPageState extends State<P2HFormPage> {
           'jenisKendaraan': row['type']?.toString() ?? 'LIGHT VEHICLE',
 
           'lastKm': 0.0,
-          'commissioningExpired': row['commissioning_expired']?.toString() ?? '',
+          'commissioningExpired': (row['tanggal_komisioning'] ?? row['commissioning_expired'])?.toString() ?? '-',
           'commissioningNo': row['commissioning_no']?.toString() ?? '',
 
         });
@@ -466,7 +466,7 @@ class _P2HFormPageState extends State<P2HFormPage> {
 
         final p2hVehs = await _db.rawQuery(
 
-            'SELECT no_lambung, merek, jenis_kendaraan, last_km, commissioning_expired, commissioning_no FROM p2h_vehicles');
+            'SELECT no_lambung, merek, jenis_kendaraan, last_km, tanggal_komisioning, commissioning_expired, commissioning_no FROM p2h_vehicles');
 
         for (var row in p2hVehs) {
 
@@ -499,7 +499,7 @@ class _P2HFormPageState extends State<P2HFormPage> {
                   row['jenis_kendaraan']?.toString() ?? 'LIGHT VEHICLE',
 
               'lastKm': km,
-              'commissioningExpired': row['commissioning_expired']?.toString() ?? '',
+              'commissioningExpired': (row['tanggal_komisioning'] ?? row['commissioning_expired'])?.toString() ?? '-',
               'commissioningNo': row['commissioning_no']?.toString() ?? '',
 
             });
@@ -698,13 +698,58 @@ class _P2HFormPageState extends State<P2HFormPage> {
 
 
 
+    // Look up commissioning date
+    String? foundExp;
+    String? foundCommNo;
+    for (var v in _availableVehicles) {
+      if (v['noLambung'].toString().toLowerCase() == cleanNl) {
+        foundExp = v['commissioningExpired']?.toString();
+        foundCommNo = v['commissioningNo']?.toString();
+        break;
+      }
+    }
+    if (foundExp == null || foundExp.isEmpty || foundExp == '-') {
+      try {
+        final q = await _db.rawQuery('''
+          SELECT tanggal_komisioning, commissioning_expired, commissioning_no 
+          FROM vehicle_masters 
+          WHERE LOWER(code) = ? 
+          LIMIT 1
+        ''', [cleanNl]);
+        if (q.isNotEmpty) {
+          foundExp = (q.first['tanggal_komisioning'] ?? q.first['commissioning_expired'])?.toString();
+          foundCommNo = q.first['commissioning_no']?.toString();
+        }
+      } catch (_) {}
+    }
+    if (foundExp == null || foundExp.isEmpty || foundExp == '-') {
+      try {
+        final q = await _db.rawQuery('''
+          SELECT tanggal_komisioning, commissioning_expired, commissioning_no 
+          FROM p2h_vehicles 
+          WHERE LOWER(no_lambung) = ? 
+          LIMIT 1
+        ''', [cleanNl]);
+        if (q.isNotEmpty) {
+          foundExp = (q.first['tanggal_komisioning'] ?? q.first['commissioning_expired'])?.toString();
+          foundCommNo = q.first['commissioning_no']?.toString();
+        }
+      } catch (_) {}
+    }
+
     if (mounted) {
-
       setState(() {
-
         _lastRecordedKm = bestKm;
-
         _lastRecordedKmDate = localDate;
+        if (foundExp != null && foundExp.trim().isNotEmpty && foundExp.trim() != '-' && foundExp.trim() != 'null') {
+          _commissioningExpired = foundExp.trim();
+          _commissioningNo = foundCommNo;
+          _commissioningRemainingDays = _calcRemainingDays(_commissioningExpired);
+        } else {
+          _commissioningExpired = '-';
+          _commissioningNo = null;
+          _commissioningRemainingDays = null;
+        }
 
       });
 
@@ -1180,7 +1225,7 @@ class _P2HFormPageState extends State<P2HFormPage> {
                                           fontSize: 11,
                                           color: Colors.grey.shade600),
                                     ),
-                                    if ((v['commissioningExpired'] ?? '').toString().isNotEmpty) ...[
+                                    if ((v['commissioningExpired'] ?? '').toString().isNotEmpty && v['commissioningExpired'] != '-' && v['commissioningExpired'] != 'null') ...[
                                       const SizedBox(height: 3),
                                       Builder(builder: (_) {
                                         final cDays = _calcRemainingDays(v['commissioningExpired']?.toString());
@@ -1189,8 +1234,8 @@ class _P2HFormPageState extends State<P2HFormPage> {
                                         final color = isExp ? const Color(0xFFDC2626) : (isCrit ? const Color(0xFFD97706) : const Color(0xFF16A34A));
                                         final bg = isExp ? const Color(0xFFFEE2E2) : (isCrit ? const Color(0xFFFEF3C7) : const Color(0xFFDCFCE7));
                                         final text = isExp
-                                            ? 'Komisioning Habis (${cDays.abs()} hr lalu)'
-                                            : (cDays != null ? 'Komisi Sisa $cDays Hari (${_formatCommDate(v['commissioningExpired']?.toString())})' : 'Exp: ${_formatCommDate(v['commissioningExpired']?.toString())}');
+                                            ? 'Komisioning HABIS (${cDays.abs()} hr lalu)'
+                                            : (cDays != null ? 'Kurang $cDays hari (${_formatCommDate(v['commissioningExpired']?.toString())})' : 'Exp: ${_formatCommDate(v['commissioningExpired']?.toString())}');
                                         return Container(
                                           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
                                           decoration: BoxDecoration(
@@ -3245,7 +3290,7 @@ class _P2HFormPageState extends State<P2HFormPage> {
 
 
                           // Commissioning Status Banner
-                          if (_noLambungCtrl.text.isNotEmpty && _commissioningRemainingDays != null) ...[
+                          if (_noLambungCtrl.text.isNotEmpty && _commissioningRemainingDays != null && _commissioningExpired != null && _commissioningExpired != '-' && _commissioningExpired != 'null') ...[
                             const SizedBox(height: 12),
                             Builder(
                               builder: (context) {
@@ -3278,8 +3323,8 @@ class _P2HFormPageState extends State<P2HFormPage> {
                                 final String statusTitle = isExpired
                                     ? 'Masa Komisioning Telah HABIS'
                                     : (isCritical
-                                        ? 'Masa Komisioning Kritis: Sisa $days Hari!'
-                                        : (isWarning ? 'Masa Komisioning: Sisa $days Hari' : 'Komisioning Aktif: Sisa $days Hari'));
+                                        ? 'Masa Komisioning Kritis: Kurang $days Hari Lagi!'
+                                        : (isWarning ? 'Masa Komisioning: Kurang $days Hari Lagi' : 'Komisioning Aktif: Kurang $days Hari'));
 
                                 final String subtitle = isExpired
                                     ? 'Expired sejak ${_formatCommDate(_commissioningExpired)} (${days.abs()} hari lalu)'
@@ -3324,7 +3369,7 @@ class _P2HFormPageState extends State<P2HFormPage> {
                                                     borderRadius: BorderRadius.circular(6),
                                                   ),
                                                   child: Text(
-                                                    isExpired ? 'EXPIRED' : '$days HARI',
+                                                    isExpired ? 'HABIS' : 'KURANG $days HARI',
                                                     style: const TextStyle(
                                                       fontSize: 9.5,
                                                       fontWeight: FontWeight.w900,
@@ -4807,7 +4852,10 @@ class _P2HFormPageState extends State<P2HFormPage> {
                     ),
                     if ((item.name.toLowerCase().contains('komisioning') ||
                             item.name.toLowerCase().contains('commissioning')) &&
-                        _commissioningRemainingDays != null) ...[
+                        _commissioningRemainingDays != null &&
+                        _commissioningExpired != null &&
+                        _commissioningExpired != '-' &&
+                        _commissioningExpired != 'null') ...[
                       const SizedBox(height: 4),
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
@@ -4828,8 +4876,8 @@ class _P2HFormPageState extends State<P2HFormPage> {
                         ),
                         child: Text(
                           _commissioningRemainingDays! < 0
-                              ? 'Stiker Expired (${_commissioningRemainingDays!.abs()} hari lalu) - s/d ${_formatCommDate(_commissioningExpired)}'
-                              : 'Stiker Aktif: Sisa $_commissioningRemainingDays Hari (s/d ${_formatCommDate(_commissioningExpired)})',
+                              ? 'Masa Komisioning Telah HABIS (Lewat ${_commissioningRemainingDays!.abs()} hari lalu - s/d ${_formatCommDate(_commissioningExpired)})'
+                              : 'Masa Komisioning: Kurang $_commissioningRemainingDays Hari Lagi (s/d ${_formatCommDate(_commissioningExpired)})',
                           style: TextStyle(
                             fontSize: 10.5,
                             fontWeight: FontWeight.bold,

@@ -10969,7 +10969,7 @@ class _ScanPageState extends State<ScanPage>
     int? commissioningRemainingDays;
 
     int? getRemainingDays(String? raw) {
-      if (raw == null || raw.trim().isEmpty) return null;
+      if (raw == null || raw.trim().isEmpty || raw.trim() == '-' || raw.trim().toLowerCase() == 'null') return null;
       final str = raw.trim();
       DateTime? dt;
       try {
@@ -11016,7 +11016,7 @@ class _ScanPageState extends State<ScanPage>
       hasLoadedVehicles = true;
       try {
         final cached = await _db.rawQuery('''
-          SELECT code, name, type, commissioning_expired, commissioning_no FROM vehicle_masters 
+          SELECT code, name, type, tanggal_komisioning, commissioning_expired, commissioning_no FROM vehicle_masters 
           WHERE deleted_at IS NULL 
           ORDER BY code ASC
         ''');
@@ -11028,13 +11028,13 @@ class _ScanPageState extends State<ScanPage>
               'noLambung': code,
               'merek': row['name']?.toString() ?? '',
               'jenisKendaraan': row['type']?.toString() ?? 'LIGHT VEHICLE',
-              'commissioningExpired': row['commissioning_expired']?.toString() ?? '',
+              'commissioningExpired': (row['tanggal_komisioning'] ?? row['commissioning_expired'])?.toString() ?? '-',
               'commissioningNo': row['commissioning_no']?.toString() ?? '',
             });
           }
         }
         try {
-          final p2hVehs = await _db.rawQuery('SELECT no_lambung, merek, jenis_kendaraan, commissioning_expired, commissioning_no FROM p2h_vehicles');
+          final p2hVehs = await _db.rawQuery('SELECT no_lambung, merek, jenis_kendaraan, tanggal_komisioning, commissioning_expired, commissioning_no FROM p2h_vehicles');
           for (var r in p2hVehs) {
             final nl = r['no_lambung']?.toString() ?? '';
             if (nl.isNotEmpty && !list.any((x) => x['noLambung'].toString().toLowerCase() == nl.toLowerCase())) {
@@ -11042,7 +11042,7 @@ class _ScanPageState extends State<ScanPage>
                 'noLambung': nl,
                 'merek': r['merek']?.toString() ?? '',
                 'jenisKendaraan': r['jenis_kendaraan']?.toString() ?? 'LIGHT VEHICLE',
-                'commissioningExpired': r['commissioning_expired']?.toString() ?? '',
+                'commissioningExpired': (r['tanggal_komisioning'] ?? r['commissioning_expired'])?.toString() ?? '-',
                 'commissioningNo': r['commissioning_no']?.toString() ?? '',
               });
             }
@@ -11168,11 +11168,11 @@ class _ScanPageState extends State<ScanPage>
       if (foundExp == null || foundExp.isEmpty) {
         try {
           final vRows = await _db.rawQuery('''
-            SELECT commissioning_expired, commissioning_no FROM vehicle_masters 
+            SELECT tanggal_komisioning, commissioning_expired, commissioning_no FROM vehicle_masters 
             WHERE LOWER(code) = LOWER(?) LIMIT 1
           ''', [cleanUnit]);
           if (vRows.isNotEmpty) {
-            foundExp = vRows.first['commissioning_expired']?.toString();
+            foundExp = (vRows.first['tanggal_komisioning'] ?? vRows.first['commissioning_expired'])?.toString();
             foundCommNo = vRows.first['commissioning_no']?.toString();
           }
         } catch (_) {}
@@ -12617,32 +12617,8 @@ class _ScanPageState extends State<ScanPage>
                                   final days = commissioningRemainingDays;
                                   final expDateFormatted = formatCommDate(commissioningExpired);
 
-                                  if (days == null) {
-                                    return Container(
-                                      margin: const EdgeInsets.only(top: 8),
-                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFFF8FAFC),
-                                        borderRadius: BorderRadius.circular(10),
-                                        border: Border.all(color: const Color(0xFFE2E8F0)),
-                                      ),
-                                      child: Row(
-                                        children: [
-                                          const Icon(Icons.verified_outlined, size: 16, color: Color(0xFF64748B)),
-                                          const SizedBox(width: 8),
-                                          Expanded(
-                                            child: Text(
-                                              'Masa Komisioning: Belum terinput di sistem pusat',
-                                              style: const TextStyle(
-                                                fontSize: 11,
-                                                fontWeight: FontWeight.w600,
-                                                color: Color(0xFF64748B),
-                                              ),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    );
+                                  if (days == null || commissioningExpired == null || commissioningExpired == '-' || commissioningExpired == 'null') {
+                                    return const SizedBox.shrink();
                                   }
 
                                   final isExpired = days < 0;
@@ -12682,12 +12658,12 @@ class _ScanPageState extends State<ScanPage>
                                               : const Color(0xFF166534);
 
                                   final String statusTitle = isExpired
-                                      ? 'Masa Komisioning Telah HABIS (Expired)!'
+                                      ? 'Masa Komisioning Telah HABIS!'
                                       : isCritical
-                                          ? 'Masa Komisioning Kritis: Sisa $days Hari Lagi!'
+                                          ? 'Masa Komisioning Kritis: Kurang $days Hari Lagi!'
                                           : isWarning
-                                              ? 'Masa Komisioning: Sisa $days Hari Lagi'
-                                              : 'Komisioning Aktif: Sisa $days Hari';
+                                              ? 'Masa Komisioning: Kurang $days Hari Lagi'
+                                              : 'Komisioning Aktif: Kurang $days Hari';
 
                                   final String subtitle = isExpired
                                       ? 'Expired sejak $expDateFormatted (${days.abs()} hari lalu). Unit tidak boleh beroperasi!'
@@ -12753,7 +12729,7 @@ class _ScanPageState extends State<ScanPage>
                                                       borderRadius: BorderRadius.circular(6),
                                                     ),
                                                     child: Text(
-                                                      isExpired ? 'EXPIRED' : '$days HARI',
+                                                      isExpired ? 'HABIS' : 'KURANG $days HARI',
                                                       style: const TextStyle(
                                                         fontSize: 9.5,
                                                         fontWeight: FontWeight.w900,
