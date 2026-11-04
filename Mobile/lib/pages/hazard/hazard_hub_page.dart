@@ -90,12 +90,33 @@ class _HazardHubPageState extends State<HazardHubPage> {
     return _items;
   }
 
+  bool _isDummyHazard(HazardReportItem item) {
+    final t = (item.temuan).toLowerCase();
+    final rem = (item.perbaikan ?? '').toLowerCase();
+    final id = item.id.abs();
+    if (t.contains('ceceran oli & solar tebal') ||
+        rem.contains('ceceran oli & solar tebal') ||
+        t.contains('simulated_hazard_offline') ||
+        t.contains('dummy hazard') ||
+        t.trim() == 'tes' ||
+        t.trim() == 'test' ||
+        id == 8207491 ||
+        id == 8207463 ||
+        id == 8205037) {
+      return true;
+    }
+    return false;
+  }
+
   Future<void> _cleanDummyData() async {
     try {
       final sqldb = await _db.database;
       // Hapus data dummy simulasi jika pernah ada di SQLite lokal
       await sqldb.rawDelete(
-        "DELETE FROM hazard_trans WHERE code LIKE 'HAZ-OFF-%' OR image LIKE '%simulated_hazard_offline%' OR remark LIKE '%Ditemukan ceceran oli & solar tebal%'",
+        "DELETE FROM hazard_trans WHERE code LIKE 'HAZ-OFF-%' OR image LIKE '%simulated_hazard_offline%' OR remark LIKE '%ceceran oli & solar tebal%' OR title LIKE '%ceceran oli & solar tebal%' OR id IN (8207491, 8207463, 8205037) OR sync_id IN (8207491, 8207463, 8205037)",
+      );
+      await sqldb.rawDelete(
+        "DELETE FROM action_plans WHERE remark LIKE '%ceceran oli & solar tebal%' OR title LIKE '%ceceran oli & solar tebal%' OR tran_id IN (8207491, 8207463, 8205037)",
       );
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove('hazard_offline_dummy_created');
@@ -158,7 +179,7 @@ class _HazardHubPageState extends State<HazardHubPage> {
           canDelete: true,
           isOfflinePending: true,
         );
-      }).toList();
+      }).where((item) => !_isDummyHazard(item)).toList();
       _allOfflineItems = offlineItems;
       _offlineOpenCount = offlineItems.where((i) => i.statusTemuan.toLowerCase() != 'closed').length;
       _offlineClosedCount = offlineItems.where((i) => i.statusTemuan.toLowerCase() == 'closed').length;
@@ -221,6 +242,7 @@ class _HazardHubPageState extends State<HazardHubPage> {
           final list = (data['data'] as List)
               .map((e) =>
                   HazardReportItem.fromJson(Map<String, dynamic>.from(e as Map)))
+              .where((item) => !_isDummyHazard(item))
               .toList();
 
           // Gabungkan item offline yang relevan ke atas list secara tegas
@@ -1366,10 +1388,12 @@ class _HazardHubPageState extends State<HazardHubPage> {
             ),
             onPressed: () async {
               Navigator.pop(ctx);
+              final targetId = item.id.abs();
               if (isDraft) {
                 try {
                   final sqldb = await _db.database;
-                  await sqldb.delete('hazard_trans', where: 'id = ?', whereArgs: [item.id]);
+                  await sqldb.delete('hazard_trans', where: 'id = ?', whereArgs: [targetId]);
+                  await sqldb.delete('action_plans', where: 'tran_id = ?', whereArgs: [targetId]);
                   await OfflineSyncService.instance.refresh();
                   if (!mounted) return;
                   SnackBarMsg.success(context, 'Draft Hazard berhasil dihapus.');
@@ -1379,10 +1403,19 @@ class _HazardHubPageState extends State<HazardHubPage> {
                   SnackBarMsg.danger(context, 'Gagal menghapus draft: $e');
                 }
               } else {
-                final res = await _api.deleteHazardDirect(item.id);
+                final res = await _api.deleteHazardDirect(targetId);
+                try {
+                  final sqldb = await _db.database;
+                  await sqldb.delete('hazard_trans', where: 'id = ? OR sync_id = ?', whereArgs: [targetId, targetId]);
+                  await sqldb.delete('action_plans', where: 'tran_id = ?', whereArgs: [targetId]);
+                  await OfflineSyncService.instance.refresh();
+                } catch (_) {}
                 if (!mounted) return;
                 res.fold(
-                  (err) => SnackBarMsg.danger(context, err['message']?.toString() ?? 'Gagal menghapus laporan.'),
+                  (err) {
+                    _loadData();
+                    SnackBarMsg.danger(context, err['message']?.toString() ?? 'Gagal menghapus laporan.');
+                  },
                   (_) {
                     SnackBarMsg.success(context, 'Laporan Hazard berhasil dihapus.');
                     _loadData();

@@ -105,6 +105,10 @@ class _HistoryPageState extends State<HistoryPage> {
                 final item = Map<String, dynamic>.from(raw);
                 final id = item['id'];
                 if (id is int) {
+                  final remark = (item['remark'] ?? item['title'] ?? '').toString().toLowerCase();
+                  if (remark.contains('ceceran oli & solar tebal') || id == 8207491 || id == 8207463 || id == 8205037) {
+                    continue;
+                  }
                   final itemNik = (item['nik'] ?? '').toString().trim();
                   final itemNama = (item['nama'] ?? '').toString().trim().toUpperCase();
                   final isReporter = (myNik.isNotEmpty && itemNik == myNik) ||
@@ -148,6 +152,10 @@ class _HistoryPageState extends State<HistoryPage> {
                 final item = Map<String, dynamic>.from(raw);
                 final id = item['id'];
                 if (id is int) {
+                  final remark = (item['remark'] ?? item['title'] ?? '').toString().toLowerCase();
+                  if (remark.contains('ceceran oli & solar tebal') || id == 8207491 || id == 8207463 || id == 8205037) {
+                    continue;
+                  }
                   final row = <String, dynamic>{
                     'code': item['code'] ?? 'P2H-$id',
                     'title': 'P2H Unit ${item['noLambung'] ?? ''}',
@@ -268,6 +276,10 @@ class _HistoryPageState extends State<HistoryPage> {
                 final item = Map<String, dynamic>.from(raw);
                 final id = item['id'];
                 if (id is int) {
+                  final remark = (item['remark'] ?? item['title'] ?? '').toString().toLowerCase();
+                  if (remark.contains('ceceran oli & solar tebal') || id == 8207491 || id == 8207463 || id == 8205037) {
+                    continue;
+                  }
                   final row = <String, dynamic>{
                     'code': item['code'] ?? 'P5M-$id',
                     'title': item['title'] ?? item['judul'] ?? 'P5M & Fit to Work',
