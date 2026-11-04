@@ -1267,9 +1267,9 @@ class _FciFormPageState extends State<FciFormPage> {
   Widget build(BuildContext context) {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
-    final minDate = widget.editData != null && widget.editData!.tanggal.isBefore(today)
-        ? widget.editData!.tanggal
-        : today;
+    final minDate = today.subtract(const Duration(days: 3));
+
+
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
@@ -1351,7 +1351,7 @@ class _FciFormPageState extends State<FciFormPage> {
                                 context: context,
                                 initialDate: _tanggal.isBefore(minDate) ? minDate : _tanggal,
                                 firstDate: minDate, // NO BACKDATE
-                                lastDate: DateTime.now().add(const Duration(days: 365)),
+                                lastDate: today,
                               );
                               if (picked != null) {
                                 setState(() => _tanggal = picked);

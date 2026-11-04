@@ -3976,11 +3976,11 @@ class _P2HFormPageState extends State<P2HFormPage> {
 
               context: context,
 
-              initialDate: _tanggal.isBefore(today) ? today : _tanggal,
+              initialDate: _tanggal.isBefore(today.subtract(const Duration(days: 3))) ? today : (_tanggal.isAfter(today) ? today : _tanggal),
 
-              firstDate: today, // STRICT: No past dates / back-dates!
+              firstDate: today.subtract(const Duration(days: 3)),
 
-              lastDate: today.add(const Duration(days: 7)),
+              lastDate: today,
 
               helpText: 'PILIH TANGGAL PEMERIKSAAN P2H',
 

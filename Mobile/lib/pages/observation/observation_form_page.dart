@@ -464,7 +464,7 @@ class _ObservationFormPageState extends State<ObservationFormPage> {
                                       final picked = await showDatePicker(
                                         context: context,
                                         initialDate: _date ?? DateTime.now(),
-                                        firstDate: DateTime(2020),
+                                        firstDate: DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day).subtract(const Duration(days: 3)),
                                         lastDate: DateTime.now(),
                                       );
                                       if (picked != null) setState(() => _date = picked);

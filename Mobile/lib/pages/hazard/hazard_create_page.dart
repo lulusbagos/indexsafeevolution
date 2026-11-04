@@ -2276,7 +2276,7 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
                             final today =
                                 DateTime(now.year, now.month, now.day);
                             final minDate =
-                                today.subtract(const Duration(days: 2));
+                                today.subtract(const Duration(days: 3));
                             final initial = _tanggal.isBefore(minDate)
                                 ? minDate
                                 : (_tanggal.isAfter(today) ? today : _tanggal);
@@ -2286,7 +2286,7 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
                               initialDate: initial,
                               firstDate: minDate,
                               lastDate: today,
-                              helpText: 'PILIH TANGGAL (MAKS. 2 HARI TERAKHIR)',
+                              helpText: 'PILIH TANGGAL (MAKS. 3 HARI TERAKHIR)',
                             );
                             if (picked != null)
                               setState(() => _tanggal = picked);

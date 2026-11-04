@@ -1675,12 +1675,14 @@ class _P5MFormPageState extends State<P5MFormPage> {
                       onTap: () async {
                         final now = DateTime.now();
                         final today = DateTime(now.year, now.month, now.day);
-                        final initial = _date.isBefore(today) ? today : _date;
+                        final minDate = today.subtract(const Duration(days: 3));
+                        final initial = _date.isBefore(minDate) ? today : (_date.isAfter(today) ? today : _date);
                         final picked = await showDatePicker(
                           context: context,
                           initialDate: initial,
-                          firstDate: today, // Tidak bisa backdate!
-                          lastDate: DateTime(now.year + 2),
+                          firstDate: minDate,
+                          lastDate: today,
+                          helpText: 'PILIH TANGGAL (MAKS. 3 HARI TERAKHIR)',
                         );
                         if (picked != null) setState(() => _date = picked);
                       },

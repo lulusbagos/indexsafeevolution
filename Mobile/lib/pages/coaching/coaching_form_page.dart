@@ -1623,8 +1623,9 @@ class _CoachingFormPageState extends State<CoachingFormPage> {
                                 final picked = await showDatePicker(
                                   context: context,
                                   initialDate: _date ?? DateTime.now(),
-                                  firstDate: DateTime(2020),
-                                  lastDate: DateTime(2030),
+                                  firstDate: DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day).subtract(const Duration(days: 3)),
+                                  lastDate: DateTime.now(),
+                                  helpText: 'PILIH TANGGAL (MAKS. 3 HARI TERAKHIR)',
                                 );
                                 if (picked != null) {
                                   setState(() => _date = picked);

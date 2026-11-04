@@ -872,9 +872,9 @@ class _DciFormPageState extends State<DciFormPage> {
   Widget build(BuildContext context) {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
-    final minDate = widget.editData != null && widget.editData!.tanggal.isBefore(today)
-        ? widget.editData!.tanggal
-        : today;
+    final minDate = today.subtract(const Duration(days: 3)); // Backdate maks 3 hari
+
+
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
@@ -956,7 +956,7 @@ class _DciFormPageState extends State<DciFormPage> {
                             context: context,
                             initialDate: _tanggal.isBefore(minDate) ? minDate : _tanggal,
                             firstDate: minDate,
-                            lastDate: DateTime(now.year + 1),
+                            lastDate: today,
                           );
                           if (picked != null) setState(() => _tanggal = picked);
                         },

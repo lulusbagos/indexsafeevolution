@@ -1709,7 +1709,7 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
                               context: context,
                               initialDate: _tanggal,
                               firstDate: DateTime.now()
-                                  .subtract(const Duration(days: 30)),
+                                  .subtract(const Duration(days: 3)),
                               lastDate: DateTime.now(),
                             );
                             if (picked != null)

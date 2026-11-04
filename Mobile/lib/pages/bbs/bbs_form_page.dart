@@ -1778,7 +1778,7 @@ class _BbsFormPageState extends State<BbsFormPage> {
                             context: context,
                             initialDate: _observedAt,
                             firstDate: DateTime.now()
-                                .subtract(const Duration(days: 30)),
+                                .subtract(const Duration(days: 3)),
                             lastDate: DateTime.now(),
                           );
                           if (picked != null) {

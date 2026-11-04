@@ -1206,14 +1206,14 @@ class _SpiFormPageState extends State<SpiFormPage> {
                         onTap: () async {
                           final now = DateTime.now();
                           final today = DateTime(now.year, now.month, now.day);
-                          final minDate = widget.editData != null && widget.editData!.tanggal.isBefore(today)
-                              ? widget.editData!.tanggal
-                              : today;
+                          final minDate = today.subtract(const Duration(days: 3));
+
+
                           final picked = await showDatePicker(
                             context: context,
                             initialDate: _tanggal.isBefore(minDate) ? minDate : _tanggal,
                             firstDate: minDate,
-                            lastDate: DateTime(now.year + 2),
+                            lastDate: today,
                           );
                           if (picked != null) setState(() => _tanggal = picked);
                         },

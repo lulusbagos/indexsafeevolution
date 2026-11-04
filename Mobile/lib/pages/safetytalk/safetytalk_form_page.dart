@@ -1328,9 +1328,10 @@ class _SafetyTalkFormPageState extends State<SafetyTalkFormPage> {
                               onTap: () async {
                                 final picked = await showDatePicker(
                                   context: context,
-                                  initialDate: _date ?? DateTime.now(),
-                                  firstDate: DateTime(2020),
-                                  lastDate: DateTime(2030),
+                                  initialDate: (_date != null && _date!.isAfter(DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day).subtract(const Duration(days: 4))) && !_date!.isAfter(DateTime.now())) ? _date! : DateTime.now(),
+                                  firstDate: DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day).subtract(const Duration(days: 3)),
+                                  lastDate: DateTime.now(),
+                                  helpText: 'PILIH TANGGAL (MAKS. 3 HARI TERAKHIR)',
                                 );
                                 if (picked != null) {
                                   setState(() => _date = picked);

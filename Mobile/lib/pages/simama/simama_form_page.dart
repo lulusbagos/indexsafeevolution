@@ -2019,12 +2019,12 @@ class _SimamaFormPageState extends State<SimamaFormPage> {
       onTap: () async {
         final now = DateTime.now();
         final today = DateTime(now.year, now.month, now.day);
-        final initial = _date.isBefore(today) ? today : _date;
+        final initial = _date.isBefore(today.subtract(const Duration(days: 3))) ? today : (_date.isAfter(today) ? today : _date);
         final picked = await showDatePicker(
           context: context,
           initialDate: initial,
-          firstDate: today, // STRICT: Tidak bisa backdate
-          lastDate: DateTime(now.year + 2),
+          firstDate: today.subtract(const Duration(days: 3)),
+          lastDate: today,
           helpText: 'PILIH TANGGAL SIDAK SIMAMA',
         );
         if (picked != null) {

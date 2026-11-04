@@ -63,3 +63,5 @@ _ReSharper*/
 # Temporary / Scratch scripts
 *.py
 scratch/
+
+App_Data/
