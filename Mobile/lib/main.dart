@@ -1,3 +1,4 @@
+import 'utils/app_date_time_picker.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
@@ -46,6 +47,8 @@ class MyApp extends StatelessWidget {
           ),
           scaffoldBackgroundColor: Colors.white,
           appBarTheme: const AppBarTheme(backgroundColor: Colors.white),
+          datePickerTheme: AppDateTimePicker.datePickerThemeData,
+          timePickerTheme: AppDateTimePicker.timePickerThemeData,
           dialogTheme: DialogThemeData(
             backgroundColor: const Color(0xFFFDFEFF).withValues(alpha: .96),
             surfaceTintColor: Colors.transparent,

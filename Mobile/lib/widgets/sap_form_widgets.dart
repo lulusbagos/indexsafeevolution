@@ -892,7 +892,9 @@ class SapDatePickerTile extends StatelessWidget {
     required this.label,
     required this.date,
     required this.onTap,
-    this.badgeText,
+    this.badgeText = 'Maks. H-3',
+    this.accentColor = const Color(0xFF1D4ED8),
+    this.showDayName = false,
     super.key,
   });
 
@@ -900,60 +902,104 @@ class SapDatePickerTile extends StatelessWidget {
   final DateTime date;
   final VoidCallback onTap;
   final String? badgeText;
+  final Color accentColor;
+  final bool showDayName;
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              label,
-              style: const TextStyle(
-                color: Color(0xFF0F172A),
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-              ),
+    const hari = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+    const bulan = [
+      '', 'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'
+    ];
+    final dayStr = date.day.toString().padLeft(2, '0');
+    final monthStr = bulan[date.month];
+    final yearStr = date.year.toString();
+    final formattedDate = showDayName
+        ? '${hari[date.weekday % 7]}, $dayStr $monthStr $yearStr'
+        : '$dayStr $monthStr $yearStr';
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: const Color(0xFFE2E8F0), width: 1.2),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x080F172A),
+              blurRadius: 8,
+              offset: Offset(0, 2),
             ),
-            if (badgeText != null)
-              Text(
-                badgeText!,
-                style: const TextStyle(
-                  color: Color(0xFF94A3B8),
-                  fontSize: 10.5,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
           ],
         ),
-        const SizedBox(height: 6),
-        InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(12),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF8FAFC),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFE2E8F0)),
+        child: Row(
+          children: [
+            Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                color: accentColor.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(Icons.calendar_month_rounded, color: accentColor, size: 20),
             ),
-            child: Row(
-              children: [
-                const Icon(Icons.calendar_today_rounded, size: 16, color: Color(0xFF0284C7)),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    DateFormat('dd MMM yyyy').format(date),
-                    style: const TextStyle(color: Color(0xFF0F172A), fontSize: 13, fontWeight: FontWeight.w600),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    children: [
+                      Text(
+                        label.toUpperCase(),
+                        style: const TextStyle(
+                          fontSize: 9.5,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF64748B),
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                      if (badgeText != null && badgeText!.isNotEmpty) ...[
+                        const SizedBox(width: 5),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFEFF6FF),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(color: const Color(0xFFDBEAFE), width: 0.8),
+                          ),
+                          child: Text(
+                            badgeText!,
+                            style: TextStyle(
+                              fontSize: 8.5,
+                              fontWeight: FontWeight.w700,
+                              color: accentColor,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
-                ),
-              ],
+                  const SizedBox(height: 3),
+                  Text(
+                    formattedDate,
+                    style: const TextStyle(
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF0F172A),
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
+            const Icon(Icons.edit_calendar_rounded, size: 16, color: Color(0xFF94A3B8)),
+          ],
         ),
-      ],
+      ),
     );
   }
 }
@@ -963,52 +1009,93 @@ class SapTimePickerTile extends StatelessWidget {
     required this.label,
     required this.timeText,
     required this.onTap,
+    this.accentColor = const Color(0xFF1D4ED8),
+    this.zoneSuffix = 'WITA',
     super.key,
   });
 
   final String label;
   final String timeText;
   final VoidCallback onTap;
+  final Color accentColor;
+  final String? zoneSuffix;
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: const TextStyle(
-            color: Color(0xFF0F172A),
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        const SizedBox(height: 6),
-        InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(12),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF8FAFC),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFE2E8F0)),
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: const Color(0xFFE2E8F0), width: 1.2),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x080F172A),
+              blurRadius: 8,
+              offset: Offset(0, 2),
             ),
-            child: Row(
-              children: [
-                const Icon(Icons.access_time_rounded, size: 16, color: Color(0xFF0284C7)),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    timeText,
-                    style: const TextStyle(color: Color(0xFF0F172A), fontSize: 13, fontWeight: FontWeight.w600),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                color: accentColor.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(Icons.schedule_rounded, color: accentColor, size: 20),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    label.toUpperCase(),
+                    style: const TextStyle(
+                      fontSize: 9.5,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF64748B),
+                      letterSpacing: 0.5,
+                    ),
                   ),
-                ),
-              ],
+                  const SizedBox(height: 3),
+                  Row(
+                    children: [
+                      Text(
+                        timeText,
+                        style: const TextStyle(
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF0F172A),
+                        ),
+                      ),
+                      if (zoneSuffix != null && zoneSuffix!.isNotEmpty) ...[
+                        const SizedBox(width: 4),
+                        Text(
+                          zoneSuffix!,
+                          style: const TextStyle(
+                            fontSize: 9.5,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF64748B),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ],
+              ),
             ),
-          ),
+            const Icon(Icons.access_time_rounded, size: 16, color: Color(0xFF94A3B8)),
+          ],
         ),
-      ],
+      ),
     );
   }
 }

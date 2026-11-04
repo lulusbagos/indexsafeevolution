@@ -1,3 +1,4 @@
+import '../../utils/app_date_time_picker.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -1774,12 +1775,10 @@ class _BbsFormPageState extends State<BbsFormPage> {
                         label: 'Tanggal Observasi',
                         date: _observedAt,
                         onTap: () async {
-                          final picked = await showDatePicker(
+                          final picked = await AppDateTimePicker.showDatePickerDialog(
                             context: context,
                             initialDate: _observedAt,
-                            firstDate: DateTime.now()
-                                .subtract(const Duration(days: 3)),
-                            lastDate: DateTime.now(),
+                            restrict3DaysBack: true,
                           );
                           if (picked != null) {
                             setState(() {
@@ -1801,7 +1800,7 @@ class _BbsFormPageState extends State<BbsFormPage> {
                         label: 'Waktu Observasi',
                         timeText: DateFormat('HH:mm').format(_observedAt),
                         onTap: () async {
-                          final picked = await showTimePicker(
+                          final picked = await AppDateTimePicker.showTimePickerDialog(
                             context: context,
                             initialTime: TimeOfDay.fromDateTime(_observedAt),
                           );

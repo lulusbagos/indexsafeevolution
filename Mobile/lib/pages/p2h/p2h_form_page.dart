@@ -1,3 +1,4 @@
+import '../../utils/app_date_time_picker.dart';
 import 'dart:convert';
 
 import 'dart:io';
@@ -3945,194 +3946,40 @@ class _P2HFormPageState extends State<P2HFormPage> {
 
 
   Widget _buildDatePicker(BuildContext context) {
-
-    return Column(
-
-      crossAxisAlignment: CrossAxisAlignment.start,
-
-      children: [
-
-        const Text('Tanggal *',
-
-            style: TextStyle(
-
-                fontSize: 12,
-
-                fontWeight: FontWeight.w600,
-
-                color: Color(0xFF334155))),
-
-        const SizedBox(height: 4),
-
-        InkWell(
-
-          onTap: () async {
-
-            final now = DateTime.now();
-
-            final today = DateTime(now.year, now.month, now.day);
-
-            final picked = await showDatePicker(
-
-              context: context,
-
-              initialDate: _tanggal.isBefore(today.subtract(const Duration(days: 3))) ? today : (_tanggal.isAfter(today) ? today : _tanggal),
-
-              firstDate: today.subtract(const Duration(days: 3)),
-
-              lastDate: today,
-
-              helpText: 'PILIH TANGGAL PEMERIKSAAN P2H',
-
-            );
-
-            if (picked != null) setState(() => _tanggal = picked);
-
-          },
-
-          child: Container(
-
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-
-            decoration: BoxDecoration(
-
-              color: Colors.white,
-
-              borderRadius: BorderRadius.circular(10),
-
-              border: Border.all(color: Colors.grey.shade300),
-
-            ),
-
-            child: Row(
-
-              children: [
-
-                const Icon(Icons.calendar_month_rounded,
-
-                    size: 18, color: Color(0xFF0284C7)),
-
-                const SizedBox(width: 8),
-
-                Expanded(
-
-                  child: Text(
-
-                    DateFormat('dd/MM/yyyy').format(_tanggal),
-
-                    style: const TextStyle(
-
-                        fontSize: 12, fontWeight: FontWeight.w600),
-
-                  ),
-
-                ),
-
-              ],
-
-            ),
-
-          ),
-
-        ),
-
-      ],
-
+    return ModernDateSelectorTile(
+      label: 'Tanggal Pemeriksaan P2H',
+      badgeText: 'Maks. H-3',
+      date: _tanggal,
+      accentColor: const Color(0xFF0284C7),
+      onTap: () async {
+        final picked = await AppDateTimePicker.showDatePickerDialog(
+          context: context,
+          initialDate: _tanggal,
+          restrict3DaysBack: true,
+          helpText: 'PILIH TANGGAL PEMERIKSAAN P2H',
+        );
+        if (picked != null) setState(() => _tanggal = picked);
+      },
     );
-
   }
-
-
 
   Widget _buildTimePicker(BuildContext context) {
-
-    return Column(
-
-      crossAxisAlignment: CrossAxisAlignment.start,
-
-      children: [
-
-        const Text('Waktu *',
-
-            style: TextStyle(
-
-                fontSize: 12,
-
-                fontWeight: FontWeight.w600,
-
-                color: Color(0xFF334155))),
-
-        const SizedBox(height: 4),
-
-        InkWell(
-
-          onTap: () async {
-
-            final picked = await showTimePicker(
-
-              context: context,
-
-              initialTime: _waktu,
-
-            );
-
-            if (picked != null) setState(() => _waktu = picked);
-
-          },
-
-          child: Container(
-
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-
-            decoration: BoxDecoration(
-
-              color: Colors.white,
-
-              borderRadius: BorderRadius.circular(10),
-
-              border: Border.all(color: Colors.grey.shade300),
-
-            ),
-
-            child: Row(
-
-              children: [
-
-                const Icon(Icons.access_time_rounded,
-
-                    size: 18, color: Color(0xFF0284C7)),
-
-                const SizedBox(width: 8),
-
-                Expanded(
-
-                  child: Text(
-
-                    '${_waktu.hour.toString().padLeft(2, '0')}:${_waktu.minute.toString().padLeft(2, '0')}',
-
-                    style: const TextStyle(
-
-                        fontSize: 12, fontWeight: FontWeight.w600),
-
-                  ),
-
-                ),
-
-              ],
-
-            ),
-
-          ),
-
-        ),
-
-      ],
-
+    final hh = _waktu.hour.toString().padLeft(2, '0');
+    final mm = _waktu.minute.toString().padLeft(2, '0');
+    return ModernTimeSelectorTile(
+      label: 'Waktu Pemeriksaan',
+      timeText: '$hh:$mm',
+      zoneSuffix: 'WITA',
+      accentColor: const Color(0xFF0284C7),
+      onTap: () async {
+        final picked = await AppDateTimePicker.showTimePickerDialog(
+          context: context,
+          initialTime: _waktu,
+        );
+        if (picked != null) setState(() => _waktu = picked);
+      },
     );
-
   }
-
-
 
   Widget _buildSpeedometerUploadCard() {
 

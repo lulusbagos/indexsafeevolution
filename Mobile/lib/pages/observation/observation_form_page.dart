@@ -1,3 +1,4 @@
+import '../../utils/app_date_time_picker.dart';
 import 'package:dropdown_search/dropdown_search.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -461,11 +462,10 @@ class _ObservationFormPageState extends State<ObservationFormPage> {
                                     label: 'Tanggal Observasi',
                                     date: _date ?? DateTime.now(),
                                     onTap: () async {
-                                      final picked = await showDatePicker(
+                                      final picked = await AppDateTimePicker.showDatePickerDialog(
                                         context: context,
-                                        initialDate: _date ?? DateTime.now(),
-                                        firstDate: DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day).subtract(const Duration(days: 3)),
-                                        lastDate: DateTime.now(),
+                                        initialDate: _date,
+                                        restrict3DaysBack: true,
                                       );
                                       if (picked != null) setState(() => _date = picked);
                                     },
@@ -477,10 +477,8 @@ class _ObservationFormPageState extends State<ObservationFormPage> {
                                     label: 'Waktu Observasi',
                                     timeText: _time ?? DateFormat('HH:mm').format(DateTime.now()),
                                     onTap: () async {
-                                      final now = TimeOfDay.now();
-                                      final picked = await showTimePicker(
+                                      final picked = await AppDateTimePicker.showTimePickerDialog(
                                         context: context,
-                                        initialTime: now,
                                       );
                                       if (picked != null) {
                                         final hh = picked.hour.toString().padLeft(2, '0');

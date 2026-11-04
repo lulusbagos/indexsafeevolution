@@ -1,3 +1,4 @@
+import '../../utils/app_date_time_picker.dart';
 import 'dart:convert';
 import 'dart:io';
 
@@ -1705,15 +1706,14 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
                           label: 'Tanggal Inspeksi',
                           date: _tanggal,
                           onTap: () async {
-                            final picked = await showDatePicker(
+                            final picked = await AppDateTimePicker.showDatePickerDialog(
                               context: context,
                               initialDate: _tanggal,
-                              firstDate: DateTime.now()
-                                  .subtract(const Duration(days: 3)),
-                              lastDate: DateTime.now(),
+                              restrict3DaysBack: true,
                             );
-                            if (picked != null)
+                            if (picked != null) {
                               setState(() => _tanggal = picked);
+                            }
                           },
                         ),
                       ),
@@ -1723,7 +1723,7 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
                           label: 'Waktu Inspeksi',
                           time: _waktu,
                           onTap: () async {
-                            final picked = await showTimePicker(
+                            final picked = await AppDateTimePicker.showTimePickerDialog(
                               context: context,
                               initialTime: _waktu,
                             );

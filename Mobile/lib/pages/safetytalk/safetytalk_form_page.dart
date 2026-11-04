@@ -1,3 +1,4 @@
+import '../../utils/app_date_time_picker.dart';
 import 'dart:io';
 
 
@@ -2694,188 +2695,47 @@ class _SafetyTalkFormPageState extends State<SafetyTalkFormPage> {
                       // Tanggal & Jam
 
                       Row(
-
                         children: [
-
                           Expanded(
-
-                            child: InkWell(
-
+                            child: ModernDateSelectorTile(
+                              label: 'Tanggal',
+                              badgeText: 'Maks. H-3',
+                              date: _date ?? DateTime.now(),
+                              accentColor: _stRed,
                               onTap: () async {
-
-                                final picked = await showDatePicker(
-
+                                final picked = await AppDateTimePicker.showDatePickerDialog(
                                   context: context,
-
-                                  initialDate: (_date != null && _date!.isAfter(DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day).subtract(const Duration(days: 4))) && !_date!.isAfter(DateTime.now())) ? _date! : DateTime.now(),
-
-                                  firstDate: DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day).subtract(const Duration(days: 3)),
-
-                                  lastDate: DateTime.now(),
-                                  helpText: 'PILIH TANGGAL (MAKS. 3 HARI TERAKHIR)',
-
+                                  initialDate: _date,
+                                  restrict3DaysBack: true,
                                 );
-
                                 if (picked != null) {
-
                                   setState(() => _date = picked);
-
                                 }
-
                               },
-
-                              borderRadius: BorderRadius.circular(12),
-
-                              child: Container(
-
-                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-
-                                decoration: BoxDecoration(
-
-                                  color: const Color(0xFFF8FAFC),
-
-                                  borderRadius: BorderRadius.circular(12),
-
-                                  border: Border.all(color: const Color(0xFFE2E8F0)),
-
-                                ),
-
-                                child: Row(
-
-                                  children: [
-
-                                    const Icon(Icons.calendar_today_rounded, size: 18, color: _stRed),
-
-                                    const SizedBox(width: 8),
-
-                                    Expanded(
-
-                                      child: Column(
-
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-
-                                        children: [
-
-                                          const Text('Tanggal', style: TextStyle(fontSize: 10, color: Color(0xFF64748B))),
-
-                                          Text(
-
-                                            DateFormat('dd MMM yyyy').format(_date ?? DateTime.now()),
-
-                                            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: _stDark),
-
-                                          ),
-
-                                        ],
-
-                                      ),
-
-                                    ),
-
-                                  ],
-
-                                ),
-
-                              ),
-
                             ),
-
                           ),
-
                           const SizedBox(width: 10),
-
                           Expanded(
-
-                            child: InkWell(
-
+                            child: ModernTimeSelectorTile(
+                              label: 'Jam',
+                              timeText: _time ?? DateFormat('HH:mm').format(DateTime.now()),
+                              zoneSuffix: 'WITA',
+                              accentColor: _stRed,
                               onTap: () async {
-
-                                final time = await showTimePicker(
-
+                                final time = await AppDateTimePicker.showTimePickerDialog(
                                   context: context,
-
-                                  initialTime: TimeOfDay.now(),
-
                                 );
-
                                 if (time != null) {
-
                                   final hour = time.hour.toString().padLeft(2, '0');
-
                                   final minute = time.minute.toString().padLeft(2, '0');
-
                                   setState(() => _time = '$hour:$minute');
-
                                 }
-
                               },
-
-                              borderRadius: BorderRadius.circular(12),
-
-                              child: Container(
-
-                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-
-                                decoration: BoxDecoration(
-
-                                  color: const Color(0xFFF8FAFC),
-
-                                  borderRadius: BorderRadius.circular(12),
-
-                                  border: Border.all(color: const Color(0xFFE2E8F0)),
-
-                                ),
-
-                                child: Row(
-
-                                  children: [
-
-                                    const Icon(Icons.access_time_rounded, size: 18, color: _stRed),
-
-                                    const SizedBox(width: 8),
-
-                                    Expanded(
-
-                                      child: Column(
-
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-
-                                        children: [
-
-                                          const Text('Jam', style: TextStyle(fontSize: 10, color: Color(0xFF64748B))),
-
-                                          Text(
-
-                                            _time ?? DateFormat('HH:mm').format(DateTime.now()),
-
-                                            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: _stDark),
-
-                                          ),
-
-                                        ],
-
-                                      ),
-
-                                    ),
-
-                                  ],
-
-                                ),
-
-                              ),
-
                             ),
-
                           ),
-
                         ],
-
                       ),
-
                       const SizedBox(height: 14),
-
-
-
                       // Area Utama
 
                       const Text(

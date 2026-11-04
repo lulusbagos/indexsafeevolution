@@ -1,3 +1,4 @@
+import '../../utils/app_date_time_picker.dart';
 import 'dart:convert';
 import 'dart:io';
 
@@ -2015,58 +2016,35 @@ class _SimamaFormPageState extends State<SimamaFormPage> {
   }
 
   Widget _buildDatePicker(Color accent) {
-    return InkWell(
+    return ModernDateSelectorTile(
+      label: 'Tanggal Sidak',
+      badgeText: 'Maks. H-3',
+      date: _date,
+      accentColor: accent,
       onTap: () async {
-        final now = DateTime.now();
-        final today = DateTime(now.year, now.month, now.day);
-        final initial = _date.isBefore(today.subtract(const Duration(days: 3))) ? today : (_date.isAfter(today) ? today : _date);
-        final picked = await showDatePicker(
+        final picked = await AppDateTimePicker.showDatePickerDialog(
           context: context,
-          initialDate: initial,
-          firstDate: today.subtract(const Duration(days: 3)),
-          lastDate: today,
+          initialDate: _date,
+          restrict3DaysBack: true,
           helpText: 'PILIH TANGGAL SIDAK SIMAMA',
         );
         if (picked != null) {
           setState(() => _date = picked);
         }
       },
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: const Color(0xFFCBD5E1)),
-        ),
-        child: Row(
-          children: [
-            Icon(Icons.calendar_today_rounded, color: accent, size: 18),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('Tanggal Sidak',
-                      style: TextStyle(fontSize: 10, color: Color(0xFF64748B))),
-                  Text(
-                    DateFormat('dd MMM yyyy').format(_date),
-                    style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 13,
-                        color: Color(0xFF0F172A)),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 
   Widget _buildTimePicker(Color accent) {
-    return InkWell(
+    final hh = _time.hour.toString().padLeft(2, '0');
+    final mm = _time.minute.toString().padLeft(2, '0');
+    return ModernTimeSelectorTile(
+      label: 'Waktu / Jam',
+      timeText: '$hh:$mm',
+      zoneSuffix: 'WITA',
+      accentColor: accent,
       onTap: () async {
-        final picked = await showTimePicker(
+        final picked = await AppDateTimePicker.showTimePickerDialog(
           context: context,
           initialTime: _time,
         );
@@ -2074,35 +2052,6 @@ class _SimamaFormPageState extends State<SimamaFormPage> {
           setState(() => _time = picked);
         }
       },
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: const Color(0xFFCBD5E1)),
-        ),
-        child: Row(
-          children: [
-            Icon(Icons.access_time_rounded, color: accent, size: 18),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('Waktu / Jam',
-                      style: TextStyle(fontSize: 10, color: Color(0xFF64748B))),
-                  Text(
-                    '${_time.hour.toString().padLeft(2, '0')}:${_time.minute.toString().padLeft(2, '0')}',
-                    style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 13,
-                        color: Color(0xFF0F172A)),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 
