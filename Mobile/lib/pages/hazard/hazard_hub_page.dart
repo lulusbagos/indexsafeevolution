@@ -2,9 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart' show rootBundle;
 import 'package:image_picker/image_picker.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../models/hazard_hub_model.dart';
@@ -14,6 +12,8 @@ import '../../services/hazard_pdf_service.dart';
 import '../../services/offline_sync_service.dart';
 import '../../services/preference.dart';
 import '../../services/sync.dart';
+import '../../utils/enums.dart';
+import '../../widgets/sap_module_ui.dart';
 import '../../widgets/snackbar_msg.dart';
 import '../../widgets/top_bar.dart';
 import 'hazard_create_page.dart';
@@ -90,128 +90,26 @@ class _HazardHubPageState extends State<HazardHubPage> {
     return _items;
   }
 
-  Future<void> _ensureSimulatedOfflineDummy() async {
+  Future<void> _cleanDummyData() async {
     try {
-      final localRows = await _db.rawQuery(
-        'SELECT count(1) as jml FROM hazard_trans WHERE deleted_at IS NULL AND sync_id IS NULL',
+      final sqldb = await _db.database;
+      // Hapus data dummy simulasi jika pernah ada di SQLite lokal
+      await sqldb.rawDelete(
+        "DELETE FROM hazard_trans WHERE code LIKE 'HAZ-OFF-%' OR image LIKE '%simulated_hazard_offline%' OR remark LIKE '%Ditemukan ceceran oli & solar tebal%'",
       );
-      final count = (localRows.isNotEmpty && localRows.first['jml'] != null)
-          ? (localRows.first['jml'] as int)
-          : 0;
-
-      if (count == 0) {
-        final prefs = await SharedPreferences.getInstance();
-        final alreadySeeded = prefs.getBool('hazard_offline_dummy_created_v2') ?? false;
-        if (!alreadySeeded) {
-          // Buat file dummy gambar offline yang valid di storage aplikasi
-          final docDir = await getApplicationDocumentsDirectory();
-          final dummyImageFile = File('${docDir.path}/simulated_hazard_offline.jpg');
-
-          if (!await dummyImageFile.exists()) {
-            try {
-              final byteData = await rootBundle.load('assets/images/info1.jpg');
-              final buffer = byteData.buffer;
-              await dummyImageFile.writeAsBytes(
-                buffer.asUint8List(byteData.offsetInBytes, byteData.lengthInBytes),
-                flush: true,
-              );
-            } catch (_) {
-              final dummyBytes = base64Decode(
-                '/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wgALCAABAAEBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA=',
-              );
-              await dummyImageFile.writeAsBytes(dummyBytes, flush: true);
-            }
-          }
-
-          final profile = PreferenceService.getProfile();
-          final profileId = profile?.id ?? 1;
-          final profileNama = profile?.namaLengkap ?? 'LULUS HERMAWAN';
-          final profileNik = profile?.noNik ?? '10888';
-          final profileDepartemen = profile?.depart ?? 'IT & DIGITAL';
-
-          // Cari PJA dari database SQLite jika ada
-          String pjaNama = 'BAMBANG SUPRAPTO';
-          String pjaNik = 'EMP-10492';
-          String pjaDept = 'PRODUKSI';
-          try {
-            final empRows = await _db.rawQuery(
-              "SELECT no_nik, nama_lengkap, depart FROM employees WHERE nama_lengkap != '' AND no_nik != '$profileNik' LIMIT 1",
-            );
-            if (empRows.isNotEmpty) {
-              pjaNama = empRows.first['nama_lengkap']?.toString() ?? pjaNama;
-              pjaNik = empRows.first['no_nik']?.toString() ?? pjaNik;
-              pjaDept = empRows.first['depart']?.toString() ?? pjaDept;
-            }
-          } catch (_) {}
-
-          final now = DateTime.now();
-          final dateStr = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
-          final timeStr = '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
-          final code = 'HAZ-OFF-${now.millisecondsSinceEpoch.toString().substring(7)}';
-
-          final Map<String, dynamic> fields = {
-            'tanggal': dateStr,
-            'waktu': timeStr,
-            'nama': profileNama,
-            'nik': profileNik,
-            'departemen': profileDepartemen,
-            'area': 'PIT UTARA',
-            'lokasi': 'Loading Point Seam B',
-            'detil_lokasi': 'Dekat Lampu Menara No. 4 KM 2.5 Jalur Hauling',
-            'temuan': 'Ditemukan ceceran oli & solar tebal di jalur manuver dump truck, berpotensi unit tergelincir dan kecelakaan tambang.',
-            'kategori_bahaya': 'Kondisi Tidak Aman',
-            'jenis_bahaya': 'Bahan Kimia / B3',
-            'jenis_ketidaksesuaian': 'Prosedur K3 Lingkungan',
-            'tingkat_resiko': 'Tinggi',
-            'tindakan_perbaikan': 'Beri rambu peringatan licin dan taburkan absorbent/pasir segera.',
-            'pja': pjaNama,
-            'nik_pja': pjaNik,
-            'departemen_pja': pjaDept,
-            'status_temuan': 'Open',
-          };
-
-          final Map<String, dynamic> row = {
-            'code': code,
-            'title': '${fields['kategori_bahaya']} - ${fields['jenis_bahaya']}',
-            'location_detail': '${fields['lokasi']} ${fields['detil_lokasi']}'.trim(),
-            'date': fields['tanggal'],
-            'time': fields['waktu'],
-            'remark': fields['temuan'],
-            'image': dummyImageFile.path,
-            'repair_remark': null,
-            'repair_image': null,
-            'status': 0, // 0 = Open
-            'pja_id': 0,
-            'employee_id': profileId,
-            'sync_id': null,
-            'area': fields['area'],
-            'lokasi': fields['lokasi'],
-            'kategori_bahaya': fields['kategori_bahaya'],
-            'jenis_bahaya': fields['jenis_bahaya'],
-            'jenis_ketidaksesuaian': fields['jenis_ketidaksesuaian'],
-            'tingkat_resiko': fields['tingkat_resiko'],
-            'tindakan_perbaikan': fields['tindakan_perbaikan'],
-            'pja': fields['pja'],
-            'nik_pja': fields['nik_pja'],
-            'departemen_pja': fields['departemen_pja'],
-            'payload_json': jsonEncode(fields),
-            'created_at': now.toString(),
-          };
-
-          await _db.insert('hazard_trans', row);
-          await prefs.setBool('hazard_offline_dummy_created_v2', true);
-          await OfflineSyncService.instance.refresh();
-        }
-      }
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('hazard_offline_dummy_created');
+      await prefs.remove('hazard_offline_dummy_created_v2');
+      await OfflineSyncService.instance.refresh();
     } catch (e) {
-      debugPrint('[HazardHubPage] Error seeding dummy offline: $e');
+      debugPrint('[HazardHubPage] Error cleaning dummy data: $e');
     }
   }
 
   Future<void> _loadData() async {
     setState(() => _isLoading = true);
 
-    await _ensureSimulatedOfflineDummy();
+    await _cleanDummyData();
 
     // 1. Muat data offline lokal yang belum tersinkron
     List<HazardReportItem> offlineItems = [];
@@ -1439,14 +1337,20 @@ class _HazardHubPageState extends State<HazardHubPage> {
   }
 
   void _confirmDelete(HazardReportItem item) {
+    final isDraft = item.isOfflinePending;
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Hapus Temuan Hazard?', style: TextStyle(color: Color(0xFF0F172A), fontSize: 16, fontWeight: FontWeight.bold)),
+        title: Text(
+          isDraft ? 'Hapus Draft Hazard?' : 'Hapus Temuan Hazard?',
+          style: const TextStyle(color: Color(0xFF0F172A), fontSize: 16, fontWeight: FontWeight.bold),
+        ),
         content: Text(
-          'Laporan #${item.id} (${item.lokasi}) akan dihapus secara permanen dari server.',
+          isDraft
+              ? 'Draft laporan di HP ini (${item.lokasi ?? "Temuan"}) akan dihapus secara permanen dari memori HP.'
+              : 'Laporan #${item.id} (${item.lokasi ?? "Temuan"}) akan dihapus secara permanen dari server.',
           style: const TextStyle(color: Color(0xFF64748B), fontSize: 13),
         ),
         actions: [
@@ -1462,15 +1366,29 @@ class _HazardHubPageState extends State<HazardHubPage> {
             ),
             onPressed: () async {
               Navigator.pop(ctx);
-              final res = await _api.deleteHazardDirect(item.id);
-              if (!mounted) return;
-              res.fold(
-                (err) => SnackBarMsg.danger(context, err['message']?.toString() ?? 'Gagal menghapus laporan.'),
-                (_) {
-                  SnackBarMsg.success(context, 'Laporan Hazard berhasil dihapus.');
+              if (isDraft) {
+                try {
+                  final sqldb = await _db.database;
+                  await sqldb.delete('hazard_trans', where: 'id = ?', whereArgs: [item.id]);
+                  await OfflineSyncService.instance.refresh();
+                  if (!mounted) return;
+                  SnackBarMsg.success(context, 'Draft Hazard berhasil dihapus.');
                   _loadData();
-                },
-              );
+                } catch (e) {
+                  if (!mounted) return;
+                  SnackBarMsg.danger(context, 'Gagal menghapus draft: $e');
+                }
+              } else {
+                final res = await _api.deleteHazardDirect(item.id);
+                if (!mounted) return;
+                res.fold(
+                  (err) => SnackBarMsg.danger(context, err['message']?.toString() ?? 'Gagal menghapus laporan.'),
+                  (_) {
+                    SnackBarMsg.success(context, 'Laporan Hazard berhasil dihapus.');
+                    _loadData();
+                  },
+                );
+              }
             },
             child: const Text('Hapus', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
           ),
@@ -1510,11 +1428,11 @@ class _HazardHubPageState extends State<HazardHubPage> {
         backgroundColor: Colors.white,
         appBar: TopBar(title: pageTitle),
       floatingActionButton: FloatingActionButton.extended(
-        backgroundColor: const Color(0xFFEA580C),
+        backgroundColor: const Color(0xFF1D4ED8),
         foregroundColor: Colors.white,
-        elevation: 3,
+        elevation: 4,
         icon: const Icon(Icons.add_rounded, size: 22),
-        label: const Text('Lapor Hazard', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+        label: const Text('Buat Baru', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
         onPressed: () => _openCreateHazard(),
       ),
       body: RefreshIndicator(
@@ -1530,6 +1448,32 @@ class _HazardHubPageState extends State<HazardHubPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      SapModuleHeader(
+                        module: Module.hazard,
+                        trailing: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: .2),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.table_rows_rounded, color: Colors.white, size: 14),
+                              const SizedBox(width: 4),
+                              Text(
+                                '${_filteredItems.length} Data',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
                       // Modern 3-Tab Segmented Selector
                       Container(
                         padding: const EdgeInsets.all(4),
@@ -1631,13 +1575,13 @@ class _HazardHubPageState extends State<HazardHubPage> {
                       Container(
                         decoration: BoxDecoration(
                           color: Colors.white,
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(16),
                           border: Border.all(color: const Color(0xFFE2E8F0)),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.02),
-                              blurRadius: 6,
-                              offset: const Offset(0, 2),
+                              color: Colors.black.withValues(alpha: 0.03),
+                              blurRadius: 10,
+                              offset: const Offset(0, 4),
                             ),
                           ],
                         ),
@@ -1656,7 +1600,7 @@ class _HazardHubPageState extends State<HazardHubPage> {
                                     },
                                   )
                                 : null,
-                            hintText: 'Cari lokasi, area, temuan, atau pelapor...',
+                            hintText: 'Cari laporan, lokasi, PJA, atau PIC...',
                             hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
                             border: InputBorder.none,
                             enabledBorder: InputBorder.none,
@@ -1676,6 +1620,18 @@ class _HazardHubPageState extends State<HazardHubPage> {
                         scrollDirection: Axis.horizontal,
                         child: Row(
                           children: _buildFilterChipsForCurrentTab(),
+                        ),
+                      ),
+
+                      const SizedBox(height: 14),
+
+                      // Section Title
+                      const Text(
+                        'Riwayat Laporan',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.black87,
                         ),
                       ),
                     ],
@@ -2099,25 +2055,246 @@ class _HazardHubPageState extends State<HazardHubPage> {
     );
   }
 
-  void _showOfflineItemDetailModal(HazardReportItem item) {
+  void _showHazardBottomSheet(HazardReportItem item) {
+    showModalBottomSheet(
+      context: context,
+      useSafeArea: true,
+      showDragHandle: true,
+      constraints: const BoxConstraints(
+        maxHeight: 560,
+      ),
+      builder: (_) {
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                title: const Text(
+                  'Tampilkan',
+                  style: TextStyle(
+                    color: Colors.black87,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                trailing: Icon(
+                  Icons.remove_red_eye,
+                  color: Colors.indigo.shade400,
+                ),
+                contentPadding: const EdgeInsets.fromLTRB(0, 10, 0, 10),
+                shape: Border(bottom: BorderSide(color: Colors.indigo.shade100)),
+                onTap: () {
+                  Navigator.pop(context);
+                  _showHazardDetailModal(item);
+                },
+              ),
+              ListTile(
+                title: Text(
+                  'Sinkron',
+                  style: TextStyle(
+                    color: item.isOfflinePending ? Colors.black87 : Colors.black45,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                trailing: Icon(
+                  Icons.cloud_sync,
+                  color: item.isOfflinePending ? Colors.indigo : Colors.indigo.shade200,
+                ),
+                contentPadding: const EdgeInsets.fromLTRB(0, 10, 0, 10),
+                shape: Border(bottom: BorderSide(color: Colors.indigo.shade100)),
+                onTap: item.isOfflinePending
+                    ? () {
+                        Navigator.pop(context);
+                        _syncSingleOfflineItem(item);
+                      }
+                    : null,
+              ),
+              ListTile(
+                title: const Text(
+                  'Edit Hazard',
+                  style: TextStyle(
+                    color: Colors.black87,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                trailing: const Icon(
+                  Icons.edit_outlined,
+                  color: Color(0xFF7C3AED),
+                ),
+                contentPadding: const EdgeInsets.fromLTRB(0, 10, 0, 10),
+                shape: Border(bottom: BorderSide(color: Colors.indigo.shade100)),
+                onTap: () {
+                  Navigator.pop(context);
+                  _openCreateHazard(item);
+                },
+              ),
+              ListTile(
+                title: const Text(
+                  'Bagikan Laporan (Share PDF / WA)',
+                  style: TextStyle(
+                    color: Colors.black87,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                trailing: const Icon(
+                  Icons.share_rounded,
+                  color: Color(0xFFEA580C),
+                ),
+                contentPadding: const EdgeInsets.fromLTRB(0, 10, 0, 10),
+                shape: Border(bottom: BorderSide(color: Colors.indigo.shade100)),
+                onTap: () {
+                  Navigator.pop(context);
+                  HazardPdfService.showShareModal(context, item);
+                },
+              ),
+              ListTile(
+                title: const Text(
+                  'Cetak PDF',
+                  style: TextStyle(
+                    color: Colors.black87,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                trailing: const Icon(
+                  Icons.picture_as_pdf_rounded,
+                  color: Color(0xFFEA580C),
+                ),
+                contentPadding: const EdgeInsets.fromLTRB(0, 10, 0, 10),
+                shape: Border(bottom: BorderSide(color: Colors.indigo.shade100)),
+                onTap: () {
+                  Navigator.pop(context);
+                  HazardPdfService.printHazardPdf(item);
+                },
+              ),
+              if (item.canTakeUp)
+                ListTile(
+                  title: const Text(
+                    'Take Up (Tindak Lanjuti)',
+                    style: TextStyle(
+                      color: Color(0xFF0284C7),
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  trailing: const Icon(
+                    Icons.pan_tool_rounded,
+                    color: Color(0xFF0284C7),
+                  ),
+                  contentPadding: const EdgeInsets.fromLTRB(0, 10, 0, 10),
+                  shape: Border(bottom: BorderSide(color: Colors.indigo.shade100)),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _showTakeUpModal(item);
+                  },
+                ),
+              if (item.canClose)
+                ListTile(
+                  title: const Text(
+                    'Close Temuan',
+                    style: TextStyle(
+                      color: Color(0xFF16A34A),
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  trailing: const Icon(
+                    Icons.check_circle_outline_rounded,
+                    color: Color(0xFF16A34A),
+                  ),
+                  contentPadding: const EdgeInsets.fromLTRB(0, 10, 0, 10),
+                  shape: Border(bottom: BorderSide(color: Colors.indigo.shade100)),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _showCloseModal(item);
+                  },
+                ),
+              if (item.canReassign)
+                ListTile(
+                  title: const Text(
+                    'Alihkan PJA',
+                    style: TextStyle(
+                      color: Color(0xFFD97706),
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  trailing: const Icon(
+                    Icons.swap_horiz_rounded,
+                    color: Color(0xFFD97706),
+                  ),
+                  contentPadding: const EdgeInsets.fromLTRB(0, 10, 0, 10),
+                  shape: Border(bottom: BorderSide(color: Colors.indigo.shade100)),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _showReassignModal(item);
+                  },
+                ),
+              ListTile(
+                title: Text(
+                  item.isOfflinePending ? 'Hapus Draft' : 'Hapus Data',
+                  style: const TextStyle(
+                    color: Color(0xFFDC2626),
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                trailing: const Icon(
+                  Icons.delete_forever,
+                  color: Color(0xFFDC2626),
+                ),
+                contentPadding: const EdgeInsets.fromLTRB(0, 10, 0, 10),
+                onTap: () {
+                  Navigator.pop(context);
+                  _confirmDelete(item);
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _showHazardDetailModal(HazardReportItem item) {
+    final isClosed = item.statusTemuan.toLowerCase() == 'closed';
+    final isInProgress = item.statusTemuan.toLowerCase().contains('progress');
+    final isExtreme = item.tingkatResiko.toLowerCase().contains('ekstrim');
+    final isHigh = item.tingkatResiko.toLowerCase().contains('tinggi');
+    final isMedium = item.tingkatResiko.toLowerCase().contains('sedang');
+
+    final riskColor = isExtreme
+        ? const Color(0xFFDC2626)
+        : isHigh
+            ? const Color(0xFFEA580C)
+            : isMedium
+                ? const Color(0xFFD97706)
+                : const Color(0xFF059669);
+
+    final statusColor = isClosed
+        ? const Color(0xFF16A34A)
+        : isInProgress
+            ? const Color(0xFF0284C7)
+            : const Color(0xFFD97706);
+
+    final hasBeforePhoto = item.fotoTemuan != null && item.fotoTemuan!.isNotEmpty;
+    final hasAfterPhoto = item.fotoPerbaikan != null && item.fotoPerbaikan!.isNotEmpty;
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) {
         return Container(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(context).size.height * 0.88,
+          ),
           decoration: const BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
           ),
           padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
           child: Column(
-            mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Center(
                 child: Container(
-                  width: 40,
+                  width: 44,
                   height: 4,
                   decoration: BoxDecoration(
                     color: const Color(0xFFCBD5E1),
@@ -2129,136 +2306,153 @@ class _HazardHubPageState extends State<HazardHubPage> {
               Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.all(10),
+                    width: 44,
+                    height: 44,
                     decoration: BoxDecoration(
-                      color: const Color(0xFFFEF3C7),
-                      borderRadius: BorderRadius.circular(12),
+                      color: const Color(0xFFEA580C).withValues(alpha: .12),
+                      borderRadius: BorderRadius.circular(15),
                     ),
-                    child: const Icon(Icons.cloud_off_rounded, color: Color(0xFFD97706), size: 24),
+                    child: const Icon(Icons.warning_amber_rounded, color: Color(0xFFEA580C), size: 24),
                   ),
                   const SizedBox(width: 12),
-                  const Expanded(
+                  Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Laporan Belum Tersinkron',
-                          style: TextStyle(
+                          'Detail Hazard #HZR-${item.id}',
+                          style: const TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w800,
                             color: Color(0xFF0F172A),
                           ),
                         ),
-                        SizedBox(height: 2),
+                        const SizedBox(height: 2),
                         Text(
-                          'Data tersimpan di perangkat lokal HP (Draft)',
-                          style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                          '${item.tanggal} • ${item.waktu}',
+                          style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
                         ),
                       ],
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 16),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFFFBEB),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: const Color(0xFFFDE68A)),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFD97706),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Text(
-                            item.tingkatResiko.toUpperCase(),
-                            style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
-                          ),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  item.isOfflinePending
+                      ? const SapStatusPill(
+                          label: 'Belum Sinkron (Draft)',
+                          color: Color(0xFFEF4444),
+                          icon: Icons.cloud_off_rounded,
+                        )
+                      : const SapStatusPill(
+                          label: 'Sudah Sinkron',
+                          color: Color(0xFF16A34A),
+                          icon: Icons.cloud_done_rounded,
                         ),
-                        const SizedBox(width: 6),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(6),
-                            border: Border.all(color: const Color(0xFFF59E0B)),
-                          ),
-                          child: Text(
-                            item.statusTemuan.toUpperCase(),
-                            style: const TextStyle(color: Color(0xFFD97706), fontSize: 10, fontWeight: FontWeight.bold),
-                          ),
-                        ),
-                        const Spacer(),
-                        Text(
-                          '${item.tanggal} ${item.waktu}',
-                          style: const TextStyle(color: Color(0xFF92400E), fontSize: 11, fontWeight: FontWeight.w600),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      '${item.area ?? "-"} • ${item.lokasi ?? "-"}',
-                      style: const TextStyle(color: Color(0xFF0F172A), fontSize: 13, fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      item.temuan,
-                      style: const TextStyle(color: Color(0xFF334155), fontSize: 12),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      'PJA: ${item.pja ?? "Belum Ditunjuk"}',
-                      style: const TextStyle(color: Color(0xFF0284C7), fontSize: 11, fontWeight: FontWeight.w600),
-                    ),
-                  ],
-                ),
+                  SapStatusPill(
+                    label: item.tingkatResiko.toUpperCase(),
+                    color: riskColor,
+                    icon: Icons.flag_rounded,
+                  ),
+                  SapStatusPill(
+                    label: item.statusTemuan.toUpperCase(),
+                    color: statusColor,
+                    icon: isClosed ? Icons.check_circle_rounded : Icons.hourglass_top_rounded,
+                  ),
+                ],
               ),
               const SizedBox(height: 14),
-              const Row(
-                children: [
-                  Icon(Icons.info_outline_rounded, size: 14, color: Color(0xFFB45309)),
-                  SizedBox(width: 6),
-                  Expanded(
-                    child: Text(
-                      'Laporan ini belum masuk server pusat IndexSafe. Klik tombol di bawah untuk menyinkronkan data sekarang saat terhubung ke server/WiFi.',
-                      style: TextStyle(fontSize: 11, color: Color(0xFF92400E)),
-                    ),
+              const Divider(height: 1),
+              Expanded(
+                child: SingleChildScrollView(
+                  physics: const BouncingScrollPhysics(),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      SapInfoLine(icon: Icons.notes_rounded, text: 'Temuan: ${item.temuan}'),
+                      SapInfoLine(icon: Icons.map_rounded, text: 'Area: ${item.area ?? "-"}'),
+                      SapInfoLine(icon: Icons.place_rounded, text: 'Lokasi: ${item.lokasi ?? "-"}${item.detilLokasi != null && item.detilLokasi!.trim().isNotEmpty && item.detilLokasi != "-" ? " • ${item.detilLokasi}" : ""}'),
+                      if (item.kategoriBahaya != null && item.kategoriBahaya!.isNotEmpty)
+                        SapInfoLine(icon: Icons.category_rounded, text: 'Kategori: ${item.kategoriBahaya}'),
+                      if (item.jenisBahaya != null && item.jenisBahaya!.isNotEmpty)
+                        SapInfoLine(icon: Icons.local_fire_department_rounded, text: 'Jenis Bahaya: ${item.jenisBahaya}'),
+                      SapInfoLine(icon: Icons.person_outline_rounded, text: 'Pelapor: ${item.nama} (${item.nik})'),
+                      if (item.pja != null && item.pja!.isNotEmpty && item.pja != '-')
+                        SapInfoLine(icon: Icons.assignment_ind_outlined, text: 'PJA: ${item.pja} (${item.nikPja ?? "-"}) - ${item.departemenPja ?? "-"}'),
+                      if (item.tindakanPerbaikan != null && item.tindakanPerbaikan!.isNotEmpty) ...[
+                        const SizedBox(height: 8),
+                        SapInfoLine(icon: Icons.build_rounded, text: 'Tindakan: ${item.tindakanPerbaikan}'),
+                      ],
+                      if (item.perbaikan != null && item.perbaikan!.isNotEmpty) ...[
+                        const SizedBox(height: 8),
+                        SapInfoLine(icon: Icons.check_circle_outline_rounded, text: 'Bukti Perbaikan: ${item.perbaikan}'),
+                      ],
+                      if (hasBeforePhoto || hasAfterPhoto) ...[
+                        const SizedBox(height: 14),
+                        const Text(
+                          'Dokumentasi Foto Temuan & Perbaikan:',
+                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                        ),
+                        const SizedBox(height: 8),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            if (hasBeforePhoto)
+                              _buildPhotoBadge(
+                                url: item.fotoTemuan!,
+                                title: 'Foto Temuan (Before)',
+                                label: 'Foto Temuan (Before)',
+                                color: const Color(0xFF475569),
+                                bg: const Color(0xFFF1F5F9),
+                                border: const Color(0xFFCBD5E1),
+                              ),
+                            if (hasAfterPhoto)
+                              _buildPhotoBadge(
+                                url: item.fotoPerbaikan!,
+                                title: 'Foto Perbaikan (After)',
+                                label: 'Bukti Perbaikan (After)',
+                                color: const Color(0xFF059669),
+                                bg: const Color(0xFFECFDF5),
+                                border: const Color(0xFFA7F3D0),
+                              ),
+                          ],
+                        ),
+                      ],
+                    ],
                   ),
-                ],
+                ),
               ),
-              const SizedBox(height: 18),
+              const Divider(height: 1),
+              const SizedBox(height: 12),
               Row(
                 children: [
                   Expanded(
                     child: OutlinedButton.icon(
                       style: OutlinedButton.styleFrom(
-                        foregroundColor: const Color(0xFFDC2626),
-                        side: const BorderSide(color: Color(0xFFFECACA)),
+                        foregroundColor: const Color(0xFFEA580C),
+                        side: const BorderSide(color: Color(0xFFFED7AA)),
                         padding: const EdgeInsets.symmetric(vertical: 12),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                       ),
                       onPressed: () {
                         Navigator.pop(ctx);
-                        _confirmDelete(item);
+                        HazardPdfService.showShareModal(context, item);
                       },
-                      icon: const Icon(Icons.delete_outline_rounded, size: 18),
-                      label: const Text('Hapus Draft', style: TextStyle(fontWeight: FontWeight.bold)),
+                      icon: const Icon(Icons.share_rounded, size: 18),
+                      label: const Text('Bagikan Laporan', style: TextStyle(fontWeight: FontWeight.bold)),
                     ),
                   ),
                   const SizedBox(width: 10),
                   Expanded(
-                    flex: 2,
                     child: ElevatedButton.icon(
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFFD97706),
+                        backgroundColor: const Color(0xFFEA580C),
                         foregroundColor: Colors.white,
                         elevation: 0,
                         padding: const EdgeInsets.symmetric(vertical: 12),
@@ -2266,10 +2460,10 @@ class _HazardHubPageState extends State<HazardHubPage> {
                       ),
                       onPressed: () {
                         Navigator.pop(ctx);
-                        _syncSingleOfflineItem(item);
+                        HazardPdfService.printHazardPdf(item);
                       },
-                      icon: const Icon(Icons.sync_rounded, size: 18),
-                      label: const Text('Sinkronkan Sekarang', style: TextStyle(fontWeight: FontWeight.bold)),
+                      icon: const Icon(Icons.picture_as_pdf_rounded, size: 18),
+                      label: const Text('Cetak PDF', style: TextStyle(fontWeight: FontWeight.bold)),
                     ),
                   ),
                 ],
@@ -2283,8 +2477,7 @@ class _HazardHubPageState extends State<HazardHubPage> {
 
   Widget _buildSimpleHazardCard(HazardReportItem item) {
     final isClosed = item.statusTemuan.toLowerCase() == 'closed';
-    final hasBeforePhoto = item.fotoTemuan != null && item.fotoTemuan!.isNotEmpty;
-    final hasAfterPhoto = item.fotoPerbaikan != null && item.fotoPerbaikan!.isNotEmpty;
+    final isInProgress = item.statusTemuan.toLowerCase().contains('progress');
 
     // Risk level styling
     final isExtreme = item.tingkatResiko.toLowerCase().contains('ekstrim');
@@ -2299,621 +2492,193 @@ class _HazardHubPageState extends State<HazardHubPage> {
                 ? const Color(0xFFD97706)
                 : const Color(0xFF059669);
 
-    final riskBg = isExtreme
-        ? const Color(0xFFFEF2F2)
-        : isHigh
-            ? const Color(0xFFFFF7ED)
-            : isMedium
-                ? const Color(0xFFFFFBEB)
-                : const Color(0xFFECFDF5);
+    final statusColor = isClosed
+        ? const Color(0xFF16A34A)
+        : isInProgress
+            ? const Color(0xFF0284C7)
+            : const Color(0xFFD97706);
 
-    final riskBorderColor = isExtreme
-        ? const Color(0xFFFECACA)
-        : isHigh
-            ? const Color(0xFFFED7AA)
-            : isMedium
-                ? const Color(0xFFFDE68A)
-                : const Color(0xFFA7F3D0);
+    final statusIcon = isClosed
+        ? Icons.check_circle_rounded
+        : isInProgress
+            ? Icons.engineering_rounded
+            : Icons.hourglass_top_rounded;
 
-    final riskIcon = isExtreme
-        ? Icons.local_fire_department_rounded
-        : isHigh
-            ? Icons.warning_rounded
-            : isMedium
-                ? Icons.report_problem_rounded
-                : Icons.shield_rounded;
+    final timeText = [
+      if (item.tanggal.isNotEmpty) item.tanggal,
+      if (item.waktu.isNotEmpty) item.waktu,
+    ].join(' • ');
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: item.isOfflinePending
-              ? const Color(0xFFF59E0B)
-              : (item.isAssignedToMe && !isClosed ? const Color(0xFF0284C7) : riskBorderColor),
-          width: item.isOfflinePending ? 2.0 : ((item.isAssignedToMe && !isClosed) ? 1.5 : 1),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: item.isOfflinePending
-                ? const Color(0xFFD97706).withValues(alpha: 0.12)
-                : const Color(0xFF64748B).withValues(alpha: 0.04),
-            blurRadius: item.isOfflinePending ? 8 : 6,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(14),
-          onTap: item.isOfflinePending ? () => _showOfflineItemDetailModal(item) : null,
-          child: Column(
+    return SapSoftCard(
+      onTap: () => _showHazardBottomSheet(item),
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Banner Offline Belum Singkron (jika item disimpan lokal dan belum terkirim ke server)
-              if (item.isOfflinePending)
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 12),
-                  decoration: const BoxDecoration(
-                    color: Color(0xFFFFFBEB),
-                    borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
-                    border: Border(
-                      bottom: BorderSide(color: Color(0xFFFDE68A), width: 1),
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEA580C).withValues(alpha: .12),
+                  borderRadius: BorderRadius.circular(15),
+                ),
+                child: const Icon(Icons.warning_amber_rounded, color: Color(0xFFEA580C), size: 24),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      item.temuan.isNotEmpty ? item.temuan : (item.kategoriBahaya ?? 'Temuan Bahaya'),
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.black87,
+                        height: 1.25,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(4),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFFEF3C7),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: const Icon(Icons.cloud_off_rounded, color: Color(0xFFD97706), size: 14),
-                      ),
-                      const SizedBox(width: 8),
-                      const Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'BELUM SINKRON (DRAFT OFFLINE)',
-                              style: TextStyle(color: Color(0xFF92400E), fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 0.2),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            Text(
-                              'Tersimpan di HP & belum masuk server pusat',
-                              style: TextStyle(color: Color(0xFFB45309), fontSize: 9.5),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      InkWell(
-                        onTap: () => _syncSingleOfflineItem(item),
-                        borderRadius: BorderRadius.circular(6),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFD97706),
-                            borderRadius: BorderRadius.circular(6),
-                            boxShadow: [
-                              BoxShadow(
-                                color: const Color(0xFFD97706).withValues(alpha: 0.25),
-                                blurRadius: 4,
-                                offset: const Offset(0, 1),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        item.isOfflinePending
+                            ? const SapStatusPill(
+                                label: 'Belum Sinkron',
+                                color: Color(0xFFEF4444),
+                                icon: Icons.cloud_off_rounded,
+                              )
+                            : const SapStatusPill(
+                                label: 'Sudah Sinkron',
+                                color: Color(0xFF16A34A),
+                                icon: Icons.cloud_done_rounded,
                               ),
-                            ],
-                          ),
-                          child: const Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.sync_rounded, color: Colors.white, size: 12),
-                              SizedBox(width: 4),
-                              Text('Sinkronkan', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
-                            ],
-                          ),
+                        SapStatusPill(
+                          label: item.tingkatResiko.toUpperCase(),
+                          color: riskColor,
+                          icon: Icons.flag_rounded,
                         ),
-                      ),
-                    ],
-                  ),
-                ),
-
-          // Banner Penugasan PJA (jika ditugaskan ke user login)
-          if (item.isAssignedToMe && !isClosed && !item.isOfflinePending)
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 12),
-              decoration: const BoxDecoration(
-                color: Color(0xFFE0F2FE),
-                borderRadius: BorderRadius.vertical(top: Radius.circular(13)),
-              ),
-              child: const Row(
-                children: [
-                  Icon(Icons.assignment_ind_rounded, color: Color(0xFF0284C7), size: 13),
-                  SizedBox(width: 6),
-                  Text(
-                    'TUGAS PJA UNTUK ANDA (HARAP DITINDAKLANJUTI)',
-                    style: TextStyle(color: Color(0xFF0369A1), fontSize: 9.5, fontWeight: FontWeight.bold),
-                  ),
-                ],
-              ),
-            ),
-
-          // Header Card Sesuai Tingkat Risiko
-          ClipRRect(
-            borderRadius: (item.isOfflinePending || (item.isAssignedToMe && !isClosed))
-                ? BorderRadius.zero
-                : const BorderRadius.vertical(top: Radius.circular(13)),
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(
-                color: riskBg,
-                border: Border(
-                  bottom: BorderSide(color: riskBorderColor, width: 1),
-                ),
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    width: 4,
-                    height: 18,
-                    margin: const EdgeInsets.only(right: 8),
-                    decoration: BoxDecoration(
-                      color: riskColor,
-                      borderRadius: BorderRadius.circular(2),
+                        SapStatusPill(
+                          label: item.statusTemuan.toUpperCase(),
+                          color: statusColor,
+                          icon: statusIcon,
+                        ),
+                        if (timeText.isNotEmpty)
+                          SapStatusPill(
+                            label: timeText,
+                            color: const Color(0xFF64748B),
+                            icon: Icons.schedule_rounded,
+                          ),
+                      ],
                     ),
-                  ),
-                  // Risk Badge (Icon + Text)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                  ],
+                ),
+              ),
+              Icon(Icons.chevron_right_rounded, color: Colors.blueGrey.shade300),
+            ],
+          ),
+          const SizedBox(height: 10),
+          SapInfoLine(icon: Icons.notes_rounded, text: 'Note: ${item.temuan}'),
+          SapInfoLine(icon: Icons.map_rounded, text: 'Area: ${item.area ?? "-"}'),
+          SapInfoLine(icon: Icons.place_rounded, text: 'Lokasi: ${item.lokasi ?? "-"}${item.detilLokasi != null && item.detilLokasi!.trim().isNotEmpty && item.detilLokasi != "-" ? " • ${item.detilLokasi}" : ""}'),
+          if (item.pja != null && item.pja!.isNotEmpty && item.pja != '-')
+            SapInfoLine(icon: Icons.person_outline_rounded, text: 'PJA: ${item.pja}'),
+          SapInfoLine(icon: Icons.assignment_ind_outlined, text: 'Pelapor: ${item.nama}'),
+          const SizedBox(height: 10),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              InkWell(
+                onTap: () => HazardPdfService.showShareModal(context, item),
+                borderRadius: BorderRadius.circular(8),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                   decoration: BoxDecoration(
-                    color: riskColor,
-                    borderRadius: BorderRadius.circular(6),
-                    boxShadow: [
-                      BoxShadow(
-                        color: riskColor.withValues(alpha: 0.28),
-                        blurRadius: 4,
-                        offset: const Offset(0, 1),
-                      ),
-                    ],
+                    color: const Color(0xFFEA580C).withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFFEA580C).withValues(alpha: 0.3)),
                   ),
-                  child: Row(
+                  child: const Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(riskIcon, color: Colors.white, size: 12),
-                      const SizedBox(width: 4),
+                      Icon(Icons.share_rounded, size: 14, color: Color(0xFFEA580C)),
+                      SizedBox(width: 4),
                       Text(
-                        item.tingkatResiko.toUpperCase(),
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 9.5,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: 0.3,
-                        ),
+                        'Bagikan',
+                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFFEA580C)),
                       ),
                     ],
                   ),
                 ),
-                const SizedBox(width: 6),
-
-                // Status Badge
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
-                  decoration: BoxDecoration(
-                    color: isClosed
-                        ? const Color(0xFFECFDF5)
-                        : (item.statusTemuan.toLowerCase().contains('progress')
-                            ? const Color(0xFFEFF6FF)
-                            : Colors.white),
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(
-                      color: isClosed
-                          ? const Color(0xFFA7F3D0)
-                          : (item.statusTemuan.toLowerCase().contains('progress')
-                              ? const Color(0xFFBFDBFE)
-                              : riskBorderColor),
-                    ),
-                  ),
-                  child: Text(
-                    item.statusTemuan.toUpperCase(),
-                    style: TextStyle(
-                      color: isClosed
-                          ? const Color(0xFF059669)
-                          : (item.statusTemuan.toLowerCase().contains('progress')
-                              ? const Color(0xFF1D4ED8)
-                              : riskColor),
-                      fontSize: 9.5,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-                // Offline Pending Badge
-                if (item.isOfflinePending) ...[
-                  const SizedBox(width: 6),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+              ),
+              if (item.isOfflinePending) ...[
+                const SizedBox(width: 8),
+                InkWell(
+                  onTap: () => _syncSingleOfflineItem(item),
+                  borderRadius: BorderRadius.circular(8),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFFEF3C7),
-                      borderRadius: BorderRadius.circular(6),
-                      border: Border.all(color: const Color(0xFFF59E0B)),
+                      color: const Color(0xFFD97706),
+                      borderRadius: BorderRadius.circular(8),
                     ),
                     child: const Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.cloud_off_rounded, color: Color(0xFFD97706), size: 10),
-                        SizedBox(width: 3),
+                        Icon(Icons.sync_rounded, size: 14, color: Colors.white),
+                        SizedBox(width: 4),
                         Text(
-                          'BELUM SINKRON',
-                          style: TextStyle(
-                            color: Color(0xFF92400E),
-                            fontSize: 9,
-                            fontWeight: FontWeight.w900,
-                          ),
+                          'Sinkronkan',
+                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),
                         ),
                       ],
                     ),
                   ),
-                ],
+                ),
+              ],
+              if (item.canTakeUp) ...[
                 const SizedBox(width: 8),
-
-                // Category
-                Expanded(
-                  child: Text(
-                    item.kategoriBahaya ?? 'Hazard',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: Color(0xFF475569),
-                      fontSize: 10.5,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-
-                // Date
-                Text(
-                  item.tanggal,
-                  style: const TextStyle(
-                    color: Color(0xFF64748B),
-                    fontSize: 10.5,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                const SizedBox(width: 2),
-
-                // 3-dot Popup Menu
-                PopupMenuButton<String>(
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(),
-                  icon: const Icon(Icons.more_vert, color: Color(0xFF64748B), size: 18),
-                  color: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  onSelected: (val) {
-                    switch (val) {
-                      case 'pdf_share':
-                        HazardPdfService.shareHazardPdf(item);
-                        break;
-                      case 'pdf_print':
-                        HazardPdfService.printHazardPdf(item);
-                        break;
-                      case 'take_up':
-                        _showTakeUpModal(item);
-                        break;
-                      case 'close':
-                        _showCloseModal(item);
-                        break;
-                      case 'reassign':
-                        _showReassignModal(item);
-                        break;
-                      case 'edit':
-                        _openCreateHazard(item);
-                        break;
-                      case 'delete':
-                        _confirmDelete(item);
-                        break;
-                    }
-                  },
-                  itemBuilder: (ctx) => [
-                    const PopupMenuItem(
-                      value: 'pdf_share',
-                      child: Row(
-                        children: [
-                          Icon(Icons.share_rounded, color: Color(0xFF0284C7), size: 16),
-                          SizedBox(width: 8),
-                          Text('Bagikan PDF', style: TextStyle(color: Color(0xFF0F172A), fontSize: 12)),
-                        ],
-                      ),
-                    ),
-                    const PopupMenuItem(
-                      value: 'pdf_print',
-                      child: Row(
-                        children: [
-                          Icon(Icons.picture_as_pdf_rounded, color: Color(0xFFDC2626), size: 16),
-                          SizedBox(width: 8),
-                          Text('Cetak PDF', style: TextStyle(color: Color(0xFF0F172A), fontSize: 12)),
-                        ],
-                      ),
-                    ),
-                    if (!isClosed && (item.isAssignedToMe || item.canTakeUp))
-                      const PopupMenuItem(
-                        value: 'take_up',
-                        child: Row(
-                          children: [
-                            Icon(Icons.play_arrow_rounded, color: Color(0xFF0284C7), size: 16),
-                            SizedBox(width: 8),
-                            Text('Take Up Temuan', style: TextStyle(color: Color(0xFF0F172A), fontSize: 12)),
-                          ],
-                        ),
-                      ),
-                    if (!isClosed && (item.canClose || item.isAssignedToMe || item.isMyReport))
-                      const PopupMenuItem(
-                        value: 'close',
-                        child: Row(
-                          children: [
-                            Icon(Icons.check_circle_outline, color: Color(0xFF059669), size: 16),
-                            SizedBox(width: 8),
-                            Text('Close Hazard', style: TextStyle(color: Color(0xFF0F172A), fontSize: 12)),
-                          ],
-                        ),
-                      ),
-                    if (!isClosed)
-                      const PopupMenuItem(
-                        value: 'reassign',
-                        child: Row(
-                          children: [
-                            Icon(Icons.person_pin_circle_rounded, color: Color(0xFFD97706), size: 16),
-                            SizedBox(width: 8),
-                            Text('Alihkan PJA', style: TextStyle(color: Color(0xFF0F172A), fontSize: 12)),
-                          ],
-                        ),
-                      ),
-                    if (item.canDelete && !isClosed)
-                      const PopupMenuItem(
-                        value: 'delete',
-                        child: Row(
-                          children: [
-                            Icon(Icons.delete_outline, color: Color(0xFFDC2626), size: 16),
-                            SizedBox(width: 8),
-                            Text('Hapus Laporan', style: TextStyle(color: Color(0xFFDC2626), fontSize: 12)),
-                          ],
-                        ),
-                      ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ),
-
-          Padding(
-            padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-
-                const SizedBox(height: 6),
-
-                // Location Line
-                Row(
-                  children: [
-                    const Icon(Icons.location_on_rounded, color: Color(0xFFEA580C), size: 14),
-                    const SizedBox(width: 4),
-                    Expanded(
-                      child: Text(
-                        '${item.area ?? "-"} • ${item.lokasi ?? "-"}',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(color: Color(0xFF0F172A), fontSize: 12.5, fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                  ],
-                ),
-
-                const SizedBox(height: 4),
-
-                // Finding Description
-                Text(
-                  item.temuan,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: Color(0xFF334155), fontSize: 12, height: 1.35),
-                ),
-
-                // Compact Photo Badges (Simple & Clean)
-                if (hasBeforePhoto || hasAfterPhoto) ...[
-                  const SizedBox(height: 6),
-                  Wrap(
-                    spacing: 6,
-                    runSpacing: 4,
-                    children: [
-                      if (hasBeforePhoto)
-                        _buildPhotoBadge(
-                          url: item.fotoTemuan!,
-                          title: 'Foto Temuan (Before)',
-                          label: 'Foto Temuan',
-                          color: const Color(0xFF475569),
-                          bg: const Color(0xFFF1F5F9),
-                          border: const Color(0xFFCBD5E1),
-                        ),
-                      if (hasAfterPhoto)
-                        _buildPhotoBadge(
-                          url: item.fotoPerbaikan!,
-                          title: 'Foto Perbaikan (After)',
-                          label: 'Bukti Perbaikan',
-                          color: const Color(0xFF059669),
-                          bg: const Color(0xFFECFDF5),
-                          border: const Color(0xFFA7F3D0),
-                        ),
-                    ],
-                  ),
-                ],
-
-                // Subtle Perbaikan Callout (Hanya jika ada)
-                if (item.perbaikan != null && item.perbaikan!.isNotEmpty) ...[
-                  const SizedBox(height: 6),
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                InkWell(
+                  onTap: () => _showTakeUpModal(item),
+                  borderRadius: BorderRadius.circular(8),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFECFDF5),
+                      color: const Color(0xFF0284C7).withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: const Color(0xFFA7F3D0)),
+                      border: Border.all(color: const Color(0xFF0284C7).withValues(alpha: 0.3)),
                     ),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Icon(Icons.check_circle_rounded, color: Color(0xFF059669), size: 13),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: Text(
-                            item.perbaikan!,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(color: Color(0xFF065F46), fontSize: 10.5),
-                          ),
-                        ),
-                      ],
-                    ),
+                    child: const Text('Take Up', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF0284C7))),
                   ),
-                ],
-
-                const SizedBox(height: 8),
-                const Divider(color: Color(0xFFF1F5F9), height: 1),
-                const SizedBox(height: 6),
-
-                // Footer Metadata & Quick Actions
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('Pelapor: ${item.nama}', style: const TextStyle(color: Color(0xFF64748B), fontSize: 10)),
-                          Text('PJA: ${item.pja ?? "Belum Ditunjuk"}', style: const TextStyle(color: Color(0xFF0284C7), fontSize: 10, fontWeight: FontWeight.w600)),
-                          if (item.isOfflinePending)
-                            const Padding(
-                              padding: EdgeInsets.only(top: 2),
-                              child: Row(
-                                children: [
-                                  Icon(Icons.cloud_off_rounded, size: 10, color: Color(0xFFD97706)),
-                                  SizedBox(width: 4),
-                                  Text(
-                                    'Status: Belum Sinkron (Draft HP)',
-                                    style: TextStyle(color: Color(0xFFD97706), fontSize: 9.5, fontWeight: FontWeight.bold),
-                                  ),
-                                ],
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
-                    Row(
-                      children: [
-                        IconButton(
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(),
-                          icon: const Icon(Icons.share_rounded, color: Color(0xFF64748B), size: 18),
-                          tooltip: 'Bagikan PDF',
-                          onPressed: () => HazardPdfService.shareHazardPdf(item),
-                        ),
-                        if (!isClosed) ...[
-                          if (item.isAssignedToMe) ...[
-                            if (item.canTakeUp) ...[
-                              const SizedBox(width: 6),
-                              ElevatedButton(
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color(0xFF0284C7),
-                                  foregroundColor: Colors.white,
-                                  elevation: 0,
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                  minimumSize: const Size(54, 28),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                                ),
-                                onPressed: () => _showTakeUpModal(item),
-                                child: const Text(
-                                  'Take Up',
-                                  style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold),
-                                ),
-                              ),
-                            ],
-                            const SizedBox(width: 6),
-                            OutlinedButton(
-                              style: OutlinedButton.styleFrom(
-                                foregroundColor: const Color(0xFFD97706),
-                                side: const BorderSide(color: Color(0xFFFDE68A)),
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                minimumSize: const Size(48, 28),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                              ),
-                              onPressed: () => _showReassignModal(item),
-                              child: const Text('Alihkan', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold)),
-                            ),
-                            const SizedBox(width: 6),
-                            ElevatedButton(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF059669),
-                                foregroundColor: Colors.white,
-                                elevation: 0,
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                minimumSize: const Size(54, 28),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                              ),
-                              onPressed: () => _showCloseModal(item),
-                              child: const Text(
-                                'Tuntaskan',
-                                style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold),
-                              ),
-                            ),
-                          ] else if (item.isMyReport) ...[
-                            const SizedBox(width: 6),
-                            OutlinedButton(
-                              style: OutlinedButton.styleFrom(
-                                foregroundColor: const Color(0xFFD97706),
-                                side: const BorderSide(color: Color(0xFFFDE68A)),
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                minimumSize: const Size(48, 28),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                              ),
-                              onPressed: () => _showReassignModal(item),
-                              child: const Text('Alihkan', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold)),
-                            ),
-                            const SizedBox(width: 6),
-                            ElevatedButton(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF059669),
-                                foregroundColor: Colors.white,
-                                elevation: 0,
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                minimumSize: const Size(54, 28),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                              ),
-                              onPressed: () => _showCloseModal(item),
-                              child: const Text(
-                                'Close',
-                                style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold),
-                              ),
-                            ),
-                          ],
-                        ],
-                      ],
-                    ),
-                  ],
                 ),
               ],
-            ),
+              if (item.canClose) ...[
+                const SizedBox(width: 8),
+                InkWell(
+                  onTap: () => _showCloseModal(item),
+                  borderRadius: BorderRadius.circular(8),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF16A34A),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Text('Close', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white)),
+                  ),
+                ),
+              ],
+            ],
           ),
         ],
       ),
-    ),
-  ),
-);
+    );
   }
 
   Widget _buildPhotoBadge({

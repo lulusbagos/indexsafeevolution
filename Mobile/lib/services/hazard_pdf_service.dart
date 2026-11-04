@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'dart:typed_data';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
@@ -5,16 +6,22 @@ import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../models/hazard_hub_model.dart';
 import 'api.dart';
 
 class HazardPdfService {
-  /// Mengunduh gambar dari URL untuk disematkan dalam PDF
+  /// Mengunduh gambar dari URL atau file lokal untuk disematkan dalam PDF
   static Future<Uint8List?> _fetchImageBytes(String? imageUrl) async {
     if (imageUrl == null || imageUrl.trim().isEmpty) return null;
     try {
-      var url = imageUrl.trim();
+      final trimmed = imageUrl.trim();
+      final localFile = File(trimmed);
+      if (await localFile.exists()) {
+        return await localFile.readAsBytes();
+      }
+      var url = trimmed;
       if (!url.startsWith('http://') && !url.startsWith('https://')) {
         final apiBase = ApiService().baseUrl;
         if (!url.startsWith('/')) url = '/$url';
@@ -484,6 +491,181 @@ class HazardPdfService {
     await Printing.layoutPdf(
       onLayout: (PdfPageFormat format) async => pdfBytes,
       name: 'Hazard_Report_HZR_${item.id}',
+    );
+  }
+
+  /// Format teks ringkasan untuk WhatsApp
+  static String formatWhatsAppSummary(HazardReportItem item) {
+    final sb = StringBuffer();
+    sb.writeln('⚠️ *LAPORAN TEMUAN HAZARD (K3)*');
+    sb.writeln('*PT INDEXIM COALINDO*');
+    sb.writeln('----------------------------------------');
+    sb.writeln('🆔 *No. Laporan:* #HZR-${item.id}');
+    sb.writeln('📅 *Waktu Temuan:* ${item.tanggal} ${item.waktu}');
+    sb.writeln('📍 *Area:* ${item.area ?? '-'}');
+    sb.writeln('📌 *Lokasi:* ${item.lokasi ?? '-'}');
+    if (item.detilLokasi != null && item.detilLokasi!.trim().isNotEmpty && item.detilLokasi != '-') {
+      sb.writeln('🔍 *Detil Lokasi:* ${item.detilLokasi}');
+    }
+    sb.writeln('----------------------------------------');
+    sb.writeln('⚡ *Tingkat Risiko:* ${item.tingkatResiko.toUpperCase()}');
+    sb.writeln('🏷️ *Status:* ${item.statusTemuan.toUpperCase()}');
+    if (item.kategoriBahaya != null && item.kategoriBahaya!.isNotEmpty) {
+      sb.writeln('📂 *Kategori:* ${item.kategoriBahaya}');
+    }
+    if (item.jenisBahaya != null && item.jenisBahaya!.isNotEmpty) {
+      sb.writeln('🔥 *Jenis Bahaya:* ${item.jenisBahaya}');
+    }
+    sb.writeln('----------------------------------------');
+    sb.writeln('📝 *Deskripsi Temuan Bahaya:*');
+    sb.writeln(item.temuan.trim());
+    if (item.tindakanPerbaikan != null && item.tindakanPerbaikan!.trim().isNotEmpty) {
+      sb.writeln('\n🛠️ *Tindakan Perbaikan:*');
+      sb.writeln(item.tindakanPerbaikan!.trim());
+    }
+    sb.writeln('----------------------------------------');
+    sb.writeln('👤 *Pelapor:* ${item.nama} (${item.nik})');
+    if (item.pja != null && item.pja!.trim().isNotEmpty && item.pja != '-') {
+      sb.writeln('👷 *PJA / PIC:* ${item.pja} (${item.nikPja ?? '-'}) - ${item.departemenPja ?? '-'}');
+    }
+    sb.writeln('----------------------------------------');
+    sb.writeln('_Dikirim via Aplikasi Mobile Indexsafe Evolution_');
+    return sb.toString();
+  }
+
+  /// Membagikan teks ringkasan langsung ke WhatsApp
+  static Future<void> shareToWhatsApp(HazardReportItem item) async {
+    final text = formatWhatsAppSummary(item);
+    final encoded = Uri.encodeComponent(text);
+    final whatsappUri = Uri.parse("whatsapp://send?text=$encoded");
+    try {
+      if (await canLaunchUrl(whatsappUri)) {
+        await launchUrl(whatsappUri);
+        return;
+      }
+    } catch (_) {}
+
+    final webUri = Uri.parse("https://api.whatsapp.com/send?text=$encoded");
+    await launchUrl(webUri, mode: LaunchMode.externalApplication);
+  }
+
+  /// Menampilkan modal bottom sheet opsi berbagi lengkap
+  static void showShareModal(BuildContext context, HazardReportItem item) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade300,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEA580C).withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(Icons.share_rounded, color: Color(0xFFEA580C), size: 24),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Bagikan Laporan Hazard #HZR-${item.id}',
+                            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
+                          ),
+                          Text(
+                            'Risiko: ${item.tingkatResiko} • Status: ${item.statusTemuan}',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFFEA580C),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                ListTile(
+                  leading: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF25D366).withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.chat_rounded, color: Color(0xFF25D366)),
+                  ),
+                  title: const Text('Kirim Ringkasan Teks ke WhatsApp', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                  subtitle: const Text('Format ringkas siap kirim ke grup atau atasan', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                  trailing: const Icon(Icons.chevron_right_rounded),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    shareToWhatsApp(item);
+                  },
+                ),
+                const Divider(),
+                ListTile(
+                  leading: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFEA580C).withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.picture_as_pdf_rounded, color: Color(0xFFEA580C)),
+                  ),
+                  title: const Text('Bagikan File PDF Lengkap', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                  subtitle: const Text('Kirim dokumen PDF resmi via WhatsApp / Email', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                  trailing: const Icon(Icons.chevron_right_rounded),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    shareHazardPdf(item);
+                  },
+                ),
+                const Divider(),
+                ListTile(
+                  leading: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF64748B).withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.print_rounded, color: Color(0xFF64748B)),
+                  ),
+                  title: const Text('Cetak / Pratinjau PDF Langsung', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                  subtitle: const Text('Buka viewer cetak printer atau simpan dokumen', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                  trailing: const Icon(Icons.chevron_right_rounded),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    printHazardPdf(item);
+                  },
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }
