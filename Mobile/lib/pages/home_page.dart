@@ -50,7 +50,6 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin, Widg
   final Widget _safetyUpdatesView = const SafetyUpdatesPage();
   final Widget _profileView = const ProfilePage();
 
-  final List<int> _tabOrder = [0, 1, 3, 4];
 
   Timer? _hideNavTimer;
   ImageProvider? _navbarProfileImage;
@@ -288,11 +287,11 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin, Widg
   }
 
   void _onTabSelected(int index) {
-    if (index == _currentPage && !_isPageTransitioning) return;
+    if (index == _currentPage) return;
     try {
       HapticFeedback.selectionClick();
     } catch (_) {}
-    _showNavAndScheduleHide(3000);
+    _showNavbar();
 
     final forward = index > _currentPage;
     setState(() {
@@ -306,19 +305,6 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin, Widg
     _pageTransitionCtrl.forward(from: 0.0);
   }
 
-  void _navigateToNextTab() {
-    final idx = _tabOrder.indexOf(_currentPage);
-    if (idx != -1 && idx < _tabOrder.length - 1) {
-      _onTabSelected(_tabOrder[idx + 1]);
-    }
-  }
-
-  void _navigateToPreviousTab() {
-    final idx = _tabOrder.indexOf(_currentPage);
-    if (idx > 0) {
-      _onTabSelected(_tabOrder[idx - 1]);
-    }
-  }
 
   Future<bool> _showBackDialog() async {
     return (await showDialog(
@@ -526,53 +512,44 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin, Widg
                 ),
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(34),
-                  child: GestureDetector(
-                    behavior: HitTestBehavior.translucent,
-                    onHorizontalDragEnd: (details) {
-                      final vx = details.primaryVelocity ?? 0;
-                      if (vx < -220) {
-                        _navigateToNextTab();
-                      } else if (vx > 220) {
-                        _navigateToPreviousTab();
-                      }
-                    },
-                    child: Container(
-                      color: Colors.white,
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-                      child: LayoutBuilder(
-                        builder: (context, constraints) {
-                          final totalWidth = constraints.maxWidth;
-                          const centerBtnWidth = 58.0;
-                          final itemWidth = (totalWidth - centerBtnWidth) / 4.0;
-                          const indWidth = 48.0;
-                          const indHeight = 32.0;
+                  child: Container(
+                    color: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        final totalWidth = constraints.maxWidth;
+                        const centerBtnWidth = 58.0;
+                        final itemWidth = (totalWidth - centerBtnWidth) / 4.0;
+                        const indWidth = 48.0;
+                        const indHeight = 32.0;
 
-                          double getIndicatorLeft(int index) {
-                            switch (index) {
-                              case 0:
-                                return (itemWidth - indWidth) / 2.0;
-                              case 1:
-                                return itemWidth + (itemWidth - indWidth) / 2.0;
-                              case 3:
-                                return (2.0 * itemWidth) + centerBtnWidth + (itemWidth - indWidth) / 2.0;
-                              case 4:
-                                return (3.0 * itemWidth) + centerBtnWidth + (itemWidth - indWidth) / 2.0;
-                              default:
-                                return (itemWidth - indWidth) / 2.0;
-                            }
+                        double getIndicatorLeft(int index) {
+                          switch (index) {
+                            case 0:
+                              return (itemWidth - indWidth) / 2.0;
+                            case 1:
+                              return itemWidth + (itemWidth - indWidth) / 2.0;
+                            case 3:
+                              return (2.0 * itemWidth) + centerBtnWidth + (itemWidth - indWidth) / 2.0;
+                            case 4:
+                              return (3.0 * itemWidth) + centerBtnWidth + (itemWidth - indWidth) / 2.0;
+                            default:
+                              return (itemWidth - indWidth) / 2.0;
                           }
+                        }
 
-                          return Stack(
-                            alignment: Alignment.center,
-                            children: [
-                              // 1. Sliding Pill Indicator ke kiri kanannya!
-                              AnimatedPositioned(
-                                duration: const Duration(milliseconds: 280),
-                                curve: Curves.easeOutCubic,
-                                left: getIndicatorLeft(_currentPage),
-                                top: 5.0,
-                                width: indWidth,
-                                height: indHeight,
+                        return Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            // 1. Sliding Pill Indicator ke kiri kanannya!
+                            AnimatedPositioned(
+                              duration: const Duration(milliseconds: 280),
+                              curve: Curves.easeOutCubic,
+                              left: getIndicatorLeft(_currentPage),
+                              top: 5.0,
+                              width: indWidth,
+                              height: indHeight,
+                              child: IgnorePointer(
                                 child: Container(
                                   decoration: BoxDecoration(
                                     color: const Color(0xFFEFF6FF),
@@ -591,6 +568,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin, Widg
                                   ),
                                 ),
                               ),
+                            ),
 
                               // 2. Interactive Navigation Items
                               Row(
@@ -645,7 +623,6 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin, Widg
                         },
                       ),
                     ),
-                  ),
                 ),
               ),
             ),
@@ -709,7 +686,10 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin, Widg
       onTap: () => _onTabSelected(index),
       splashColor: Colors.transparent,
       highlightColor: Colors.transparent,
-      child: Column(
+      child: Container(
+        height: double.infinity,
+        alignment: Alignment.center,
+        child: Column(
         mainAxisSize: MainAxisSize.min,
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
@@ -771,6 +751,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin, Widg
             ),
           ),
         ],
+      ),
       ),
     );
   }
