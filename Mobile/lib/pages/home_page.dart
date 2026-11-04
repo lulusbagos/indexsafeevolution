@@ -264,24 +264,24 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
               ),
 
               // 2. Gesture tap edge detection at bottom to reveal navbar if hidden
-              AnimatedBuilder(
-                animation: _navAnimCtrl,
-                builder: (context, _) {
-                  if (_navAnimCtrl.value < 0.2) {
-                    return Positioned(
-                      left: 0,
-                      right: 0,
-                      bottom: 0,
-                      height: 38,
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                height: 38,
+                child: AnimatedBuilder(
+                  animation: _navAnimCtrl,
+                  builder: (context, _) {
+                    return IgnorePointer(
+                      ignoring: _navAnimCtrl.value > 0.15,
                       child: GestureDetector(
                         behavior: HitTestBehavior.translucent,
                         onTap: () => _showNavAndScheduleHide(3500),
                         onVerticalDragUpdate: (_) => _showNavAndScheduleHide(3500),
                       ),
                     );
-                  }
-                  return const SizedBox.shrink();
-                },
+                  },
+                ),
               ),
 
               // 3. Floating Navbar Layer - ALWAYS ON TOP (Highest Z-index)
