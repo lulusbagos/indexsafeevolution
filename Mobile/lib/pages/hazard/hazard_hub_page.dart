@@ -2624,6 +2624,91 @@ class _HazardHubPageState extends State<HazardHubPage> {
           if (item.pja != null && item.pja!.isNotEmpty && item.pja != '-')
             SapInfoLine(icon: Icons.person_outline_rounded, text: 'PJA: ${item.pja}'),
           SapInfoLine(icon: Icons.assignment_ind_outlined, text: 'Pelapor: ${item.nama}'),
+          const SizedBox(height: 10),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              InkWell(
+                onTap: () => HazardPdfService.showShareModal(context, item),
+                borderRadius: BorderRadius.circular(8),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEA580C).withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFFEA580C).withValues(alpha: 0.3)),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.share_rounded, size: 14, color: Color(0xFFEA580C)),
+                      SizedBox(width: 4),
+                      Text(
+                        'Bagikan',
+                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFFEA580C)),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              if (item.isOfflinePending) ...[
+                const SizedBox(width: 8),
+                InkWell(
+                  onTap: () => _syncSingleOfflineItem(item),
+                  borderRadius: BorderRadius.circular(8),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFD97706),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.sync_rounded, size: 14, color: Colors.white),
+                        SizedBox(width: 4),
+                        Text(
+                          'Sinkronkan',
+                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+              if (item.canTakeUp) ...[
+                const SizedBox(width: 8),
+                InkWell(
+                  onTap: () => _showTakeUpModal(item),
+                  borderRadius: BorderRadius.circular(8),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF0284C7).withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: const Color(0xFF0284C7).withValues(alpha: 0.3)),
+                    ),
+                    child: const Text('Take Up', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF0284C7))),
+                  ),
+                ),
+              ],
+              if (item.canClose) ...[
+                const SizedBox(width: 8),
+                InkWell(
+                  onTap: () => _showCloseModal(item),
+                  borderRadius: BorderRadius.circular(8),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF16A34A),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Text('Close', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white)),
+                  ),
+                ),
+              ],
+            ],
+          ),
         ],
       ),
     );

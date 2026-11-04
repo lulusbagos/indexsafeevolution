@@ -4198,7 +4198,7 @@ class _DashboardPageState extends State<DashboardPage>
                           );
                         },
                         icon: const Icon(Icons.open_in_new_rounded, size: 16),
-                        label: const Text('Summary Hazard'),
+                        label: const Text('Hazard Hub'),
                         style: OutlinedButton.styleFrom(
                           foregroundColor: const Color(0xFF1D4ED8),
                           side: const BorderSide(color: Color(0xFFBFDBFE)),
