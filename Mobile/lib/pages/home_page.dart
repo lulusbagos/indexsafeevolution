@@ -65,6 +65,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin, Widg
       vsync: this,
       duration: const Duration(milliseconds: 380),
       reverseDuration: const Duration(milliseconds: 320),
+      value: 1.0,
     );
 
     _navSlideAnim = Tween<Offset>(
