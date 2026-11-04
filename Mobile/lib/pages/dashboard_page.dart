@@ -4940,7 +4940,7 @@ class _DashboardPageState extends State<DashboardPage>
                     // never share its space, even for a long employee name.
                     left: 0, right: 154, top: 7,
                     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      const Text('SELAMAT DATANG', style: TextStyle(fontSize: 9, letterSpacing: 1.2, fontWeight: FontWeight.w900, color: Color(0xFF64748B))),
+                      const Text('SEMANGAT PAGI!', style: TextStyle(fontSize: 9, letterSpacing: 1.2, fontWeight: FontWeight.w900, color: Color(0xFF64748B))),
                       const SizedBox(height: 4),
                       _adaptiveHeroText(name, fontSize: 17, minimumFontSize: 10, maxLines: 2, weight: FontWeight.w900, color: const Color(0xFF0F172A)),
                       const SizedBox(height: 6),
@@ -4976,18 +4976,38 @@ class _DashboardPageState extends State<DashboardPage>
         (_profile?.myCoaching ?? 0) +
         (_profile?.myP5ms ?? 0);
 
-    final bool isComplete = rate >= 100.0;
-    final bool isGood = rate >= 75.0;
+    // Gradasi status kepatuhan dari Merah -> Oranye -> Amber -> Hijau -> Emerald
+    final Color primaryColor;
+    final Color bgColor;
+    final Color borderColor;
+    final IconData statusIcon;
 
-    final Color primaryColor = isComplete
-        ? const Color(0xFF059669)
-        : (isGood ? const Color(0xFF0284C7) : const Color(0xFFD97706));
-    final Color bgColor = isComplete
-        ? const Color(0xFFECFDF5)
-        : (isGood ? const Color(0xFFF0F9FF) : const Color(0xFFFFFBEB));
-    final Color borderColor = isComplete
-        ? const Color(0xFFA7F3D0)
-        : (isGood ? const Color(0xFFBAE6FD) : const Color(0xFFFDE68A));
+    if (rate >= 100.0) {
+      primaryColor = const Color(0xFF059669); // Emerald Green
+      bgColor = const Color(0xFFECFDF5);
+      borderColor = const Color(0xFFA7F3D0);
+      statusIcon = Icons.verified_rounded;
+    } else if (rate >= 75.0) {
+      primaryColor = const Color(0xFF16A34A); // Vibrant Green
+      bgColor = const Color(0xFFF0FDF4);
+      borderColor = const Color(0xFFBBF7D0);
+      statusIcon = Icons.task_alt_rounded;
+    } else if (rate >= 50.0) {
+      primaryColor = const Color(0xFFD97706); // Amber
+      bgColor = const Color(0xFFFFFBEB);
+      borderColor = const Color(0xFFFDE68A);
+      statusIcon = Icons.trending_up_rounded;
+    } else if (rate >= 25.0) {
+      primaryColor = const Color(0xFFEA580C); // Warm Orange
+      bgColor = const Color(0xFFFFF7ED);
+      borderColor = const Color(0xFFFED7AA);
+      statusIcon = Icons.trending_up_rounded;
+    } else {
+      primaryColor = const Color(0xFFDC2626); // Alert Red
+      bgColor = const Color(0xFFFEF2F2);
+      borderColor = const Color(0xFFFECACA);
+      statusIcon = Icons.pie_chart_outline_rounded;
+    }
 
     final String rateText = target > 0
         ? '${rate.toStringAsFixed(0)}%'
@@ -5012,12 +5032,12 @@ class _DashboardPageState extends State<DashboardPage>
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3.5),
           decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.94),
+            color: Colors.white.withValues(alpha: 0.95),
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: borderColor, width: 1.1),
+            border: Border.all(color: borderColor, width: 1.2),
             boxShadow: [
               BoxShadow(
-                color: primaryColor.withValues(alpha: 0.08),
+                color: primaryColor.withValues(alpha: 0.12),
                 blurRadius: 6,
                 offset: const Offset(0, 2),
               ),
@@ -5035,9 +5055,7 @@ class _DashboardPageState extends State<DashboardPage>
                   border: Border.all(color: borderColor),
                 ),
                 child: Icon(
-                  isComplete
-                      ? Icons.check_circle_rounded
-                      : (isGood ? Icons.trending_up_rounded : Icons.pie_chart_rounded),
+                  statusIcon,
                   size: 11,
                   color: primaryColor,
                 ),
@@ -5149,7 +5167,7 @@ class _DashboardPageState extends State<DashboardPage>
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               const Text(
-                                'SELAMAT DATANG',
+                                'SEMANGAT PAGI!',
                                 style: TextStyle(
                                   fontSize: 10,
                                   fontWeight: FontWeight.w800,
