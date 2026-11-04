@@ -920,12 +920,12 @@ class SapDatePickerTile extends StatelessWidget {
 
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(14),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(14),
           border: Border.all(color: const Color(0xFFE2E8F0), width: 1.2),
           boxShadow: const [
             BoxShadow(
@@ -938,15 +938,15 @@ class SapDatePickerTile extends StatelessWidget {
         child: Row(
           children: [
             Container(
-              width: 38,
-              height: 38,
+              width: 36,
+              height: 36,
               decoration: BoxDecoration(
                 color: accentColor.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(10),
               ),
-              child: Icon(Icons.calendar_month_rounded, color: accentColor, size: 20),
+              child: Icon(Icons.calendar_month_rounded, color: accentColor, size: 18),
             ),
-            const SizedBox(width: 10),
+            const SizedBox(width: 8),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -954,28 +954,32 @@ class SapDatePickerTile extends StatelessWidget {
                 children: [
                   Row(
                     children: [
-                      Text(
-                        label.toUpperCase(),
-                        style: const TextStyle(
-                          fontSize: 9.5,
-                          fontWeight: FontWeight.w700,
-                          color: Color(0xFF64748B),
-                          letterSpacing: 0.5,
+                      Expanded(
+                        child: Text(
+                          label.toUpperCase(),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 9,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF64748B),
+                            letterSpacing: 0.4,
+                          ),
                         ),
                       ),
                       if (badgeText != null && badgeText!.isNotEmpty) ...[
-                        const SizedBox(width: 5),
+                        const SizedBox(width: 4),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
                           decoration: BoxDecoration(
                             color: const Color(0xFFEFF6FF),
-                            borderRadius: BorderRadius.circular(6),
+                            borderRadius: BorderRadius.circular(4),
                             border: Border.all(color: const Color(0xFFDBEAFE), width: 0.8),
                           ),
                           child: Text(
                             badgeText!,
                             style: TextStyle(
-                              fontSize: 8.5,
+                              fontSize: 8,
                               fontWeight: FontWeight.w700,
                               color: accentColor,
                             ),
@@ -984,11 +988,13 @@ class SapDatePickerTile extends StatelessWidget {
                       ],
                     ],
                   ),
-                  const SizedBox(height: 3),
+                  const SizedBox(height: 2),
                   Text(
                     formattedDate,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
-                      fontSize: 13.5,
+                      fontSize: 12.5,
                       fontWeight: FontWeight.w800,
                       color: Color(0xFF0F172A),
                     ),
@@ -996,7 +1002,7 @@ class SapDatePickerTile extends StatelessWidget {
                 ],
               ),
             ),
-            const Icon(Icons.edit_calendar_rounded, size: 16, color: Color(0xFF94A3B8)),
+            const Icon(Icons.edit_calendar_rounded, size: 15, color: Color(0xFF94A3B8)),
           ],
         ),
       ),
@@ -1024,12 +1030,12 @@ class SapTimePickerTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(14),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(14),
           border: Border.all(color: const Color(0xFFE2E8F0), width: 1.2),
           boxShadow: const [
             BoxShadow(
@@ -1042,15 +1048,15 @@ class SapTimePickerTile extends StatelessWidget {
         child: Row(
           children: [
             Container(
-              width: 38,
-              height: 38,
+              width: 36,
+              height: 36,
               decoration: BoxDecoration(
                 color: accentColor.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(10),
               ),
-              child: Icon(Icons.schedule_rounded, color: accentColor, size: 20),
+              child: Icon(Icons.schedule_rounded, color: accentColor, size: 18),
             ),
-            const SizedBox(width: 10),
+            const SizedBox(width: 8),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -1058,20 +1064,22 @@ class SapTimePickerTile extends StatelessWidget {
                 children: [
                   Text(
                     label.toUpperCase(),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
-                      fontSize: 9.5,
+                      fontSize: 9,
                       fontWeight: FontWeight.w700,
                       color: Color(0xFF64748B),
-                      letterSpacing: 0.5,
+                      letterSpacing: 0.4,
                     ),
                   ),
-                  const SizedBox(height: 3),
+                  const SizedBox(height: 2),
                   Row(
                     children: [
                       Text(
                         timeText,
                         style: const TextStyle(
-                          fontSize: 13.5,
+                          fontSize: 12.5,
                           fontWeight: FontWeight.w800,
                           color: Color(0xFF0F172A),
                         ),
@@ -1081,7 +1089,7 @@ class SapTimePickerTile extends StatelessWidget {
                         Text(
                           zoneSuffix!,
                           style: const TextStyle(
-                            fontSize: 9.5,
+                            fontSize: 9,
                             fontWeight: FontWeight.w700,
                             color: Color(0xFF64748B),
                           ),
@@ -1092,14 +1100,13 @@ class SapTimePickerTile extends StatelessWidget {
                 ],
               ),
             ),
-            const Icon(Icons.access_time_rounded, size: 16, color: Color(0xFF94A3B8)),
+            const Icon(Icons.access_time_rounded, size: 15, color: Color(0xFF94A3B8)),
           ],
         ),
       ),
     );
   }
 }
-
 class SapEmployeeItem {
   final String nik;
   final String nama;
