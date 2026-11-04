@@ -8,7 +8,9 @@ import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../services/api.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 import '../services/popup_ad_service.dart';
+import '../services/security_check_service.dart';
 import '../widgets/roster_prompt_dialog.dart';
 import '../widgets/web_campaign_dialog.dart';
 import '../services/preference.dart';
@@ -26,7 +28,7 @@ class HomePage extends StatefulWidget {
   State<HomePage> createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin {
+class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   final _pageCtrl = PageController(initialPage: globals.currentPage);
   final _api = ApiService();
   final _profile = PreferenceService.getProfile();
@@ -39,6 +41,8 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
 
   Timer? _hideNavTimer;
   ImageProvider? _navbarProfileImage;
+  Timer? _securityCheckTimer;
+  StreamSubscription? _connectivitySub;
 
   @override
   void initState() {
@@ -70,6 +74,8 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
 
     _loadNavbarProfilePhoto();
     PreferenceService.profilePhotoNotifier.addListener(_onProfilePhotoChanged);
+    WidgetsBinding.instance.addObserver(this);
+    _initSecurityWatcher();
 
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       final prefs = await SharedPreferences.getInstance();
@@ -115,8 +121,46 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     _hideNavTimer?.cancel();
     _navAnimCtrl.dispose();
     PreferenceService.profilePhotoNotifier.removeListener(_onProfilePhotoChanged);
+    WidgetsBinding.instance.removeObserver(this);
+    _securityCheckTimer?.cancel();
+    _connectivitySub?.cancel();
     _pageCtrl.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && mounted && !SecurityCheckService.isDialogOpen) {
+      SecurityCheckService.checkAndShowIfViolation(context);
+    }
+  }
+
+  void _initSecurityWatcher() {
+    // 1. Cek keamanan pertama kali saat app dibuka
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await Future.delayed(const Duration(milliseconds: 600));
+      if (mounted) {
+        SecurityCheckService.checkAndShowIfViolation(context);
+      }
+    });
+
+    // 2. Pantau perubahan jaringan real-time (misal user menyalakan VPN di tengah penggunaan)
+    try {
+      _connectivitySub = Connectivity().onConnectivityChanged.listen((results) {
+        if (results.contains(ConnectivityResult.vpn) && mounted) {
+          SecurityCheckService.checkAndShowIfViolation(context);
+        }
+      });
+    } catch (_) {}
+
+    // 3. Polling berkala setiap 5 detik untuk mendeteksi Fake GPS atau VPN yang aktif di background
+    _securityCheckTimer = Timer.periodic(const Duration(seconds: 5), (_) async {
+      if (!mounted || SecurityCheckService.isDialogOpen) return;
+      final status = await SecurityCheckService.instance.runFullAudit();
+      if (status.hasViolation && mounted) {
+        SecurityCheckService.checkAndShowIfViolation(context);
+      }
+    });
   }
 
   void _onProfilePhotoChanged() {
