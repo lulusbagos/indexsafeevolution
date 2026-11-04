@@ -29,13 +29,13 @@ class _ReinductionApprovalPageState extends State<ReinductionApprovalPage> {
   bool _canApprove = false;
 
   final List<String> _questions = [
-    'Apakah Mine Permit & SIMPER karyawan masih berlaku?',
-    'Apakah APD karyawan masih layak digunakan?',
-    'Apakah karyawan sudah dijelaskan:\na. Materi Safety Talk terakhir\nb. Peraturan-Ketentuan baru di lingkungan perusahaan\nc. Rambu-rambu Keselamatan yang baru/berubah\nd. Accident-Incident terakhir',
-    'Apakah karyawan sudah di-ingatkan lagi tentang Golden Rules?',
-    'Apakah karyawan sudah di-ingatkan lagi tentang tata cara komunikasi Radio yang baik, termasuk saat "Penting" dan Emergency?',
-    'Apakah karyawan sudah dijelaskan temuan inspeksi HSE terakhir yang belum maupun sudah ditindaklanjuti?',
-    'Apakah karyawan sudah memahami ketentuan umum K3LH terlampir?',
+    'Masa Berlaku Mine Permit & SIMPER:\nApakah Mine Permit dan SIMPER karyawan masih dalam masa berlaku aktif?',
+    'Kelaikan Alat Pelindung Diri (APD):\nApakah seluruh APD standar K3LH dalam kondisi lengkap dan layak pakai?',
+    'Penyegaran Materi K3LH & Insiden Terkini:\nApakah karyawan telah memahami materi Safety Talk terkini, perubahan peraturan/rambu, serta evaluasi insiden terakhir?',
+    'Penerapan & Kepatuhan Golden Rules:\nApakah karyawan telah diingatkan dan berkomitmen mematuhi 10 Golden Rules keselamatan kerja tanpa kompromi?',
+    'Protokol Komunikasi Radio Dua Arah:\nApakah karyawan memahami tata cara komunikasi radio yang baik, termasuk prioritas Urgent dan Emergency?',
+    'Evaluasi & Temuan Inspeksi HSE:\nApakah karyawan telah dijelaskan terkait temuan inspeksi HSE terakhir di lingkungan kerja?',
+    'Kesiapan Kerja (Fit to Work) & K3LH:\nApakah karyawan menyatakan dalam kondisi sehat jasmani rohani, cukup istirahat, bebas zat terlarang/alkohol, dan siap kerja aman?',
   ];
 
   @override

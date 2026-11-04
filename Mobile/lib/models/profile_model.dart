@@ -80,7 +80,19 @@ class ProfileModel {
   String? masaAktifPermit;
   String? permitStatus;
   bool? hasPermit;
+  bool? isPermitActive;
   String? qrCode;
+
+  // SIMPER fields from BIMA PostgreSQL
+  String? simperNomor;
+  String? simperExpiredDate;
+  String? simperMasaBerlaku;
+  String? simperStatus;
+  String? jenisSimper;
+  String? jenisSim;
+  String? nomorSim;
+  bool? hasSimper;
+  bool? isSimperActive;
 
   ProfileModel({
     this.id,
@@ -160,7 +172,17 @@ class ProfileModel {
     this.masaAktifPermit,
     this.permitStatus,
     this.hasPermit,
+    this.isPermitActive,
     this.qrCode,
+    this.simperNomor,
+    this.simperExpiredDate,
+    this.simperMasaBerlaku,
+    this.simperStatus,
+    this.jenisSimper,
+    this.jenisSim,
+    this.nomorSim,
+    this.hasSimper,
+    this.isSimperActive,
   });
 
   ProfileModel.fromJson(Map<String, dynamic> json) {
@@ -247,7 +269,19 @@ class ProfileModel {
     masaAktifPermit = json['masa_aktif_permit'] ?? json['permit_berakhir_kerja'] ?? json['permit_last_expired'];
     permitStatus = json['permit_status'];
     hasPermit = json['has_permit'] ?? (permitNomor != null && permitNomor!.isNotEmpty);
+    isPermitActive = json['is_permit_active'] ?? json['isPermitActive'];
     qrCode = json['qr_code'] ?? json['qr'];
+
+    // SIMPER fields from BIMA PostgreSQL
+    simperNomor = json['simper_nomor'] ?? json['simperNomor'];
+    simperExpiredDate = json['simper_expired_date'] ?? json['simperExpiredDate'] ?? json['simper_masa_berlaku'] ?? json['simperMasaBerlaku'];
+    simperMasaBerlaku = json['simper_masa_berlaku'] ?? json['simperMasaBerlaku'];
+    simperStatus = json['simper_status'] ?? json['simperStatus'];
+    jenisSimper = json['jenis_simper'] ?? json['jenisSimper'];
+    jenisSim = json['jenis_sim'] ?? json['simperJenisSim'] ?? json['simper_jenis_sim'];
+    nomorSim = json['nomor_sim'] ?? json['simperNomorSim'] ?? json['simper_nomor_sim'];
+    hasSimper = json['has_simper'] ?? json['hasSimper'] ?? (simperNomor != null && simperNomor!.isNotEmpty);
+    isSimperActive = json['is_simper_active'] ?? json['isSimperActive'];
   }
 
   Map<String, dynamic> toJson() {
@@ -333,7 +367,19 @@ class ProfileModel {
     data['masa_aktif_permit'] = masaAktifPermit;
     data['permit_status'] = permitStatus;
     data['has_permit'] = hasPermit;
+    data['is_permit_active'] = isPermitActive;
     data['qr_code'] = qrCode;
+
+    // SIMPER fields
+    data['simper_nomor'] = simperNomor;
+    data['simper_expired_date'] = simperExpiredDate;
+    data['simper_masa_berlaku'] = simperMasaBerlaku;
+    data['simper_status'] = simperStatus;
+    data['jenis_simper'] = jenisSimper;
+    data['jenis_sim'] = jenisSim;
+    data['nomor_sim'] = nomorSim;
+    data['has_simper'] = hasSimper;
+    data['is_simper_active'] = isSimperActive;
     return data;
   }
 }
