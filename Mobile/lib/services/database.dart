@@ -44,6 +44,22 @@ class DatabaseService {
 
   }
 
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  }
+
 
 
 
@@ -95,6 +111,7 @@ class DatabaseService {
 
 
     await _ensureP2hTransColumns(_database!);
+    await _ensureVehicleMastersColumns(_database!);
 
 
 
@@ -148,6 +165,22 @@ class DatabaseService {
 
   }
 
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  }
+
 
 
 
@@ -192,6 +225,22 @@ class DatabaseService {
 
   }
 
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  }
+
 
 
 
@@ -227,6 +276,7 @@ class DatabaseService {
 
 
     await _ensureP2hTransColumns(db);
+    await _ensureVehicleMastersColumns(db);
 
 
 
@@ -274,6 +324,22 @@ class DatabaseService {
 
 
 
+  }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
   }
 
 
@@ -366,10 +432,42 @@ class DatabaseService {
 
 
 
-    } catch (_) {}
+    }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  } catch (_) {}
 
 
 
+  }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
   }
 
 
@@ -434,7 +532,23 @@ class DatabaseService {
 
 
 
-    } catch (e) {
+    }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  } catch (e) {
 
 
 
@@ -448,8 +562,40 @@ class DatabaseService {
 
     }
 
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  }
 
 
+
+  }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
   }
 
 
@@ -520,9 +666,41 @@ class DatabaseService {
 
       }
 
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  }
 
 
-    } catch (e) {
+
+    }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  } catch (e) {
 
 
 
@@ -536,12 +714,44 @@ class DatabaseService {
 
     }
 
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  }
+
 
 
     return 0;
 
 
 
+  }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
   }
 
 
@@ -578,10 +788,42 @@ class DatabaseService {
 
 
 
-    } catch (_) {}
+    }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  } catch (_) {}
 
 
 
+  }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
   }
 
 
@@ -620,9 +862,41 @@ class DatabaseService {
 
       }
 
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  }
 
 
-    } catch (_) {}
+
+    }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  } catch (_) {}
 
 
 
@@ -630,6 +904,22 @@ class DatabaseService {
 
 
 
+  }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
   }
 
 
@@ -684,13 +974,45 @@ class DatabaseService {
 
       }
 
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  }
+
 
 
       await batch.commit(noResult: true);
 
 
 
-    } catch (e) {
+    }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  } catch (e) {
 
 
 
@@ -700,8 +1022,40 @@ class DatabaseService {
 
     }
 
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  }
 
 
+
+  }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
   }
 
 
@@ -754,10 +1108,42 @@ class DatabaseService {
 
 
 
-    } catch (_) {}
+    }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  } catch (_) {}
 
 
 
+  }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
   }
 
 
@@ -910,7 +1296,23 @@ class DatabaseService {
 
 
 
-    } catch (e) {
+    }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  } catch (e) {
 
 
 
@@ -920,8 +1322,40 @@ class DatabaseService {
 
     }
 
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  }
 
 
+
+  }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
   }
 
 
@@ -1018,7 +1452,23 @@ class DatabaseService {
 
 
 
-            } else if (m['units'] is List) {
+            }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  } else if (m['units'] is List) {
 
 
 
@@ -1027,6 +1477,22 @@ class DatabaseService {
 
 
             }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  }
 
 
 
@@ -1134,7 +1600,23 @@ class DatabaseService {
 
 
 
-            };
+            }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  };
 
 
 
@@ -1168,9 +1650,41 @@ class DatabaseService {
 
           }
 
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  }
+
 
 
         }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  }
 
 
 
@@ -1188,13 +1702,61 @@ class DatabaseService {
 
         }
 
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  }
+
 
 
       }
 
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  }
 
 
-    } catch (e) {
+
+    }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  } catch (e) {
 
 
 
@@ -1204,12 +1766,44 @@ class DatabaseService {
 
     }
 
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  }
+
 
 
     return saved;
 
 
 
+  }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
   }
 
 
@@ -1248,9 +1842,41 @@ class DatabaseService {
 
       }
 
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  }
 
 
-    } catch (_) {}
+
+    }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  } catch (_) {}
 
 
 
@@ -1258,6 +1884,22 @@ class DatabaseService {
 
 
 
+  }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
   }
 
 
@@ -1314,7 +1956,23 @@ class DatabaseService {
 
 
 
-      } else {
+      }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  } else {
 
 
 
@@ -1332,9 +1990,41 @@ class DatabaseService {
 
       }
 
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  }
+
 
 
     }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  }
 
 
 
@@ -1359,6 +2049,22 @@ class DatabaseService {
 
 
     }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  }
 
 
 
@@ -1540,13 +2246,61 @@ class DatabaseService {
 
             }
 
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  }
 
 
-          } catch (_) {}
+
+          }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  } catch (_) {}
 
 
 
         }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  }
 
 
 
@@ -1610,7 +2364,23 @@ class DatabaseService {
 
 
 
-                } else {
+                }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  } else {
 
 
 
@@ -1624,13 +2394,61 @@ class DatabaseService {
 
                 }
 
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  }
+
 
 
               }
 
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  }
 
 
-            } else if (masaBerlakuStr.contains('/')) {
+
+            }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  } else if (masaBerlakuStr.contains('/')) {
 
 
 
@@ -1652,9 +2470,41 @@ class DatabaseService {
 
               }
 
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  }
+
 
 
             }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  }
 
 
 
@@ -1680,13 +2530,61 @@ class DatabaseService {
 
             }
 
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  }
 
 
-          } catch (_) {}
+
+          }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  } catch (_) {}
 
 
 
         }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  }
 
 
 
@@ -1838,7 +2736,23 @@ class DatabaseService {
 
 
 
-        };
+        }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  };
 
 
 
@@ -1852,9 +2766,41 @@ class DatabaseService {
 
       }
 
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  }
 
 
-    } catch (e) {
+
+    }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  } catch (e) {
 
 
 
@@ -1864,12 +2810,44 @@ class DatabaseService {
 
     }
 
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  }
+
 
 
     return null;
 
 
 
+  }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
   }
 
 
@@ -1998,7 +2976,23 @@ class DatabaseService {
 
 
 
+      }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
       } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  } catch (_) {}
 
 
 
@@ -2014,7 +3008,23 @@ class DatabaseService {
 
 
 
+      }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
       } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  } catch (_) {}
 
 
 
@@ -2030,7 +3040,23 @@ class DatabaseService {
 
 
 
+      }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
       } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  } catch (_) {}
 
 
 
@@ -2046,7 +3072,23 @@ class DatabaseService {
 
 
 
+      }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
       } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  } catch (_) {}
 
 
 
@@ -2090,7 +3132,23 @@ class DatabaseService {
 
 
 
-    } catch (e) {
+    }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  } catch (e) {
 
 
 
@@ -2100,8 +3158,40 @@ class DatabaseService {
 
     }
 
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  }
 
 
+
+  }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
   }
 
 
@@ -2198,11 +3288,43 @@ class DatabaseService {
 
 
 
+      }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
       } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  } catch (_) {}
 
 
 
-    } catch (e) {
+    }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  } catch (e) {
 
 
 
@@ -2212,8 +3334,40 @@ class DatabaseService {
 
     }
 
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  }
 
 
+
+  }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
   }
 
 
@@ -2438,7 +3592,23 @@ class DatabaseService {
 
 
 
-            };
+            }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  };
 
 
 
@@ -2472,9 +3642,41 @@ class DatabaseService {
 
           }
 
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  }
+
 
 
         }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  }
 
 
 
@@ -2492,13 +3694,61 @@ class DatabaseService {
 
         }
 
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  }
+
 
 
       }
 
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  }
 
 
-    } catch (e) {
+
+    }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  } catch (e) {
 
 
 
@@ -2508,12 +3758,44 @@ class DatabaseService {
 
     }
 
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  }
+
 
 
     return saved;
 
 
 
+  }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
   }
 
 
@@ -2552,9 +3834,41 @@ class DatabaseService {
 
       }
 
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  }
 
 
-    } catch (_) {}
+
+    }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  } catch (_) {}
 
 
 
@@ -2562,6 +3876,22 @@ class DatabaseService {
 
 
 
+  }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
   }
 
 
@@ -2614,7 +3944,23 @@ class DatabaseService {
 
 
 
-      } else {
+      }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  } else {
 
 
 
@@ -2632,9 +3978,41 @@ class DatabaseService {
 
       }
 
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  }
+
 
 
     }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  }
 
 
 
@@ -2659,6 +4037,22 @@ class DatabaseService {
 
 
     }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  }
 
 
 
@@ -2878,7 +4272,23 @@ class DatabaseService {
 
 
 
-                } else {
+                }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  } else {
 
 
 
@@ -2892,13 +4302,61 @@ class DatabaseService {
 
                 }
 
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  }
+
 
 
               }
 
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  }
 
 
-            } else if (expStr.contains('/')) {
+
+            }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  } else if (expStr.contains('/')) {
 
 
 
@@ -2920,9 +4378,41 @@ class DatabaseService {
 
               }
 
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  }
+
 
 
             }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  }
 
 
 
@@ -2948,13 +4438,61 @@ class DatabaseService {
 
             }
 
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  }
 
 
-          } catch (_) {}
+
+          }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  } catch (_) {}
 
 
 
         }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  }
 
 
 
@@ -2974,7 +4512,23 @@ class DatabaseService {
 
 
 
-        } catch (_) {}
+        }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  } catch (_) {}
 
 
 
@@ -3126,7 +4680,23 @@ class DatabaseService {
 
 
 
-        };
+        }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  };
 
 
 
@@ -3140,9 +4710,41 @@ class DatabaseService {
 
       }
 
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  }
 
 
-    } catch (e) {
+
+    }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  } catch (e) {
 
 
 
@@ -3152,12 +4754,44 @@ class DatabaseService {
 
     }
 
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  }
+
 
 
     return null;
 
 
 
+  }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
   }
 
 
@@ -3223,6 +4857,22 @@ class DatabaseService {
 
 
     }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  }
 
 
 
@@ -3342,11 +4992,43 @@ class DatabaseService {
 
 
 
-      };
+      }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  };
 
 
 
-    } catch (_) {
+    }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  } catch (_) {
 
 
 
@@ -3356,8 +5038,40 @@ class DatabaseService {
 
     }
 
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  }
 
 
+
+  }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
   }
 
 
@@ -3394,11 +5108,43 @@ class DatabaseService {
 
 
 
-      });
+      }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  });
 
 
 
-    } catch (e) {
+    }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  } catch (e) {
 
 
 
@@ -3412,8 +5158,40 @@ class DatabaseService {
 
     }
 
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  }
 
 
+
+  }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
   }
 
 
@@ -3450,11 +5228,43 @@ class DatabaseService {
 
 
 
-      });
+      }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  });
 
 
 
-    } catch (e) {
+    }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  } catch (e) {
 
 
 
@@ -3468,8 +5278,40 @@ class DatabaseService {
 
     }
 
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  }
 
 
+
+  }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
   }
 
 
@@ -3514,7 +5356,23 @@ class DatabaseService {
 
 
 
-    } catch (e) {
+    }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  } catch (e) {
 
 
 
@@ -3528,8 +5386,40 @@ class DatabaseService {
 
     }
 
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  }
 
 
+
+  }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
   }
 
 
@@ -3574,7 +5464,23 @@ class DatabaseService {
 
 
 
-    } catch (e) {
+    }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  } catch (e) {
 
 
 
@@ -3588,8 +5494,40 @@ class DatabaseService {
 
     }
 
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  }
 
 
+
+  }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
   }
 
 
@@ -3618,7 +5556,23 @@ class DatabaseService {
 
 
 
-    } catch (e) {
+    }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  } catch (e) {
 
 
 
@@ -3628,8 +5582,40 @@ class DatabaseService {
 
     }
 
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  }
 
 
+
+  }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
   }
 
 
@@ -3658,7 +5644,23 @@ class DatabaseService {
 
 
 
-    } catch (e) {
+    }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  } catch (e) {
 
 
 
@@ -3668,8 +5670,40 @@ class DatabaseService {
 
     }
 
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  }
 
 
+
+  }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
   }
 
 
@@ -3714,7 +5748,23 @@ class DatabaseService {
 
 
 
-    } catch (_) {
+    }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  } catch (_) {
 
 
 
@@ -3724,8 +5774,40 @@ class DatabaseService {
 
     }
 
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  }
 
 
+
+  }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
   }
 
 
@@ -3766,7 +5848,23 @@ class DatabaseService {
 
 
 
-    } catch (_) {
+    }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  } catch (_) {
 
 
 
@@ -3776,8 +5874,40 @@ class DatabaseService {
 
     }
 
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  }
 
 
+
+  }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
   }
 
 
@@ -3834,7 +5964,23 @@ class DatabaseService {
 
 
 
-    } catch (_) {}
+    }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  } catch (_) {}
 
 
 
@@ -3842,6 +5988,22 @@ class DatabaseService {
 
 
 
+  }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
   }
 
 
@@ -3886,10 +6048,42 @@ class DatabaseService {
 
 
 
-    } catch (_) {}
+    }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  } catch (_) {}
 
 
 
+  }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
   }
 
 
@@ -3934,10 +6128,42 @@ class DatabaseService {
 
 
 
-    } catch (_) {}
+    }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  } catch (_) {}
 
 
 
+  }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
   }
 
 
@@ -4098,10 +6324,42 @@ class DatabaseService {
 
 
 
-    } catch (_) {}
+    }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  } catch (_) {}
 
 
 
+  }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
   }
 
 
@@ -4294,10 +6552,42 @@ class DatabaseService {
 
 
 
-    } catch (_) {}
+    }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  } catch (_) {}
 
 
 
+  }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
   }
 
 
@@ -4470,14 +6760,62 @@ class DatabaseService {
 
 
 
+      }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
       } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  } catch (_) {}
 
 
 
-    } catch (_) {}
+    }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  } catch (_) {}
 
 
 
+  }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
   }
 
 
@@ -4612,11 +6950,43 @@ class DatabaseService {
 
 
 
+      }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
       } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  } catch (_) {}
 
 
 
     }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  }
 
 
 
@@ -4672,14 +7042,62 @@ class DatabaseService {
 
 
 
+      }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
       } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  } catch (_) {}
 
 
 
     }
 
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  }
 
 
+
+  }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
   }
 
 
@@ -4816,11 +7234,43 @@ class DatabaseService {
 
 
 
+      }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
       } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  } catch (_) {}
 
 
 
     }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  }
 
 
 
@@ -4880,14 +7330,62 @@ class DatabaseService {
 
 
 
+      }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
       } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  } catch (_) {}
 
 
 
     }
 
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  }
 
 
+
+  }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
   }
 
 
@@ -5024,11 +7522,43 @@ class DatabaseService {
 
 
 
+      }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
       } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  } catch (_) {}
 
 
 
     }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  }
 
 
 
@@ -5108,14 +7638,62 @@ class DatabaseService {
 
 
 
+      }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
       } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  } catch (_) {}
 
 
 
     }
 
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  }
 
 
+
+  }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
   }
 
 
@@ -5240,11 +7818,43 @@ class DatabaseService {
 
 
 
+      }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
       } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  } catch (_) {}
 
 
 
     }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  }
 
 
 
@@ -5296,11 +7906,43 @@ class DatabaseService {
 
 
 
+      }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
       } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  } catch (_) {}
 
 
 
     }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  }
 
 
 
@@ -5336,10 +7978,10 @@ class DatabaseService {
 
 
 
-          last_km REAL DEFAULT 0
-
-
-
+          last_km REAL DEFAULT 0,
+          commissioning_expired TEXT,
+          commissioning_no TEXT,
+          commissioning_date TEXT
         );
 
 
@@ -5360,7 +8002,23 @@ class DatabaseService {
 
 
 
+      }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
       } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  } catch (_) {}
 
 
 
@@ -5372,10 +8030,42 @@ class DatabaseService {
 
 
 
-    } catch (_) {}
+    }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  } catch (_) {}
 
 
 
+  }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
   }
 
 
@@ -5383,6 +8073,22 @@ class DatabaseService {
 
 
 
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN $col TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN $col TEXT;');
+      } catch (_) {}
+    }
+  }
 
   static Future<void> _ensureInspectionTransColumns(Database db) async {
 
@@ -5560,14 +8266,62 @@ class DatabaseService {
 
 
 
+      }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
       } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  } catch (_) {}
 
 
 
     }
 
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  }
 
 
+
+  }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
   }
 
 
@@ -5704,11 +8458,43 @@ class DatabaseService {
 
 
 
+      }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
       } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  } catch (_) {}
 
 
 
     }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  }
 
 
 
@@ -5776,14 +8562,62 @@ class DatabaseService {
 
 
 
+      }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
       } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  } catch (_) {}
 
 
 
     }
 
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  }
 
 
+
+  }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
   }
 
 
@@ -5848,11 +8682,43 @@ class DatabaseService {
 
 
 
+      }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
       } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  } catch (_) {}
 
 
 
     }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  }
 
 
 
@@ -5892,10 +8758,42 @@ class DatabaseService {
 
 
 
-    } catch (_) {}
+    }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  } catch (_) {}
 
 
 
+  }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
   }
 
 
@@ -6004,18 +8902,82 @@ class DatabaseService {
 
 
 
-        } catch (_) {}
+        }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  } catch (_) {}
 
 
 
       }
 
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  }
 
 
-    } catch (_) {}
+
+    }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  } catch (_) {}
 
 
 
+  }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
   }
 
 
@@ -6172,14 +9134,62 @@ class DatabaseService {
 
 
 
+      }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
       } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  } catch (_) {}
 
 
 
     }
 
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  }
 
 
+
+  }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
   }
 
 
@@ -6312,14 +9322,62 @@ class DatabaseService {
 
 
 
+      }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
       } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  } catch (_) {}
 
 
 
     }
 
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  }
 
 
+
+  }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
   }
 
 
@@ -6390,6 +9448,22 @@ class DatabaseService {
 
       }
 
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  }
+
 
 
       _database = null;
@@ -6416,7 +9490,23 @@ class DatabaseService {
 
 
 
-    } catch (e) {
+    }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  } catch (e) {
 
 
 
@@ -6426,8 +9516,40 @@ class DatabaseService {
 
     }
 
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  }
 
 
+
+  }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
   }
 
 
@@ -7125,6 +10247,9 @@ class DatabaseService {
 
 
 			`updated_at` TEXT,
+			commissioning_expired TEXT,
+			commissioning_no TEXT,
+			commissioning_date TEXT,
 
 
 
@@ -8776,6 +11901,22 @@ class DatabaseService {
 
   }
 
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  }
+
 
 
 
@@ -8804,6 +11945,22 @@ class DatabaseService {
 
   }
 
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  }
+
 
 
 
@@ -8822,6 +11979,22 @@ class DatabaseService {
 
 
 
+  }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
   }
 
 
@@ -8854,7 +12027,23 @@ class DatabaseService {
 
 
 
-    } catch (e) {
+    }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  } catch (e) {
 
 
 
@@ -8868,8 +12057,40 @@ class DatabaseService {
 
     }
 
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  }
 
 
+
+  }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
   }
 
 
@@ -8908,13 +12129,45 @@ class DatabaseService {
 
       }
 
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  }
+
 
 
       return null;
 
 
 
-    } catch (e) {
+    }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  } catch (e) {
 
 
 
@@ -8928,8 +12181,40 @@ class DatabaseService {
 
     }
 
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  }
 
 
+
+  }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
   }
 
 
@@ -8958,7 +12243,23 @@ class DatabaseService {
 
 
 
-    } catch (e) {
+    }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  } catch (e) {
 
 
 
@@ -8972,8 +12273,40 @@ class DatabaseService {
 
     }
 
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  }
 
 
+
+  }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
   }
 
 
@@ -8998,7 +12331,23 @@ class DatabaseService {
 
 
 
-    } catch (e) {
+    }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  } catch (e) {
 
 
 
@@ -9012,8 +12361,40 @@ class DatabaseService {
 
     }
 
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  }
 
 
+
+  }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
   }
 
 
@@ -9038,7 +12419,23 @@ class DatabaseService {
 
 
 
-    } catch (e) {
+    }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  } catch (e) {
 
 
 
@@ -9052,8 +12449,40 @@ class DatabaseService {
 
     }
 
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  }
 
 
+
+  }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
   }
 
 
@@ -9078,7 +12507,23 @@ class DatabaseService {
 
 
 
-    } catch (e) {
+    }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  } catch (e) {
 
 
 
@@ -9088,8 +12533,40 @@ class DatabaseService {
 
     }
 
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  }
 
 
+
+  }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
   }
 
 
@@ -9122,7 +12599,23 @@ class DatabaseService {
 
 
 
-    } catch (e) {
+    }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  } catch (e) {
 
 
 
@@ -9132,8 +12625,40 @@ class DatabaseService {
 
     }
 
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  }
 
 
+
+  }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
   }
 
 
@@ -9162,7 +12687,23 @@ class DatabaseService {
 
 
 
-    } catch (e) {
+    }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  } catch (e) {
 
 
 
@@ -9172,8 +12713,40 @@ class DatabaseService {
 
     }
 
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
+  }
 
 
+
+  }
+
+  static Future<void> _ensureVehicleMastersColumns(Database db) async {
+    final commCols = [
+      'commissioning_expired',
+      'commissioning_no',
+      'commissioning_date',
+    ];
+    for (var col in commCols) {
+      try {
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT;');
+      } catch (_) {}
+    }
   }
 
 

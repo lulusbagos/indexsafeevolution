@@ -10964,13 +10964,59 @@ class _ScanPageState extends State<ScanPage>
     String? p2hLastDriver;
     double? p2hLastKm;
     Timer? p2hDebounceTimer;
+    String? commissioningExpired;
+    String? commissioningNo;
+    int? commissioningRemainingDays;
+
+    int? getRemainingDays(String? raw) {
+      if (raw == null || raw.trim().isEmpty) return null;
+      final str = raw.trim();
+      DateTime? dt;
+      try {
+        dt = DateTime.parse(str);
+      } catch (_) {
+        final parts = str.split(RegExp(r'[-/]'));
+        if (parts.length == 3) {
+          if (parts[0].length == 4) {
+            dt = DateTime(int.tryParse(parts[0]) ?? 2026, int.tryParse(parts[1]) ?? 1, int.tryParse(parts[2]) ?? 1);
+          } else if (parts[2].length == 4) {
+            dt = DateTime(int.tryParse(parts[2]) ?? 2026, int.tryParse(parts[1]) ?? 1, int.tryParse(parts[0]) ?? 1);
+          }
+        }
+      }
+      if (dt == null) return null;
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
+      final target = DateTime(dt.year, dt.month, dt.day);
+      return target.difference(today).inDays;
+    }
+
+    String formatCommDate(String? raw) {
+      if (raw == null || raw.trim().isEmpty) return '-';
+      final str = raw.trim();
+      DateTime? dt;
+      try {
+        dt = DateTime.parse(str);
+      } catch (_) {
+        final parts = str.split(RegExp(r'[-/]'));
+        if (parts.length == 3) {
+          if (parts[0].length == 4) {
+            dt = DateTime(int.tryParse(parts[0]) ?? 2026, int.tryParse(parts[1]) ?? 1, int.tryParse(parts[2]) ?? 1);
+          } else if (parts[2].length == 4) {
+            dt = DateTime(int.tryParse(parts[2]) ?? 2026, int.tryParse(parts[1]) ?? 1, int.tryParse(parts[0]) ?? 1);
+          }
+        }
+      }
+      if (dt == null) return raw;
+      return DateFormat('dd/MM/yyyy').format(dt);
+    }
 
     Future<void> loadVehicles(void Function(void Function()) setModalState) async {
       if (hasLoadedVehicles) return;
       hasLoadedVehicles = true;
       try {
         final cached = await _db.rawQuery('''
-          SELECT code, name, type FROM vehicle_masters 
+          SELECT code, name, type, commissioning_expired, commissioning_no FROM vehicle_masters 
           WHERE deleted_at IS NULL 
           ORDER BY code ASC
         ''');
@@ -10982,11 +11028,13 @@ class _ScanPageState extends State<ScanPage>
               'noLambung': code,
               'merek': row['name']?.toString() ?? '',
               'jenisKendaraan': row['type']?.toString() ?? 'LIGHT VEHICLE',
+              'commissioningExpired': row['commissioning_expired']?.toString() ?? '',
+              'commissioningNo': row['commissioning_no']?.toString() ?? '',
             });
           }
         }
         try {
-          final p2hVehs = await _db.rawQuery('SELECT no_lambung, merek, jenis_kendaraan FROM p2h_vehicles');
+          final p2hVehs = await _db.rawQuery('SELECT no_lambung, merek, jenis_kendaraan, commissioning_expired, commissioning_no FROM p2h_vehicles');
           for (var r in p2hVehs) {
             final nl = r['no_lambung']?.toString() ?? '';
             if (nl.isNotEmpty && !list.any((x) => x['noLambung'].toString().toLowerCase() == nl.toLowerCase())) {
@@ -10994,6 +11042,8 @@ class _ScanPageState extends State<ScanPage>
                 'noLambung': nl,
                 'merek': r['merek']?.toString() ?? '',
                 'jenisKendaraan': r['jenis_kendaraan']?.toString() ?? 'LIGHT VEHICLE',
+                'commissioningExpired': r['commissioning_expired']?.toString() ?? '',
+                'commissioningNo': r['commissioning_no']?.toString() ?? '',
               });
             }
           }
@@ -11018,6 +11068,9 @@ class _ScanPageState extends State<ScanPage>
           p2hLastTime = null;
           p2hLastDriver = null;
           p2hLastKm = null;
+          commissioningExpired = null;
+          commissioningNo = null;
+          commissioningRemainingDays = null;
         });
         return;
       }
@@ -11100,6 +11153,33 @@ class _ScanPageState extends State<ScanPage>
         } catch (_) {}
       }
 
+      // Check commissioning info from availableVehicles or SQLite
+      String? foundExp;
+      String? foundCommNo;
+      final vMatch = availableVehicles.firstWhere(
+        (v) => (v['noLambung'] ?? '').toString().toLowerCase() == cleanUnit.toLowerCase(),
+        orElse: () => {},
+      );
+      if (vMatch.isNotEmpty) {
+        foundExp = vMatch['commissioningExpired']?.toString();
+        foundCommNo = vMatch['commissioningNo']?.toString();
+      }
+
+      if (foundExp == null || foundExp.isEmpty) {
+        try {
+          final vRows = await _db.rawQuery('''
+            SELECT commissioning_expired, commissioning_no FROM vehicle_masters 
+            WHERE LOWER(code) = LOWER(?) LIMIT 1
+          ''', [cleanUnit]);
+          if (vRows.isNotEmpty) {
+            foundExp = vRows.first['commissioning_expired']?.toString();
+            foundCommNo = vRows.first['commissioning_no']?.toString();
+          }
+        } catch (_) {}
+      }
+
+      final remDays = getRemainingDays(foundExp);
+
       setModalState(() {
         isCheckingP2h = false;
         p2hDoneToday = verifiedToday;
@@ -11107,6 +11187,9 @@ class _ScanPageState extends State<ScanPage>
         p2hLastTime = foundTime;
         p2hLastDriver = foundDriver;
         p2hLastKm = foundKm;
+        commissioningExpired = foundExp;
+        commissioningNo = foundCommNo;
+        commissioningRemainingDays = remDays;
       });
     }
 
@@ -11356,7 +11439,45 @@ class _ScanPageState extends State<ScanPage>
                                   merek.isNotEmpty ? '$merek • $jenis' : jenis,
                                   style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
                                 ),
-                                trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 13, color: Color(0xFFCBD5E1)),
+                                trailing: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Builder(
+                                      builder: (_) {
+                                        final expStr = veh['commissioningExpired']?.toString();
+                                        final days = getRemainingDays(expStr);
+                                        if (days == null) return const SizedBox.shrink();
+                                        final isExp = days < 0;
+                                        final isCrit = days >= 0 && days <= 14;
+                                        return Container(
+                                          margin: const EdgeInsets.only(right: 6),
+                                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+                                          decoration: BoxDecoration(
+                                            color: isExp
+                                                ? const Color(0xFFFEE2E2)
+                                                : isCrit
+                                                    ? const Color(0xFFFFEDD5)
+                                                    : const Color(0xFFDCFCE7),
+                                            borderRadius: BorderRadius.circular(6),
+                                          ),
+                                          child: Text(
+                                            isExp ? 'Exp -${days.abs()}h' : '$days h',
+                                            style: TextStyle(
+                                              fontSize: 10,
+                                              fontWeight: FontWeight.w800,
+                                              color: isExp
+                                                  ? const Color(0xFFDC2626)
+                                                  : isCrit
+                                                      ? const Color(0xFFC2410C)
+                                                      : const Color(0xFF15803D),
+                                            ),
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                    const Icon(Icons.arrow_forward_ios_rounded, size: 13, color: Color(0xFFCBD5E1)),
+                                  ],
+                                ),
                                 onTap: () {
                                   Navigator.pop(ctx);
                                   unitController.text = noLambung;
@@ -12489,6 +12610,178 @@ class _ScanPageState extends State<ScanPage>
                                 ),
                               ),
 
+                            // MASA AKTIF KOMISIONING UNIT WIDGET
+                            if (unitController.text.trim().isNotEmpty && !isCheckingP2h)
+                              Builder(
+                                builder: (_) {
+                                  final days = commissioningRemainingDays;
+                                  final expDateFormatted = formatCommDate(commissioningExpired);
+
+                                  if (days == null) {
+                                    return Container(
+                                      margin: const EdgeInsets.only(top: 8),
+                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFF8FAFC),
+                                        borderRadius: BorderRadius.circular(10),
+                                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          const Icon(Icons.verified_outlined, size: 16, color: Color(0xFF64748B)),
+                                          const SizedBox(width: 8),
+                                          Expanded(
+                                            child: Text(
+                                              'Masa Komisioning: Belum terinput di sistem pusat',
+                                              style: const TextStyle(
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.w600,
+                                                color: Color(0xFF64748B),
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                  }
+
+                                  final isExpired = days < 0;
+                                  final isCritical = days >= 0 && days <= 14;
+                                  final isWarning = days > 14 && days <= 30;
+
+                                  final Color bgColor = isExpired
+                                      ? const Color(0xFFFEF2F2)
+                                      : isCritical
+                                          ? const Color(0xFFFFF7ED)
+                                          : isWarning
+                                              ? const Color(0xFFFFFBEB)
+                                              : const Color(0xFFF0FDF4);
+
+                                  final Color borderColor = isExpired
+                                      ? const Color(0xFFFCA5A5)
+                                      : isCritical
+                                          ? const Color(0xFFFDBA74)
+                                          : isWarning
+                                              ? const Color(0xFFFCD34D)
+                                              : const Color(0xFFBBF7D0);
+
+                                  final Color iconColor = isExpired
+                                      ? const Color(0xFFDC2626)
+                                      : isCritical
+                                          ? const Color(0xFFEA580C)
+                                          : isWarning
+                                              ? const Color(0xFFD97706)
+                                              : const Color(0xFF16A34A);
+
+                                  final Color textColor = isExpired
+                                      ? const Color(0xFF991B1B)
+                                      : isCritical
+                                          ? const Color(0xFF9A3412)
+                                          : isWarning
+                                              ? const Color(0xFF92400E)
+                                              : const Color(0xFF166534);
+
+                                  final String statusTitle = isExpired
+                                      ? 'Masa Komisioning Telah HABIS (Expired)!'
+                                      : isCritical
+                                          ? 'Masa Komisioning Kritis: Sisa $days Hari Lagi!'
+                                          : isWarning
+                                              ? 'Masa Komisioning: Sisa $days Hari Lagi'
+                                              : 'Komisioning Aktif: Sisa $days Hari';
+
+                                  final String subtitle = isExpired
+                                      ? 'Expired sejak $expDateFormatted (${days.abs()} hari lalu). Unit tidak boleh beroperasi!'
+                                      : 'Masa berlaku stiker s/d $expDateFormatted ${commissioningNo != null && commissioningNo!.isNotEmpty ? "• No: $commissioningNo" : ""}';
+
+                                  return Container(
+                                    margin: const EdgeInsets.only(top: 8),
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+                                    decoration: BoxDecoration(
+                                      color: bgColor,
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(color: borderColor),
+                                      boxShadow: [
+                                        if (isExpired || isCritical)
+                                          BoxShadow(
+                                            color: iconColor.withValues(alpha: .12),
+                                            blurRadius: 6,
+                                            offset: const Offset(0, 2),
+                                          ),
+                                      ],
+                                    ),
+                                    child: Row(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Container(
+                                          padding: const EdgeInsets.all(4),
+                                          decoration: BoxDecoration(
+                                            color: iconColor.withValues(alpha: .15),
+                                            shape: BoxShape.circle,
+                                          ),
+                                          child: Icon(
+                                            isExpired
+                                                ? Icons.block_rounded
+                                                : isCritical
+                                                    ? Icons.timer_outlined
+                                                    : isWarning
+                                                        ? Icons.info_outline_rounded
+                                                        : Icons.verified_rounded,
+                                            size: 16,
+                                            color: iconColor,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Row(
+                                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                                children: [
+                                                  Text(
+                                                    statusTitle,
+                                                    style: TextStyle(
+                                                      fontSize: 12,
+                                                      fontWeight: FontWeight.w800,
+                                                      color: textColor,
+                                                    ),
+                                                  ),
+                                                  Container(
+                                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                                                    decoration: BoxDecoration(
+                                                      color: iconColor,
+                                                      borderRadius: BorderRadius.circular(6),
+                                                    ),
+                                                    child: Text(
+                                                      isExpired ? 'EXPIRED' : '$days HARI',
+                                                      style: const TextStyle(
+                                                        fontSize: 9.5,
+                                                        fontWeight: FontWeight.w900,
+                                                        color: Colors.white,
+                                                        letterSpacing: 0.5,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                              const SizedBox(height: 2),
+                                              Text(
+                                                subtitle,
+                                                style: TextStyle(
+                                                  fontSize: 10.5,
+                                                  fontWeight: FontWeight.w500,
+                                                  color: textColor.withValues(alpha: .85),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                },
+                              ),
+
                             const SizedBox(height: 18),
 
 
@@ -13341,6 +13634,11 @@ class _ScanPageState extends State<ScanPage>
 
                                                   : posController.text.trim(),
                                                 isP2hDone: p2hDoneToday,
+                                                commissioningText: commissioningRemainingDays != null
+                                                    ? (commissioningRemainingDays! < 0
+                                                        ? 'EXPIRED (${commissioningRemainingDays!.abs()} hari lalu)'
+                                                        : 'Aktif (Sisa $commissioningRemainingDays hari)')
+                                                    : null,
 
                                             );
 
@@ -13475,6 +13773,7 @@ class _ScanPageState extends State<ScanPage>
     String? lokasiDetail,
 
     bool? isP2hDone,
+    String? commissioningText,
   }) {
 
     final isMasuk = direction == 'MASUK';
@@ -13538,6 +13837,15 @@ class _ScanPageState extends State<ScanPage>
                 : 'Belum P2H Hari Ini (Perlu Inspeksi)',
             isHighlight: true,
             highlightColor: isP2hDone ? const Color(0xFF16A34A) : const Color(0xFFD97706),
+          ),
+        if (commissioningText != null)
+          SuccessReceiptItem(
+            label: 'Masa Komisioning',
+            value: commissioningText,
+            isHighlight: commissioningText.contains('EXPIRED'),
+            highlightColor: commissioningText.contains('EXPIRED')
+                ? const Color(0xFFDC2626)
+                : const Color(0xFF16A34A),
           ),
 
         SuccessReceiptItem(

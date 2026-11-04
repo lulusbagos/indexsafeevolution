@@ -123,6 +123,9 @@ class _P2HFormPageState extends State<P2HFormPage> {
   final _merekCtrl = TextEditingController();
 
   final _kmCtrl = TextEditingController();
+  String? _commissioningExpired;
+  String? _commissioningNo;
+  int? _commissioningRemainingDays;
 
   final _noLambungFocusNode = FocusNode();
 
@@ -325,6 +328,50 @@ class _P2HFormPageState extends State<P2HFormPage> {
 
 
 
+  
+  int? _calcRemainingDays(String? raw) {
+    if (raw == null || raw.trim().isEmpty) return null;
+    final str = raw.trim();
+    DateTime? dt;
+    try {
+      dt = DateTime.parse(str);
+    } catch (_) {
+      final parts = str.split(RegExp(r'[-/]'));
+      if (parts.length == 3) {
+        if (parts[0].length == 4) {
+          dt = DateTime(int.tryParse(parts[0]) ?? 2026, int.tryParse(parts[1]) ?? 1, int.tryParse(parts[2]) ?? 1);
+        } else if (parts[2].length == 4) {
+          dt = DateTime(int.tryParse(parts[2]) ?? 2026, int.tryParse(parts[1]) ?? 1, int.tryParse(parts[0]) ?? 1);
+        }
+      }
+    }
+    if (dt == null) return null;
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final target = DateTime(dt.year, dt.month, dt.day);
+    return target.difference(today).inDays;
+  }
+
+  String _formatCommDate(String? raw) {
+    if (raw == null || raw.trim().isEmpty) return '-';
+    final str = raw.trim();
+    DateTime? dt;
+    try {
+      dt = DateTime.parse(str);
+    } catch (_) {
+      final parts = str.split(RegExp(r'[-/]'));
+      if (parts.length == 3) {
+        if (parts[0].length == 4) {
+          dt = DateTime(int.tryParse(parts[0]) ?? 2026, int.tryParse(parts[1]) ?? 1, int.tryParse(parts[2]) ?? 1);
+        } else if (parts[2].length == 4) {
+          dt = DateTime(int.tryParse(parts[2]) ?? 2026, int.tryParse(parts[1]) ?? 1, int.tryParse(parts[0]) ?? 1);
+        }
+      }
+    }
+    if (dt == null) return raw;
+    return DateFormat('dd/MM/yyyy').format(dt);
+  }
+
   void _initChecklists() {
 
     for (int i = 0; i < _golAQuestions.length; i++) {
@@ -381,7 +428,7 @@ class _P2HFormPageState extends State<P2HFormPage> {
 
       final cached = await _db.rawQuery('''
 
-        SELECT code, name, type FROM vehicle_masters 
+        SELECT code, name, type, commissioning_expired, commissioning_no FROM vehicle_masters 
 
         WHERE deleted_at IS NULL 
 
@@ -404,6 +451,8 @@ class _P2HFormPageState extends State<P2HFormPage> {
           'jenisKendaraan': row['type']?.toString() ?? 'LIGHT VEHICLE',
 
           'lastKm': 0.0,
+          'commissioningExpired': row['commissioning_expired']?.toString() ?? '',
+          'commissioningNo': row['commissioning_no']?.toString() ?? '',
 
         });
 
@@ -417,7 +466,7 @@ class _P2HFormPageState extends State<P2HFormPage> {
 
         final p2hVehs = await _db.rawQuery(
 
-            'SELECT no_lambung, merek, jenis_kendaraan, last_km FROM p2h_vehicles');
+            'SELECT no_lambung, merek, jenis_kendaraan, last_km, commissioning_expired, commissioning_no FROM p2h_vehicles');
 
         for (var row in p2hVehs) {
 
@@ -432,6 +481,10 @@ class _P2HFormPageState extends State<P2HFormPage> {
           if (idx >= 0) {
 
             list[idx]['lastKm'] = km;
+            if ((list[idx]['commissioningExpired'] ?? '').toString().isEmpty) {
+              list[idx]['commissioningExpired'] = row['commissioning_expired']?.toString() ?? '';
+              list[idx]['commissioningNo'] = row['commissioning_no']?.toString() ?? '';
+            }
 
           } else if (nl.isNotEmpty) {
 
@@ -446,6 +499,8 @@ class _P2HFormPageState extends State<P2HFormPage> {
                   row['jenis_kendaraan']?.toString() ?? 'LIGHT VEHICLE',
 
               'lastKm': km,
+              'commissioningExpired': row['commissioning_expired']?.toString() ?? '',
+              'commissioningNo': row['commissioning_no']?.toString() ?? '',
 
             });
 
@@ -690,6 +745,9 @@ class _P2HFormPageState extends State<P2HFormPage> {
         _lastRecordedKm = km;
 
       }
+      _commissioningExpired = veh['commissioningExpired']?.toString();
+      _commissioningNo = veh['commissioningNo']?.toString();
+      _commissioningRemainingDays = _calcRemainingDays(_commissioningExpired);
 
       _showInlineVehicleSuggestions = false;
 
@@ -1113,16 +1171,45 @@ class _P2HFormPageState extends State<P2HFormPage> {
 
                                 ),
 
-                                subtitle: Text(
-
-                                  '${v['merek']} • ${v['jenisKendaraan']}',
-
-                                  style: TextStyle(
-
-                                      fontSize: 11,
-
-                                      color: Colors.grey.shade600),
-
+                                subtitle: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      '${v['merek']} • ${v['jenisKendaraan']}',
+                                      style: TextStyle(
+                                          fontSize: 11,
+                                          color: Colors.grey.shade600),
+                                    ),
+                                    if ((v['commissioningExpired'] ?? '').toString().isNotEmpty) ...[
+                                      const SizedBox(height: 3),
+                                      Builder(builder: (_) {
+                                        final cDays = _calcRemainingDays(v['commissioningExpired']?.toString());
+                                        final isExp = cDays != null && cDays < 0;
+                                        final isCrit = cDays != null && cDays >= 0 && cDays <= 14;
+                                        final color = isExp ? const Color(0xFFDC2626) : (isCrit ? const Color(0xFFD97706) : const Color(0xFF16A34A));
+                                        final bg = isExp ? const Color(0xFFFEE2E2) : (isCrit ? const Color(0xFFFEF3C7) : const Color(0xFFDCFCE7));
+                                        final text = isExp
+                                            ? 'Komisioning Habis (${cDays.abs()} hr lalu)'
+                                            : (cDays != null ? 'Komisi Sisa $cDays Hari (${_formatCommDate(v['commissioningExpired']?.toString())})' : 'Exp: ${_formatCommDate(v['commissioningExpired']?.toString())}');
+                                        return Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                                          decoration: BoxDecoration(
+                                            color: bg,
+                                            borderRadius: BorderRadius.circular(4),
+                                            border: Border.all(color: color.withValues(alpha: 0.3)),
+                                          ),
+                                          child: Text(
+                                            text,
+                                            style: TextStyle(
+                                              fontSize: 9.5,
+                                              fontWeight: FontWeight.w700,
+                                              color: color,
+                                            ),
+                                          ),
+                                        );
+                                      }),
+                                    ],
+                                  ],
                                 ),
 
                                 trailing: km > 0
@@ -3157,12 +3244,119 @@ class _P2HFormPageState extends State<P2HFormPage> {
 
 
 
+                          // Commissioning Status Banner
+                          if (_noLambungCtrl.text.isNotEmpty && _commissioningRemainingDays != null) ...[
+                            const SizedBox(height: 12),
+                            Builder(
+                              builder: (context) {
+                                final days = _commissioningRemainingDays!;
+                                final isExpired = days < 0;
+                                final isCritical = days >= 0 && days <= 14;
+                                final isWarning = days > 14 && days <= 30;
+
+                                final Color cardBg = isExpired
+                                    ? const Color(0xFFFEF2F2)
+                                    : (isCritical
+                                        ? const Color(0xFFFFF7ED)
+                                        : (isWarning ? const Color(0xFFFEFCE8) : const Color(0xFFF0FDF4)));
+                                final Color borderColor = isExpired
+                                    ? const Color(0xFFFCA5A5)
+                                    : (isCritical
+                                        ? const Color(0xFFFDBA74)
+                                        : (isWarning ? const Color(0xFFFDE047) : const Color(0xFF86EFAC)));
+                                final Color textColor = isExpired
+                                    ? const Color(0xFF991B1B)
+                                    : (isCritical
+                                        ? const Color(0xFF9A3412)
+                                        : (isWarning ? const Color(0xFF854D0E) : const Color(0xFF166534)));
+                                final Color iconColor = isExpired
+                                    ? const Color(0xFFDC2626)
+                                    : (isCritical
+                                        ? const Color(0xFFEA580C)
+                                        : (isWarning ? const Color(0xFFCA8A04) : const Color(0xFF16A34A)));
+
+                                final String statusTitle = isExpired
+                                    ? 'Masa Komisioning Telah HABIS'
+                                    : (isCritical
+                                        ? 'Masa Komisioning Kritis: Sisa $days Hari!'
+                                        : (isWarning ? 'Masa Komisioning: Sisa $days Hari' : 'Komisioning Aktif: Sisa $days Hari'));
+
+                                final String subtitle = isExpired
+                                    ? 'Expired sejak ${_formatCommDate(_commissioningExpired)} (${days.abs()} hari lalu)'
+                                    : 'Berlaku s/d ${_formatCommDate(_commissioningExpired)}${_commissioningNo != null && _commissioningNo!.isNotEmpty ? ' • No: $_commissioningNo' : ''}';
+
+                                return Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                  decoration: BoxDecoration(
+                                    color: cardBg,
+                                    borderRadius: BorderRadius.circular(10),
+                                    border: Border.all(color: borderColor, width: 1.2),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Icon(
+                                        isExpired
+                                            ? Icons.warning_amber_rounded
+                                            : (isCritical ? Icons.schedule_rounded : Icons.verified_rounded),
+                                        color: iconColor,
+                                        size: 24,
+                                      ),
+                                      const SizedBox(width: 10),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Row(
+                                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                              children: [
+                                                Text(
+                                                  statusTitle,
+                                                  style: TextStyle(
+                                                    fontSize: 12,
+                                                    fontWeight: FontWeight.w800,
+                                                    color: textColor,
+                                                  ),
+                                                ),
+                                                Container(
+                                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                                                  decoration: BoxDecoration(
+                                                    color: iconColor,
+                                                    borderRadius: BorderRadius.circular(6),
+                                                  ),
+                                                  child: Text(
+                                                    isExpired ? 'EXPIRED' : '$days HARI',
+                                                    style: const TextStyle(
+                                                      fontSize: 9.5,
+                                                      fontWeight: FontWeight.w900,
+                                                      color: Colors.white,
+                                                      letterSpacing: 0.5,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                            const SizedBox(height: 2),
+                                            Text(
+                                              subtitle,
+                                              style: TextStyle(
+                                                fontSize: 10.5,
+                                                fontWeight: FontWeight.w500,
+                                                color: textColor.withValues(alpha: .85),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              },
+                            ),
+                          ],
+
                           const SizedBox(height: 16),
 
-
-
                           // Foto Speedometer (Mandatory)
-
                           _buildSpeedometerUploadCard(),
 
                         ],
@@ -4598,29 +4792,59 @@ class _P2HFormPageState extends State<P2HFormPage> {
           children: [
 
             Expanded(
-
               child: Padding(
-
                 padding: const EdgeInsets.only(top: 4),
-
-                child: Text(
-
-                  '${index + 1}. ${item.name}',
-
-                  style: const TextStyle(
-
-                    fontSize: 13,
-
-                    fontWeight: FontWeight.w600,
-
-                    color: Color(0xFF1E293B),
-
-                  ),
-
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '${index + 1}. ${item.name}',
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF1E293B),
+                      ),
+                    ),
+                    if ((item.name.toLowerCase().contains('komisioning') ||
+                            item.name.toLowerCase().contains('commissioning')) &&
+                        _commissioningRemainingDays != null) ...[
+                      const SizedBox(height: 4),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: _commissioningRemainingDays! < 0
+                              ? const Color(0xFFFEE2E2)
+                              : (_commissioningRemainingDays! <= 14
+                                  ? const Color(0xFFFEF3C7)
+                                  : const Color(0xFFDCFCE7)),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(
+                            color: _commissioningRemainingDays! < 0
+                                ? const Color(0xFFEF4444)
+                                : (_commissioningRemainingDays! <= 14
+                                    ? const Color(0xFFF59E0B)
+                                    : const Color(0xFF22C55E)),
+                          ),
+                        ),
+                        child: Text(
+                          _commissioningRemainingDays! < 0
+                              ? 'Stiker Expired (${_commissioningRemainingDays!.abs()} hari lalu) - s/d ${_formatCommDate(_commissioningExpired)}'
+                              : 'Stiker Aktif: Sisa $_commissioningRemainingDays Hari (s/d ${_formatCommDate(_commissioningExpired)})',
+                          style: TextStyle(
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.bold,
+                            color: _commissioningRemainingDays! < 0
+                                ? const Color(0xFFB91C1C)
+                                : (_commissioningRemainingDays! <= 14
+                                    ? const Color(0xFFB45309)
+                                    : const Color(0xFF15803D)),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
-
               ),
-
             ),
 
             const SizedBox(width: 8),
