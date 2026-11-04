@@ -4947,6 +4947,8 @@ class _DashboardPageState extends State<DashboardPage>
                       _adaptiveHeroText(position, fontSize: 11, minimumFontSize: 8, maxLines: 2, weight: FontWeight.w800, color: const Color(0xFF2563EB)),
                       const SizedBox(height: 2),
                       _adaptiveHeroText(company, fontSize: 10.5, minimumFontSize: 8, maxLines: 2, weight: FontWeight.w600, color: const Color(0xFF64748B)),
+                      const SizedBox(height: 8),
+                      _buildSapComplianceHeroBadge(),
                     ]),
                   ),
                   Positioned(right: 48, top: 13, child: const HomeWeatherWidget()),
@@ -4961,6 +4963,123 @@ class _DashboardPageState extends State<DashboardPage>
         ),
         Positioned(left: 20, right: 20, bottom: 0, child: _buildProfessionalSearchBar()),
       ]),
+    );
+  }
+
+  Widget _buildSapComplianceHeroBadge() {
+    final double rate = _profile?.complianceRate ?? 0.0;
+    final int target = _profile?.totalTarget ?? 0;
+    final int actual = (_profile?.myHazards ?? 0) +
+        (_profile?.myInspections ?? 0) +
+        (_profile?.mySafetyTalks ?? 0) +
+        (_profile?.myObservasi ?? 0) +
+        (_profile?.myCoaching ?? 0) +
+        (_profile?.myP5ms ?? 0);
+
+    final bool isComplete = rate >= 100.0;
+    final bool isGood = rate >= 75.0;
+
+    final Color primaryColor = isComplete
+        ? const Color(0xFF059669)
+        : (isGood ? const Color(0xFF0284C7) : const Color(0xFFD97706));
+    final Color bgColor = isComplete
+        ? const Color(0xFFECFDF5)
+        : (isGood ? const Color(0xFFF0F9FF) : const Color(0xFFFFFBEB));
+    final Color borderColor = isComplete
+        ? const Color(0xFFA7F3D0)
+        : (isGood ? const Color(0xFFBAE6FD) : const Color(0xFFFDE68A));
+
+    final String rateText = target > 0
+        ? '${rate.toStringAsFixed(0)}%'
+        : '$actual Laporan';
+    final String detailText = target > 0
+        ? '$actual/$target Lap'
+        : 'Aktif';
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () {
+          HapticFeedback.lightImpact();
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              fullscreenDialog: true,
+              builder: (context) => const ExtraPage(),
+            ),
+          );
+        },
+        borderRadius: BorderRadius.circular(20),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3.5),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.94),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: borderColor, width: 1.1),
+            boxShadow: [
+              BoxShadow(
+                color: primaryColor.withValues(alpha: 0.08),
+                blurRadius: 6,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 17,
+                height: 17,
+                decoration: BoxDecoration(
+                  color: bgColor,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: borderColor),
+                ),
+                child: Icon(
+                  isComplete
+                      ? Icons.check_circle_rounded
+                      : (isGood ? Icons.trending_up_rounded : Icons.pie_chart_rounded),
+                  size: 11,
+                  color: primaryColor,
+                ),
+              ),
+              const SizedBox(width: 5),
+              const Text(
+                'Kepatuhan SAP: ',
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF475569),
+                ),
+              ),
+              Text(
+                rateText,
+                style: TextStyle(
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w900,
+                  color: primaryColor,
+                ),
+              ),
+              if (target > 0) ...[
+                const SizedBox(width: 4),
+                Text(
+                  '($detailText)',
+                  style: const TextStyle(
+                    fontSize: 9.5,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF64748B),
+                  ),
+                ),
+              ],
+              const SizedBox(width: 2),
+              const Icon(
+                Icons.chevron_right_rounded,
+                size: 13,
+                color: Color(0xFF94A3B8),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
