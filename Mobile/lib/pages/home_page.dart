@@ -3,7 +3,7 @@ import 'dart:io';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../services/api.dart';
@@ -31,9 +31,17 @@ class _HomePageState extends State<HomePage> {
   final _profile = PreferenceService.getProfile();
   int _currentPage = globals.currentPage;
 
+  // Auto-hide & scroll-reveal navbar state
+  bool _isNavVisible = false;
+  Timer? _hideNavTimer;
+  ImageProvider? _navbarProfileImage;
+
   @override
   void initState() {
     super.initState();
+
+    _loadNavbarProfilePhoto();
+    PreferenceService.profilePhotoNotifier.addListener(_onProfilePhotoChanged);
 
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       final prefs = await SharedPreferences.getInstance();
@@ -76,50 +84,99 @@ class _HomePageState extends State<HomePage> {
 
   @override
   void dispose() {
-    /** */
-
+    _hideNavTimer?.cancel();
+    PreferenceService.profilePhotoNotifier.removeListener(_onProfilePhotoChanged);
+    _pageCtrl.dispose();
     super.dispose();
   }
 
-  void _showBackDialog() {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Keluar Aplikasi'),
-          content: const Text(
-            'Apakah anda akan keluar aplikasi?',
+  void _onProfilePhotoChanged() {
+    _loadNavbarProfilePhoto(PreferenceService.profilePhotoNotifier.value);
+  }
+
+  Future<void> _loadNavbarProfilePhoto([String? specificFoto]) async {
+    try {
+      final foto = specificFoto ?? PreferenceService.getProfile()?.foto;
+      if (foto == null || foto.trim().isEmpty) {
+        if (mounted) setState(() => _navbarProfileImage = null);
+        return;
+      }
+
+      if (foto.startsWith('http://') || foto.startsWith('https://')) {
+        if (mounted) setState(() => _navbarProfileImage = NetworkImage(foto));
+        return;
+      }
+
+      final localFile = File(foto);
+      if (localFile.existsSync()) {
+        if (mounted) setState(() => _navbarProfileImage = FileImage(localFile));
+        return;
+      }
+
+      final tempDir = (await getTemporaryDirectory()).path;
+      final tempFile = File('$tempDir/$foto');
+      if (tempFile.existsSync()) {
+        if (mounted) setState(() => _navbarProfileImage = FileImage(tempFile));
+        return;
+      }
+
+      // Download from API if not yet in cache
+      await _api.dio.download('${_api.baseUrl}/image/$foto', tempFile.path);
+      if (mounted && tempFile.existsSync()) {
+        setState(() => _navbarProfileImage = FileImage(tempFile));
+      }
+    } catch (e) {
+      debugPrint('[HomePage] Error loading navbar profile avatar: $e');
+    }
+  }
+
+  bool _handleScrollNotification(ScrollNotification notification) {
+    if (notification is ScrollUpdateNotification) {
+      final dy = notification.scrollDelta ?? 0;
+      if (dy.abs() > 0.8) {
+        _showNavAndScheduleHide();
+      }
+    } else if (notification is ScrollStartNotification) {
+      if (notification.metrics.axis == Axis.vertical) {
+        _showNavAndScheduleHide();
+      }
+    }
+    return false;
+  }
+
+  void _showNavAndScheduleHide([int durationMs = 2800]) {
+    _hideNavTimer?.cancel();
+    if (!_isNavVisible) {
+      if (mounted) {
+        setState(() => _isNavVisible = true);
+      }
+    }
+    _hideNavTimer = Timer(Duration(milliseconds: durationMs), () {
+      if (mounted && _isNavVisible) {
+        setState(() => _isNavVisible = false);
+      }
+    });
+  }
+
+  Future<bool> _showBackDialog() async {
+    return (await showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Keluar dari Aplikasi?'),
+            content: const Text('Apakah Anda yakin ingin keluar dari aplikasi?'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: const Text('Batal'),
+              ),
+              TextButton(
+                onPressed: () => exit(0),
+                child: const Text('Ya, Keluar'),
+              ),
+            ],
           ),
-          actions: [
-            TextButton(
-              style: TextButton.styleFrom(
-                textStyle: Theme.of(context).textTheme.labelLarge,
-              ),
-              child: const Text('Cancel'),
-              onPressed: () {
-                Navigator.pop(context);
-              },
-            ),
-            TextButton(
-              style: TextButton.styleFrom(
-                textStyle: Theme.of(context).textTheme.labelLarge,
-              ),
-              child: const Text('Ok'),
-              onPressed: () {
-                Navigator.pop(context);
-                Future.delayed(const Duration(milliseconds: 1000), () {
-                  if (Platform.isAndroid) {
-                    SystemChannels.platform.invokeMethod('SystemNavigator.pop');
-                  } else if (Platform.isIOS) {
-                    exit(0);
-                  }
-                });
-              },
-            ),
-          ],
-        );
-      },
-    );
+        )) ??
+        false;
   }
 
   @override
@@ -131,134 +188,170 @@ class _HomePageState extends State<HomePage> {
         _showBackDialog();
       },
       child: Scaffold(
-        body: PageView(
-          controller: _pageCtrl,
-          physics: const NeverScrollableScrollPhysics(),
-          onPageChanged: (page) {
-            setState(() {
-              _currentPage = page;
-              globals.currentPage = page;
-            });
-          },
-          children: const [
-            DashboardPage(),
-            SafetyUpdatesPage(),
-            SizedBox.shrink(),
-            ScanPage(),
-            ProfilePage(),
-          ],
-        ),
         extendBody: true,
-        bottomNavigationBar: bottomNavBar(),
-        // floatingActionButton: FloatingActionButton(
-        //   elevation: 12,
-        //   shape: const CircleBorder(),
-        //   onPressed: () {
-        //     Navigator.push(
-        //       context,
-        //       MaterialPageRoute(
-        //         builder: (context) => const HazardFormPage(),
-        //       ),
-        //     );
-        //   },
-        //   tooltip: 'Quick',
-        //   backgroundColor: Theme.of(context).colorScheme.primary,
-        //   child: Image.asset(
-        //     'assets/images/quick-hazard.png',
-        //     height: 72,
-        //     fit: BoxFit.cover,
-        //   ),
-        // ),
-        // floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
-        // floatingActionButtonAnimator: FloatingActionButtonAnimator.scaling,
+        body: NotificationListener<ScrollNotification>(
+          onNotification: _handleScrollNotification,
+          child: Stack(
+            children: [
+              // 1. Pages Body
+              Positioned.fill(
+                child: PageView(
+                  controller: _pageCtrl,
+                  physics: const NeverScrollableScrollPhysics(),
+                  onPageChanged: (page) {
+                    setState(() {
+                      _currentPage = page;
+                      globals.currentPage = page;
+                    });
+                    _showNavAndScheduleHide(3000);
+                  },
+                  children: const [
+                    DashboardPage(),
+                    SafetyUpdatesPage(),
+                    SizedBox.shrink(),
+                    ScanPage(),
+                    ProfilePage(),
+                  ],
+                ),
+              ),
+
+              // 2. Gesture tap edge detection at bottom to reveal navbar if hidden
+              if (!_isNavVisible)
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  height: 36,
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.translucent,
+                    onTap: () => _showNavAndScheduleHide(3500),
+                    onVerticalDragUpdate: (_) => _showNavAndScheduleHide(3500),
+                  ),
+                ),
+
+              // 3. Floating Navbar Layer - ALWAYS ON TOP (Highest Z-index)
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                child: _buildAnimatedFloatingNavBar(),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
 
-  Widget bottomNavBar() {
+  Widget _buildAnimatedFloatingNavBar() {
     final bottomInset = MediaQuery.of(context).padding.bottom;
-    final bottomMargin = bottomInset > 0 ? bottomInset + 4.0 : 14.0;
+    final bottomMargin = bottomInset > 0 ? bottomInset + 8.0 : 16.0;
 
-    return Padding(
-      padding: EdgeInsets.only(
-        left: 16,
-        right: 16,
-        bottom: bottomMargin,
-      ),
-      child: Container(
-        height: 66,
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(34),
-          border: Border.all(
-            color: const Color(0xFFE2E8F0),
-            width: 1.2,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: const Color(0xFF0F172A).withValues(alpha: 0.10),
-              blurRadius: 24,
-              offset: const Offset(0, 8),
-            ),
-            BoxShadow(
-              color: const Color(0xFF0284C7).withValues(alpha: 0.08),
-              blurRadius: 10,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(34),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-            child: Container(
-              color: Colors.white.withValues(alpha: 0.94),
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-              child: Row(
-                children: [
-                  // 1. Beranda
-                  Expanded(
-                    child: _bottomItem(
-                      index: 0,
-                      activeIcon: Icons.home_rounded,
-                      inactiveIcon: Icons.home_outlined,
-                      label: 'Beranda',
+    return AnimatedSlide(
+      offset: _isNavVisible ? Offset.zero : const Offset(0, 1.4),
+      duration: const Duration(milliseconds: 320),
+      curve: Curves.easeOutCubic,
+      child: AnimatedOpacity(
+        opacity: _isNavVisible ? 1.0 : 0.0,
+        duration: const Duration(milliseconds: 260),
+        curve: Curves.easeOutCubic,
+        child: IgnorePointer(
+          ignoring: !_isNavVisible,
+          child: Listener(
+            onPointerDown: (_) => _hideNavTimer?.cancel(),
+            onPointerUp: (_) {
+              _hideNavTimer?.cancel();
+              _hideNavTimer = Timer(const Duration(milliseconds: 2800), () {
+                if (mounted && _isNavVisible) {
+                  setState(() => _isNavVisible = false);
+                }
+              });
+            },
+            child: Padding(
+              padding: EdgeInsets.only(
+                left: 16,
+                right: 16,
+                bottom: bottomMargin,
+              ),
+              child: Container(
+                height: 66,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(34),
+                  border: Border.all(
+                    color: const Color(0xFFE2E8F0),
+                    width: 1.2,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF0F172A).withValues(alpha: 0.12),
+                      blurRadius: 24,
+                      offset: const Offset(0, 8),
+                    ),
+                    BoxShadow(
+                      color: const Color(0xFF0284C7).withValues(alpha: 0.08),
+                      blurRadius: 10,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(34),
+                  child: BackdropFilter(
+                    filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+                    child: Container(
+                      color: Colors.white.withValues(alpha: 0.94),
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                      child: Row(
+                        children: [
+                          // 1. Beranda
+                          Expanded(
+                            child: _bottomItem(
+                              index: 0,
+                              activeIcon: Icons.home_rounded,
+                              inactiveIcon: Icons.home_outlined,
+                              label: 'Beranda',
+                            ),
+                          ),
+
+                          // 2. Safety Updates
+                          Expanded(
+                            child: _bottomItem(
+                              index: 1,
+                              activeIcon: Icons.health_and_safety_rounded,
+                              inactiveIcon: Icons.health_and_safety_outlined,
+                              label: 'Safety Updates',
+                            ),
+                          ),
+
+                          // 3. Center Quick Hazard Action Button
+                          _centerHazardButton(),
+
+                          // 4. Scan
+                          Expanded(
+                            child: _bottomItem(
+                              index: 3,
+                              activeIcon: Icons.qr_code_scanner_rounded,
+                              inactiveIcon: Icons.qr_code_scanner_rounded,
+                              label: 'Scan',
+                            ),
+                          ),
+
+                          // 5. Profil (dengan foto avatar jika sudah diupload)
+                          Expanded(
+                            child: _bottomItem(
+                              index: 4,
+                              activeIcon: Icons.person_rounded,
+                              inactiveIcon: Icons.person_outline_rounded,
+                              label: 'Profil',
+                              isProfileTab: true,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-
-                  // 2. Safety Updates
-                  Expanded(
-                    child: _bottomItem(
-                      index: 1,
-                      activeIcon: Icons.health_and_safety_rounded,
-                      inactiveIcon: Icons.health_and_safety_outlined,
-                      label: 'Safety Updates',
-                    ),
-                  ),
-
-                  // 3. Center Quick Hazard Action Button
-                  _centerHazardButton(),
-
-                  // 4. Scan
-                  Expanded(
-                    child: _bottomItem(
-                      index: 3,
-                      activeIcon: Icons.qr_code_scanner_rounded,
-                      inactiveIcon: Icons.qr_code_scanner_rounded,
-                      label: 'Scan',
-                    ),
-                  ),
-
-                  // 5. Profil
-                  Expanded(
-                    child: _bottomItem(
-                      index: 4,
-                      activeIcon: Icons.person_rounded,
-                      inactiveIcon: Icons.person_outline_rounded,
-                      label: 'Profil',
-                    ),
-                  ),
-                ],
+                ),
               ),
             ),
           ),
@@ -318,6 +411,7 @@ class _HomePageState extends State<HomePage> {
     required IconData activeIcon,
     required IconData inactiveIcon,
     required String label,
+    bool isProfileTab = false,
   }) {
     final selected = _currentPage == index;
     final primaryColor = Theme.of(context).colorScheme.primary;
@@ -326,6 +420,7 @@ class _HomePageState extends State<HomePage> {
 
     return InkWell(
       onTap: () {
+        _showNavAndScheduleHide(3000);
         _pageCtrl.animateToPage(
           index,
           duration: const Duration(milliseconds: 280),
@@ -341,7 +436,10 @@ class _HomePageState extends State<HomePage> {
           AnimatedContainer(
             duration: const Duration(milliseconds: 220),
             curve: Curves.easeOutCubic,
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 3),
+            padding: EdgeInsets.symmetric(
+              horizontal: isProfileTab && _navbarProfileImage != null ? 8 : 12,
+              vertical: isProfileTab && _navbarProfileImage != null ? 3 : 3,
+            ),
             decoration: BoxDecoration(
               color: selected
                   ? const Color(0xFFEFF6FF)
@@ -354,11 +452,36 @@ class _HomePageState extends State<HomePage> {
                 width: 1.0,
               ),
             ),
-            child: Icon(
-              selected ? activeIcon : inactiveIcon,
-              size: 21,
-              color: selected ? activeColor : inactiveColor,
-            ),
+            child: (isProfileTab && _navbarProfileImage != null)
+                ? Container(
+                    width: 22,
+                    height: 22,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: selected ? activeColor : const Color(0xFFCBD5E1),
+                        width: selected ? 1.8 : 1.0,
+                      ),
+                    ),
+                    child: ClipOval(
+                      child: Image(
+                        image: _navbarProfileImage!,
+                        width: 22,
+                        height: 22,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => Icon(
+                          selected ? activeIcon : inactiveIcon,
+                          size: 21,
+                          color: selected ? activeColor : inactiveColor,
+                        ),
+                      ),
+                    ),
+                  )
+                : Icon(
+                    selected ? activeIcon : inactiveIcon,
+                    size: 21,
+                    color: selected ? activeColor : inactiveColor,
+                  ),
           ),
           const SizedBox(height: 1),
           Text(
@@ -379,6 +502,7 @@ class _HomePageState extends State<HomePage> {
   }
 
   void _openQuickHazard() {
+    _showNavAndScheduleHide(3000);
     Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => const HazardCreatePage()),
