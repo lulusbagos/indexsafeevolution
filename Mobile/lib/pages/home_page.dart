@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -25,20 +26,47 @@ class HomePage extends StatefulWidget {
   State<HomePage> createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage> {
+class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin {
   final _pageCtrl = PageController(initialPage: globals.currentPage);
   final _api = ApiService();
   final _profile = PreferenceService.getProfile();
   int _currentPage = globals.currentPage;
 
-  // Auto-hide & scroll-reveal navbar state
-  bool _isNavVisible = false;
+  // Dedicated hardware-synchronized AnimationController for butter-smooth slide & fade
+  late final AnimationController _navAnimCtrl;
+  late final Animation<Offset> _navSlideAnim;
+  late final Animation<double> _navFadeAnim;
+
   Timer? _hideNavTimer;
   ImageProvider? _navbarProfileImage;
 
   @override
   void initState() {
     super.initState();
+
+    _navAnimCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 380),
+      reverseDuration: const Duration(milliseconds: 320),
+    );
+
+    _navSlideAnim = Tween<Offset>(
+      begin: const Offset(0, 1.45),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(
+      parent: _navAnimCtrl,
+      curve: Curves.easeOutCubic,
+      reverseCurve: Curves.easeInOutCubic,
+    ));
+
+    _navFadeAnim = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(
+      parent: _navAnimCtrl,
+      curve: const Interval(0.0, 0.85, curve: Curves.easeOut),
+      reverseCurve: const Interval(0.15, 1.0, curve: Curves.easeIn),
+    ));
 
     _loadNavbarProfilePhoto();
     PreferenceService.profilePhotoNotifier.addListener(_onProfilePhotoChanged);
@@ -85,6 +113,7 @@ class _HomePageState extends State<HomePage> {
   @override
   void dispose() {
     _hideNavTimer?.cancel();
+    _navAnimCtrl.dispose();
     PreferenceService.profilePhotoNotifier.removeListener(_onProfilePhotoChanged);
     _pageCtrl.dispose();
     super.dispose();
@@ -130,32 +159,51 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  bool _handleScrollNotification(ScrollNotification notification) {
-    if (notification is ScrollUpdateNotification) {
-      final dy = notification.scrollDelta ?? 0;
-      if (dy.abs() > 0.8) {
-        _showNavAndScheduleHide();
+  void _showNavbar() {
+    _hideNavTimer?.cancel();
+    if (!_navAnimCtrl.isCompleted && _navAnimCtrl.status != AnimationStatus.forward) {
+      _navAnimCtrl.forward();
+    }
+  }
+
+  void _scheduleHideNavbar([int delayMs = 3000]) {
+    _hideNavTimer?.cancel();
+    _hideNavTimer = Timer(Duration(milliseconds: delayMs), () {
+      if (mounted && _navAnimCtrl.value > 0) {
+        _navAnimCtrl.reverse();
       }
-    } else if (notification is ScrollStartNotification) {
-      if (notification.metrics.axis == Axis.vertical) {
-        _showNavAndScheduleHide();
+    });
+  }
+
+  void _showNavAndScheduleHide([int delayMs = 3000]) {
+    _showNavbar();
+    _scheduleHideNavbar(delayMs);
+  }
+
+  /// Only responds to real physical human touch scrolling on vertical axis
+  /// completely ignoring horizontal banner carousels, timers, and layout rebuilds
+  bool _handleScrollNotification(ScrollNotification notification) {
+    if (notification.metrics.axis != Axis.vertical) {
+      return false;
+    }
+
+    if (notification is ScrollUpdateNotification) {
+      // dragDetails != null GUARANTEES it is user's finger dragging on screen!
+      if (notification.dragDetails != null) {
+        final dy = notification.scrollDelta ?? 0;
+        if (dy.abs() > 0.4) {
+          _showNavbar();
+          _scheduleHideNavbar(3000);
+        }
+      }
+    } else if (notification is UserScrollNotification) {
+      if (notification.direction != ScrollDirection.idle) {
+        _showNavbar();
+      } else {
+        _scheduleHideNavbar(3000);
       }
     }
     return false;
-  }
-
-  void _showNavAndScheduleHide([int durationMs = 2800]) {
-    _hideNavTimer?.cancel();
-    if (!_isNavVisible) {
-      if (mounted) {
-        setState(() => _isNavVisible = true);
-      }
-    }
-    _hideNavTimer = Timer(Duration(milliseconds: durationMs), () {
-      if (mounted && _isNavVisible) {
-        setState(() => _isNavVisible = false);
-      }
-    });
   }
 
   Future<bool> _showBackDialog() async {
@@ -203,7 +251,7 @@ class _HomePageState extends State<HomePage> {
                       _currentPage = page;
                       globals.currentPage = page;
                     });
-                    _showNavAndScheduleHide(3000);
+                    _showNavAndScheduleHide(3200);
                   },
                   children: const [
                     DashboardPage(),
@@ -216,18 +264,25 @@ class _HomePageState extends State<HomePage> {
               ),
 
               // 2. Gesture tap edge detection at bottom to reveal navbar if hidden
-              if (!_isNavVisible)
-                Positioned(
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  height: 36,
-                  child: GestureDetector(
-                    behavior: HitTestBehavior.translucent,
-                    onTap: () => _showNavAndScheduleHide(3500),
-                    onVerticalDragUpdate: (_) => _showNavAndScheduleHide(3500),
-                  ),
-                ),
+              AnimatedBuilder(
+                animation: _navAnimCtrl,
+                builder: (context, _) {
+                  if (_navAnimCtrl.value < 0.2) {
+                    return Positioned(
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      height: 38,
+                      child: GestureDetector(
+                        behavior: HitTestBehavior.translucent,
+                        onTap: () => _showNavAndScheduleHide(3500),
+                        onVerticalDragUpdate: (_) => _showNavAndScheduleHide(3500),
+                      ),
+                    );
+                  }
+                  return const SizedBox.shrink();
+                },
+              ),
 
               // 3. Floating Navbar Layer - ALWAYS ON TOP (Highest Z-index)
               Positioned(
@@ -247,26 +302,21 @@ class _HomePageState extends State<HomePage> {
     final bottomInset = MediaQuery.of(context).padding.bottom;
     final bottomMargin = bottomInset > 0 ? bottomInset + 8.0 : 16.0;
 
-    return AnimatedSlide(
-      offset: _isNavVisible ? Offset.zero : const Offset(0, 1.4),
-      duration: const Duration(milliseconds: 320),
-      curve: Curves.easeOutCubic,
-      child: AnimatedOpacity(
-        opacity: _isNavVisible ? 1.0 : 0.0,
-        duration: const Duration(milliseconds: 260),
-        curve: Curves.easeOutCubic,
-        child: IgnorePointer(
-          ignoring: !_isNavVisible,
+    return SlideTransition(
+      position: _navSlideAnim,
+      child: FadeTransition(
+        opacity: _navFadeAnim,
+        child: AnimatedBuilder(
+          animation: _navAnimCtrl,
+          builder: (context, child) {
+            return IgnorePointer(
+              ignoring: _navAnimCtrl.value < 0.15,
+              child: child,
+            );
+          },
           child: Listener(
             onPointerDown: (_) => _hideNavTimer?.cancel(),
-            onPointerUp: (_) {
-              _hideNavTimer?.cancel();
-              _hideNavTimer = Timer(const Duration(milliseconds: 2800), () {
-                if (mounted && _isNavVisible) {
-                  setState(() => _isNavVisible = false);
-                }
-              });
-            },
+            onPointerUp: (_) => _scheduleHideNavbar(3000),
             child: Padding(
               padding: EdgeInsets.only(
                 left: 16,
