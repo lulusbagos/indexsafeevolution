@@ -168,14 +168,24 @@ class _SafetyUpdatesPageState extends State<SafetyUpdatesPage> {
 
   List<IncidentNewsModel> get _filteredUpdates {
     final list = _allUpdates.where((item) {
-      // Buang data import excel placeholder / dummy jika ada
-      final isDummy = item.dibuatOleh.toLowerCase().contains('system import') ||
-          item.dibuatOleh.toLowerCase().contains('system') ||
-          item.konten.trim().length < 15;
-      if (isDummy) return false;
+      final isBannerItem = item.isBanner ||
+          item.kategori.toLowerCase().contains('banner') ||
+          item.kategori.toLowerCase().contains('informasi');
+
+      // Hanya buang data dummy import jika BUKAN banner resmi
+      if (!isBannerItem) {
+        final isDummy = item.dibuatOleh.toLowerCase().contains('system import') ||
+            item.dibuatOleh.toLowerCase().contains('system') ||
+            item.konten.trim().length < 15;
+        if (isDummy) return false;
+      }
 
       final matchesCat = _category == 'Semua' ||
-          item.kategori.toLowerCase().contains(_category.toLowerCase());
+          (_category == 'Banner Informasi'
+              ? (item.kategori.toLowerCase().contains('banner') ||
+                  item.kategori.toLowerCase().contains('informasi') ||
+                  item.isBanner)
+              : item.kategori.toLowerCase().contains(_category.toLowerCase()));
       final q = _searchQuery.trim().toLowerCase();
       final matchesSearch = q.isEmpty ||
           item.judul.toLowerCase().contains(q) ||
@@ -230,8 +240,8 @@ class _SafetyUpdatesPageState extends State<SafetyUpdatesPage> {
       return const Color(0xFFEA580C);
     } else if (cat.contains('injury') || cat.contains('medical')) {
       return const Color(0xFFE11D48);
-    } else if (cat.contains('banner')) {
-      return const Color(0xFF2563EB);
+    } else if (cat.contains('banner') || cat.contains('informasi')) {
+      return const Color(0xFF0284C7);
     } else if (cat.contains('announcement') || cat.contains('mbs')) {
       return const Color(0xFF059669);
     }
@@ -248,8 +258,8 @@ class _SafetyUpdatesPageState extends State<SafetyUpdatesPage> {
       return Icons.car_crash_rounded;
     } else if (cat.contains('injury') || cat.contains('medical')) {
       return Icons.health_and_safety_rounded;
-    } else if (cat.contains('banner')) {
-      return Icons.view_carousel_rounded;
+    } else if (cat.contains('banner') || cat.contains('informasi')) {
+      return Icons.campaign_rounded;
     } else if (cat.contains('announcement') || cat.contains('mbs')) {
       return Icons.campaign_rounded;
     }

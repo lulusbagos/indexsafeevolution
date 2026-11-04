@@ -22,14 +22,16 @@ namespace Indexsafe.Api.Controllers
         private readonly AppDbContext _context;
         private readonly IWebHostEnvironment _env;
         private readonly ILogger<IncidentController> _logger;
+        private readonly Indexsafe.Api.Services.ImageUploadService _imageUploadService;
         private static bool _schemaEnsured = false;
         private static readonly object _schemaLock = new();
 
-        public IncidentController(AppDbContext context, IWebHostEnvironment env, ILogger<IncidentController> logger)
+        public IncidentController(AppDbContext context, IWebHostEnvironment env, ILogger<IncidentController> logger, Indexsafe.Api.Services.ImageUploadService imageUploadService)
         {
             _context = context;
             _env = env;
             _logger = logger;
+            _imageUploadService = imageUploadService;
             EnsureSchema();
         }
 
@@ -103,12 +105,16 @@ namespace Indexsafe.Api.Controllers
 
             if (is_update.HasValue)
             {
-                query = query.Where(i => i.IsUpdate == is_update.Value);
+                if (is_update.Value)
+                    query = query.Where(i => i.IsUpdate || i.IsBanner || (i.Kategori != null && i.Kategori.Contains("Banner")));
+                else
+                    query = query.Where(i => i.IsUpdate == false);
             }
 
             if (!string.IsNullOrWhiteSpace(category) && !string.Equals(category, "Semua", StringComparison.OrdinalIgnoreCase))
             {
-                query = query.Where(i => i.Kategori != null && i.Kategori.ToLower() == category.ToLower());
+                var catLower = category.ToLower().Trim();
+                query = query.Where(i => i.Kategori != null && (i.Kategori.ToLower().Contains(catLower) || (catLower.Contains("banner") && i.IsBanner)));
             }
 
             if (!string.IsNullOrWhiteSpace(search))
@@ -138,10 +144,10 @@ namespace Indexsafe.Api.Controllers
                             !i.DibuatOleh.Contains("System Import Excel") &&
                             i.Konten.Length >= 15);
 
-            // 1. Coba ambil yang explicitly is_banner = true
+            // 1. Coba ambil yang is_banner = true atau berkategori Banner Informasi
             var banners = await baseQuery
-                .Where(i => i.IsBanner)
-                .OrderBy(i => i.BannerUrutan)
+                .Where(i => i.IsBanner || (i.Kategori != null && i.Kategori.Contains("Banner")))
+                .OrderBy(i => i.BannerUrutan > 0 ? i.BannerUrutan : 999)
                 .ThenByDescending(i => i.TanggalKejadian ?? i.CreatedAt)
                 .Take(limit)
                 .ToListAsync();
@@ -207,7 +213,14 @@ namespace Indexsafe.Api.Controllers
 
             if (uploadFile != null && uploadFile.Length > 0)
             {
-                savedImageUrl = await SaveIncidentImageAsync(uploadFile);
+                if (form.IsBanner == true || (form.Kategori != null && form.Kategori.Contains("Banner", StringComparison.OrdinalIgnoreCase)))
+                {
+                    savedImageUrl = await _imageUploadService.UploadBannerImageAsync(uploadFile);
+                }
+                else
+                {
+                    savedImageUrl = await SaveIncidentImageAsync(uploadFile);
+                }
             }
 
             DateTime? tglKejadian = null;
