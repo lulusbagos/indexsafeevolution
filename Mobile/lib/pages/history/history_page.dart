@@ -15,6 +15,9 @@ import '../../widgets/snackbar_msg.dart';
 import '../../widgets/top_bar.dart';
 import '../../services/p2h_pdf_service.dart';
 import '../../services/p5m_share_service.dart';
+import '../../services/hazard_pdf_service.dart';
+import '../hazard/hazard_create_page.dart';
+import '../../models/hazard_hub_model.dart';
 import '../simama/simama_form_page.dart';
 import '../p5m/p5m_form_page.dart';
 import 'history_detail_page.dart';
@@ -632,6 +635,75 @@ class _HistoryPageState extends State<HistoryPage> {
                     P5mShareService.showShareModal(context, _rawData[index] as Map<String, dynamic>);
                   },
                 ),
+              if (widget.module == Module.hazard)
+                ListTile(
+                  title: const Text(
+                    'Edit Laporan Hazard',
+                    style: TextStyle(
+                      color: Colors.black87,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  trailing: const Icon(
+                    Icons.edit_note_rounded,
+                    color: Color(0xFFEA580C),
+                  ),
+                  contentPadding: const EdgeInsets.fromLTRB(0, 10, 0, 10),
+                  shape: Border(bottom: BorderSide(color: Colors.indigo.shade100)),
+                  onTap: () {
+                    Navigator.pop(context);
+                    final raw = _rawData[index] as Map<String, dynamic>;
+                    final hazardItem = HazardReportItem.fromJson(raw);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => HazardCreatePage(
+                          editItem: hazardItem,
+                        ),
+                      ),
+                    ).then((_) => _getData());
+                  },
+                ),
+              if (widget.module == Module.hazard)
+                ListTile(
+                  title: const Text(
+                    'Bagikan Laporan (Share PDF / WA)',
+                    style: TextStyle(
+                      color: Colors.black87,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  trailing: const Icon(
+                    Icons.share_rounded,
+                    color: Color(0xFFEA580C),
+                  ),
+                  contentPadding: const EdgeInsets.fromLTRB(0, 10, 0, 10),
+                  shape: Border(bottom: BorderSide(color: Colors.indigo.shade100)),
+                  onTap: () {
+                    Navigator.pop(context);
+                    HazardPdfService.showShareModalFromMap(context, _rawData[index] as Map<String, dynamic>);
+                  },
+                ),
+              if (widget.module == Module.hazard)
+                ListTile(
+                  title: const Text(
+                    'Cetak PDF',
+                    style: TextStyle(
+                      color: Colors.black87,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  trailing: const Icon(
+                    Icons.picture_as_pdf_rounded,
+                    color: Color(0xFFEA580C),
+                  ),
+                  contentPadding: const EdgeInsets.fromLTRB(0, 10, 0, 10),
+                  shape: Border(bottom: BorderSide(color: Colors.indigo.shade100)),
+                  onTap: () {
+                    Navigator.pop(context);
+                    HazardPdfService.printHazardPdfFromMap(_rawData[index] as Map<String, dynamic>);
+                  },
+                ),
               ListTile(
                 title: Text(
                   'Sinkron',
@@ -729,8 +801,11 @@ class _HistoryPageState extends State<HistoryPage> {
                               () async {
                                 var canDelete = true;
                                 if (widget.module == Module.observation && sync && syncId != null) {
-                                  canDelete = await _api.deleteObservation(syncId as int);
-                                }
+                                    canDelete = await _api.deleteObservation(syncId as int);
+                                  } else if (widget.module == Module.hazard && sync && syncId != null) {
+                                    final res = await _api.deleteHazardDirect(syncId as int);
+                                    canDelete = res.isRight();
+                                  }
                                 if (!canDelete) {
                                   if (mounted) SnackBarMsg.danger(this.context, 'Gagal menghapus laporan server.');
                                   return;
@@ -743,6 +818,7 @@ class _HistoryPageState extends State<HistoryPage> {
                                       where tran_id=$id''');
                                   setState(() => _rawData.removeAt(index));
                                   SnackBarMsg.success(this.context, 'Data berhasil dihapus!');
+                                  OfflineSyncService.instance.refresh();
                                   if (syncId != null && widget.module != Module.observation) {
                                     final modName = (widget.module == Module.simama) ? 'simama' : widget.module.name;
                                     _api.dio.delete('/tran/$modName/$syncId').then((_) {}, onError: (_) {});

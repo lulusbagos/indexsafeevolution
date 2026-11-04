@@ -107,39 +107,63 @@ class HazardReportItem {
   });
 
   factory HazardReportItem.fromJson(Map<String, dynamic> json) {
+    final tgl = json['tanggal']?.toString() ?? json['date']?.toString() ?? '';
+    final wkt = json['waktu']?.toString() ?? json['time']?.toString() ?? '';
+    final empNama = json['nama']?.toString() ?? json['employee_name']?.toString() ?? '';
+    final empNik = json['nik']?.toString() ?? json['employee_nik']?.toString() ?? '';
+    final tmn = json['temuan']?.toString() ?? json['remark']?.toString() ?? json['detil_temuan']?.toString() ?? json['title']?.toString() ?? '';
+    final ar = json['area']?.toString() ?? json['area_name']?.toString();
+    final lok = json['lokasi']?.toString() ?? json['location_name']?.toString();
+    final detLok = json['detil_lokasi']?.toString() ?? json['location_detail']?.toString();
+    final pj = json['pja']?.toString() ?? json['pja_name']?.toString();
+    final imgTemuan = json['foto_temuan']?.toString() ?? json['image']?.toString();
+    final imgRepair = json['foto_perbaikan']?.toString() ?? json['image_repair']?.toString() ?? json['repair_image']?.toString();
+
+    String stat = json['status_temuan']?.toString() ?? '';
+    if (stat.isEmpty) {
+      if (json['status'] == 1 || json['status'] == '1' || json['status'] == 'closed' || json['status'] == 'Closed') {
+        stat = 'Closed';
+      } else if (json['status'] == 2 || json['status'] == '2') {
+        stat = 'In Progress';
+      } else {
+        stat = 'Open';
+      }
+    }
+
+    final isOffline = json['is_offline_pending'] == true || (json.containsKey('sync_id') && json['sync_id'] == null);
+
     return HazardReportItem(
-      id: json['id'] ?? 0,
-      tanggal: json['tanggal']?.toString() ?? '',
-      waktu: json['waktu']?.toString() ?? '',
-      nama: json['nama']?.toString() ?? '',
-      nik: json['nik']?.toString() ?? '',
-      departemen: json['departemen']?.toString(),
-      area: json['area']?.toString(),
-      lokasi: json['lokasi']?.toString(),
-      detilLokasi: json['detil_lokasi']?.toString(),
-      temuan: json['temuan']?.toString() ?? '',
+      id: json['id'] is int ? json['id'] : int.tryParse('${json['id']}') ?? 0,
+      tanggal: tgl,
+      waktu: wkt,
+      nama: empNama,
+      nik: empNik,
+      departemen: json['departemen']?.toString() ?? json['dept_name']?.toString(),
+      area: ar,
+      lokasi: lok,
+      detilLokasi: detLok,
+      temuan: tmn,
       kategoriBahaya: json['kategori_bahaya']?.toString(),
       jenisBahaya: json['jenis_bahaya']?.toString(),
       jenisKetidaksesuaian: json['jenis_ketidaksesuaian']?.toString(),
-      tingkatResiko: json['tingkat_resiko']?.toString() ?? 'Rendah',
-      perbaikan: json['perbaikan']?.toString(),
+      tingkatResiko: json['tingkat_resiko']?.toString() ?? json['resiko']?.toString() ?? 'Rendah',
+      perbaikan: json['perbaikan']?.toString() ?? json['action_taken']?.toString(),
       tindakanPerbaikan: json['tindakan_perbaikan']?.toString(),
-      pja: json['pja']?.toString(),
+      pja: pj,
       nikPja: json['nik_pja']?.toString(),
       departemenPja: json['departemen_pja']?.toString(),
-      statusTemuan: json['status_temuan']?.toString() ?? 'Open',
-      fotoTemuan: json['foto_temuan']?.toString(),
-      fotoPerbaikan: json['foto_perbaikan']?.toString(),
+      statusTemuan: stat,
+      fotoTemuan: imgTemuan,
+      fotoPerbaikan: imgRepair,
       createdAt: json['created_at']?.toString(),
       isMyReport: json['is_my_report'] == true,
       isAssignedToMe: json['is_assigned_to_me'] == true,
       canTakeUp: json['can_take_up'] == true ||
-          (json['is_assigned_to_me'] == true &&
-              (json['status_temuan']?.toString().toLowerCase() == 'open')),
+          (json['is_assigned_to_me'] == true && stat.toLowerCase() == 'open'),
       canClose: json['can_close'] == true,
       canReassign: json['can_reassign'] == true,
-      canDelete: json['can_delete'] == true,
-      isOfflinePending: json['is_offline_pending'] == true,
+      canDelete: json['can_delete'] == true || isOffline,
+      isOfflinePending: isOffline,
     );
   }
 }

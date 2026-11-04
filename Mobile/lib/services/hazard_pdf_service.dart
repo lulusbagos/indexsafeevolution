@@ -75,371 +75,399 @@ class HazardPdfService {
     final statusColor = isClosed ? PdfColors.green700 : PdfColors.amber800;
 
     pdf.addPage(
-      pw.Page(
+      pw.MultiPage(
         pageFormat: PdfPageFormat.a4,
-        margin: const pw.EdgeInsets.all(32),
+        margin: const pw.EdgeInsets.all(24),
         build: (pw.Context context) {
-          return pw.Column(
-            crossAxisAlignment: pw.CrossAxisAlignment.start,
-            children: [
-              // HEADER KOP SURAT
-              pw.Container(
-                padding: const pw.EdgeInsets.only(bottom: 12),
-                decoration: const pw.BoxDecoration(
-                  border: pw.Border(
-                    bottom: pw.BorderSide(color: PdfColors.grey400, width: 1.5),
-                  ),
-                ),
-                child: pw.Row(
-                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                  crossAxisAlignment: pw.CrossAxisAlignment.center,
-                  children: [
-                    pw.Column(
-                      crossAxisAlignment: pw.CrossAxisAlignment.start,
-                      children: [
-                        pw.Text(
-                          'PT INDEXIM COALINDO',
-                          style: pw.TextStyle(
-                            fontSize: 16,
-                            fontWeight: pw.FontWeight.bold,
-                            color: PdfColors.blueGrey900,
-                          ),
-                        ),
-                        pw.SizedBox(height: 2),
-                        pw.Text(
-                          'SAFETY ACCOUNTABILITY PROGRAM (SAP)',
-                          style: pw.TextStyle(
-                            fontSize: 9,
-                            fontWeight: pw.FontWeight.bold,
-                            color: PdfColors.grey700,
-                          ),
-                        ),
-                      ],
-                    ),
-                    pw.Column(
-                      crossAxisAlignment: pw.CrossAxisAlignment.end,
-                      children: [
-                        pw.Container(
-                          padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                          decoration: pw.BoxDecoration(
-                            color: PdfColors.grey200,
-                            borderRadius: const pw.BorderRadius.all(pw.Radius.circular(6)),
-                          ),
-                          child: pw.Text(
-                            'NO: #HZR-${item.id}',
-                            style: pw.TextStyle(
-                              fontSize: 10,
-                              fontWeight: pw.FontWeight.bold,
-                              color: PdfColors.black,
-                            ),
-                          ),
-                        ),
-                        pw.SizedBox(height: 2),
-                        pw.Text(
-                          'Dicetak: ${DateFormat('dd/MM/yyyy HH:mm').format(DateTime.now())}',
-                          style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey600),
-                        ),
-                      ],
-                    ),
-                  ],
+          return [
+            // HEADER KOP SURAT RESMI
+            pw.Container(
+              padding: const pw.EdgeInsets.only(bottom: 12),
+              decoration: const pw.BoxDecoration(
+                border: pw.Border(
+                  bottom: pw.BorderSide(color: PdfColors.blueGrey800, width: 2),
                 ),
               ),
-
-              pw.SizedBox(height: 14),
-
-              // JUDUL LAPORAN & BADGE
-              pw.Row(
+              child: pw.Row(
                 mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: pw.CrossAxisAlignment.center,
                 children: [
-                  pw.Text(
-                    'LAPORAN TEMUAN HAZARD',
-                    style: pw.TextStyle(
-                      fontSize: 14,
-                      fontWeight: pw.FontWeight.bold,
-                      color: PdfColors.black,
-                    ),
-                  ),
-                  pw.Row(
-                    children: [
-                      // Badge Status
-                      pw.Container(
-                        padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 3),
-                        decoration: pw.BoxDecoration(
-                          color: statusColor,
-                          borderRadius: const pw.BorderRadius.all(pw.Radius.circular(4)),
-                        ),
-                        child: pw.Text(
-                          item.statusTemuan.toUpperCase(),
-                          style: pw.TextStyle(
-                            color: PdfColors.white,
-                            fontSize: 9,
-                            fontWeight: pw.FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                      pw.SizedBox(width: 6),
-                      // Badge Risiko
-                      pw.Container(
-                        padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 3),
-                        decoration: pw.BoxDecoration(
-                          color: riskColor,
-                          borderRadius: const pw.BorderRadius.all(pw.Radius.circular(4)),
-                        ),
-                        child: pw.Text(
-                          'RISIKO: ${item.tingkatResiko.toUpperCase()}',
-                          style: pw.TextStyle(
-                            color: PdfColors.white,
-                            fontSize: 9,
-                            fontWeight: pw.FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-
-              pw.SizedBox(height: 12),
-
-              // TABEL DATA UTAMA
-              pw.Container(
-                decoration: pw.BoxDecoration(
-                  border: pw.Border.all(color: PdfColors.grey300),
-                  borderRadius: const pw.BorderRadius.all(pw.Radius.circular(6)),
-                ),
-                padding: const pw.EdgeInsets.all(10),
-                child: pw.Column(
-                  children: [
-                    _buildPdfRow('Waktu Temuan', '$formattedDate, Pukul ${item.waktu} WITA'),
-                    _buildPdfRow('Pelapor', '${item.nama} (NIK: ${item.nik}) - Dept: ${item.departemen ?? '-'}'),
-                    _buildPdfRow('Area & Lokasi', '${item.area ?? '-'} / ${item.lokasi ?? '-'}'),
-                    if (item.detilLokasi != null && item.detilLokasi!.isNotEmpty)
-                      _buildPdfRow('Detil Lokasi', item.detilLokasi!),
-                    _buildPdfRow('Kategori Bahaya', item.kategoriBahaya ?? '-'),
-                    _buildPdfRow('Jenis Bahaya', '${item.jenisBahaya ?? '-'} ${item.jenisKetidaksesuaian != null && item.jenisKetidaksesuaian!.isNotEmpty ? "(${item.jenisKetidaksesuaian})" : ""}'),
-                    _buildPdfRow('PJA Ditunjuk', '${item.pja ?? '-'} ${item.nikPja != null && item.nikPja!.isNotEmpty ? "(NIK: ${item.nikPja})" : ""} - Dept: ${item.departemenPja ?? '-'}'),
-                  ],
-                ),
-              ),
-
-              pw.SizedBox(height: 12),
-
-              // URAIAN TEMUAN
-              pw.Container(
-                width: double.infinity,
-                padding: const pw.EdgeInsets.all(10),
-                decoration: pw.BoxDecoration(
-                  color: PdfColors.grey100,
-                  borderRadius: const pw.BorderRadius.all(pw.Radius.circular(6)),
-                  border: pw.Border.all(color: PdfColors.grey300),
-                ),
-                child: pw.Column(
-                  crossAxisAlignment: pw.CrossAxisAlignment.start,
-                  children: [
-                    pw.Text(
-                      'URAIAN TEMUAN HAZARD:',
-                      style: pw.TextStyle(
-                        fontSize: 9,
-                        fontWeight: pw.FontWeight.bold,
-                        color: PdfColors.blueGrey800,
-                      ),
-                    ),
-                    pw.SizedBox(height: 4),
-                    pw.Text(
-                      item.temuan,
-                      style: const pw.TextStyle(fontSize: 9, lineSpacing: 1.3),
-                    ),
-                  ],
-                ),
-              ),
-
-              pw.SizedBox(height: 10),
-
-              // TINDAKAN PERBAIKAN / PENYELESAIAN
-              if ((item.perbaikan != null && item.perbaikan!.isNotEmpty) ||
-                  (item.tindakanPerbaikan != null && item.tindakanPerbaikan!.isNotEmpty))
-                pw.Container(
-                  width: double.infinity,
-                  padding: const pw.EdgeInsets.all(10),
-                  decoration: pw.BoxDecoration(
-                    color: isClosed ? PdfColors.green50 : PdfColors.orange50,
-                    borderRadius: const pw.BorderRadius.all(pw.Radius.circular(6)),
-                    border: pw.Border.all(
-                      color: isClosed ? PdfColors.green200 : PdfColors.orange200,
-                    ),
-                  ),
-                  child: pw.Column(
+                  pw.Column(
                     crossAxisAlignment: pw.CrossAxisAlignment.start,
                     children: [
                       pw.Text(
-                        isClosed ? 'TINDAKAN PERBAIKAN (CLOSED):' : 'RENCANA TINDAKAN LANJUTAN:',
+                        'PT INDEXIM COALINDO',
                         style: pw.TextStyle(
-                          fontSize: 9,
+                          fontSize: 16,
                           fontWeight: pw.FontWeight.bold,
-                          color: isClosed ? PdfColors.green900 : PdfColors.orange900,
+                          color: PdfColors.blueGrey900,
                         ),
                       ),
-                      pw.SizedBox(height: 4),
+                      pw.SizedBox(height: 2),
                       pw.Text(
-                        (item.perbaikan != null && item.perbaikan!.isNotEmpty)
-                            ? item.perbaikan!
-                            : (item.tindakanPerbaikan ?? '-'),
-                        style: const pw.TextStyle(fontSize: 9, lineSpacing: 1.3),
+                        'FORMULIR LAPORAN TEMUAN BAHAYA (HAZARD REPORT)',
+                        style: pw.TextStyle(
+                          fontSize: 10.5,
+                          fontWeight: pw.FontWeight.bold,
+                          color: PdfColors.orange800,
+                        ),
+                      ),
+                      pw.Text(
+                        'Safety Accountability Program (SAP) - Integrated HSE System',
+                        style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey700),
                       ),
                     ],
                   ),
-                ),
-
-              pw.SizedBox(height: 12),
-
-              // DOKUMENTASI FOTO (BEFORE & AFTER)
-              pw.Text(
-                'DOKUMENTASI FOTO TEMUAN & PERBAIKAN:',
-                style: pw.TextStyle(
-                  fontSize: 10,
-                  fontWeight: pw.FontWeight.bold,
-                  color: PdfColors.blueGrey900,
-                ),
-              ),
-              pw.SizedBox(height: 6),
-
-              pw.Row(
-                children: [
-                  // Foto Before (Temuan)
-                  pw.Expanded(
-                    child: pw.Container(
-                      height: 160,
-                      decoration: pw.BoxDecoration(
-                        border: pw.Border.all(color: PdfColors.grey300),
-                        borderRadius: const pw.BorderRadius.all(pw.Radius.circular(6)),
-                      ),
-                      child: pw.Column(
-                        children: [
-                          pw.Container(
-                            width: double.infinity,
-                            padding: const pw.EdgeInsets.symmetric(vertical: 4),
-                            color: PdfColors.red50,
-                            alignment: pw.Alignment.center,
-                            child: pw.Text(
-                              'FOTO TEMUAN (BEFORE)',
-                              style: pw.TextStyle(
-                                fontSize: 8,
-                                fontWeight: pw.FontWeight.bold,
-                                color: PdfColors.red800,
-                              ),
-                            ),
-                          ),
-                          pw.Expanded(
-                            child: fotoTemuanBytes != null
-                                ? pw.Padding(
-                                    padding: const pw.EdgeInsets.all(6),
-                                    child: pw.Image(
-                                      pw.MemoryImage(fotoTemuanBytes),
-                                      fit: pw.BoxFit.contain,
-                                    ),
-                                  )
-                                : pw.Center(
-                                    child: pw.Text(
-                                      'Tidak ada foto temuan',
-                                      style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey500),
-                                    ),
-                                  ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-
-                  pw.SizedBox(width: 12),
-
-                  // Foto After (Perbaikan)
-                  pw.Expanded(
-                    child: pw.Container(
-                      height: 160,
-                      decoration: pw.BoxDecoration(
-                        border: pw.Border.all(color: PdfColors.grey300),
-                        borderRadius: const pw.BorderRadius.all(pw.Radius.circular(6)),
-                      ),
-                      child: pw.Column(
-                        children: [
-                          pw.Container(
-                            width: double.infinity,
-                            padding: const pw.EdgeInsets.symmetric(vertical: 4),
-                            color: isClosed ? PdfColors.green50 : PdfColors.grey200,
-                            alignment: pw.Alignment.center,
-                            child: pw.Text(
-                              isClosed ? 'FOTO PERBAIKAN (AFTER)' : 'BELUM ADA PERBAIKAN',
-                              style: pw.TextStyle(
-                                fontSize: 8,
-                                fontWeight: pw.FontWeight.bold,
-                                color: isClosed ? PdfColors.green800 : PdfColors.grey700,
-                              ),
-                            ),
-                          ),
-                          pw.Expanded(
-                            child: fotoPerbaikanBytes != null
-                                ? pw.Padding(
-                                    padding: const pw.EdgeInsets.all(6),
-                                    child: pw.Image(
-                                      pw.MemoryImage(fotoPerbaikanBytes),
-                                      fit: pw.BoxFit.contain,
-                                    ),
-                                  )
-                                : pw.Center(
-                                    child: pw.Text(
-                                      isClosed
-                                          ? 'Perbaikan diselesaikan tanpa foto'
-                                          : 'Menunggu penanganan PJA',
-                                      style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey500),
-                                    ),
-                                  ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-
-              pw.Spacer(),
-
-              // FOOTER TANDA TANGAN
-              pw.Row(
-                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                children: [
                   pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.end,
                     children: [
-                      pw.Text('Pelapor Temuan,', style: const pw.TextStyle(fontSize: 8)),
-                      pw.SizedBox(height: 32),
-                      pw.Text(
-                        item.nama,
-                        style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold),
+                      pw.Container(
+                        padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: const pw.BoxDecoration(
+                          color: PdfColors.grey200,
+                          borderRadius: pw.BorderRadius.all(pw.Radius.circular(6)),
+                        ),
+                        child: pw.Text(
+                          'NO: #HZR-${item.id}',
+                          style: pw.TextStyle(
+                            fontSize: 10,
+                            fontWeight: pw.FontWeight.bold,
+                            color: PdfColors.black,
+                          ),
+                        ),
                       ),
-                      pw.Text('NIK: ${item.nik}', style: const pw.TextStyle(fontSize: 8)),
-                    ],
-                  ),
-                  pw.Column(
-                    children: [
-                      pw.Text('Penanggung Jawab Area (PJA),', style: const pw.TextStyle(fontSize: 8)),
-                      pw.SizedBox(height: 32),
+                      pw.SizedBox(height: 3),
                       pw.Text(
-                        item.pja ?? 'Belum Ditunjuk',
-                        style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold),
+                        'Dicetak: ${DateFormat('dd/MM/yyyy HH:mm').format(DateTime.now())} WITA',
+                        style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey600),
                       ),
-                      pw.Text('NIK: ${item.nikPja ?? "-"}', style: const pw.TextStyle(fontSize: 8)),
                     ],
                   ),
                 ],
               ),
-              pw.SizedBox(height: 8),
-              pw.Center(
-                child: pw.Text(
-                  'Dokumen digital resmi diterbitkan oleh Sistem Mobile Safety Indexsafe Evolution - PT Indexim Coalindo',
-                  style: const pw.TextStyle(fontSize: 7, color: PdfColors.grey500),
+            ),
+
+            pw.SizedBox(height: 12),
+
+            // STATUS & TINGKAT RISIKO BAR
+            pw.Row(
+              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+              children: [
+                pw.Text(
+                  'RINGKASAN STATUS TEMUAN:',
+                  style: pw.TextStyle(
+                    fontSize: 11,
+                    fontWeight: pw.FontWeight.bold,
+                    color: PdfColors.blueGrey900,
+                  ),
+                ),
+                pw.Row(
+                  children: [
+                    // Badge Status
+                    pw.Container(
+                      padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 3.5),
+                      decoration: pw.BoxDecoration(
+                        color: statusColor,
+                        borderRadius: const pw.BorderRadius.all(pw.Radius.circular(4)),
+                      ),
+                      child: pw.Text(
+                        item.statusTemuan.toUpperCase(),
+                        style: pw.TextStyle(
+                          color: PdfColors.white,
+                          fontSize: 9,
+                          fontWeight: pw.FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    pw.SizedBox(width: 8),
+                    // Badge Risiko
+                    pw.Container(
+                      padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 3.5),
+                      decoration: pw.BoxDecoration(
+                        color: riskColor,
+                        borderRadius: const pw.BorderRadius.all(pw.Radius.circular(4)),
+                      ),
+                      child: pw.Text(
+                        'RISIKO: ${item.tingkatResiko.toUpperCase()}',
+                        style: pw.TextStyle(
+                          color: PdfColors.white,
+                          fontSize: 9,
+                          fontWeight: pw.FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+
+            pw.SizedBox(height: 10),
+
+            // METADATA GRID (2 KOLOM RAPI)
+            pw.Container(
+              decoration: pw.BoxDecoration(
+                color: PdfColors.grey100,
+                border: pw.Border.all(color: PdfColors.grey300),
+                borderRadius: const pw.BorderRadius.all(pw.Radius.circular(6)),
+              ),
+              padding: const pw.EdgeInsets.all(10),
+              child: pw.Row(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  pw.Expanded(
+                    child: pw.Column(
+                      crossAxisAlignment: pw.CrossAxisAlignment.start,
+                      children: [
+                        _buildPdfRow('Waktu Temuan', '$formattedDate • ${item.waktu} WITA'),
+                        _buildPdfRow('Pelapor', '${item.nama} (${item.nik})'),
+                        _buildPdfRow('Dept. Pelapor', item.departemen ?? '-'),
+                        _buildPdfRow('Area Utama', item.area ?? '-'),
+                        _buildPdfRow('Lokasi Temuan', item.lokasi ?? '-'),
+                        if (item.detilLokasi != null && item.detilLokasi!.isNotEmpty && item.detilLokasi != '-')
+                          _buildPdfRow('Detil Spesifik', item.detilLokasi!),
+                      ],
+                    ),
+                  ),
+                  pw.SizedBox(width: 14),
+                  pw.Expanded(
+                    child: pw.Column(
+                      crossAxisAlignment: pw.CrossAxisAlignment.start,
+                      children: [
+                        _buildPdfRow('PJA Ditunjuk', item.pja ?? 'Belum Ditunjuk'),
+                        _buildPdfRow('NIK & Dept PJA', '${item.nikPja ?? "-"} / ${item.departemenPja ?? "-"}'),
+                        _buildPdfRow('Kategori Bahaya', item.kategoriBahaya ?? '-'),
+                        _buildPdfRow('Jenis Bahaya', item.jenisBahaya ?? '-'),
+                        if (item.jenisKetidaksesuaian != null && item.jenisKetidaksesuaian!.isNotEmpty)
+                          _buildPdfRow('Ketidaksesuaian', item.jenisKetidaksesuaian!),
+                        _buildPdfRow('Status Laporan', item.statusTemuan.toUpperCase()),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            pw.SizedBox(height: 12),
+
+            // URAIAN TEMUAN
+            pw.Container(
+              width: double.infinity,
+              padding: const pw.EdgeInsets.all(10),
+              decoration: pw.BoxDecoration(
+                color: PdfColors.white,
+                borderRadius: const pw.BorderRadius.all(pw.Radius.circular(6)),
+                border: pw.Border.all(color: PdfColors.grey300),
+              ),
+              child: pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  pw.Text(
+                    'URAIAN DESKRIPSI TEMUAN BAHAYA:',
+                    style: pw.TextStyle(
+                      fontSize: 9.5,
+                      fontWeight: pw.FontWeight.bold,
+                      color: PdfColors.blueGrey800,
+                    ),
+                  ),
+                  pw.SizedBox(height: 5),
+                  pw.Text(
+                    item.temuan,
+                    style: const pw.TextStyle(fontSize: 9, lineSpacing: 1.35),
+                  ),
+                ],
+              ),
+            ),
+
+            pw.SizedBox(height: 10),
+
+            // TINDAKAN PERBAIKAN / PENYELESAIAN
+            pw.Container(
+              width: double.infinity,
+              padding: const pw.EdgeInsets.all(10),
+              decoration: pw.BoxDecoration(
+                color: isClosed ? PdfColors.green50 : PdfColors.orange50,
+                borderRadius: const pw.BorderRadius.all(pw.Radius.circular(6)),
+                border: pw.Border.all(
+                  color: isClosed ? PdfColors.green300 : PdfColors.orange300,
                 ),
               ),
-            ],
-          );
+              child: pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  pw.Text(
+                    isClosed ? 'TINDAKAN PERBAIKAN SELESAI (CLOSED):' : 'RENCANA PENANGANAN / TINDAK LANJUT PJA:',
+                    style: pw.TextStyle(
+                      fontSize: 9.5,
+                      fontWeight: pw.FontWeight.bold,
+                      color: isClosed ? PdfColors.green900 : PdfColors.orange900,
+                    ),
+                  ),
+                  pw.SizedBox(height: 4),
+                  pw.Text(
+                    (item.perbaikan != null && item.perbaikan!.isNotEmpty)
+                        ? item.perbaikan!
+                        : ((item.tindakanPerbaikan != null && item.tindakanPerbaikan!.isNotEmpty)
+                            ? item.tindakanPerbaikan!
+                            : 'Menunggu proses investigasi dan tindakan penanganan dari PJA terkait.'),
+                    style: pw.TextStyle(
+                      fontSize: 9,
+                      lineSpacing: 1.35,
+                      color: isClosed ? PdfColors.green900 : PdfColors.orange900,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            pw.SizedBox(height: 12),
+
+            // DOKUMENTASI FOTO (BEFORE & AFTER)
+            pw.Text(
+              'DOKUMENTASI FOTO TEMUAN & PERBAIKAN:',
+              style: pw.TextStyle(
+                fontSize: 10,
+                fontWeight: pw.FontWeight.bold,
+                color: PdfColors.blueGrey900,
+              ),
+            ),
+            pw.SizedBox(height: 6),
+
+            pw.Row(
+              children: [
+                // Foto Before (Temuan)
+                pw.Expanded(
+                  child: pw.Container(
+                    height: 170,
+                    decoration: pw.BoxDecoration(
+                      border: pw.Border.all(color: PdfColors.grey300),
+                      borderRadius: const pw.BorderRadius.all(pw.Radius.circular(6)),
+                    ),
+                    child: pw.Column(
+                      children: [
+                        pw.Container(
+                          width: double.infinity,
+                          padding: const pw.EdgeInsets.symmetric(vertical: 4),
+                          color: PdfColors.red50,
+                          alignment: pw.Alignment.center,
+                          child: pw.Text(
+                            'FOTO TEMUAN (BEFORE)',
+                            style: pw.TextStyle(
+                              fontSize: 8.5,
+                              fontWeight: pw.FontWeight.bold,
+                              color: PdfColors.red800,
+                            ),
+                          ),
+                        ),
+                        pw.Expanded(
+                          child: fotoTemuanBytes != null
+                              ? pw.Padding(
+                                  padding: const pw.EdgeInsets.all(6),
+                                  child: pw.Image(
+                                    pw.MemoryImage(fotoTemuanBytes),
+                                    fit: pw.BoxFit.contain,
+                                  ),
+                                )
+                              : pw.Center(
+                                  child: pw.Text(
+                                    'Tidak ada foto temuan',
+                                    style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey500),
+                                  ),
+                                ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+
+                pw.SizedBox(width: 12),
+
+                // Foto After (Perbaikan)
+                pw.Expanded(
+                  child: pw.Container(
+                    height: 170,
+                    decoration: pw.BoxDecoration(
+                      border: pw.Border.all(color: PdfColors.grey300),
+                      borderRadius: const pw.BorderRadius.all(pw.Radius.circular(6)),
+                    ),
+                    child: pw.Column(
+                      children: [
+                        pw.Container(
+                          width: double.infinity,
+                          padding: const pw.EdgeInsets.symmetric(vertical: 4),
+                          color: isClosed ? PdfColors.green50 : PdfColors.grey200,
+                          alignment: pw.Alignment.center,
+                          child: pw.Text(
+                            isClosed ? 'FOTO PERBAIKAN (AFTER)' : 'BELUM ADA PERBAIKAN',
+                            style: pw.TextStyle(
+                              fontSize: 8.5,
+                              fontWeight: pw.FontWeight.bold,
+                              color: isClosed ? PdfColors.green800 : PdfColors.grey700,
+                            ),
+                          ),
+                        ),
+                        pw.Expanded(
+                          child: fotoPerbaikanBytes != null
+                              ? pw.Padding(
+                                  padding: const pw.EdgeInsets.all(6),
+                                  child: pw.Image(
+                                    pw.MemoryImage(fotoPerbaikanBytes),
+                                    fit: pw.BoxFit.contain,
+                                  ),
+                                )
+                              : pw.Center(
+                                  child: pw.Text(
+                                    isClosed
+                                        ? 'Perbaikan diselesaikan tanpa foto'
+                                        : 'Menunggu penanganan PJA',
+                                    style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey500),
+                                  ),
+                                ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+
+            pw.SizedBox(height: 20),
+
+            // FOOTER TANDA TANGAN
+            pw.Row(
+              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+              children: [
+                pw.Column(
+                  children: [
+                    pw.Text('Pelapor Temuan,', style: const pw.TextStyle(fontSize: 8.5)),
+                    pw.SizedBox(height: 36),
+                    pw.Text(
+                      item.nama.isNotEmpty ? item.nama : 'LULUS BAGOS HERMAWAN',
+                      style: pw.TextStyle(fontSize: 9.5, fontWeight: pw.FontWeight.bold),
+                    ),
+                    pw.Text('NIK: ${item.nik}', style: const pw.TextStyle(fontSize: 8)),
+                  ],
+                ),
+                pw.Column(
+                  children: [
+                    pw.Text('Penanggung Jawab Area (PJA),', style: const pw.TextStyle(fontSize: 8.5)),
+                    pw.SizedBox(height: 36),
+                    pw.Text(
+                      (item.pja != null && item.pja!.isNotEmpty) ? item.pja! : 'Penanggung Jawab Area',
+                      style: pw.TextStyle(fontSize: 9.5, fontWeight: pw.FontWeight.bold),
+                    ),
+                    pw.Text('NIK: ${item.nikPja ?? "-"}', style: const pw.TextStyle(fontSize: 8)),
+                  ],
+                ),
+              ],
+            ),
+            pw.SizedBox(height: 14),
+            pw.Center(
+              child: pw.Text(
+                'Dokumen digital resmi diterbitkan oleh Sistem Mobile Safety Indexsafe Evolution - PT Indexim Coalindo',
+                style: const pw.TextStyle(fontSize: 7.5, color: PdfColors.grey600),
+              ),
+            ),
+          ];
         },
       ),
     );
@@ -454,7 +482,7 @@ class HazardPdfService {
         crossAxisAlignment: pw.CrossAxisAlignment.start,
         children: [
           pw.SizedBox(
-            width: 110,
+            width: 100,
             child: pw.Text(
               label,
               style: pw.TextStyle(
@@ -494,6 +522,18 @@ class HazardPdfService {
     );
   }
 
+  /// Membagikan PDF langsung dari data Map (misal dari HistoryPage)
+  static Future<void> shareHazardPdfFromMap(Map<String, dynamic> data) async {
+    final item = HazardReportItem.fromJson(data);
+    await shareHazardPdf(item);
+  }
+
+  /// Preview cetak langsung dari data Map
+  static Future<void> printHazardPdfFromMap(Map<String, dynamic> data) async {
+    final item = HazardReportItem.fromJson(data);
+    await printHazardPdf(item);
+  }
+
   /// Format teks ringkasan untuk WhatsApp
   static String formatWhatsAppSummary(HazardReportItem item) {
     final sb = StringBuffer();
@@ -501,7 +541,7 @@ class HazardPdfService {
     sb.writeln('*PT INDEXIM COALINDO*');
     sb.writeln('----------------------------------------');
     sb.writeln('🆔 *No. Laporan:* #HZR-${item.id}');
-    sb.writeln('📅 *Waktu Temuan:* ${item.tanggal} ${item.waktu}');
+    sb.writeln('📅 *Waktu Temuan:* ${item.tanggal} • ${item.waktu} WITA');
     sb.writeln('📍 *Area:* ${item.area ?? '-'}');
     sb.writeln('📌 *Lokasi:* ${item.lokasi ?? '-'}');
     if (item.detilLokasi != null && item.detilLokasi!.trim().isNotEmpty && item.detilLokasi != '-') {
@@ -519,8 +559,11 @@ class HazardPdfService {
     sb.writeln('----------------------------------------');
     sb.writeln('📝 *Deskripsi Temuan Bahaya:*');
     sb.writeln(item.temuan.trim());
-    if (item.tindakanPerbaikan != null && item.tindakanPerbaikan!.trim().isNotEmpty) {
-      sb.writeln('\n🛠️ *Tindakan Perbaikan:*');
+    if (item.perbaikan != null && item.perbaikan!.trim().isNotEmpty) {
+      sb.writeln('\n✅ *Tindakan Perbaikan (Closed):*');
+      sb.writeln(item.perbaikan!.trim());
+    } else if (item.tindakanPerbaikan != null && item.tindakanPerbaikan!.trim().isNotEmpty) {
+      sb.writeln('\n🛠️ *Rencana Tindakan Perbaikan:*');
       sb.writeln(item.tindakanPerbaikan!.trim());
     }
     sb.writeln('----------------------------------------');
@@ -667,5 +710,11 @@ class HazardPdfService {
         );
       },
     );
+  }
+
+  /// Menampilkan modal berbagi dari data Map
+  static void showShareModalFromMap(BuildContext context, Map<String, dynamic> data) {
+    final item = HazardReportItem.fromJson(data);
+    showShareModal(context, item);
   }
 }

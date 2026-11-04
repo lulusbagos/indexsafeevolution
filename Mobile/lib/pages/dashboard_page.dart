@@ -28,6 +28,7 @@ import '../widgets/snackbar_msg.dart';
 import 'approval/approval_center_page.dart';
 import 'global_search_page.dart';
 import 'hazard/hazard_hub_page.dart';
+import 'hazard/hazard_page.dart';
 import 'menu/extra_page.dart';
 import 'menu/ohs_page.dart';
 import 'menu/sap_page.dart';
@@ -4193,11 +4194,11 @@ class _DashboardPageState extends State<DashboardPage>
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                                builder: (_) => const HazardHubPage()),
+                                builder: (_) => const HazardPage()),
                           );
                         },
                         icon: const Icon(Icons.open_in_new_rounded, size: 16),
-                        label: const Text('Hazard Hub'),
+                        label: const Text('Summary Hazard'),
                         style: OutlinedButton.styleFrom(
                           foregroundColor: const Color(0xFF1D4ED8),
                           side: const BorderSide(color: Color(0xFFBFDBFE)),
