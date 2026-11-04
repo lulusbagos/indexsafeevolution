@@ -1,9 +1,9 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -28,16 +28,29 @@ class HomePage extends StatefulWidget {
   State<HomePage> createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin, WidgetsBindingObserver {
-  final _pageCtrl = PageController(initialPage: globals.currentPage);
+class _HomePageState extends State<HomePage> with TickerProviderStateMixin, WidgetsBindingObserver {
   final _api = ApiService();
   final _profile = PreferenceService.getProfile();
-  int _currentPage = globals.currentPage;
+  int _currentPage = (globals.currentPage == 2) ? 0 : globals.currentPage;
+  late int _previousPage = _currentPage;
 
-  // Dedicated hardware-synchronized AnimationController for butter-smooth slide & fade
+  // Dedicated hardware-synchronized AnimationController for floating navbar slide & fade
   late final AnimationController _navAnimCtrl;
   late final Animation<Offset> _navSlideAnim;
   late final Animation<double> _navFadeAnim;
+
+  // Ultra-smooth, lightweight directional page transition controllers (ke kiri & ke kanan)
+  late final AnimationController _pageTransitionCtrl;
+  late final Animation<double> _pageCurvedAnim;
+  bool _isPageTransitioning = false;
+  bool _isForward = true;
+
+  // State-retained page instances: prevent re-renders, re-fetching API, and loss of scroll position
+  final Widget _dashboardView = const DashboardPage();
+  final Widget _safetyUpdatesView = const SafetyUpdatesPage();
+  final Widget _profileView = const ProfilePage();
+
+  final List<int> _tabOrder = [0, 1, 3, 4];
 
   Timer? _hideNavTimer;
   ImageProvider? _navbarProfileImage;
@@ -71,6 +84,28 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
       curve: const Interval(0.0, 0.85, curve: Curves.easeOut),
       reverseCurve: const Interval(0.15, 1.0, curve: Curves.easeIn),
     ));
+
+    // Page transition controller (280ms easeOutCubic)
+    _pageTransitionCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 280),
+    );
+
+    _pageCurvedAnim = CurvedAnimation(
+      parent: _pageTransitionCtrl,
+      curve: Curves.easeOutCubic,
+    );
+
+    _pageTransitionCtrl.addStatusListener((status) {
+      if (status == AnimationStatus.completed) {
+        if (mounted) {
+          setState(() {
+            _previousPage = _currentPage;
+            _isPageTransitioning = false;
+          });
+        }
+      }
+    });
 
     _loadNavbarProfilePhoto();
     PreferenceService.profilePhotoNotifier.addListener(_onProfilePhotoChanged);
@@ -120,11 +155,11 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
   void dispose() {
     _hideNavTimer?.cancel();
     _navAnimCtrl.dispose();
+    _pageTransitionCtrl.dispose();
     PreferenceService.profilePhotoNotifier.removeListener(_onProfilePhotoChanged);
     WidgetsBinding.instance.removeObserver(this);
     _securityCheckTimer?.cancel();
     _connectivitySub?.cancel();
-    _pageCtrl.dispose();
     super.dispose();
   }
 
@@ -227,6 +262,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
   /// Only responds to real physical human touch scrolling on vertical axis
   /// completely ignoring horizontal banner carousels, timers, and layout rebuilds
   bool _handleScrollNotification(ScrollNotification notification) {
+    if (_isPageTransitioning) return false;
     if (notification.metrics.axis != Axis.vertical) {
       return false;
     }
@@ -248,6 +284,39 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
       }
     }
     return false;
+  }
+
+  void _onTabSelected(int index) {
+    if (index == _currentPage && !_isPageTransitioning) return;
+    try {
+      HapticFeedback.selectionClick();
+    } catch (_) {}
+    _showNavAndScheduleHide(3000);
+
+    final forward = index > _currentPage;
+    setState(() {
+      _isForward = forward;
+      _previousPage = _currentPage;
+      _currentPage = index;
+      globals.currentPage = index;
+      _isPageTransitioning = true;
+    });
+
+    _pageTransitionCtrl.forward(from: 0.0);
+  }
+
+  void _navigateToNextTab() {
+    final idx = _tabOrder.indexOf(_currentPage);
+    if (idx != -1 && idx < _tabOrder.length - 1) {
+      _onTabSelected(_tabOrder[idx + 1]);
+    }
+  }
+
+  void _navigateToPreviousTab() {
+    final idx = _tabOrder.indexOf(_currentPage);
+    if (idx > 0) {
+      _onTabSelected(_tabOrder[idx - 1]);
+    }
   }
 
   Future<bool> _showBackDialog() async {
@@ -285,26 +354,9 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
           onNotification: _handleScrollNotification,
           child: Stack(
             children: [
-              // 1. Pages Body
+              // 1. Pages Body with smooth left/right directional transition and state preservation
               Positioned.fill(
-                child: PageView(
-                  controller: _pageCtrl,
-                  physics: const NeverScrollableScrollPhysics(),
-                  onPageChanged: (page) {
-                    setState(() {
-                      _currentPage = page;
-                      globals.currentPage = page;
-                    });
-                    _showNavAndScheduleHide(3200);
-                  },
-                  children: const [
-                    DashboardPage(),
-                    SafetyUpdatesPage(),
-                    SizedBox.shrink(),
-                    ScanPage(),
-                    ProfilePage(),
-                  ],
-                ),
+                child: _buildPagesBody(),
               ),
 
               // 2. Gesture tap edge detection at bottom to reveal navbar if hidden
@@ -340,6 +392,88 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
         ),
       ),
     );
+  }
+
+  Widget _buildPagesBody() {
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        _buildTabWrapper(0, _dashboardView),
+        _buildTabWrapper(1, _safetyUpdatesView),
+        _buildTabWrapper(3, _buildScanView()),
+        _buildTabWrapper(4, _profileView),
+      ],
+    );
+  }
+
+  Widget _buildScanView() {
+    // Only mount ScanPage when active or transitioning to avoid holding camera hardware in background
+    if (_currentPage == 3 || _previousPage == 3) {
+      return const ScanPage();
+    }
+    return const SizedBox.shrink();
+  }
+
+  Widget _buildTabWrapper(int tabIndex, Widget child) {
+    final isCurrent = tabIndex == _currentPage;
+    final isPrevious = tabIndex == _previousPage;
+
+    // Completely inactive: offstage to preserve state with 0 render cost
+    if (!isCurrent && (!isPrevious || !_isPageTransitioning)) {
+      return Offstage(
+        offstage: true,
+        child: child,
+      );
+    }
+
+    // Currently active and idle
+    if (isCurrent && !_isPageTransitioning) {
+      return Offstage(
+        offstage: false,
+        child: child,
+      );
+    }
+
+    // Entering tab transition (ke kiri / ke kanan)
+    if (isCurrent && _isPageTransitioning) {
+      final inBegin = _isForward ? const Offset(1.0, 0.0) : const Offset(-1.0, 0.0);
+      return AnimatedBuilder(
+        animation: _pageCurvedAnim,
+        builder: (context, _) {
+          return SlideTransition(
+            position: Tween<Offset>(begin: inBegin, end: Offset.zero).animate(_pageCurvedAnim),
+            child: FadeTransition(
+              opacity: Tween<double>(begin: 0.1, end: 1.0).animate(_pageCurvedAnim),
+              child: child,
+            ),
+          );
+        },
+      );
+    }
+
+    // Exiting tab transition (ke kiri / ke kanan)
+    if (isPrevious && _isPageTransitioning) {
+      final outEnd = _isForward ? const Offset(-0.25, 0.0) : const Offset(0.25, 0.0);
+      return AnimatedBuilder(
+        animation: _pageCurvedAnim,
+        builder: (context, _) {
+          return SlideTransition(
+            position: Tween<Offset>(begin: Offset.zero, end: outEnd).animate(_pageCurvedAnim),
+            child: FadeTransition(
+              opacity: Tween<double>(begin: 1.0, end: 0.0).animate(
+                CurvedAnimation(
+                  parent: _pageTransitionCtrl,
+                  curve: const Interval(0.0, 0.70, curve: Curves.easeIn),
+                ),
+              ),
+              child: child,
+            ),
+          );
+        },
+      );
+    }
+
+    return Offstage(offstage: true, child: child);
   }
 
   Widget _buildAnimatedFloatingNavBar() {
@@ -378,70 +512,136 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: const Color(0xFF0F172A).withValues(alpha: 0.12),
-                      blurRadius: 24,
-                      offset: const Offset(0, 8),
+                      color: const Color(0xFF0F172A).withValues(alpha: 0.10),
+                      blurRadius: 20,
+                      offset: const Offset(0, 6),
                     ),
                     BoxShadow(
-                      color: const Color(0xFF0284C7).withValues(alpha: 0.08),
-                      blurRadius: 10,
+                      color: const Color(0xFF0284C7).withValues(alpha: 0.06),
+                      blurRadius: 8,
                       offset: const Offset(0, 2),
                     ),
                   ],
                 ),
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(34),
-                  child: BackdropFilter(
-                    filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.translucent,
+                    onHorizontalDragEnd: (details) {
+                      final vx = details.primaryVelocity ?? 0;
+                      if (vx < -220) {
+                        _navigateToNextTab();
+                      } else if (vx > 220) {
+                        _navigateToPreviousTab();
+                      }
+                    },
                     child: Container(
-                      color: Colors.white.withValues(alpha: 0.94),
+                      color: Colors.white,
                       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-                      child: Row(
-                        children: [
-                          // 1. Beranda
-                          Expanded(
-                            child: _bottomItem(
-                              index: 0,
-                              activeIcon: Icons.home_rounded,
-                              inactiveIcon: Icons.home_outlined,
-                              label: 'Beranda',
-                            ),
-                          ),
+                      child: LayoutBuilder(
+                        builder: (context, constraints) {
+                          final totalWidth = constraints.maxWidth;
+                          const centerBtnWidth = 58.0;
+                          final itemWidth = (totalWidth - centerBtnWidth) / 4.0;
+                          const indWidth = 48.0;
+                          const indHeight = 32.0;
 
-                          // 2. Safety Updates
-                          Expanded(
-                            child: _bottomItem(
-                              index: 1,
-                              activeIcon: Icons.health_and_safety_rounded,
-                              inactiveIcon: Icons.health_and_safety_outlined,
-                              label: 'Safety Updates',
-                            ),
-                          ),
+                          double getIndicatorLeft(int index) {
+                            switch (index) {
+                              case 0:
+                                return (itemWidth - indWidth) / 2.0;
+                              case 1:
+                                return itemWidth + (itemWidth - indWidth) / 2.0;
+                              case 3:
+                                return (2.0 * itemWidth) + centerBtnWidth + (itemWidth - indWidth) / 2.0;
+                              case 4:
+                                return (3.0 * itemWidth) + centerBtnWidth + (itemWidth - indWidth) / 2.0;
+                              default:
+                                return (itemWidth - indWidth) / 2.0;
+                            }
+                          }
 
-                          // 3. Center Quick Hazard Action Button
-                          _centerHazardButton(),
+                          return Stack(
+                            alignment: Alignment.center,
+                            children: [
+                              // 1. Sliding Pill Indicator ke kiri kanannya!
+                              AnimatedPositioned(
+                                duration: const Duration(milliseconds: 280),
+                                curve: Curves.easeOutCubic,
+                                left: getIndicatorLeft(_currentPage),
+                                top: 5.0,
+                                width: indWidth,
+                                height: indHeight,
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFEFF6FF),
+                                    borderRadius: BorderRadius.circular(16),
+                                    border: Border.all(
+                                      color: const Color(0xFFBFDBFE),
+                                      width: 1.0,
+                                    ),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: const Color(0xFF2563EB).withValues(alpha: 0.08),
+                                        blurRadius: 4,
+                                        offset: const Offset(0, 1),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
 
-                          // 4. Scan
-                          Expanded(
-                            child: _bottomItem(
-                              index: 3,
-                              activeIcon: Icons.qr_code_scanner_rounded,
-                              inactiveIcon: Icons.qr_code_scanner_rounded,
-                              label: 'Scan',
-                            ),
-                          ),
+                              // 2. Interactive Navigation Items
+                              Row(
+                                children: [
+                                  // 1. Beranda
+                                  Expanded(
+                                    child: _bottomItem(
+                                      index: 0,
+                                      activeIcon: Icons.home_rounded,
+                                      inactiveIcon: Icons.home_outlined,
+                                      label: 'Beranda',
+                                    ),
+                                  ),
 
-                          // 5. Profil (dengan foto avatar jika sudah diupload)
-                          Expanded(
-                            child: _bottomItem(
-                              index: 4,
-                              activeIcon: Icons.person_rounded,
-                              inactiveIcon: Icons.person_outline_rounded,
-                              label: 'Profil',
-                              isProfileTab: true,
-                            ),
-                          ),
-                        ],
+                                  // 2. Safety Updates
+                                  Expanded(
+                                    child: _bottomItem(
+                                      index: 1,
+                                      activeIcon: Icons.health_and_safety_rounded,
+                                      inactiveIcon: Icons.health_and_safety_outlined,
+                                      label: 'Safety Updates',
+                                    ),
+                                  ),
+
+                                  // 3. Center Quick Hazard Action Button
+                                  _centerHazardButton(),
+
+                                  // 4. Scan
+                                  Expanded(
+                                    child: _bottomItem(
+                                      index: 3,
+                                      activeIcon: Icons.qr_code_scanner_rounded,
+                                      inactiveIcon: Icons.qr_code_scanner_rounded,
+                                      label: 'Scan',
+                                    ),
+                                  ),
+
+                                  // 5. Profil (dengan foto avatar jika sudah diupload)
+                                  Expanded(
+                                    child: _bottomItem(
+                                      index: 4,
+                                      activeIcon: Icons.person_rounded,
+                                      inactiveIcon: Icons.person_outline_rounded,
+                                      label: 'Profil',
+                                      isProfileTab: true,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          );
+                        },
                       ),
                     ),
                   ),
@@ -468,15 +668,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
           padding: const EdgeInsets.all(2),
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            gradient: const LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                Colors.white,
-                Color(0xFFF1F5F9),
-                Color(0xFFE2E8F0),
-              ],
-            ),
+            color: Colors.white,
             border: Border.all(color: Colors.white, width: 2),
             boxShadow: [
               BoxShadow(
@@ -513,81 +705,68 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     const inactiveColor = Color(0xFF64748B);
 
     return InkWell(
-      onTap: () {
-        _showNavAndScheduleHide(3000);
-        _pageCtrl.animateToPage(
-          index,
-          duration: const Duration(milliseconds: 280),
-          curve: Curves.easeOutCubic,
-        );
-      },
+      onTap: () => _onTabSelected(index),
       splashColor: Colors.transparent,
       highlightColor: Colors.transparent,
       child: Column(
         mainAxisSize: MainAxisSize.min,
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 220),
-            curve: Curves.easeOutCubic,
-            padding: EdgeInsets.symmetric(
-              horizontal: isProfileTab && _navbarProfileImage != null ? 8 : 12,
-              vertical: isProfileTab && _navbarProfileImage != null ? 3 : 3,
-            ),
-            decoration: BoxDecoration(
-              color: selected
-                  ? const Color(0xFFEFF6FF)
-                  : Colors.transparent,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: selected
-                    ? const Color(0xFFBFDBFE)
-                    : Colors.transparent,
-                width: 1.0,
-              ),
-            ),
-            child: (isProfileTab && _navbarProfileImage != null)
-                ? Container(
-                    width: 22,
-                    height: 22,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: selected ? activeColor : const Color(0xFFCBD5E1),
-                        width: selected ? 1.8 : 1.0,
-                      ),
-                    ),
-                    child: ClipOval(
-                      child: Image(
-                        image: _navbarProfileImage!,
+          SizedBox(
+            height: 32,
+            child: Center(
+              child: AnimatedScale(
+                scale: selected ? 1.08 : 1.0,
+                duration: const Duration(milliseconds: 240),
+                curve: Curves.easeOutBack,
+                child: (isProfileTab && _navbarProfileImage != null)
+                    ? Container(
                         width: 22,
                         height: 22,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => Icon(
-                          selected ? activeIcon : inactiveIcon,
-                          size: 21,
-                          color: selected ? activeColor : inactiveColor,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: selected ? activeColor : const Color(0xFFCBD5E1),
+                            width: selected ? 1.8 : 1.0,
+                          ),
                         ),
+                        child: ClipOval(
+                          child: Image(
+                            image: _navbarProfileImage!,
+                            width: 22,
+                            height: 22,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => Icon(
+                              selected ? activeIcon : inactiveIcon,
+                              size: 21,
+                              color: selected ? activeColor : inactiveColor,
+                            ),
+                          ),
+                        ),
+                      )
+                    : Icon(
+                        selected ? activeIcon : inactiveIcon,
+                        size: 21,
+                        color: selected ? activeColor : inactiveColor,
                       ),
-                    ),
-                  )
-                : Icon(
-                    selected ? activeIcon : inactiveIcon,
-                    size: 21,
-                    color: selected ? activeColor : inactiveColor,
-                  ),
+              ),
+            ),
           ),
           const SizedBox(height: 1),
-          Text(
-            label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            textAlign: TextAlign.center,
+          AnimatedDefaultTextStyle(
+            duration: const Duration(milliseconds: 200),
+            curve: Curves.easeOut,
             style: TextStyle(
               color: selected ? activeColor : inactiveColor,
               fontSize: 9.5,
               fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
               letterSpacing: -0.2,
+            ),
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
             ),
           ),
         ],
