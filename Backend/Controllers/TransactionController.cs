@@ -278,8 +278,6 @@ namespace Indexsafe.Api.Controllers
 
         [HttpPost("/tran/{name}")]
 
-        [HttpPost("/api/tran/{name}")]
-
         public async Task<IActionResult> SubmitTransaction(string name)
 
         {
@@ -2235,7 +2233,6 @@ namespace Indexsafe.Api.Controllers
 
         [HttpGet("tran/{name}")]
         [HttpGet("/tran/{name}")]
-        [HttpGet("/api/tran/{name}")]
         public async Task<IActionResult> GetTransactions(string name, [FromQuery] int limit = 50)
 
         {
@@ -2807,8 +2804,6 @@ namespace Indexsafe.Api.Controllers
 
         [HttpDelete("/tran/safety/{id:int}")]
 
-        [HttpDelete("/api/tran/safety/{id:int}")]
-
         public async Task<IActionResult> DeleteSafety(int id)
 
         {
@@ -2929,7 +2924,6 @@ namespace Indexsafe.Api.Controllers
 
         [HttpPost("detail/{name}")]
         [HttpPost("/detail/{name}")]
-        [HttpPost("/api/detail/{name}")]
 
         [Consumes("multipart/form-data")]
 
@@ -3041,7 +3035,6 @@ namespace Indexsafe.Api.Controllers
 
         [HttpPost("action/{name}")]
         [HttpPost("/action/{name}")]
-        [HttpPost("/api/action/{name}")]
 
         [Consumes("multipart/form-data")]
 
@@ -3523,10 +3516,8 @@ namespace Indexsafe.Api.Controllers
 
         [HttpPost("action-plan/reassign")]
         [HttpPost("/action-plan/reassign")]
-        [HttpPost("/api/action-plan/reassign")]
         [HttpPost("action/reassign")]
         [HttpPost("/action/reassign")]
-        [HttpPost("/api/action/reassign")]
 
         public async Task<IActionResult> ReassignActionPlan()
 
@@ -3998,7 +3989,6 @@ namespace Indexsafe.Api.Controllers
 
         [HttpGet("action/{name}")]
         [HttpGet("/action/{name}")]
-        [HttpGet("/api/action/{name}")]
 
         public async Task<IActionResult> GetActionPlans(string name, [FromQuery] int limit = 100)
 
@@ -4262,7 +4252,6 @@ namespace Indexsafe.Api.Controllers
 
         [HttpPost("files")]
         [HttpPost("/files")]
-        [HttpPost("/api/files")]
 
         [Consumes("multipart/form-data")]
 
@@ -4366,7 +4355,7 @@ namespace Indexsafe.Api.Controllers
 
         [HttpDelete("tran/{name}/{id:int}")]
 
-        [HttpDelete("api/tran/{name}/{id:int}")]
+        [HttpDelete("/tran/{name}/{id:int}")]
 
         public async Task<IActionResult> DeleteTransaction(string name, int id)
 

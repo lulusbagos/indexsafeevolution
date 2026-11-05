@@ -520,7 +520,6 @@ namespace Indexsafe.Api.Controllers
 
         [HttpPost]
         [HttpPost("/p2h")]
-        [HttpPost("/api/p2h")]
         [Consumes("multipart/form-data")]
         public async Task<IActionResult> CreateOrUpdate([FromForm] IFormCollection form)
 

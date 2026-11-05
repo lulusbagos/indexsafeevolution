@@ -174,7 +174,6 @@ namespace Indexsafe.Api.Controllers
         /// </summary>
         [HttpPost("create")]
         [HttpPost("/hazard/create")]
-        [HttpPost("/api/hazard/create")]
         public async Task<IActionResult> CreateHazard([FromForm] IFormCollection form)
         {
             try
