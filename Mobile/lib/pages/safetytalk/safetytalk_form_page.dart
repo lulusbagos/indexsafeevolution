@@ -2339,6 +2339,8 @@ class _SafetyTalkFormPageState extends State<SafetyTalkFormPage> {
           'updated_at': DateTime.now().toIso8601String(),
 
           'sync_id': null, // trigger resync
+          'nik': _profile?.noNik,
+          'nama': _profile?.namaLengkap,
 
         };
 

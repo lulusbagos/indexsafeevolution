@@ -2627,23 +2627,29 @@ namespace Indexsafe.Api.Controllers
             }
 
             if (targetName == "safety" || targetName == "safety_talk")
-
             {
+                var nikQuery = Request.Query["nik"].FirstOrDefault()?.Trim();
+                var targetNik = !string.IsNullOrEmpty(nikQuery) && nikQuery != "0000" ? nikQuery : userNik;
 
-                var list = await _context.SafetyTalks
-
+                var query = _context.SafetyTalks
                     .AsNoTracking()
+                    .Where(s => !s.IsDeleted);
 
-                    .Where(s => !s.IsDeleted && (s.Nik == userNik || (s.PerusahaanId.HasValue && allowedCompanyIds.Contains(s.PerusahaanId.Value))))
+                if (!string.IsNullOrEmpty(targetNik) && targetNik != "0000")
+                {
+                    query = query.Where(s => s.Nik == targetNik);
+                }
+                else
+                {
+                    query = query.Where(s => s.Nik == userNik);
+                }
 
+                var list = await query
                     .OrderByDescending(s => s.CreatedAt)
-
                     .Take(limit)
-
                     .ToListAsync();
 
                 return Ok(new { status = true, data = list });
-
             }
 
 

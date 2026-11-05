@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import '../../services/api.dart';
 import '../../services/database.dart';
 import '../../services/offline_sync_service.dart';
+import '../../services/preference.dart';
 import '../../services/sync.dart';
 import '../../widgets/top_bar.dart';
 import 'safetytalk_detail_page.dart';
@@ -89,6 +90,10 @@ class _SafetyTalkPageState extends State<SafetyTalkPage> {
   Future<void> _load() async {
     setState(() => _loading = true);
 
+    final profile = PreferenceService.getProfile();
+    final myNik = (profile?.noNik ?? PreferenceService.getOfflineNik())?.trim() ?? '';
+    final myName = (profile?.namaLengkap ?? '').trim().toLowerCase();
+
     // 1. Load Local items from SQLite with all columns
     List<Map<String, dynamic>> localItems = [];
     try {
@@ -102,18 +107,34 @@ class _SafetyTalkPageState extends State<SafetyTalkPage> {
         map['judul'] = _decodeHtml((r['judul'] ?? r['title'] ?? 'Safety Talk').toString());
         map['title'] = map['judul'];
         return map;
+      }).where((m) {
+        if (myNik.isEmpty) return true;
+        final itemNik = (m['nik'] ?? '').toString().trim();
+        final itemSpeaker = (m['nama'] ?? m['speaker'] ?? '').toString().trim().toLowerCase();
+        if (itemNik.isNotEmpty) return itemNik == myNik;
+        if (myName.isNotEmpty && itemSpeaker.isNotEmpty) return itemSpeaker == myName;
+        return true;
       }).toList();
     } catch (_) {}
 
-    // 2. Fetch server items: try REST API first, then MBS Web scraping
+    // 2. Fetch server items: try REST API first (filtered by current user's NIK)
     List<Map<String, dynamic>> serverItems = [];
     try {
-      final res = await _api.getTran('safety');
+      final res = await _api.getTran(myNik.isNotEmpty ? 'safety?nik=$myNik' : 'safety');
       res.fold((_) {}, (r) {
         if (r['data'] is List && (r['data'] as List).isNotEmpty) {
           for (var item in (r['data'] as List)) {
             final map = Map<String, dynamic>.from(item as Map);
             final rawJudul = (map['judul'] ?? map['title'] ?? 'Safety Talk').toString();
+            final itemNik = (map['nik'] ?? '').toString().trim();
+            final itemSpeaker = (map['nama'] ?? '').toString().trim().toLowerCase();
+
+            // Strictly filter so only Safety Talks created by the logged-in user appear:
+            if (myNik.isNotEmpty) {
+              if (itemNik.isNotEmpty && itemNik != myNik) continue;
+              if (itemNik.isEmpty && myName.isNotEmpty && itemSpeaker.isNotEmpty && itemSpeaker != myName) continue;
+            }
+
             serverItems.add({
               'id': map['id'],
               'judul': _decodeHtml(rawJudul),
@@ -131,16 +152,17 @@ class _SafetyTalkPageState extends State<SafetyTalkPage> {
               'remark': map['keterangan'] ?? map['remark'],
               'foto_diri': map['fotoDiri'] ?? map['foto_diri'],
               'foto_kegiatan': map['fotoKegiatan'] ?? map['foto_kegiatan'],
-              'nama': map['nama'],
-              'nik': map['nik'],
-              'departemen': map['departemen'],
+              'nama': map['nama'] ?? profile?.namaLengkap,
+              'nik': map['nik'] ?? myNik,
+              'departemen': map['departemen'] ?? profile?.depart,
             });
           }
         }
       });
     } catch (_) {}
 
-    if (serverItems.isEmpty) {
+    // Fallback: If REST returned empty, only check web scraping if no local items
+    if (serverItems.isEmpty && localItems.isEmpty) {
       try {
         final data = await _api.getSafetyTalkData();
         if (data != null && data['talks'] is List) {
@@ -179,6 +201,10 @@ class _SafetyTalkPageState extends State<SafetyTalkPage> {
   }
 
   Future<void> _enrichServerItems(List<Map<String, dynamic>> items) async {
+    final profile = PreferenceService.getProfile();
+    final myNik = (profile?.noNik ?? PreferenceService.getOfflineNik())?.trim() ?? '';
+    final myName = (profile?.namaLengkap ?? '').trim().toLowerCase();
+
     final toEnrich = items
         .where((s) => s['tanggal'] == null || s['tanggal'].toString().isEmpty)
         .take(15)
@@ -211,6 +237,20 @@ class _SafetyTalkPageState extends State<SafetyTalkPage> {
         } catch (_) {}
       }
     }));
+
+    // Remove any items that belong to someone else:
+    if (myNik.isNotEmpty) {
+      final beforeCount = _talks.length;
+      _talks.removeWhere((t) {
+        if (t['is_local'] == true) return false;
+        final itemNik = (t['nik'] ?? '').toString().trim();
+        final itemSpeaker = (t['nama'] ?? t['speaker'] ?? '').toString().trim().toLowerCase();
+        if (itemNik.isNotEmpty && itemNik != myNik) return true;
+        if (itemNik.isEmpty && myName.isNotEmpty && itemSpeaker.isNotEmpty && itemSpeaker != myName) return true;
+        return false;
+      });
+      if (_talks.length != beforeCount) changed = true;
+    }
 
     if (changed && mounted) {
       setState(() {});
