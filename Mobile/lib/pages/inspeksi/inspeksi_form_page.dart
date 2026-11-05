@@ -534,9 +534,6 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
             final filtered = _masterAreas
                 .where((a) => a.toLowerCase().contains(filter.toLowerCase()))
                 .toList();
-            final hasExactMatch = _masterAreas
-                .any((a) => a.toLowerCase() == filter.trim().toLowerCase());
-            final canAddCustom = filter.trim().isNotEmpty && !hasExactMatch;
 
             return Container(
               height: MediaQuery.of(context).size.height * 0.85,
@@ -570,7 +567,7 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
                                   fontWeight: FontWeight.bold),
                             ),
                             SizedBox(height: 2),
-                            Text('Pilih area lokasi kerja atau ketik area baru',
+                            Text('Pilih area standar yang terdaftar di sistem',
                                 style: TextStyle(
                                     color: Color(0xFF64748B), fontSize: 12)),
                           ],
@@ -608,51 +605,12 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
                     ),
                   ),
                   const SizedBox(height: 12),
-                  if (canAddCustom)
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
-                      child: InkWell(
-                        onTap: () {
-                          final newArea = filter.trim().toUpperCase();
-                          setState(() {
-                            if (!_masterAreas.contains(newArea)) {
-                              _masterAreas.add(newArea);
-                              _masterAreas.sort();
-                            }
-                            _area = newArea;
-                            _selectedBenchmark = null;
-                          });
-                          _loadBenchmarksForArea(newArea);
-                          Navigator.pop(modalCtx);
-                        },
-                        borderRadius: BorderRadius.circular(12),
-                        child: Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFECFDF5),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: const Color(0xFFA7F3D0)),
-                          ),
-                          child: Row(
-                            children: [
-                              const Icon(Icons.add_circle_outline_rounded,
-                                  color: primaryGreen, size: 20),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                    'Gunakan Area Baru: "${filter.trim().toUpperCase()}"',
-                                    style: const TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 12,
-                                        color: primaryGreen)),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
                   Expanded(
-                    child: ListView.separated(
+                    child: filtered.isEmpty
+                        ? const Center(
+                            child: Text('Area standar tidak ditemukan',
+                                style: TextStyle(color: Color(0xFF94A3B8))))
+                        : ListView.separated(
                       padding: const EdgeInsets.symmetric(
                           horizontal: 20, vertical: 8),
                       itemCount: filtered.length,

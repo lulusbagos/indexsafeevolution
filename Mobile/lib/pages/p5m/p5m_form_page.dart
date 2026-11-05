@@ -511,66 +511,6 @@ class _P5MFormPageState extends State<P5MFormPage> {
 
 
 
-  Future<void> _addNewArea(String newArea) async {
-
-    final cleanArea = newArea.trim().toUpperCase();
-
-    if (cleanArea.isEmpty) return;
-
-
-
-    final companyId = _companyId ?? _profile?.companyId ?? 1;
-
-    final sqldb = await _db.database;
-
-    await sqldb.rawInsert(
-
-      '''INSERT INTO tbl_m_benchmark (perusahaan_id, area_utama, nama_benchmark, created_by_nik, created_by_name, created_at)
-
-         VALUES (?, ?, '', ?, ?, ?)''',
-
-      [
-
-        companyId,
-
-        cleanArea,
-
-        _profile?.noNik ?? '',
-
-        _profile?.namaLengkap ?? '',
-
-        DateTime.now().toIso8601String(),
-
-      ],
-
-    );
-
-
-
-    setState(() {
-
-      if (!_masterAreas.contains(cleanArea)) {
-
-        _masterAreas.add(cleanArea);
-
-        _masterAreas.sort();
-
-      }
-
-      _area = cleanArea;
-
-      _benchmark = '';
-
-      _detilLokasiCtrl.text = '';
-
-    });
-
-    _loadBenchmarksForArea(cleanArea);
-
-  }
-
-
-
   void _showAreaPickerModal() {
 
     showModalBottomSheet(
@@ -598,11 +538,6 @@ class _P5MFormPageState extends State<P5MFormPage> {
 
 
             final filtered = _masterAreas.where((a) => a.toLowerCase().contains(filter.toLowerCase())).toList();
-
-            final hasExactMatch = _masterAreas.any((a) => a.toLowerCase() == filter.trim().toLowerCase());
-
-            final canAddCustom = filter.trim().isNotEmpty && !hasExactMatch;
-
 
 
             return Container(
@@ -679,7 +614,7 @@ class _P5MFormPageState extends State<P5MFormPage> {
 
                             Text(
 
-                              'Pilih area kerja atau cari lokasi tambang',
+                              'Pilih area standar yang terdaftar di sistem',
 
                               style: TextStyle(color: Color(0xFF64748B), fontSize: 12),
 
@@ -771,121 +706,14 @@ class _P5MFormPageState extends State<P5MFormPage> {
 
 
 
-                  if (canAddCustom)
-
-                    Padding(
-
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
-
-                      child: InkWell(
-
-                        onTap: () async {
-
-                          Navigator.pop(modalCtx);
-
-                          await _addNewArea(filter.trim());
-
-                        },
-
-                        borderRadius: BorderRadius.circular(12),
-
-                        child: Container(
-
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-
-                          decoration: BoxDecoration(
-
-                            color: const Color(0xFFF5F3FF),
-
-                            borderRadius: BorderRadius.circular(12),
-
-                            border: Border.all(color: const Color(0xFFDDD6FE)),
-
-                          ),
-
-                          child: Row(
-
-                            children: [
-
-                              Container(
-
-                                padding: const EdgeInsets.all(6),
-
-                                decoration: BoxDecoration(
-
-                                  color: const Color(0xFF0D9488),
-
-                                  borderRadius: BorderRadius.circular(8),
-
-                                ),
-
-                                child: const Icon(Icons.add, color: Colors.white, size: 16),
-
-                              ),
-
-                              const SizedBox(width: 12),
-
-                              Expanded(
-
-                                child: Column(
-
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-
-                                  children: [
-
-                                    Text(
-
-                                      'Gunakan / Tambah Area Baru:',
-
-                                      style: TextStyle(color: Colors.purple.shade700, fontSize: 11, fontWeight: FontWeight.w600),
-
-                                    ),
-
-                                    Text(
-
-                                      '"${filter.trim()}"',
-
-                                      style: const TextStyle(
-
-                                        color: Color(0xFF0F172A),
-
-                                        fontSize: 14,
-
-                                        fontWeight: FontWeight.bold,
-
-                                      ),
-
-                                    ),
-
-                                  ],
-
-                                ),
-
-                              ),
-
-                              const Icon(Icons.arrow_forward_ios_rounded, color: Color(0xFF0D9488), size: 14),
-
-                            ],
-
-                          ),
-
-                        ),
-
-                      ),
-
-                    ),
-
-
-
                   Expanded(
 
                     child: _isLoadingAreas && _masterAreas.isEmpty
 
                         ? const Center(child: CircularProgressIndicator(strokeWidth: 2.5, color: Color(0xFF0D9488)))
 
-                        : filtered.isEmpty && !canAddCustom
-
-                            ? const Center(child: Text('Area tidak ditemukan', style: TextStyle(color: Color(0xFF94A3B8))))
+                        : filtered.isEmpty
+                            ? const Center(child: Text('Area standar tidak ditemukan', style: TextStyle(color: Color(0xFF94A3B8))))
 
                             : ListView.separated(
 

@@ -577,12 +577,6 @@ class _SafetyTalkFormPageState extends State<SafetyTalkFormPage> {
 
                 .toList();
 
-            final hasExactMatch = _masterAreas.any((a) => a.toLowerCase() == filter.trim().toLowerCase());
-
-            final canAddCustom = filter.trim().isNotEmpty && !hasExactMatch;
-
-
-
             return Container(
 
               height: MediaQuery.of(context).size.height * 0.85,
@@ -657,7 +651,7 @@ class _SafetyTalkFormPageState extends State<SafetyTalkFormPage> {
 
                             Text(
 
-                              'Pilih atau ketik untuk mencari & menambah area',
+                              'Pilih area standar yang terdaftar di sistem',
 
                               style: TextStyle(color: Color(0xFF64748B), fontSize: 12),
 
@@ -709,7 +703,7 @@ class _SafetyTalkFormPageState extends State<SafetyTalkFormPage> {
 
                         decoration: InputDecoration(
 
-                          hintText: 'Ketik untuk mencari area...',
+                          hintText: 'Cari area standar...',
 
                           hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
 
@@ -743,132 +737,6 @@ class _SafetyTalkFormPageState extends State<SafetyTalkFormPage> {
 
 
 
-                  if (canAddCustom)
-
-                    Padding(
-
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
-
-                      child: InkWell(
-
-                        onTap: () {
-
-                          final newArea = filter.trim().toUpperCase();
-
-                          Navigator.pop(modalCtx);
-
-                          setState(() {
-
-                            if (!_masterAreas.contains(newArea)) {
-
-                              _masterAreas.add(newArea);
-
-                              _masterAreas.sort();
-
-                            }
-
-                            _area = newArea;
-
-                            _benchmark = null;
-
-                            _benchmarksList = [];
-
-                          });
-
-                          _loadBenchmarksForArea(newArea);
-
-                        },
-
-                        borderRadius: BorderRadius.circular(12),
-
-                        child: Container(
-
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-
-                          decoration: BoxDecoration(
-
-                            color: const Color(0xFFFFF1F2),
-
-                            borderRadius: BorderRadius.circular(12),
-
-                            border: Border.all(color: const Color(0xFFFECDD3)),
-
-                          ),
-
-                          child: Row(
-
-                            children: [
-
-                              Container(
-
-                                padding: const EdgeInsets.all(6),
-
-                                decoration: BoxDecoration(
-
-                                  color: _stRed,
-
-                                  borderRadius: BorderRadius.circular(8),
-
-                                ),
-
-                                child: const Icon(Icons.add, color: Colors.white, size: 16),
-
-                              ),
-
-                              const SizedBox(width: 12),
-
-                              Expanded(
-
-                                child: Column(
-
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-
-                                  children: [
-
-                                    const Text(
-
-                                      'Gunakan Area Baru:',
-
-                                      style: TextStyle(color: _stRed, fontSize: 11, fontWeight: FontWeight.w600),
-
-                                    ),
-
-                                    Text(
-
-                                      '"${filter.trim().toUpperCase()}"',
-
-                                      style: const TextStyle(
-
-                                        color: _stDark,
-
-                                        fontSize: 14,
-
-                                        fontWeight: FontWeight.bold,
-
-                                      ),
-
-                                    ),
-
-                                  ],
-
-                                ),
-
-                              ),
-
-                              const Icon(Icons.arrow_forward_ios_rounded, color: _stRed, size: 14),
-
-                            ],
-
-                          ),
-
-                        ),
-
-                      ),
-
-                    ),
-
-
-
                   Expanded(
 
                     child: _isLoadingAreas && _masterAreas.isEmpty
@@ -887,11 +755,9 @@ class _SafetyTalkFormPageState extends State<SafetyTalkFormPage> {
 
                           )
 
-                        : filtered.isEmpty && !canAddCustom
-
+                        : filtered.isEmpty
                             ? const Center(
-
-                                child: Text('Area tidak ditemukan', style: TextStyle(color: Color(0xFF94A3B8))),
+                                child: Text('Area standar tidak ditemukan', style: TextStyle(color: Color(0xFF94A3B8))),
 
                               )
 

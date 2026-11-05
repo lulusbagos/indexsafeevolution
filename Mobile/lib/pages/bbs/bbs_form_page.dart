@@ -365,9 +365,6 @@ class _BbsFormPageState extends State<BbsFormPage> {
             final filtered = _masterAreas
                 .where((a) => a.toLowerCase().contains(filter.toLowerCase()))
                 .toList();
-            final hasExactMatch = _masterAreas
-                .any((a) => a.toLowerCase() == filter.trim().toLowerCase());
-            final canAddCustom = filter.trim().isNotEmpty && !hasExactMatch;
 
             return Container(
               height: MediaQuery.of(context).size.height * 0.85,
@@ -405,7 +402,7 @@ class _BbsFormPageState extends State<BbsFormPage> {
                             ),
                             SizedBox(height: 2),
                             Text(
-                              'Pilih atau ketik untuk mencari & menambah area',
+                              'Pilih area standar yang terdaftar di sistem',
                               style: TextStyle(
                                   color: Color(0xFF64748B), fontSize: 12),
                             ),
@@ -455,65 +452,6 @@ class _BbsFormPageState extends State<BbsFormPage> {
                     ),
                   ),
                   const SizedBox(height: 12),
-                  if (canAddCustom)
-                    Padding(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 20, vertical: 4),
-                      child: InkWell(
-                        onTap: () async {
-                          Navigator.pop(modalCtx);
-                          await _addNewArea(filter.trim());
-                        },
-                        borderRadius: BorderRadius.circular(12),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 14, vertical: 12),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFEFF6FF),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: const Color(0xFFBFDBFE)),
-                          ),
-                          child: Row(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.all(6),
-                                decoration: BoxDecoration(
-                                  color: _kPrimary,
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: const Icon(Icons.add,
-                                    color: Colors.white, size: 16),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      'Gunakan / Tambah Area Baru:',
-                                      style: TextStyle(
-                                          color: Colors.blue.shade700,
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.w600),
-                                    ),
-                                    Text(
-                                      '"${filter.trim()}"',
-                                      style: const TextStyle(
-                                        color: Color(0xFF0F172A),
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              const Icon(Icons.arrow_forward_ios_rounded,
-                                  color: _kPrimary, size: 14),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
                   Expanded(
                     child: _isLoadingAreas && _masterAreas.isEmpty
                         ? const Center(
@@ -533,9 +471,9 @@ class _BbsFormPageState extends State<BbsFormPage> {
                               ],
                             ),
                           )
-                        : filtered.isEmpty && !canAddCustom
+                        : filtered.isEmpty
                             ? const Center(
-                                child: Text('Area tidak ditemukan',
+                                child: Text('Area standar tidak ditemukan',
                                     style: TextStyle(color: Color(0xFF94A3B8))))
                             : ListView.separated(
                                 padding: const EdgeInsets.symmetric(
@@ -853,56 +791,6 @@ class _BbsFormPageState extends State<BbsFormPage> {
         );
       },
     );
-  }
-
-  Future<void> _addNewArea(String name) async {
-    final cleanName = name.trim();
-    if (cleanName.isEmpty) return;
-
-    final userNik = _profile?.noNik ?? 'USER';
-    final userName = _profile?.namaLengkap ?? 'User Mobile';
-    final companyId = _companyId ?? _profile?.companyId ?? 1;
-
-    setState(() {
-      if (!_masterAreas.contains(cleanName)) {
-        _masterAreas.add(cleanName);
-        _masterAreas.sort();
-      }
-      _area = cleanName;
-      _benchmark = '';
-      _benchmarksList = [];
-    });
-
-    try {
-      final sqldb = await _db.database;
-      await sqldb.rawInsert(
-        '''INSERT INTO tbl_m_benchmark (perusahaan_id, area_utama, nama_benchmark, created_by_nik, created_by_name, created_at)
-           VALUES (?, ?, '', ?, ?, ?)''',
-        [
-          companyId,
-          cleanName,
-          userNik,
-          userName,
-          DateTime.now().toIso8601String()
-        ],
-      );
-    } catch (_) {}
-
-    try {
-      await _api.createArea(
-        namaArea: cleanName,
-        createdByNik: userNik,
-        createdByName: userName,
-      );
-      if (mounted) {
-        SnackBarMsg.success(context, 'Area "$cleanName" berhasil ditambahkan!');
-      }
-    } catch (_) {
-      if (mounted) {
-        SnackBarMsg.info(
-            context, 'Area "$cleanName" tersimpan di HP (Mode Offline)');
-      }
-    }
   }
 
   Future<void> _addNewBenchmark(String name) async {

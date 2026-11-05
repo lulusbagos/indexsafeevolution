@@ -1275,11 +1275,6 @@ class _CoachingFormPageState extends State<CoachingFormPage> {
 
           final filtered = _areasList.where((a) => a.toLowerCase().contains(query)).toList();
 
-          final canAddCustom = filter.trim().isNotEmpty &&
-
-              !_areasList.any((a) => a.trim().toLowerCase() == filter.trim().toLowerCase());
-
-
 
           return DraggableScrollableSheet(
 
@@ -1397,146 +1392,6 @@ class _CoachingFormPageState extends State<CoachingFormPage> {
 
 
 
-                if (canAddCustom)
-
-                  Padding(
-
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
-
-                    child: InkWell(
-
-                      onTap: () async {
-
-                        final newArea = filter.trim().toUpperCase();
-
-                        Navigator.pop(modalCtx);
-
-                        setState(() {
-
-                          if (!_areasList.contains(newArea)) {
-
-                            _areasList.add(newArea);
-
-                            _areasList.sort();
-
-                          }
-
-                          _area = newArea;
-
-                          _benchmark = null;
-
-                        });
-
-                        _loadBenchmarks(newArea);
-
-                        try {
-
-                          final sqldb = await _db.database;
-
-                          await sqldb.rawInsert(
-
-                            '''INSERT OR IGNORE INTO tbl_m_benchmark (perusahaan_id, area_utama, nama_benchmark, created_at)
-
-                               VALUES (?, ?, '', ?)''',
-
-                            [_profile?.companyId ?? 1, newArea, DateTime.now().toIso8601String()],
-
-                          );
-
-                        } catch (_) {}
-
-                      },
-
-                      borderRadius: BorderRadius.circular(12),
-
-                      child: Container(
-
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-
-                        decoration: BoxDecoration(
-
-                          color: const Color(0xFFFAF5FF),
-
-                          borderRadius: BorderRadius.circular(12),
-
-                          border: Border.all(color: const Color(0xFFE9D5FF)),
-
-                        ),
-
-                        child: Row(
-
-                          children: [
-
-                            Container(
-
-                              padding: const EdgeInsets.all(6),
-
-                              decoration: BoxDecoration(
-
-                                color: _coachPurple,
-
-                                borderRadius: BorderRadius.circular(8),
-
-                              ),
-
-                              child: const Icon(Icons.add, color: Colors.white, size: 16),
-
-                            ),
-
-                            const SizedBox(width: 12),
-
-                            Expanded(
-
-                              child: Column(
-
-                                crossAxisAlignment: CrossAxisAlignment.start,
-
-                                children: [
-
-                                  const Text(
-
-                                    'Gunakan Area Baru:',
-
-                                    style: TextStyle(color: _coachPurple, fontSize: 11, fontWeight: FontWeight.w600),
-
-                                  ),
-
-                                  Text(
-
-                                    '"${filter.trim().toUpperCase()}"',
-
-                                    style: const TextStyle(
-
-                                      color: _coachDark,
-
-                                      fontSize: 14,
-
-                                      fontWeight: FontWeight.bold,
-
-                                    ),
-
-                                  ),
-
-                                ],
-
-                              ),
-
-                            ),
-
-                            const Icon(Icons.arrow_forward_ios_rounded, color: _coachPurple, size: 14),
-
-                          ],
-
-                        ),
-
-                      ),
-
-                    ),
-
-                  ),
-
-
-
                 Expanded(
 
                   child: _isLoadingAreas && _areasList.isEmpty
@@ -1555,11 +1410,9 @@ class _CoachingFormPageState extends State<CoachingFormPage> {
 
                         )
 
-                      : filtered.isEmpty && !canAddCustom
-
+                      : filtered.isEmpty
                           ? const Center(
-
-                              child: Text('Area tidak ditemukan', style: TextStyle(color: Color(0xFF94A3B8))),
+                              child: Text('Area standar tidak ditemukan', style: TextStyle(color: Color(0xFF94A3B8))),
 
                             )
 
