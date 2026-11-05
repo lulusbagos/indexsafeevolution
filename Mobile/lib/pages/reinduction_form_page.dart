@@ -1,3 +1,4 @@
+import '../utils/app_date_time_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
@@ -1229,6 +1230,12 @@ class _ReinductionFormPageState extends State<ReinductionFormPage> {
                       initialDate: _tanggalOffsite,
                       firstDate: DateTime(2020),
                       lastDate: DateTime(2030),
+                      cancelText: 'BATAL',
+                      confirmText: 'PILIH',
+                      builder: (ctx, child) => Theme(
+                        data: AppDateTimePicker.getDatePickerTheme(ctx),
+                        child: child ?? const SizedBox(),
+                      ),
                     );
                     if (picked != null) setState(() => _tanggalOffsite = picked);
                   },
@@ -1245,6 +1252,12 @@ class _ReinductionFormPageState extends State<ReinductionFormPage> {
                       initialDate: _tanggalOnsite,
                       firstDate: DateTime(2020),
                       lastDate: DateTime(2030),
+                      cancelText: 'BATAL',
+                      confirmText: 'PILIH',
+                      builder: (ctx, child) => Theme(
+                        data: AppDateTimePicker.getDatePickerTheme(ctx),
+                        child: child ?? const SizedBox(),
+                      ),
                     );
                     if (picked != null) setState(() => _tanggalOnsite = picked);
                   },
@@ -1767,7 +1780,7 @@ class _ReinductionFormPageState extends State<ReinductionFormPage> {
 
   Widget _buildSubmitButton() {
     return SizedBox(
-      height: 52,
+      width: double.infinity,
       child: ElevatedButton.icon(
         onPressed: _isSubmitting ? null : _submitForm,
         icon: _isSubmitting
@@ -1787,14 +1800,16 @@ class _ReinductionFormPageState extends State<ReinductionFormPage> {
               : (_isExempt
                   ? 'Simpan Roster & Form Re-Induksi'
                   : 'Kirim Form ke Pengawas & Simpan Roster'),
+          textAlign: TextAlign.center,
           style: const TextStyle(
-            fontSize: 15,
-            fontWeight: FontWeight.w900,
+            fontSize: 13.5,
+            fontWeight: FontWeight.w800,
             color: Colors.white,
             letterSpacing: 0.2,
           ),
         ),
         style: ElevatedButton.styleFrom(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           backgroundColor: const Color(0xFF0F766E),
           disabledBackgroundColor: const Color(0xFF94A3B8),
           elevation: 3,

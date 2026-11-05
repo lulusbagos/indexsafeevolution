@@ -311,16 +311,29 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin, Widg
     return (await showDialog(
           context: context,
           builder: (context) => AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
             title: const Text('Keluar dari Aplikasi?'),
             content: const Text('Apakah Anda yakin ingin keluar dari aplikasi?'),
             actions: [
-              TextButton(
+              OutlinedButton(
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: const Color(0xFF64748B),
+                  side: const BorderSide(color: Color(0xFFCBD5E1)),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                ),
                 onPressed: () => Navigator.of(context).pop(false),
-                child: const Text('Batal'),
+                child: const Text('Batalkan', style: TextStyle(fontWeight: FontWeight.w600)),
               ),
-              TextButton(
+              FilledButton(
+                style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xFFDC2626),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                ),
                 onPressed: () => exit(0),
-                child: const Text('Ya, Keluar'),
+                child: const Text('Ya, Keluar', style: TextStyle(fontWeight: FontWeight.w700)),
               ),
             ],
           ),

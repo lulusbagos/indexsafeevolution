@@ -68,11 +68,12 @@ class AppDateTimePicker {
       if (states.contains(WidgetState.selected)) return primaryBlue;
       return Colors.transparent;
     }),
-    cancelButtonStyle: TextButton.styleFrom(
+    cancelButtonStyle: OutlinedButton.styleFrom(
       foregroundColor: slateSubtext,
+      side: const BorderSide(color: Color(0xFFCBD5E1)),
       textStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
     ),
     confirmButtonStyle: FilledButton.styleFrom(
       backgroundColor: primaryBlue,
@@ -120,11 +121,12 @@ class AppDateTimePicker {
       fontWeight: FontWeight.w800,
       letterSpacing: 0.5,
     ),
-    cancelButtonStyle: TextButton.styleFrom(
+    cancelButtonStyle: OutlinedButton.styleFrom(
       foregroundColor: slateSubtext,
+      side: const BorderSide(color: Color(0xFFCBD5E1)),
       textStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
     ),
     confirmButtonStyle: FilledButton.styleFrom(
       backgroundColor: primaryBlue,

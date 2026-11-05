@@ -472,8 +472,28 @@ class _FullscreenHazardMapPageState extends State<_FullscreenHazardMapPage>
         title: const Text('Navigasi ke titik ini?'),
         content: const Text('Rute pratinjau sudah ditampilkan di peta. Lanjutkan dengan Google Maps?'),
         actions: [
-          TextButton(onPressed: () { Navigator.pop(ctx, false); _controller.runJavaScript('if(window.clearPreviewRoute) window.clearPreviewRoute();'); }, child: const Text('Batal')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Lanjutkan')),
+          OutlinedButton(
+            style: OutlinedButton.styleFrom(
+              foregroundColor: const Color(0xFF64748B),
+              side: const BorderSide(color: Color(0xFFCBD5E1)),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            ),
+            onPressed: () {
+              Navigator.pop(ctx, false);
+              _controller.runJavaScript('if(window.clearPreviewRoute) window.clearPreviewRoute();');
+            },
+            child: const Text('Batalkan', style: TextStyle(fontWeight: FontWeight.w600)),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFF2563EB),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Lanjutkan', style: TextStyle(fontWeight: FontWeight.w700)),
+          ),
         ],
       ),
     );
@@ -1378,11 +1398,17 @@ class _FullscreenHazardMapPageState extends State<_FullscreenHazardMapPage>
           ],
         ),
         actions: [
-          TextButton(
+          OutlinedButton(
+            style: OutlinedButton.styleFrom(
+              foregroundColor: const Color(0xFF94A3B8),
+              side: const BorderSide(color: Color(0xFFCBD5E1)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10)),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+            ),
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Batal',
-                style: TextStyle(
-                    color: Color(0xFF94A3B8), fontWeight: FontWeight.bold)),
+            child: const Text('Batalkan',
+                style: TextStyle(fontWeight: FontWeight.w600)),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
@@ -1390,6 +1416,7 @@ class _FullscreenHazardMapPageState extends State<_FullscreenHazardMapPage>
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(10)),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
             ),
             onPressed: () => Navigator.pop(ctx, true),
             child: const Text('Lanjutkan Lapor Fake',

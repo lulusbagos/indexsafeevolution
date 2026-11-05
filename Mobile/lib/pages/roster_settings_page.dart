@@ -1,3 +1,4 @@
+import '../utils/app_date_time_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
@@ -162,15 +163,11 @@ class _RosterSettingsPageState extends State<RosterSettingsPage>
       initialDate: initialDate,
       firstDate: DateTime(2020),
       lastDate: DateTime(2035),
+      cancelText: 'BATAL',
+      confirmText: 'PILIH',
       builder: (context, child) {
         return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: const ColorScheme.light(
-              primary: Color(0xFF7C3AED),
-              onPrimary: Colors.white,
-              onSurface: Color(0xFF1E293B),
-            ),
-          ),
+          data: AppDateTimePicker.getDatePickerTheme(context),
           child: child!,
         );
       },
@@ -283,15 +280,22 @@ class _RosterSettingsPageState extends State<RosterSettingsPage>
           style: const TextStyle(fontSize: 13, color: Color(0xFF475569)),
         ),
         actions: [
-          TextButton(
+          OutlinedButton(
+            style: OutlinedButton.styleFrom(
+              foregroundColor: const Color(0xFF64748B),
+              side: const BorderSide(color: Color(0xFFCBD5E1)),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            ),
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Batal', style: TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.w700)),
+            child: const Text('Batalkan', style: TextStyle(fontWeight: FontWeight.w600)),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFFDC2626),
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
             ),
             onPressed: () => Navigator.pop(ctx, true),
             child: const Text('Ya, Hapus', style: TextStyle(fontWeight: FontWeight.w700)),
@@ -1124,9 +1128,9 @@ class _RosterSettingsPageState extends State<RosterSettingsPage>
   Widget _buildSaveButton() {
     return SizedBox(
       width: double.infinity,
-      height: 48,
       child: ElevatedButton(
         style: ElevatedButton.styleFrom(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           backgroundColor: const Color(0xFF7C3AED),
           foregroundColor: Colors.white,
           shape: RoundedRectangleBorder(
@@ -1147,11 +1151,12 @@ class _RosterSettingsPageState extends State<RosterSettingsPage>
             : Text(
                 _editingId != null
                     ? (_selectedTab == 1 ? 'Perbarui Periode Tugas' : 'Perbarui Pengaturan Roster')
-                    : ('Lanjut ke Form Re-Induksi & Simpan Roster'),
+                    : 'Lanjut ke Form Re-Induksi & Simpan Roster',
+                textAlign: TextAlign.center,
                 style: const TextStyle(
-                  fontSize: 14,
+                  fontSize: 13.5,
                   fontWeight: FontWeight.w800,
-                  letterSpacing: 0.3,
+                  letterSpacing: 0.2,
                 ),
               ),
       ),

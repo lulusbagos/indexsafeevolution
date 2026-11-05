@@ -163,16 +163,19 @@ class _TopBarState extends State<TopBar> {
                       child: OutlinedButton(
                         onPressed: () => Navigator.of(context).pop(true),
                         style: OutlinedButton.styleFrom(
-                          minimumSize: const Size.fromHeight(44),
+                          padding: const EdgeInsets.symmetric(vertical: 12),
                           foregroundColor: const Color(0xFF64748B),
                           side: const BorderSide(color: Color(0xFFE2E8F0)),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
                           ),
                         ),
-                        child: const Text(
-                          'Keluar',
-                          style: TextStyle(fontWeight: FontWeight.w600),
+                        child: const FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(
+                            'Keluar',
+                            style: TextStyle(fontWeight: FontWeight.w600),
+                          ),
                         ),
                       ),
                     ),
@@ -181,15 +184,18 @@ class _TopBarState extends State<TopBar> {
                       child: FilledButton(
                         onPressed: () => Navigator.of(context).pop(false),
                         style: FilledButton.styleFrom(
-                          minimumSize: const Size.fromHeight(44),
+                          padding: const EdgeInsets.symmetric(vertical: 12),
                           backgroundColor: const Color(0xFF0F172A),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
                           ),
                         ),
-                        child: const Text(
-                          'Lanjut Mengisi',
-                          style: TextStyle(fontWeight: FontWeight.w700),
+                        child: const FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(
+                            'Lanjut Mengisi',
+                            style: TextStyle(fontWeight: FontWeight.w700),
+                          ),
                         ),
                       ),
                     ),
@@ -266,6 +272,8 @@ class _TopBarState extends State<TopBar> {
               : null,
       title: Text(
         widget.title.toString(),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
         style: const TextStyle(
           fontSize: 16,
           fontWeight: FontWeight.w700,
@@ -317,7 +325,7 @@ class _TopBarState extends State<TopBar> {
                         const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
                     alignment: Alignment.center,
                     decoration: BoxDecoration(
-                      color: Color(0xFFDC2626),
+                      color: const Color(0xFFDC2626),
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(color: Colors.white, width: 1.5),
                     ),
