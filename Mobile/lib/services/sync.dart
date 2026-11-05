@@ -67,7 +67,12 @@ Future<Response?> _postWithFallback({
 
   for (final targetUrl in candidateUrls) {
     try {
-      final map = Map<String, dynamic>.from(fields);
+      final map = <String, dynamic>{};
+      for (final kv in fields.entries) {
+        if (kv.value is! MultipartFile) {
+          map[kv.key] = kv.value;
+        }
+      }
       for (final entry in files.entries) {
         if (entry.value.isNotEmpty) {
           final f = File(entry.value);
@@ -100,6 +105,7 @@ Future<Response?> _postWithFallback({
       lastError = e;
       debugPrint('[syncTran] POST $targetUrl failed (${e.response?.statusCode}): ${e.message}');
       if (e.response?.statusCode == 404 ||
+          (e.response?.statusCode != null && e.response!.statusCode! >= 500) ||
           e.type == DioExceptionType.connectionError ||
           e.type == DioExceptionType.connectionTimeout) {
         continue;
@@ -230,28 +236,27 @@ Future<bool> syncTran(
       }
       cleanMap['status_temuan'] ??= (row['status'] == 1 ? 'Closed' : 'Open');
 
-      // Upload file foto (hanya 1 instance MultipartFile, jangan duplikat)
+      final files = <String, String>{};
       if ((row['image'] ?? '') != '') {
         final file = File(row['image'].toString());
         if (await file.exists()) {
-          cleanMap['foto_temuan'] = await MultipartFile.fromFile(file.path);
+          files['foto_temuan'] = file.path;
+          files['image'] = file.path;
         }
       }
       if ((row['repair_image'] ?? '') != '') {
         final file = File(row['repair_image'].toString());
         if (await file.exists()) {
-          cleanMap['foto_perbaikan'] = await MultipartFile.fromFile(file.path);
+          files['foto_perbaikan'] = file.path;
+          files['repair_image'] = file.path;
         }
       }
 
-      res = await api.dio.post(
-        '/hazard/create',
-        data: FormData.fromMap(cleanMap),
-        options: Options(
-          headers: {
-            'Authorization': 'Bearer ${api.getToken}',
-          },
-        ),
+      res = await _postWithFallback(
+        api: api,
+        path: '/hazard/create',
+        fields: cleanMap,
+        files: files,
       );
     } else if (name == 'inspection' || name == 'simama') {
       final cleanMap = <String, dynamic>{};
@@ -302,22 +307,20 @@ Future<bool> syncTran(
         }
       }
 
+      final files = <String, String>{};
       if ((row['image'] ?? '') != '') {
         final file = File(row['image'].toString());
         if (await file.exists()) {
-          cleanMap['image'] = await MultipartFile.fromFile(file.path);
+          files['image'] = file.path;
         }
       }
 
       final endpoint = (name == 'simama') ? '/tran/simama' : '/tran/inspection';
-      res = await api.dio.post(
-        endpoint,
-        data: FormData.fromMap(cleanMap),
-        options: Options(
-          headers: {
-            'Authorization': 'Bearer ${api.getToken}',
-          },
-        ),
+      res = await _postWithFallback(
+        api: api,
+        path: endpoint,
+        fields: cleanMap,
+        files: files,
       );
     } else if (name == 'p2h') {
       final cleanMap = <String, dynamic>{};
@@ -332,16 +335,15 @@ Future<bool> syncTran(
       cleanMap['gol_b_json'] = (row['gol_b_json'] ?? '[]').toString();
       cleanMap['gol_c_json'] = (row['gol_c_json'] ?? '[]').toString();
 
-      // Foto Speedometer
+      final files = <String, String>{};
       final speedoPath = row['foto_speedometer'] ?? row['image'];
       if (speedoPath != null && speedoPath.toString().isNotEmpty) {
         final f = File(speedoPath.toString());
         if (await f.exists()) {
-          cleanMap['foto_speedometer'] = await MultipartFile.fromFile(f.path);
+          files['foto_speedometer'] = f.path;
         }
       }
 
-      // Check defect photos in Gol A, B, C
       for (var group in ['golA', 'golB', 'golC']) {
         final jsonStr = (group == 'golA' ? row['gol_a_json'] : (group == 'golB' ? row['gol_b_json'] : row['gol_c_json']))?.toString();
         if (jsonStr != null && jsonStr.isNotEmpty) {
@@ -353,7 +355,7 @@ Future<bool> syncTran(
                 final photoPath = it['photoUrl'].toString();
                 final f = File(photoPath);
                 if (await f.exists()) {
-                  cleanMap['${group}_photo_$i'] = await MultipartFile.fromFile(f.path);
+                  files['${group}_photo_$i'] = f.path;
                 }
               }
             }
@@ -361,14 +363,11 @@ Future<bool> syncTran(
         }
       }
 
-      res = await api.dio.post(
-        '/p2h',
-        data: FormData.fromMap(cleanMap),
-        options: Options(
-          headers: {
-            'Authorization': 'Bearer ${api.getToken}',
-          },
-        ),
+      res = await _postWithFallback(
+        api: api,
+        path: '/p2h',
+        fields: cleanMap,
+        files: files,
       );
     } else if (name == 'p5m') {
       final cleanMap = <String, dynamic>{};
@@ -395,23 +394,21 @@ Future<bool> syncTran(
         cleanMap['answers_json'] = row['answers_json']?.toString() ?? '[]';
       }
 
-      // Upload photo
+      final files = <String, String>{};
       final photoPath = row['foto_kegiatan'] ?? row['image'];
       if (photoPath != null && photoPath.toString().isNotEmpty) {
         final file = File(photoPath.toString());
         if (await file.exists()) {
-          cleanMap['foto_kegiatan'] = await MultipartFile.fromFile(file.path);
+          files['foto_kegiatan'] = file.path;
+          files['image'] = file.path;
         }
       }
 
-      res = await api.dio.post(
-        '/tran/p5m',
-        data: FormData.fromMap(cleanMap),
-        options: Options(
-          headers: {
-            'Authorization': 'Bearer ${api.getToken}',
-          },
-        ),
+      res = await _postWithFallback(
+        api: api,
+        path: '/tran/p5m',
+        fields: cleanMap,
+        files: files,
       );
     } else if (name == 'observation') {
       // MBS stores one result per tbl_t_observation row.  Preserve every
@@ -443,15 +440,18 @@ Future<bool> syncTran(
         detailMap['hasil_observasi'] =
             _observationResult((detail['type'] ?? '').toString());
         detailMap['keterangan'] = (detail['remark'] ?? '').toString();
+        final files = <String, String>{};
         final image = detail['image']?.toString();
         if (image != null && image.isNotEmpty && await File(image).exists()) {
-          detailMap['image'] = await MultipartFile.fromFile(image);
+          files['image'] = image;
         }
-        res = await api.dio.post('/tran/observation',
-            data: FormData.fromMap(detailMap),
-            options:
-                Options(headers: {'Authorization': 'Bearer ${api.getToken}'}));
-        final responseData = res.data is Map ? res.data['data'] : null;
+        res = await _postWithFallback(
+          api: api,
+          path: '/tran/observation',
+          fields: detailMap,
+          files: files,
+        );
+        final responseData = (res != null && res.data is Map) ? res.data['data'] : null;
         final serverId = responseData is Map
             ? int.tryParse(responseData['id'].toString())
             : null;

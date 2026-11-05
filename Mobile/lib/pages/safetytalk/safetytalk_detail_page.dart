@@ -18,14 +18,18 @@ const _stBackground = Color(0xFFF8FAFC);
 
 String _decodeHtml(String? text) {
   if (text == null) return '';
-  return text
-      .replaceAll('&amp;', '&')
-      .replaceAll('&quot;', '"')
-      .replaceAll('&#39;', "'")
-      .replaceAll('&lt;', '<')
-      .replaceAll('&gt;', '>')
-      .replaceAll('&nbsp;', ' ')
-      .trim();
+  var res = text;
+  for (int i = 0; i < 2; i++) {
+    res = res
+        .replaceAll('&amp;', '&')
+        .replaceAll('&quot;', '"')
+        .replaceAll('&#39;', "'")
+        .replaceAll('&apos;', "'")
+        .replaceAll('&lt;', '<')
+        .replaceAll('&gt;', '>')
+        .replaceAll('&nbsp;', ' ');
+  }
+  return res.trim();
 }
 
 String _cleanLocation(dynamic areaRaw, dynamic lokasiRaw, [dynamic detilRaw]) {

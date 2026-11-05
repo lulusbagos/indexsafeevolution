@@ -225,81 +225,38 @@ class ApiService {
 
 
   static List<String> _buildCandidateUrls(String cleanPath) {
-
-
-
     final List<String> list = [];
-
-
+    final normalizedPath = cleanPath.startsWith('/api/')
+        ? cleanPath.substring(4)
+        : (cleanPath == '/api' ? '' : cleanPath);
 
     void addTarget(String base) {
-
-
-
       final b = base.endsWith('/') ? base.substring(0, base.length - 1) : base;
+      final withApi = '$b/api$normalizedPath';
+      final withoutApi = '$b$normalizedPath';
 
+      final bool preferDirect = normalizedPath.startsWith('/tran/') ||
+          normalizedPath.startsWith('/action/') ||
+          normalizedPath.startsWith('/hazard/') ||
+          normalizedPath.startsWith('/p2h') ||
+          normalizedPath.startsWith('/detail/') ||
+          normalizedPath.startsWith('/files');
 
-
-      final withApi = '$b/api$cleanPath';
-
-
-
-      final withoutApi = '$b$cleanPath';
-
-
-
-      if (!list.contains(withApi)) list.add(withApi);
-
-
-
-      if (!list.contains(withoutApi)) list.add(withoutApi);
-
-
-
+      if (preferDirect) {
+        if (!list.contains(withoutApi)) list.add(withoutApi);
+        if (!list.contains(withApi)) list.add(withApi);
+      } else {
+        if (!list.contains(withApi)) list.add(withApi);
+        if (!list.contains(withoutApi)) list.add(withoutApi);
+      }
     }
-
-
-
-
-
-
-
-    // 1. Prioritaskan domain aktif saat ini (utama: indexim.id)
-
-
 
     addTarget(_activeBaseUrl);
-
-
-
-
-
-
-
-    // 2. Tambahkan kandidat berikutnya (cadangan: idcoal.id, lalu fallback lokal)
-
-
-
     for (final candidate in _candidateUrls) {
-
-
-
       if (candidate == _activeBaseUrl) continue;
-
-
-
       addTarget(candidate);
-
-
-
     }
-
-
-
     return list;
-
-
-
   }
 
 
@@ -3053,73 +3010,57 @@ class ApiService {
 
 
   Future<Either<Map, Map>> getTran(name) async {
-
-
-
     final token = getToken;
-
-
-
     if (token.isNotEmpty) {
-
-
-
       dio.options.headers['Authorization'] = 'Bearer $token';
-
-
-
     }
-
-
 
     try {
-
-
-
       var con = await Connectivity().checkConnectivity();
-
-
-
       if (con.contains(ConnectivityResult.wifi) == false &&
-
-
-
           con.contains(ConnectivityResult.mobile) == false) {
-
-
-
         return const Left({'message': 'No internet access!'});
-
-
-
       }
 
+      final candidates = buildCandidateUrls('/tran/$name?limit=10000');
+      Response? res;
+      DioException? lastError;
 
+      for (final targetUrl in candidates) {
+        try {
+          final candidateRes = await dio.get(targetUrl);
+          if (candidateRes.statusCode != null &&
+              candidateRes.statusCode! >= 200 &&
+              candidateRes.statusCode! < 300) {
+            res = candidateRes;
+            break;
+          }
+        } on DioException catch (e) {
+          lastError = e;
+          if (e.response?.statusCode == 404 ||
+              (e.response?.statusCode != null && e.response!.statusCode! >= 500) ||
+              e.type == DioExceptionType.connectionError ||
+              e.type == DioExceptionType.connectionTimeout) {
+            continue;
+          }
+          break;
+        } catch (_) {
+          continue;
+        }
+      }
 
-
-
-
-
-      var res = await dio.get('/tran/$name?limit=10000');
-
-
-
-      return Right(Map<String, dynamic>.from(res.data as Map));
-
-
-
+      if (res != null && res.data is Map) {
+        return Right(Map<String, dynamic>.from(res.data as Map));
+      }
+      if (lastError != null) {
+        return Left(errorHandler(lastError));
+      }
+      return const Left({'message': 'Gagal mengambil data dari server.'});
     } on DioException catch (err) {
-
-
-
       return Left(errorHandler(err));
-
-
-
+    } catch (e) {
+      return Left({'message': e.toString()});
     }
-
-
-
   }
 
 
@@ -3205,73 +3146,57 @@ class ApiService {
 
 
   Future<Either<Map, Map>> getAction(name) async {
-
-
-
     final token = getToken;
-
-
-
     if (token.isNotEmpty) {
-
-
-
       dio.options.headers['Authorization'] = 'Bearer $token';
-
-
-
     }
-
-
 
     try {
-
-
-
       var con = await Connectivity().checkConnectivity();
-
-
-
       if (con.contains(ConnectivityResult.wifi) == false &&
-
-
-
           con.contains(ConnectivityResult.mobile) == false) {
-
-
-
         return const Left({'message': 'No internet access!'});
-
-
-
       }
 
+      final candidates = buildCandidateUrls('/action/$name?limit=10000');
+      Response? res;
+      DioException? lastError;
 
+      for (final targetUrl in candidates) {
+        try {
+          final candidateRes = await dio.get(targetUrl);
+          if (candidateRes.statusCode != null &&
+              candidateRes.statusCode! >= 200 &&
+              candidateRes.statusCode! < 300) {
+            res = candidateRes;
+            break;
+          }
+        } on DioException catch (e) {
+          lastError = e;
+          if (e.response?.statusCode == 404 ||
+              (e.response?.statusCode != null && e.response!.statusCode! >= 500) ||
+              e.type == DioExceptionType.connectionError ||
+              e.type == DioExceptionType.connectionTimeout) {
+            continue;
+          }
+          break;
+        } catch (_) {
+          continue;
+        }
+      }
 
-
-
-
-
-      var res = await dio.get('/action/$name?limit=10000');
-
-
-
-      return Right(Map<String, dynamic>.from(res.data as Map));
-
-
-
+      if (res != null && res.data is Map) {
+        return Right(Map<String, dynamic>.from(res.data as Map));
+      }
+      if (lastError != null) {
+        return Left(errorHandler(lastError));
+      }
+      return const Left({'message': 'Gagal mengambil data action plan.'});
     } on DioException catch (err) {
-
-
-
       return Left(errorHandler(err));
-
-
-
+    } catch (e) {
+      return Left({'message': e.toString()});
     }
-
-
-
   }
 
 
@@ -14610,81 +14535,45 @@ class ApiService {
 
 
   Future<bool> deleteSafetyTalk(int id) async {
-
-
-
-    await _ensureMbsWebSession();
-
-
-
-    try {
-
-
-
-      final client = _mbsDio();
-
-
-
-      final page = await client.get<String>('/SafetyTalk/Index');
-
-
-
-      final csrf = _csrfToken(page.data ?? '');
-
-
-
-      if (csrf.isEmpty) return false;
-
-
-
-      final res = await client.post<String>('/SafetyTalk/Delete/$id',
-
-
-
-          data: {
-
-
-
-            '__RequestVerificationToken': csrf,
-
-
-
-          },
-
-
-
-          options: Options(contentType: Headers.formUrlEncodedContentType));
-
-
-
-      return res.statusCode == 200 ||
-
-
-
-          res.statusCode == 302 ||
-
-
-
-          res.statusCode == 303;
-
-
-
-    } catch (e) {
-
-
-
-      debugPrint('[ApiService] Safety Talk delete failed: $e');
-
-
-
-      return false;
-
-
-
+    // 1. Try direct REST delete via candidate URLs
+    final candidates = buildCandidateUrls('/tran/safety/$id');
+    for (final targetUrl in candidates) {
+      try {
+        final res = await dio.delete(
+          targetUrl,
+          options: Options(
+            headers: {
+              if (getToken.isNotEmpty && !getToken.startsWith('offline_token_'))
+                'Authorization': 'Bearer $getToken',
+            },
+          ),
+        );
+        if (res.statusCode != null && res.statusCode! >= 200 && res.statusCode! < 300) {
+          return true;
+        }
+      } catch (_) {}
     }
 
+    // 2. Fallback to MBS web session delete
+    await _ensureMbsWebSession();
+    try {
+      final client = _mbsDio();
+      final page = await client.get<String>('/SafetyTalk/Index');
+      final csrf = _csrfToken(page.data ?? '');
+      if (csrf.isEmpty) return false;
 
-
+      final res = await client.post<String>('/SafetyTalk/Delete/$id',
+          data: {
+            '__RequestVerificationToken': csrf,
+          },
+          options: Options(contentType: Headers.formUrlEncodedContentType));
+      return res.statusCode == 200 ||
+          res.statusCode == 302 ||
+          res.statusCode == 303;
+    } catch (e) {
+      debugPrint('[ApiService] Safety Talk delete failed: $e');
+      return false;
+    }
   }
 
 
