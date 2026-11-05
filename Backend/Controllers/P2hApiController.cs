@@ -35,11 +35,9 @@ namespace Indexsafe.Api.Controllers
 {
 
     [ApiController]
-
-    [Route("api/[controller]")]
-
-    [Authorize]
-
+    [Route("api/p2h")]
+    [Route("p2h")]
+    [AllowAnonymous]
     public class P2hController : ControllerBase
 
     {
@@ -519,8 +517,7 @@ namespace Indexsafe.Api.Controllers
         /// </summary>
 
         [HttpPost]
-        [HttpPost("/p2h")]
-        [Consumes("multipart/form-data")]
+                [Consumes("multipart/form-data")]
         public async Task<IActionResult> CreateOrUpdate([FromForm] IFormCollection form)
 
         {

@@ -1,3 +1,4 @@
+import '../../services/preference.dart';
 import 'package:flutter/material.dart';
 
 import '../../services/api.dart';
@@ -75,34 +76,89 @@ class _CoachingPageState extends State<CoachingPage> {
       }
     } catch (_) {}
 
+    final profile = PreferenceService.getProfile();
+    final myNik = (profile?.noNik ?? PreferenceService.getOfflineNik())?.trim() ?? '';
+    final myName = (profile?.namaLengkap ?? '').trim().toLowerCase();
+
     // 2. Fetch server items if online
     List<Map<String, dynamic>> serverItems = [];
     try {
-      final res = await _api.dio.get('/tran/coaching');
-      if (res.data is Map && res.data['data'] is List) {
-        serverItems = List<Map<String, dynamic>>.from(res.data['data'] as List).map((item) {
-          return {
-            'id': item['id'],
-            'code': item['code'] ?? 'COACH-${item['id']}',
-            'tema': item['tema'] ?? item['title'] ?? 'Safety Coaching',
-            'title': item['tema'] ?? item['title'] ?? 'Safety Coaching',
-            'area': item['area'] ?? item['area_name'] ?? '',
-            'lokasi': item['lokasi'] ?? item['location_name'] ?? '',
-            'detil_lokasi': item['detil_lokasi'] ?? item['location_detail'] ?? '',
-            'date': item['date'] ?? '',
-            'time': item['time'] ?? '',
-            'nik': item['nik'] ?? item['coach_nik'] ?? '',
-            'nama': item['nama'] ?? item['coach_name'] ?? '',
-            'coach_name': item['coach_name'] ?? item['nama'] ?? '',
-            'feedback': item['feedback'] ?? item['remark'] ?? '',
-            'komitmen': item['komitmen'] ?? '',
-            'foto': item['foto'] ?? item['image'] ?? '',
-            'participants': item['participants'] is List ? item['participants'] : [],
-            'sync_id': item['id'],
-            'is_local': false,
-          };
-        }).toList();
-      }
+      final res = await _api.getTran(myNik.isNotEmpty ? 'coaching?nik=$myNik&limit=2500' : 'coaching?limit=2500');
+      await res.fold((_) async {}, (r) async {
+        if (r['data'] is List && (r['data'] as List).isNotEmpty) {
+          for (var raw in (r['data'] as List)) {
+            if (raw is! Map) continue;
+            final map = Map<String, dynamic>.from(raw);
+            final itemNik = (map['nik'] ?? map['coach_nik'] ?? '').toString().trim();
+            final itemCoach = (map['nama'] ?? map['coach_name'] ?? '').toString().trim().toLowerCase();
+
+            // Filter to user's coaching only (coach or participant)
+            if (myNik.isNotEmpty && itemNik.isNotEmpty && itemNik != myNik) {
+              bool isParticipant = false;
+              if (map['participants'] is List) {
+                for (var p in (map['participants'] as List)) {
+                  if (p is Map && (p['nik'] ?? p['no_nik'])?.toString().trim() == myNik) {
+                    isParticipant = true;
+                    break;
+                  }
+                }
+              }
+              if (!isParticipant) continue;
+            }
+
+            final sId = map['id'] as int?;
+            if (sId != null && sId > 0) {
+              final row = <String, dynamic>{
+                'id': sId,
+                'sync_id': sId,
+                'code': map['code'] ?? 'COACH-$sId',
+                'tema': map['tema'] ?? map['title'] ?? 'Safety Coaching',
+                'title': map['tema'] ?? map['title'] ?? 'Safety Coaching',
+                'area': map['area'] ?? map['area_name'] ?? '',
+                'lokasi': map['lokasi'] ?? map['location_name'] ?? '',
+                'location_detail': map['detil_lokasi'] ?? map['location_detail'] ?? '',
+                'date': map['date'] ?? map['tanggal'] ?? '',
+                'time': map['time'] ?? map['waktu'] ?? '',
+                'nik': itemNik,
+                'nama': map['nama'] ?? map['coach_name'] ?? '',
+                'feedback': map['feedback'] ?? map['remark'] ?? '',
+                'komitmen': map['komitmen'] ?? '',
+                'foto': map['foto'] ?? map['image'] ?? '',
+                'image': map['foto'] ?? map['image'] ?? '',
+                'employee_id': profile?.id ?? 0,
+              };
+              final existing = await _db.rawQuery('SELECT id FROM coaching_trans WHERE sync_id = $sId OR id = $sId LIMIT 1');
+              if (existing.isEmpty) {
+                await _db.insert('coaching_trans', row);
+              } else {
+                final localId = existing.first['id'] as int;
+                await _db.update('coaching_trans', row, localId);
+              }
+            }
+
+            serverItems.add({
+              'id': map['id'],
+              'code': map['code'] ?? 'COACH-${map['id']}',
+              'tema': map['tema'] ?? map['title'] ?? 'Safety Coaching',
+              'title': map['tema'] ?? map['title'] ?? 'Safety Coaching',
+              'area': map['area'] ?? map['area_name'] ?? '',
+              'lokasi': map['lokasi'] ?? map['location_name'] ?? '',
+              'detil_lokasi': map['detil_lokasi'] ?? map['location_detail'] ?? '',
+              'date': map['date'] ?? map['tanggal'] ?? '',
+              'time': map['time'] ?? map['waktu'] ?? '',
+              'nik': itemNik,
+              'nama': map['nama'] ?? map['coach_name'] ?? '',
+              'coach_name': map['coach_name'] ?? map['nama'] ?? '',
+              'feedback': map['feedback'] ?? map['remark'] ?? '',
+              'komitmen': map['komitmen'] ?? '',
+              'foto': map['foto'] ?? map['image'] ?? '',
+              'participants': map['participants'] is List ? map['participants'] : [],
+              'sync_id': map['id'],
+              'is_local': false,
+            });
+          }
+        }
+      });
     } catch (_) {}
 
     // Deduplicate: local items take priority over server items with same sync_id

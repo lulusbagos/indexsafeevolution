@@ -284,16 +284,23 @@ class _OptionPageState extends State<OptionPage> {
       // 3. Unduh riwayat transaksi (misal: hazard_trans) dari server dan simpan ke SQLite
       if (widget.module == Module.hazard) {
         try {
-          final res = await _api.dio.get('/tran/hazard?limit=100');
-          if (res.data != null && res.data['data'] is List) {
-            for (var raw in (res.data['data'] as List)) {
+          final tranRes = await _api.getTran(userNik.isNotEmpty ? 'hazard?nik=$userNik&limit=2500' : 'hazard?limit=2500');
+          final Map? res = tranRes.fold((l) => null, (r) => r);
+          if (res != null && res['data'] is List) {
+            for (var raw in (res['data'] as List)) {
               if (raw is Map) {
                 final item = Map<String, dynamic>.from(raw);
                 final id = item['id'];
                 if (id is int) {
+                  final itemNik = (item['nik'] ?? '').toString().trim();
+                  final itemPjaNik = (item['nik_pja'] ?? '').toString().trim();
+                  if (userNik.isNotEmpty && itemNik.isNotEmpty && itemNik != userNik && itemPjaNik != userNik) continue;
+
                   final row = <String, dynamic>{
                     'id': id,
                     'code': item['code'] ?? 'HZ-$id',
+                    'nik': item['nik'] ?? userNik,
+                    'nama': item['nama'] ?? '',
                     'title':
                         item['title'] ?? item['remark'] ?? 'Laporan Bahaya',
                     'location_detail':
@@ -335,20 +342,25 @@ class _OptionPageState extends State<OptionPage> {
           widget.module == Module.simama) {
         try {
           final isSimama = widget.module == Module.simama;
-          final endpoint = isSimama
-              ? '/tran/simama?limit=100'
-              : '/tran/inspection?limit=100';
-          final res = await _api.dio.get(endpoint);
-          if (res.data != null && res.data['data'] is List) {
-            for (var raw in (res.data['data'] as List)) {
+          final epName = isSimama ? 'simama' : 'inspection';
+          final tranRes = await _api.getTran(userNik.isNotEmpty ? '$epName?nik=$userNik&limit=2500' : '$epName?limit=2500');
+          final Map? res = tranRes.fold((l) => null, (r) => r);
+          if (res != null && res['data'] is List) {
+            for (var raw in (res['data'] as List)) {
               if (raw is Map) {
                 final item = Map<String, dynamic>.from(raw);
                 final id = item['id'];
                 if (id is int) {
+                  final itemNik = (item['nik'] ?? '').toString().trim();
+                  final itemPjaNik = (item['nik_pja'] ?? item['nikPja'] ?? '').toString().trim();
+                  if (userNik.isNotEmpty && itemNik.isNotEmpty && itemNik != userNik && itemPjaNik != userNik) continue;
+
                   final row = <String, dynamic>{
                     'id': id,
                     'code':
                         item['code'] ?? (isSimama ? 'SIMAMA-$id' : 'INSP-$id'),
+                    'nik': item['nik'] ?? userNik,
+                    'nama': item['nama'] ?? '',
                     'title': item['jenisInspeksi'] ??
                         item['title'] ??
                         (isSimama
@@ -396,15 +408,21 @@ class _OptionPageState extends State<OptionPage> {
         }
       } else if (widget.module == Module.p5m) {
         try {
-          final res = await _api.dio.get('/tran/p5m?limit=100');
-          if (res.data != null && res.data['data'] is List) {
-            for (var raw in (res.data['data'] as List)) {
+          final tranRes = await _api.getTran(userNik.isNotEmpty ? 'p5m?nik=$userNik&limit=2500' : 'p5m?limit=2500');
+          final Map? res = tranRes.fold((l) => null, (r) => r);
+          if (res != null && res['data'] is List) {
+            for (var raw in (res['data'] as List)) {
               if (raw is Map) {
                 final item = Map<String, dynamic>.from(raw);
                 final id = item['id'];
                 if (id is int) {
+                  final itemNik = (item['nik'] ?? '').toString().trim();
+                  if (userNik.isNotEmpty && itemNik.isNotEmpty && itemNik != userNik) continue;
+
                   final row = <String, dynamic>{
                     'code': item['code'] ?? 'P5M-$id',
+                    'nik': item['nik'] ?? userNik,
+                    'nama': item['nama'] ?? '',
                     'title':
                         item['title'] ?? item['judul'] ?? 'P5M & Fit to Work',
                     'date': item['date'] ?? '',

@@ -89,6 +89,8 @@ Future<Response?> _postWithFallback({
           headers: {
             if (api.getToken.isNotEmpty && !api.getToken.startsWith('offline_token_'))
               'Authorization': 'Bearer ${api.getToken}',
+            if ((PreferenceService.getProfile()?.noNik ?? PreferenceService.getOfflineNik())?.trim().isNotEmpty ?? false)
+              'X-User-Nik': (PreferenceService.getProfile()?.noNik ?? PreferenceService.getOfflineNik())!.trim(),
           },
           sendTimeout: const Duration(seconds: 30),
           receiveTimeout: const Duration(seconds: 30),

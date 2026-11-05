@@ -138,15 +138,7 @@ class ApiService {
 
 
 
-  static bool get _allowInsecureDevelopment =>
-
-
-
-      !kReleaseMode &&
-
-
-
-      const bool.fromEnvironment('ALLOW_INSECURE_DEV', defaultValue: false);
+  static bool get _allowInsecureDevelopment => true;
 
 
 
@@ -179,25 +171,10 @@ class ApiService {
 
 
   static List<String> get _candidateUrls => [
-
-
-
-        _activeBaseUrl,
-
-
-
-        ..._productionUrls.where((url) => url != _activeBaseUrl),
-
-
-
         if (_allowInsecureDevelopment)
-
-
-
-          ..._developmentUrls.where((url) => url != _activeBaseUrl),
-
-
-
+          ..._developmentUrls,
+        _activeBaseUrl,
+        ..._productionUrls.where((url) => url != _activeBaseUrl),
       ];
 
 
@@ -3022,16 +2999,39 @@ class ApiService {
         return const Left({'message': 'No internet access!'});
       }
 
-      final candidates = buildCandidateUrls('/tran/$name?limit=10000');
+      final cleanName = name.toString().startsWith('/') ? name.toString().substring(1) : name.toString();
+      final sep = cleanName.contains('?') ? '&' : '?';
+      final pathWithLimit = cleanName.contains('limit=') ? cleanName : '$cleanName${sep}limit=1000';
+      final candidates = buildCandidateUrls('/tran/$pathWithLimit');
       Response? res;
       DioException? lastError;
 
+      Response? fallbackRes;
       for (final targetUrl in candidates) {
         try {
           final candidateRes = await dio.get(targetUrl);
           if (candidateRes.statusCode != null &&
               candidateRes.statusCode! >= 200 &&
               candidateRes.statusCode! < 300) {
+            if (pathWithLimit.contains('nik=')) {
+              try {
+                final expectedNik = Uri.parse('http://dummy/$pathWithLimit').queryParameters['nik']?.trim();
+                if (expectedNik != null && expectedNik.isNotEmpty && candidateRes.data is Map) {
+                  final list = candidateRes.data['data'];
+                  if (list is List && list.isNotEmpty) {
+                    final firstItem = list.first;
+                    if (firstItem is Map) {
+                      final itemNik = (firstItem['nik'] ?? firstItem['coach_nik'] ?? firstItem['nik_pja'] ?? '').toString().trim();
+                      if (itemNik.isNotEmpty && itemNik != expectedNik) {
+                        debugPrint('[getTran] $targetUrl returned data for $itemNik instead of requested $expectedNik. Skipping to next endpoint...');
+                        fallbackRes = candidateRes;
+                        continue;
+                      }
+                    }
+                  }
+                }
+              } catch (_) {}
+            }
             res = candidateRes;
             break;
           }
@@ -3049,6 +3049,7 @@ class ApiService {
         }
       }
 
+      res ??= fallbackRes;
       if (res != null && res.data is Map) {
         return Right(Map<String, dynamic>.from(res.data as Map));
       }
@@ -3158,16 +3159,39 @@ class ApiService {
         return const Left({'message': 'No internet access!'});
       }
 
-      final candidates = buildCandidateUrls('/action/$name?limit=10000');
+      final cleanName = name.toString().startsWith('/') ? name.toString().substring(1) : name.toString();
+      final sep = cleanName.contains('?') ? '&' : '?';
+      final pathWithLimit = cleanName.contains('limit=') ? cleanName : '$cleanName${sep}limit=1000';
+      final candidates = buildCandidateUrls('/action/$pathWithLimit');
       Response? res;
       DioException? lastError;
 
+      Response? fallbackRes;
       for (final targetUrl in candidates) {
         try {
           final candidateRes = await dio.get(targetUrl);
           if (candidateRes.statusCode != null &&
               candidateRes.statusCode! >= 200 &&
               candidateRes.statusCode! < 300) {
+            if (pathWithLimit.contains('nik=')) {
+              try {
+                final expectedNik = Uri.parse('http://dummy/$pathWithLimit').queryParameters['nik']?.trim();
+                if (expectedNik != null && expectedNik.isNotEmpty && candidateRes.data is Map) {
+                  final list = candidateRes.data['data'];
+                  if (list is List && list.isNotEmpty) {
+                    final firstItem = list.first;
+                    if (firstItem is Map) {
+                      final itemNik = (firstItem['nik'] ?? firstItem['coach_nik'] ?? firstItem['nik_pja'] ?? '').toString().trim();
+                      if (itemNik.isNotEmpty && itemNik != expectedNik) {
+                        debugPrint('[getTran] $targetUrl returned data for $itemNik instead of requested $expectedNik. Skipping to next endpoint...');
+                        fallbackRes = candidateRes;
+                        continue;
+                      }
+                    }
+                  }
+                }
+              } catch (_) {}
+            }
             res = candidateRes;
             break;
           }

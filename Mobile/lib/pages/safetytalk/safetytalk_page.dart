@@ -17,7 +17,8 @@ const _stBackground = Color(0xFFF8FAFC);
 String _decodeHtml(String? text) {
   if (text == null) return '';
   var res = text;
-  for (int i = 0; i < 2; i++) {
+  while (res.contains('&amp;') || res.contains('&quot;') || res.contains('&#39;') || res.contains('&apos;') || res.contains('&lt;') || res.contains('&gt;') || res.contains('&nbsp;')) {
+    final before = res;
     res = res
         .replaceAll('&amp;', '&')
         .replaceAll('&quot;', '"')
@@ -26,6 +27,7 @@ String _decodeHtml(String? text) {
         .replaceAll('&lt;', '<')
         .replaceAll('&gt;', '>')
         .replaceAll('&nbsp;', ' ');
+    if (res == before) break;
   }
   return res.trim();
 }
@@ -93,19 +95,79 @@ class _SafetyTalkPageState extends State<SafetyTalkPage> {
     final profile = PreferenceService.getProfile();
     final myNik = (profile?.noNik ?? PreferenceService.getOfflineNik())?.trim() ?? '';
     final myName = (profile?.namaLengkap ?? '').trim().toLowerCase();
+    final profileId = profile?.id ?? 0;
 
-    // 1. Load Local items from SQLite with all columns
-    List<Map<String, dynamic>> localItems = [];
+    // 1. Fetch server items directly from REST API (scoped strictly to current user's NIK across 3 periods)
+    try {
+      final res = await _api.getTran(myNik.isNotEmpty ? 'safety?nik=$myNik&limit=2500' : 'safety?limit=2500');
+      await res.fold((_) async {}, (r) async {
+        if (r['data'] is List && (r['data'] as List).isNotEmpty) {
+          for (var item in (r['data'] as List)) {
+            if (item is! Map) continue;
+            final map = Map<String, dynamic>.from(item);
+            final rawJudul = (map['judul'] ?? map['title'] ?? 'Safety Talk').toString();
+            final itemNik = (map['nik'] ?? '').toString().trim();
+            final itemSpeaker = (map['nama'] ?? '').toString().trim().toLowerCase();
+
+            // Strictly filter so only Safety Talks created by the logged-in user are stored
+            if (myNik.isNotEmpty) {
+              if (itemNik.isNotEmpty && itemNik != myNik) continue;
+              if (itemNik.isEmpty && myName.isNotEmpty && itemSpeaker.isNotEmpty && itemSpeaker != myName) continue;
+            }
+
+            final sId = map['id'] as int?;
+            if (sId != null && sId > 0) {
+              final row = <String, dynamic>{
+                'id': sId,
+                'sync_id': sId,
+                'code': map['code'] ?? 'ST-$sId',
+                'judul': _decodeHtml(rawJudul),
+                'title': _decodeHtml(rawJudul),
+                'area': map['area'] ?? map['lokasi'] ?? '',
+                'lokasi': map['lokasi'] ?? map['area'] ?? '',
+                'detil_lokasi': map['detilLokasi'] ?? map['detil_lokasi'] ?? '',
+                'location_detail': map['detilLokasi'] ?? map['detil_lokasi'] ?? '',
+                'tanggal': map['tanggal']?.toString().split('T').first ?? map['date']?.toString().split('T').first ?? '',
+                'date': map['tanggal']?.toString().split('T').first ?? map['date']?.toString().split('T').first ?? '',
+                'waktu': map['waktu']?.toString() ?? map['time']?.toString() ?? '',
+                'time': map['waktu']?.toString() ?? map['time']?.toString() ?? '',
+                'keterangan': _decodeHtml((map['keterangan'] ?? map['remark'] ?? '').toString()),
+                'remark': _decodeHtml((map['keterangan'] ?? map['remark'] ?? '').toString()),
+                'foto_diri': map['fotoDiri'] ?? map['foto_diri'],
+                'foto_kegiatan': map['fotoKegiatan'] ?? map['foto_kegiatan'],
+                'nama': map['nama'] ?? profile?.namaLengkap ?? '',
+                'nik': map['nik'] ?? myNik,
+                'status': 1,
+                'employee_id': profileId,
+              };
+              final existing = await _db.rawQuery('SELECT id FROM safety_trans WHERE sync_id = $sId OR id = $sId LIMIT 1');
+              if (existing.isEmpty) {
+                await _db.insert('safety_trans', row);
+              } else {
+                final localId = existing.first['id'] as int;
+                await _db.update('safety_trans', row, localId);
+              }
+            }
+          }
+        }
+      });
+    } catch (_) {}
+
+    // 2. Load all personal items from SQLite
+    List<Map<String, dynamic>> items = [];
     try {
       final rows = await _db.rawQuery(
-        'SELECT * FROM safety_trans WHERE deleted_at IS NULL ORDER BY id DESC',
+        'SELECT * FROM safety_trans WHERE deleted_at IS NULL ORDER BY date DESC, time DESC, id DESC',
       );
-      localItems = rows.map((r) {
+      items = rows.map((r) {
         final map = Map<String, dynamic>.from(r);
-        map['is_local'] = true;
+        final isSynced = r['sync_id'] != null && (r['sync_id'] as int? ?? 0) > 0;
+        map['is_local'] = !isSynced;
         map['local_id'] = r['id'];
         map['judul'] = _decodeHtml((r['judul'] ?? r['title'] ?? 'Safety Talk').toString());
         map['title'] = map['judul'];
+        map['keterangan'] = _decodeHtml((r['keterangan'] ?? r['remark'] ?? '').toString());
+        map['remark'] = map['keterangan'];
         return map;
       }).where((m) {
         if (myNik.isEmpty) return true;
@@ -117,87 +179,11 @@ class _SafetyTalkPageState extends State<SafetyTalkPage> {
       }).toList();
     } catch (_) {}
 
-    // 2. Fetch server items: try REST API first (filtered by current user's NIK)
-    List<Map<String, dynamic>> serverItems = [];
-    try {
-      final res = await _api.getTran(myNik.isNotEmpty ? 'safety?nik=$myNik' : 'safety');
-      res.fold((_) {}, (r) {
-        if (r['data'] is List && (r['data'] as List).isNotEmpty) {
-          for (var item in (r['data'] as List)) {
-            final map = Map<String, dynamic>.from(item as Map);
-            final rawJudul = (map['judul'] ?? map['title'] ?? 'Safety Talk').toString();
-            final itemNik = (map['nik'] ?? '').toString().trim();
-            final itemSpeaker = (map['nama'] ?? '').toString().trim().toLowerCase();
-
-            // Strictly filter so only Safety Talks created by the logged-in user appear:
-            if (myNik.isNotEmpty) {
-              if (itemNik.isNotEmpty && itemNik != myNik) continue;
-              if (itemNik.isEmpty && myName.isNotEmpty && itemSpeaker.isNotEmpty && itemSpeaker != myName) continue;
-            }
-
-            serverItems.add({
-              'id': map['id'],
-              'judul': _decodeHtml(rawJudul),
-              'title': _decodeHtml(rawJudul),
-              'lokasi': map['lokasi'] ?? map['area'] ?? '',
-              'area': map['area'] ?? map['lokasi'] ?? '',
-              'detil_lokasi': map['detilLokasi'] ?? map['detil_lokasi'],
-              'sync_id': map['id'],
-              'is_local': false,
-              'tanggal': map['tanggal'] ?? map['date'],
-              'date': map['tanggal'] ?? map['date'],
-              'waktu': map['waktu'] ?? map['time'],
-              'time': map['waktu'] ?? map['time'],
-              'keterangan': map['keterangan'] ?? map['remark'],
-              'remark': map['keterangan'] ?? map['remark'],
-              'foto_diri': map['fotoDiri'] ?? map['foto_diri'],
-              'foto_kegiatan': map['fotoKegiatan'] ?? map['foto_kegiatan'],
-              'nama': map['nama'] ?? profile?.namaLengkap,
-              'nik': map['nik'] ?? myNik,
-              'departemen': map['departemen'] ?? profile?.depart,
-            });
-          }
-        }
-      });
-    } catch (_) {}
-
-    // Fallback: If REST returned empty, only check web scraping if no local items
-    if (serverItems.isEmpty && localItems.isEmpty) {
-      try {
-        final data = await _api.getSafetyTalkData();
-        if (data != null && data['talks'] is List) {
-          serverItems = List<Map<String, dynamic>>.from(data['talks'] as List).map((item) {
-            final rawJudul = (item['judul'] ?? item['title'] ?? 'Safety Talk').toString();
-            return {
-              'id': item['id'],
-              'judul': _decodeHtml(rawJudul),
-              'title': _decodeHtml(rawJudul),
-              'lokasi': item['areaLokasi'] ?? '',
-              'area': item['areaLokasi'] ?? '',
-              'sync_id': item['id'],
-              'is_local': false,
-            };
-          }).toList();
-        }
-      } catch (_) {}
-    }
-
-    // Deduplicate / merge: local items take priority
-    final localSyncIds = localItems
-        .map((e) => e['sync_id'])
-        .where((id) => id != null && id != 0)
-        .toSet();
-
-    final nonDuplicateServer = serverItems.where((s) => !localSyncIds.contains(s['id'])).toList();
-
     if (!mounted) return;
     setState(() {
-      _talks = [...localItems, ...nonDuplicateServer];
+      _talks = items;
       _loading = false;
     });
-
-    // Enrich missing server items in parallel background
-    _enrichServerItems(nonDuplicateServer);
   }
 
   Future<void> _enrichServerItems(List<Map<String, dynamic>> items) async {

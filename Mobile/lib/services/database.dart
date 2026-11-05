@@ -144,6 +144,25 @@ class DatabaseService {
 
     await _ensureOfflineQueues(_database!);
 
+    final ensureTables = [
+      'hazard_trans',
+      'observation_trans',
+      'action_plans',
+      'inspection_trans',
+      'p5m_trans',
+      'coaching_trans',
+      'p2h_trans',
+      'safety_trans'
+    ];
+    final ensureCols = ['nik', 'nama', 'nik_pja', 'nik_pic', 'category', 'area_name', 'location_name', 'lampiran_json'];
+    for (final tbl in ensureTables) {
+      for (final colName in ensureCols) {
+        try {
+          await _database!.execute('ALTER TABLE ' + tbl + ' ADD COLUMN ' + colName + ' TEXT;');
+        } catch (_) {}
+      }
+    }
+
 
 
     return _database!;
@@ -5713,26 +5732,12 @@ class DatabaseService {
 
 
       'image',
-
-
-
+      'nik',
+      'nama',
     ];
-
-
-
     for (final col in cols) {
-
-
-
       try {
-
-
-
-        await db
-
-
-
-            .execute('ALTER TABLE observation_trans ADD COLUMN `$col` TEXT;');
+        await db.execute('ALTER TABLE observation_trans ADD COLUMN `$col` TEXT;');
 
 
 
@@ -6185,21 +6190,11 @@ class DatabaseService {
 
 
       'sync_id',
-
-
-
+      'nik',
+      'nama',
     ];
-
-
-
     for (var col in cols) {
-
-
-
       try {
-
-
-
         await db.execute('ALTER TABLE hazard_trans ADD COLUMN `$col` TEXT;');
 
 
@@ -6325,21 +6320,13 @@ class DatabaseService {
 
 
       'title',
-
-
-
+      'nik',
+      'nama',
+      'nik_pja',
+      'nik_pic',
     ];
-
-
-
     for (var col in cols) {
-
-
-
       try {
-
-
-
         await db.execute('ALTER TABLE action_plans ADD COLUMN `$col` TEXT;');
 
 
