@@ -1243,162 +1243,173 @@ class _RosterSettingsPageState extends State<RosterSettingsPage>
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 3),
-                          decoration: BoxDecoration(
-                            color: isTugas
-                                ? const Color(0xFFE0F2FE)
-                                : const Color(0xFFF3E8FF),
-                            borderRadius: BorderRadius.circular(6),
-                            border: Border.all(
-                              color: isTugas
-                                  ? const Color(0xFFBAE6FD)
-                                  : const Color(0xFFE9D5FF),
-                            ),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
+                        Expanded(
+                          child: Wrap(
+                            spacing: 6,
+                            runSpacing: 6,
+                            crossAxisAlignment: WrapCrossAlignment.center,
                             children: [
-                              Icon(
-                                isTugas
-                                    ? Icons.flight_takeoff_rounded
-                                    : Icons.work_rounded,
-                                size: 11,
-                                color: isTugas
-                                    ? const Color(0xFF0284C7)
-                                    : const Color(0xFF7C3AED),
-                              ),
-                              const SizedBox(width: 4),
-                              Text(
-                                isTugas ? 'Periode Tugas' : 'Roster Reguler',
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w800,
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(
                                   color: isTugas
-                                      ? const Color(0xFF0284C7)
-                                      : const Color(0xFF7C3AED),
+                                      ? const Color(0xFFE0F2FE)
+                                      : const Color(0xFFF3E8FF),
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(
+                                    color: isTugas
+                                        ? const Color(0xFFBAE6FD)
+                                        : const Color(0xFFE9D5FF),
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      isTugas
+                                          ? Icons.flight_takeoff_rounded
+                                          : Icons.work_rounded,
+                                      size: 11,
+                                      color: isTugas
+                                          ? const Color(0xFF0284C7)
+                                          : const Color(0xFF7C3AED),
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      isTugas ? 'Periode Tugas' : 'Roster Reguler',
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w800,
+                                        color: isTugas
+                                            ? const Color(0xFF0284C7)
+                                            : const Color(0xFF7C3AED),
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: item.status.contains('Aktif') ||
+                                          item.status.contains('Dinas')
+                                      ? const Color(0xFFDCFCE7)
+                                      : const Color(0xFFF1F5F9),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  item.status,
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w700,
+                                    color: item.status.contains('Aktif') ||
+                                            item.status.contains('Dinas')
+                                        ? const Color(0xFF16A34A)
+                                        : const Color(0xFF64748B),
+                                  ),
+                                ),
+                              ),
+                              if (item.approvalStatus.isNotEmpty)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                                  decoration: BoxDecoration(
+                                    color: item.approvalStatus == 'APPROVED'
+                                        ? const Color(0xFFECFDF5)
+                                        : item.approvalStatus == 'REJECTED'
+                                            ? const Color(0xFFFEF2F2)
+                                            : const Color(0xFFFFFBEB),
+                                    borderRadius: BorderRadius.circular(6),
+                                    border: Border.all(
+                                      color: item.approvalStatus == 'APPROVED'
+                                          ? const Color(0xFFA7F3D0)
+                                          : item.approvalStatus == 'REJECTED'
+                                              ? const Color(0xFFFECACA)
+                                              : const Color(0xFFFDE68A),
+                                    ),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        item.approvalStatus == 'APPROVED'
+                                            ? Icons.check_circle_rounded
+                                            : item.approvalStatus == 'REJECTED'
+                                                ? Icons.cancel_rounded
+                                                : Icons.hourglass_top_rounded,
+                                        size: 10,
+                                        color: item.approvalStatus == 'APPROVED'
+                                            ? const Color(0xFF059669)
+                                            : item.approvalStatus == 'REJECTED'
+                                                ? const Color(0xFFDC2626)
+                                                : const Color(0xFFD97706),
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        item.approvalStatus == 'APPROVED'
+                                            ? 'Re-Induksi Disetujui'
+                                            : item.approvalStatus == 'REJECTED'
+                                                ? 'Re-Induksi Ditolak'
+                                                : 'Menunggu Pengawas',
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.w800,
+                                          color: item.approvalStatus == 'APPROVED'
+                                              ? const Color(0xFF059669)
+                                              : item.approvalStatus == 'REJECTED'
+                                                  ? const Color(0xFFDC2626)
+                                                  : const Color(0xFFD97706),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
                             ],
                           ),
                         ),
                         const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 3),
-                          decoration: BoxDecoration(
-                            color: item.status.contains('Aktif') ||
-                                    item.status.contains('Dinas')
-                                ? const Color(0xFFDCFCE7)
-                                : const Color(0xFFF1F5F9),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Text(
-                            item.status,
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w700,
-                              color: item.status.contains('Aktif') ||
-                                      item.status.contains('Dinas')
-                                  ? const Color(0xFF16A34A)
-                                  : const Color(0xFF64748B),
-                            ),
-                          ),
-                        ),
-                        if (item.approvalStatus.isNotEmpty) ...[
-                          const SizedBox(width: 6),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                            decoration: BoxDecoration(
-                              color: item.approvalStatus == 'APPROVED'
-                                  ? const Color(0xFFECFDF5)
-                                  : item.approvalStatus == 'REJECTED'
-                                      ? const Color(0xFFFEF2F2)
-                                      : const Color(0xFFFFFBEB),
-                              borderRadius: BorderRadius.circular(6),
-                              border: Border.all(
-                                color: item.approvalStatus == 'APPROVED'
-                                    ? const Color(0xFFA7F3D0)
-                                    : item.approvalStatus == 'REJECTED'
-                                        ? const Color(0xFFFECACA)
-                                        : const Color(0xFFFDE68A),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (item.idReinduksi != null) ...[
+                              IconButton(
+                                padding: const EdgeInsets.all(4),
+                                constraints: const BoxConstraints(),
+                                icon: const Icon(Icons.description_outlined,
+                                    size: 18, color: Color(0xFF0F766E)),
+                                tooltip: 'Lihat Form Re-Induksi',
+                                onPressed: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => ReinductionApprovalPage(reinduksiId: item.idReinduksi),
+                                    ),
+                                  );
+                                },
                               ),
+                              const SizedBox(width: 4),
+                            ],
+                            IconButton(
+                              padding: const EdgeInsets.all(4),
+                              constraints: const BoxConstraints(),
+                              icon: const Icon(Icons.edit_outlined,
+                                  size: 18, color: Color(0xFF0284C7)),
+                              tooltip: 'Edit',
+                              onPressed: () => _startEdit(item),
                             ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  item.approvalStatus == 'APPROVED'
-                                      ? Icons.check_circle_rounded
-                                      : item.approvalStatus == 'REJECTED'
-                                          ? Icons.cancel_rounded
-                                          : Icons.hourglass_top_rounded,
-                                  size: 10,
-                                  color: item.approvalStatus == 'APPROVED'
-                                      ? const Color(0xFF059669)
-                                      : item.approvalStatus == 'REJECTED'
-                                          ? const Color(0xFFDC2626)
-                                          : const Color(0xFFD97706),
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  item.approvalStatus == 'APPROVED'
-                                      ? 'Re-Induksi Disetujui'
-                                      : item.approvalStatus == 'REJECTED'
-                                          ? 'Re-Induksi Ditolak'
-                                          : 'Menunggu Pengawas',
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w800,
-                                    color: item.approvalStatus == 'APPROVED'
-                                        ? const Color(0xFF059669)
-                                        : item.approvalStatus == 'REJECTED'
-                                            ? const Color(0xFFDC2626)
-                                            : const Color(0xFFD97706),
-                                  ),
-                                ),
-                              ],
+                            const SizedBox(width: 4),
+                            IconButton(
+                              padding: const EdgeInsets.all(4),
+                              constraints: const BoxConstraints(),
+                              icon: const Icon(Icons.delete_outline_rounded,
+                                  size: 18, color: Color(0xFFDC2626)),
+                              tooltip: 'Hapus',
+                              onPressed: () => _deleteRosterItem(item),
                             ),
-                          ),
-                        ],
-                        const Spacer(),
-                        // Action buttons
-                        if (item.idReinduksi != null) ...[
-                          IconButton(
-                            padding: EdgeInsets.zero,
-                            constraints: const BoxConstraints(),
-                            icon: const Icon(Icons.description_outlined,
-                                size: 18, color: Color(0xFF0F766E)),
-                            tooltip: 'Lihat Form Re-Induksi',
-                            onPressed: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => ReinductionApprovalPage(reinduksiId: item.idReinduksi),
-                                ),
-                              );
-                            },
-                          ),
-                          const SizedBox(width: 8),
-                        ],
-                        IconButton(
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(),
-                          icon: const Icon(Icons.edit_outlined,
-                              size: 18, color: Color(0xFF0284C7)),
-                          tooltip: 'Edit',
-                          onPressed: () => _startEdit(item),
-                        ),
-                        const SizedBox(width: 12),
-                        IconButton(
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(),
-                          icon: const Icon(Icons.delete_outline_rounded,
-                              size: 18, color: Color(0xFFDC2626)),
-                          tooltip: 'Hapus',
-                          onPressed: () => _deleteRosterItem(item),
+                          ],
                         ),
                       ],
                     ),

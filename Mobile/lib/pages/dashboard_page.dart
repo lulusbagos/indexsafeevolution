@@ -4936,17 +4936,25 @@ class _DashboardPageState extends State<DashboardPage>
                 padding: const EdgeInsets.fromLTRB(26, 24, 18, 0),
                 child: Stack(children: [
                   Positioned(
-                    // This is a reserved text column.  The weather and bell
-                    // never share its space, even for a long employee name.
-                    left: 0, right: 154, top: 7,
+                    // Reserved column for top employee info, while the bottom
+                    // compliance badge can freely utilize the available card width.
+                    left: 0, right: 0, top: 7,
                     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      const Text('SEMANGAT PAGI!', style: TextStyle(fontSize: 9, letterSpacing: 1.2, fontWeight: FontWeight.w900, color: Color(0xFF64748B))),
-                      const SizedBox(height: 4),
-                      _adaptiveHeroText(name, fontSize: 17, minimumFontSize: 10, maxLines: 2, weight: FontWeight.w900, color: const Color(0xFF0F172A)),
-                      const SizedBox(height: 6),
-                      _adaptiveHeroText(position, fontSize: 11, minimumFontSize: 8, maxLines: 2, weight: FontWeight.w800, color: const Color(0xFF2563EB)),
-                      const SizedBox(height: 2),
-                      _adaptiveHeroText(company, fontSize: 10.5, minimumFontSize: 8, maxLines: 2, weight: FontWeight.w600, color: const Color(0xFF64748B)),
+                      Padding(
+                        padding: const EdgeInsets.only(right: 154),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('SEMANGAT PAGI!', style: TextStyle(fontSize: 9, letterSpacing: 1.2, fontWeight: FontWeight.w900, color: Color(0xFF64748B))),
+                            const SizedBox(height: 4),
+                            _adaptiveHeroText(name, fontSize: 17, minimumFontSize: 10, maxLines: 2, weight: FontWeight.w900, color: const Color(0xFF0F172A)),
+                            const SizedBox(height: 6),
+                            _adaptiveHeroText(position, fontSize: 11, minimumFontSize: 8, maxLines: 2, weight: FontWeight.w800, color: const Color(0xFF2563EB)),
+                            const SizedBox(height: 2),
+                            _adaptiveHeroText(company, fontSize: 10.5, minimumFontSize: 8, maxLines: 2, weight: FontWeight.w600, color: const Color(0xFF64748B)),
+                          ],
+                        ),
+                      ),
                       const SizedBox(height: 8),
                       _buildSapComplianceHeroBadge(),
                     ]),
@@ -5043,7 +5051,10 @@ class _DashboardPageState extends State<DashboardPage>
               ),
             ],
           ),
-          child: Row(
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               Container(
@@ -5095,6 +5106,7 @@ class _DashboardPageState extends State<DashboardPage>
                 color: Color(0xFF94A3B8),
               ),
             ],
+          ),
           ),
         ),
       ),
