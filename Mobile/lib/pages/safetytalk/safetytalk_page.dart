@@ -6,11 +6,52 @@ import '../../services/database.dart';
 import '../../services/offline_sync_service.dart';
 import '../../services/sync.dart';
 import '../../widgets/top_bar.dart';
+import 'safetytalk_detail_page.dart';
 import 'safetytalk_form_page.dart';
 
 const _stRed = Color(0xFFE11D48);
 const _stDark = Color(0xFF0F172A);
 const _stBackground = Color(0xFFF8FAFC);
+
+String _decodeHtml(String? text) {
+  if (text == null) return '';
+  return text
+      .replaceAll('&amp;', '&')
+      .replaceAll('&quot;', '"')
+      .replaceAll('&#39;', "'")
+      .replaceAll('&lt;', '<')
+      .replaceAll('&gt;', '>')
+      .replaceAll('&nbsp;', ' ')
+      .trim();
+}
+
+String _cleanLocation(dynamic areaRaw, dynamic lokasiRaw, [dynamic detilRaw]) {
+  final seen = <String>{};
+  final result = <String>[];
+
+  void add(dynamic val) {
+    if (val == null) return;
+    final text = _decodeHtml(val.toString()).trim();
+    if (text.isEmpty) return;
+
+    final parts = text.contains('•') ? text.split('•') : [text];
+    for (var p in parts) {
+      final clean = p.trim();
+      final lower = clean.toLowerCase();
+      if (clean.isNotEmpty && !seen.contains(lower)) {
+        seen.add(lower);
+        result.add(clean);
+      }
+    }
+  }
+
+  add(areaRaw);
+  add(lokasiRaw);
+  add(detilRaw);
+
+  if (result.isEmpty) return 'Lokasi Kerja Lapangan';
+  return result.join(' • ');
+}
 
 class SafetyTalkPage extends StatefulWidget {
   const SafetyTalkPage({super.key});
@@ -44,38 +85,76 @@ class _SafetyTalkPageState extends State<SafetyTalkPage> {
   Future<void> _load() async {
     setState(() => _loading = true);
 
-    // 1. Load Local items from SQLite
+    // 1. Load Local items from SQLite with all columns
     List<Map<String, dynamic>> localItems = [];
     try {
       final rows = await _db.rawQuery(
-        'SELECT id, title, judul, remark, keterangan, area, lokasi, detil_lokasi, location_detail, date, time, sync_id FROM safety_trans WHERE deleted_at IS NULL ORDER BY id DESC',
+        'SELECT * FROM safety_trans WHERE deleted_at IS NULL ORDER BY id DESC',
       );
       localItems = rows.map((r) {
         final map = Map<String, dynamic>.from(r);
         map['is_local'] = true;
         map['local_id'] = r['id'];
+        map['judul'] = _decodeHtml((r['judul'] ?? r['title'] ?? 'Safety Talk').toString());
+        map['title'] = map['judul'];
         return map;
       }).toList();
     } catch (_) {}
 
-    // 2. Fetch server items if available
+    // 2. Fetch server items: try REST API first, then MBS Web scraping
     List<Map<String, dynamic>> serverItems = [];
     try {
-      final data = await _api.getSafetyTalkData();
-      if (data != null && data['talks'] is List) {
-        serverItems = List<Map<String, dynamic>>.from(data['talks'] as List).map((item) {
-          return {
-            'id': item['id'],
-            'judul': item['judul'] ?? item['title'] ?? 'Safety Talk',
-            'title': item['judul'] ?? item['title'] ?? 'Safety Talk',
-            'lokasi': item['areaLokasi'] ?? '',
-            'area': item['areaLokasi'] ?? '',
-            'sync_id': item['id'],
-            'is_local': false,
-          };
-        }).toList();
-      }
+      final res = await _api.getTran('safety');
+      res.fold((_) {}, (r) {
+        if (r['data'] is List && (r['data'] as List).isNotEmpty) {
+          for (var item in (r['data'] as List)) {
+            final map = Map<String, dynamic>.from(item as Map);
+            final rawJudul = (map['judul'] ?? map['title'] ?? 'Safety Talk').toString();
+            serverItems.add({
+              'id': map['id'],
+              'judul': _decodeHtml(rawJudul),
+              'title': _decodeHtml(rawJudul),
+              'lokasi': map['lokasi'] ?? map['area'] ?? '',
+              'area': map['area'] ?? map['lokasi'] ?? '',
+              'detil_lokasi': map['detilLokasi'] ?? map['detil_lokasi'],
+              'sync_id': map['id'],
+              'is_local': false,
+              'tanggal': map['tanggal'] ?? map['date'],
+              'date': map['tanggal'] ?? map['date'],
+              'waktu': map['waktu'] ?? map['time'],
+              'time': map['waktu'] ?? map['time'],
+              'keterangan': map['keterangan'] ?? map['remark'],
+              'remark': map['keterangan'] ?? map['remark'],
+              'foto_diri': map['fotoDiri'] ?? map['foto_diri'],
+              'foto_kegiatan': map['fotoKegiatan'] ?? map['foto_kegiatan'],
+              'nama': map['nama'],
+              'nik': map['nik'],
+              'departemen': map['departemen'],
+            });
+          }
+        }
+      });
     } catch (_) {}
+
+    if (serverItems.isEmpty) {
+      try {
+        final data = await _api.getSafetyTalkData();
+        if (data != null && data['talks'] is List) {
+          serverItems = List<Map<String, dynamic>>.from(data['talks'] as List).map((item) {
+            final rawJudul = (item['judul'] ?? item['title'] ?? 'Safety Talk').toString();
+            return {
+              'id': item['id'],
+              'judul': _decodeHtml(rawJudul),
+              'title': _decodeHtml(rawJudul),
+              'lokasi': item['areaLokasi'] ?? '',
+              'area': item['areaLokasi'] ?? '',
+              'sync_id': item['id'],
+              'is_local': false,
+            };
+          }).toList();
+        }
+      } catch (_) {}
+    }
 
     // Deduplicate / merge: local items take priority
     final localSyncIds = localItems
@@ -90,6 +169,60 @@ class _SafetyTalkPageState extends State<SafetyTalkPage> {
       _talks = [...localItems, ...nonDuplicateServer];
       _loading = false;
     });
+
+    // Enrich missing server items in parallel background
+    _enrichServerItems(nonDuplicateServer);
+  }
+
+  Future<void> _enrichServerItems(List<Map<String, dynamic>> items) async {
+    final toEnrich = items
+        .where((s) => s['tanggal'] == null || s['tanggal'].toString().isEmpty)
+        .take(15)
+        .toList();
+
+    if (toEnrich.isEmpty) return;
+
+    bool changed = false;
+    await Future.wait(toEnrich.map((item) async {
+      final id = item['id'] as int?;
+      if (id != null && id > 0) {
+        try {
+          final detail = await _api.getSafetyTalk(id);
+          if (detail != null) {
+            item['tanggal'] = detail['tanggal'] ?? detail['date'];
+            item['date'] = detail['tanggal'] ?? detail['date'];
+            item['waktu'] = detail['waktu'] ?? detail['time'];
+            item['time'] = detail['waktu'] ?? detail['time'];
+            if (detail['keterangan'] != null) item['keterangan'] = detail['keterangan'];
+            if (detail['remark'] != null) item['remark'] = detail['remark'];
+            if (detail['nama'] != null) item['nama'] = detail['nama'];
+            if (detail['nik'] != null) item['nik'] = detail['nik'];
+            if (detail['departemen'] != null) item['departemen'] = detail['departemen'];
+            if (detail['area'] != null && detail['area'].toString().isNotEmpty) item['area'] = detail['area'];
+            if (detail['lokasi'] != null && detail['lokasi'].toString().isNotEmpty) item['lokasi'] = detail['lokasi'];
+            if (detail['fotoDiri'] != null) item['foto_diri'] = detail['fotoDiri'];
+            if (detail['fotoKegiatan'] != null) item['foto_kegiatan'] = detail['fotoKegiatan'];
+            changed = true;
+          }
+        } catch (_) {}
+      }
+    }));
+
+    if (changed && mounted) {
+      setState(() {});
+    }
+  }
+
+  Future<void> _openDetail(Map<String, dynamic> item) async {
+    final updated = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => SafetyTalkDetailPage(item: item),
+      ),
+    );
+    if (updated == true || mounted) {
+      _load();
+    }
   }
 
   Future<void> _openForm([Map<String, dynamic>? item]) async {
@@ -128,7 +261,7 @@ class _SafetyTalkPageState extends State<SafetyTalkPage> {
   }
 
   Future<void> _delete(Map<String, dynamic> item) async {
-    final title = item['judul'] ?? item['title'] ?? 'Safety Talk';
+    final title = _decodeHtml((item['judul'] ?? item['title'] ?? 'Safety Talk').toString());
     final ok = await showModalBottomSheet<bool>(
       context: context,
       showDragHandle: true,
@@ -235,7 +368,8 @@ class _SafetyTalkPageState extends State<SafetyTalkPage> {
         final a = (e['area'] ?? '').toString().toLowerCase();
         final l = (e['lokasi'] ?? e['location_detail'] ?? '').toString().toLowerCase();
         final r = (e['keterangan'] ?? e['remark'] ?? '').toString().toLowerCase();
-        return t.contains(q) || a.contains(q) || l.contains(q) || r.contains(q);
+        final s = (e['nama'] ?? '').toString().toLowerCase();
+        return t.contains(q) || a.contains(q) || l.contains(q) || r.contains(q) || s.contains(q);
       }).toList();
     }
 
@@ -278,7 +412,7 @@ class _SafetyTalkPageState extends State<SafetyTalkPage> {
                       onChanged: (val) => setState(() => _searchQuery = val.trim()),
                       style: const TextStyle(fontSize: 13),
                       decoration: InputDecoration(
-                        hintText: 'Cari topik, area, lokasi...',
+                        hintText: 'Cari topik, pemateri, area, lokasi...',
                         hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12.5),
                         prefixIcon: const Icon(Icons.search_rounded, color: Color(0xFF64748B), size: 20),
                         suffixIcon: _searchQuery.isNotEmpty
@@ -379,18 +513,18 @@ class _SafetyTalkPageState extends State<SafetyTalkPage> {
                           itemBuilder: (context, index) {
                             final item = filtered[index];
                             final isSynced = item['sync_id'] != null && item['sync_id'] != 0;
-                            final title = (item['judul'] ?? item['title'] ?? 'Safety Talk').toString();
-                            final area = (item['area'] ?? '').toString();
-                            final lokasi = (item['lokasi'] ?? item['location_detail'] ?? '').toString();
-                            final fullLoc = area.isNotEmpty && lokasi.isNotEmpty
-                                ? '$area • $lokasi'
-                                : (area.isNotEmpty ? area : (lokasi.isNotEmpty ? lokasi : 'Lokasi Kerja'));
+                            final title = _decodeHtml((item['judul'] ?? item['title'] ?? 'Safety Talk').toString());
+                            final cleanLoc = _cleanLocation(item['area'], item['lokasi'], item['detil_lokasi']);
+                            final speaker = (item['nama'] ?? item['speaker'] ?? '').toString().trim();
+
                             final dateRaw = item['date'] ?? item['tanggal'];
                             final timeRaw = item['time'] ?? item['waktu'];
-                            final remark = (item['keterangan'] ?? item['remark'] ?? '').toString();
+                            final remark = (item['keterangan'] ?? item['remark'] ?? '').toString().trim();
+                            final hasPhotos = (item['foto_diri'] != null && item['foto_diri'].toString().isNotEmpty) ||
+                                (item['foto_kegiatan'] != null && item['foto_kegiatan'].toString().isNotEmpty);
 
                             String dateText = '';
-                            if (dateRaw != null) {
+                            if (dateRaw != null && dateRaw.toString().isNotEmpty) {
                               final dt = DateTime.tryParse(dateRaw.toString());
                               if (dt != null) {
                                 dateText = DateFormat('dd MMM yyyy').format(dt);
@@ -398,9 +532,10 @@ class _SafetyTalkPageState extends State<SafetyTalkPage> {
                                 dateText = dateRaw.toString();
                               }
                             }
-                            if (timeRaw != null) {
+                            if (timeRaw != null && timeRaw.toString().isNotEmpty) {
                               final tStr = timeRaw.toString();
-                              dateText += ' • ${tStr.length >= 5 ? tStr.substring(0, 5) : tStr}';
+                              final cleanT = tStr.length >= 5 ? tStr.substring(0, 5) : tStr;
+                              dateText = dateText.isNotEmpty ? '$dateText • $cleanT WITA' : '$cleanT WITA';
                             }
 
                             return Container(
@@ -417,7 +552,7 @@ class _SafetyTalkPageState extends State<SafetyTalkPage> {
                                 ],
                               ),
                               child: InkWell(
-                                onTap: () => _openForm(item),
+                                onTap: () => _openDetail(item),
                                 borderRadius: BorderRadius.circular(16),
                                 child: Padding(
                                   padding: const EdgeInsets.all(14),
@@ -451,14 +586,14 @@ class _SafetyTalkPageState extends State<SafetyTalkPage> {
                                                     fontWeight: FontWeight.bold,
                                                   ),
                                                 ),
-                                                const SizedBox(height: 3),
+                                                const SizedBox(height: 4),
                                                 Row(
                                                   children: [
                                                     const Icon(Icons.place_rounded, size: 14, color: Color(0xFF64748B)),
                                                     const SizedBox(width: 4),
                                                     Expanded(
                                                       child: Text(
-                                                        fullLoc,
+                                                        cleanLoc,
                                                         maxLines: 1,
                                                         overflow: TextOverflow.ellipsis,
                                                         style: const TextStyle(
@@ -470,6 +605,27 @@ class _SafetyTalkPageState extends State<SafetyTalkPage> {
                                                     ),
                                                   ],
                                                 ),
+                                                if (speaker.isNotEmpty) ...[
+                                                  const SizedBox(height: 3),
+                                                  Row(
+                                                    children: [
+                                                      const Icon(Icons.person_outline_rounded, size: 13, color: Color(0xFF64748B)),
+                                                      const SizedBox(width: 4),
+                                                      Expanded(
+                                                        child: Text(
+                                                          speaker,
+                                                          maxLines: 1,
+                                                          overflow: TextOverflow.ellipsis,
+                                                          style: const TextStyle(
+                                                            color: Color(0xFF475569),
+                                                            fontSize: 11.5,
+                                                            fontWeight: FontWeight.w600,
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ],
                                               ],
                                             ),
                                           ),
@@ -477,11 +633,22 @@ class _SafetyTalkPageState extends State<SafetyTalkPage> {
                                             icon: const Icon(Icons.more_vert_rounded, color: Color(0xFF64748B), size: 20),
                                             padding: EdgeInsets.zero,
                                             onSelected: (v) {
+                                              if (v == 'detail') _openDetail(item);
                                               if (v == 'edit') _openForm(item);
                                               if (v == 'delete') _delete(item);
                                               if (v == 'sync') _triggerItemSync(item);
                                             },
                                             itemBuilder: (_) => [
+                                              const PopupMenuItem(
+                                                value: 'detail',
+                                                child: Row(
+                                                  children: [
+                                                    Icon(Icons.visibility_outlined, size: 18, color: Color(0xFF0284C7)),
+                                                    SizedBox(width: 10),
+                                                    Text('Lihat Detail', style: TextStyle(fontWeight: FontWeight.w600)),
+                                                  ],
+                                                ),
+                                              ),
                                               const PopupMenuItem(
                                                 value: 'edit',
                                                 child: Row(
@@ -528,7 +695,7 @@ class _SafetyTalkPageState extends State<SafetyTalkPage> {
                                           style: const TextStyle(
                                             color: Color(0xFF475569),
                                             fontSize: 12,
-                                            height: 1.3,
+                                            height: 1.35,
                                           ),
                                         ),
                                       ],
@@ -537,31 +704,69 @@ class _SafetyTalkPageState extends State<SafetyTalkPage> {
                                       const Divider(height: 1, color: Color(0xFFF1F5F9)),
                                       const SizedBox(height: 8),
 
-                                      // Bottom Row: Date & Sync Status
+                                      // Bottom Row: Date & Sync Status + Photo Badge
                                       Row(
                                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                         children: [
-                                          if (dateText.isNotEmpty)
-                                            Row(
+                                          Expanded(
+                                            child: Row(
                                               children: [
-                                                const Icon(Icons.event_note_rounded, size: 13, color: Color(0xFF94A3B8)),
-                                                const SizedBox(width: 5),
-                                                Text(
-                                                  dateText,
-                                                  style: const TextStyle(
-                                                    color: Color(0xFF64748B),
-                                                    fontSize: 11.5,
-                                                    fontWeight: FontWeight.w500,
+                                                if (dateText.isNotEmpty) ...[
+                                                  const Icon(Icons.event_note_rounded, size: 14, color: _stRed),
+                                                  const SizedBox(width: 5),
+                                                  Flexible(
+                                                    child: Text(
+                                                      dateText,
+                                                      maxLines: 1,
+                                                      overflow: TextOverflow.ellipsis,
+                                                      style: const TextStyle(
+                                                        color: _stDark,
+                                                        fontSize: 11.5,
+                                                        fontWeight: FontWeight.w600,
+                                                      ),
+                                                    ),
                                                   ),
-                                                ),
+                                                ] else
+                                                  const Row(
+                                                    children: [
+                                                      Icon(Icons.access_time_rounded, size: 13, color: Color(0xFF94A3B8)),
+                                                      SizedBox(width: 4),
+                                                      Text(
+                                                        'Tersedia di Detail',
+                                                        style: TextStyle(
+                                                          color: Color(0xFF94A3B8),
+                                                          fontSize: 11,
+                                                          fontStyle: FontStyle.italic,
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                if (hasPhotos) ...[
+                                                  const SizedBox(width: 8),
+                                                  Container(
+                                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                    decoration: BoxDecoration(
+                                                      color: const Color(0xFFF1F5F9),
+                                                      borderRadius: BorderRadius.circular(6),
+                                                    ),
+                                                    child: const Row(
+                                                      mainAxisSize: MainAxisSize.min,
+                                                      children: [
+                                                        Icon(Icons.photo_camera_rounded, size: 11, color: Color(0xFF475569)),
+                                                        SizedBox(width: 3),
+                                                        Text('Foto', style: TextStyle(fontSize: 10, color: Color(0xFF475569), fontWeight: FontWeight.bold)),
+                                                      ],
+                                                    ),
+                                                  ),
+                                                ],
                                               ],
-                                            )
-                                          else
-                                            const SizedBox.shrink(),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 8),
 
                                           // Status Badge
                                           Container(
-                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
                                             decoration: BoxDecoration(
                                               color: isSynced ? const Color(0xFFECFDF5) : const Color(0xFFFFFBEB),
                                               borderRadius: BorderRadius.circular(8),
