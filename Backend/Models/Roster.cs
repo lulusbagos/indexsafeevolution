@@ -41,7 +41,7 @@ namespace Indexsafe.Api.Models
 
         [MaxLength(50)]
         [Column("tipe_roster")]
-        public string TipeRoster { get; set; } = "REGULER"; // "REGULER" or "TUGAS"
+        public string? TipeRoster { get; set; } = "REGULER"; // "REGULER" or "TUGAS"
 
         [MaxLength(255)]
         [Column("keterangan")]
@@ -49,7 +49,7 @@ namespace Indexsafe.Api.Models
 
         [MaxLength(30)]
         [Column("status")]
-        public string Status { get; set; } = "APPROVED"; // "APPROVED", "PENDING_APPROVAL", "REJECTED"
+        public string? Status { get; set; } = "APPROVED"; // "APPROVED", "PENDING_APPROVAL", "REJECTED"
 
         [Column("id_reinduksi")]
         public int? IdReinduksi { get; set; }

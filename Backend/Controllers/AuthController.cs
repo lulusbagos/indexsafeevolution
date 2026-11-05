@@ -447,10 +447,12 @@ namespace Indexsafe.Api.Controllers
             bool hasRoster = false;
             bool isTugasExempt = false;
 
-            var rosterHistory = await _context.Rosters
-                .Where(r => r.Nik == userNik)
-                .OrderByDescending(r => r.AkhirCuti)
-                .ToListAsync();
+            try
+            {
+                var rosterHistory = await _context.Rosters
+                    .Where(r => r.Nik == userNik)
+                    .OrderByDescending(r => r.AkhirCuti)
+                    .ToListAsync();
 
             var relevantRoster = rosterHistory?
                 .Where(r => r.AwalDinas.Date <= endOfMonth.Date && (r.AkhirCuti.Date >= startOfMonth.Date || r.AkhirDinas.Date >= startOfMonth.Date))
@@ -511,6 +513,11 @@ namespace Indexsafe.Api.Controllers
                 targetSafetyTalk = ScaleTarget(targetSafetyTalk, ratio, computedOnsiteDays);
                 targetObservasi = ScaleTarget(targetObservasi, ratio, computedOnsiteDays);
                 targetCoaching = ScaleTarget(targetCoaching, ratio, computedOnsiteDays);
+            }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[AuthController] Roster calculation fallback for {userNik}: {ex.Message}");
             }
 
             // Bulan ini (Aktual)
