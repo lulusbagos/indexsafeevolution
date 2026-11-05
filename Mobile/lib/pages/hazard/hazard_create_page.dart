@@ -3618,34 +3618,10 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
 
 
 
-    if (!_isSelfClosed && _selectedPja == null) {
-
-      if (_pjaSearchCtrl.text.trim().isNotEmpty) {
-
-        _selectedPja = PjaSearchResult(
-
-          nik: 'MANUAL',
-
-          nama: _pjaSearchCtrl.text.trim().toUpperCase(),
-
-          departemen: 'LAPANGAN',
-
-          jabatan: 'PJA Offline',
-
-          perusahaan: 'INTERNAL',
-
-        );
-
-      } else {
-
-        SnackBarMsg.danger(context,
-
-            'Penanggung Jawab Area (PJA) wajib dipilih atau diketik untuk menindaklanjuti temuan.');
-
-        return;
-
-      }
-
+    if (!_isSelfClosed && (_selectedPja == null || _selectedPja!.nik.trim().isEmpty || _selectedPja!.nik == 'MANUAL')) {
+      SnackBarMsg.danger(context,
+          'Penanggung Jawab Area (PJA) wajib dipilih dari karyawan yang terdaftar di sistem.');
+      return;
     }
 
     if (_fotoTemuan == null && widget.editItem == null) {
@@ -3740,7 +3716,7 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
 
           : (_selectedPja?.nama ?? _pjaSearchCtrl.text.trim().toUpperCase()),
 
-      'nik_pja': _isSelfClosed ? profileNik : (_selectedPja?.nik ?? 'MANUAL'),
+      'nik_pja': _isSelfClosed ? profileNik : _selectedPja!.nik,
 
       'departemen_pja': _isSelfClosed
 
@@ -5648,7 +5624,7 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
 
                               controller: _pjaSearchCtrl,
 
-                              hint: 'KETIK NIK ATAU NAMA PENGAWAS / PJA...',
+                              hint: 'CARI NAMA ATAU NIK KARYAWAN TERDAFTAR (PJA)...',
 
                               icon: Icons.search_rounded,
 
@@ -5724,165 +5700,7 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
 
                                   children: [
 
-                                    if (_pjaSearchCtrl.text
-
-                                        .trim()
-
-                                        .isNotEmpty) ...[
-
-                                      InkWell(
-
-                                        onTap: () {
-
-                                          setState(() {
-
-                                            _selectedPja = PjaSearchResult(
-
-                                              nik: 'MANUAL',
-
-                                              nama: _pjaSearchCtrl.text
-
-                                                  .trim()
-
-                                                  .toUpperCase(),
-
-                                              departemen: 'LAPANGAN',
-
-                                              jabatan: 'PJA Offline',
-
-                                              perusahaan: 'INTERNAL',
-
-                                            );
-
-                                            _pjaSearchResults.clear();
-
-                                            _pjaSearchCtrl.clear();
-
-                                          });
-
-                                        },
-
-                                        child: Container(
-
-                                          padding: const EdgeInsets.symmetric(
-
-                                              horizontal: 12, vertical: 10),
-
-                                          decoration: const BoxDecoration(
-
-                                            color: Color(0xFFEFF6FF),
-
-                                            borderRadius: BorderRadius.vertical(
-
-                                                top: Radius.circular(9)),
-
-                                          ),
-
-                                          child: Row(
-
-                                            children: [
-
-                                              Container(
-
-                                                padding:
-
-                                                    const EdgeInsets.all(6),
-
-                                                decoration: BoxDecoration(
-
-                                                  color:
-
-                                                      const Color(0xFF2563EB),
-
-                                                  borderRadius:
-
-                                                      BorderRadius.circular(6),
-
-                                                ),
-
-                                                child: const Icon(
-
-                                                    Icons
-
-                                                        .person_add_alt_1_rounded,
-
-                                                    color: Colors.white,
-
-                                                    size: 16),
-
-                                              ),
-
-                                              const SizedBox(width: 10),
-
-                                              Expanded(
-
-                                                child: Column(
-
-                                                  crossAxisAlignment:
-
-                                                      CrossAxisAlignment.start,
-
-                                                  children: [
-
-                                                    Text(
-
-                                                      'Gunakan: "${_pjaSearchCtrl.text.trim().toUpperCase()}"',
-
-                                                      style: const TextStyle(
-
-                                                          fontWeight:
-
-                                                              FontWeight.bold,
-
-                                                          fontSize: 12,
-
-                                                          color: Color(
-
-                                                              0xFF1D4ED8)),
-
-                                                    ),
-
-                                                    const Text(
-
-                                                      'Gunakan nama ini sebagai PJA (Mode Offline / Bebas Ketik)',
-
-                                                      style: TextStyle(
-
-                                                          fontSize: 10,
-
-                                                          color: Color(
-
-                                                              0xFF64748B)),
-
-                                                    ),
-
-                                                  ],
-
-                                                ),
-
-                                              ),
-
-                                              const Icon(
-
-                                                  Icons.check_circle_rounded,
-
-                                                  size: 18,
-
-                                                  color: Color(0xFF2563EB)),
-
-                                            ],
-
-                                          ),
-
-                                        ),
-
-                                      ),
-
-                                      const Divider(
-
-                                          height: 1, color: Color(0xFFE2E8F0)),
-
-                                    ],
+                                    
 
                                     if (_pjaSearchResults.isNotEmpty)
 
@@ -6015,37 +5833,22 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
                                       ),
 
                                     if (_pjaSearchResults.isEmpty &&
-
                                         _pjaSearchCtrl.text.trim().isNotEmpty &&
-
                                         !_isSearchingPja)
-
                                       const Padding(
-
                                         padding: EdgeInsets.symmetric(
-
-                                            vertical: 10, horizontal: 12),
-
+                                            vertical: 12, horizontal: 14),
                                         child: Center(
-
                                           child: Text(
-
-                                            'Tidak ada data yang cocok. Gunakan tombol di atas untuk menetapkan PJA secara manual.',
-
+                                            'Karyawan / PJA tidak ditemukan. Wajib memilih karyawan yang terdaftar di sistem.',
                                             textAlign: TextAlign.center,
-
                                             style: TextStyle(
-
-                                                fontSize: 10.5,
-
-                                                color: Color(0xFF94A3B8)),
-
+                                                fontSize: 11,
+                                                color: Color(0xFFDC2626),
+                                                fontWeight: FontWeight.w600),
                                           ),
-
                                         ),
-
                                       ),
-
                                   ],
 
                                 ),
@@ -6496,7 +6299,7 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
 
             widget.editItem!.fotoTemuan!.isNotEmpty);
 
-    final bool pjaValid = _isSelfClosed || _selectedPja != null;
+    final bool pjaValid = _isSelfClosed || (_selectedPja != null && _selectedPja!.nik.trim().isNotEmpty && _selectedPja!.nik != 'MANUAL');
 
     final bool fotoAfterValid = !_isSelfClosed ||
 

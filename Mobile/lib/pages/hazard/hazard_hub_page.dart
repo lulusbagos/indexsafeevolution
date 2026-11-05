@@ -1150,41 +1150,7 @@ class _HazardHubPageState extends State<HazardHubPage> {
                           shrinkWrap: true,
                           padding: EdgeInsets.zero,
                           children: [
-                            if (searchCtrl.text.trim().isNotEmpty) ...[
-                              InkWell(
-                                onTap: () {
-                                  setModalState(() {
-                                    selectedNewPja = PjaSearchResult(
-                                      nik: 'MANUAL',
-                                      nama: searchCtrl.text.trim().toUpperCase(),
-                                      departemen: 'LAPANGAN',
-                                      jabatan: 'PJA Offline',
-                                      perusahaan: 'INTERNAL',
-                                    );
-                                    searchResults.clear();
-                                    searchCtrl.clear();
-                                  });
-                                },
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                                  color: const Color(0xFFEFF6FF),
-                                  child: Row(
-                                    children: [
-                                      const Icon(Icons.person_add_alt_1_rounded, color: Color(0xFF2563EB), size: 16),
-                                      const SizedBox(width: 8),
-                                      Expanded(
-                                        child: Text(
-                                          'Gunakan: "${searchCtrl.text.trim().toUpperCase()}" (Manual)',
-                                          style: const TextStyle(color: Color(0xFF1D4ED8), fontSize: 12, fontWeight: FontWeight.bold),
-                                        ),
-                                      ),
-                                      const Icon(Icons.check_circle_rounded, color: Color(0xFF2563EB), size: 16),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                              const Divider(height: 1, color: Color(0xFFE2E8F0)),
-                            ],
+                            
                             if (searchResults.isNotEmpty)
                               ListView.separated(
                                 shrinkWrap: true,
@@ -1223,6 +1189,17 @@ class _HazardHubPageState extends State<HazardHubPage> {
                                     },
                                   );
                                 },
+                              ),
+                            if (searchResults.isEmpty && searchCtrl.text.trim().isNotEmpty && !isSearching)
+                              const Padding(
+                                padding: EdgeInsets.symmetric(vertical: 12, horizontal: 14),
+                                child: Center(
+                                  child: Text(
+                                    'Karyawan / PJA tidak ditemukan. Wajib memilih karyawan yang terdaftar di sistem.',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(fontSize: 11, color: Color(0xFFDC2626), fontWeight: FontWeight.w600),
+                                  ),
+                                ),
                               ),
                           ],
                         ),
@@ -1305,19 +1282,9 @@ class _HazardHubPageState extends State<HazardHubPage> {
                       onPressed: isSaving
                           ? null
                           : () async {
-                              if (selectedNewPja == null) {
-                                if (searchCtrl.text.trim().isNotEmpty) {
-                                  selectedNewPja = PjaSearchResult(
-                                    nik: 'MANUAL',
-                                    nama: searchCtrl.text.trim().toUpperCase(),
-                                    departemen: 'LAPANGAN',
-                                    jabatan: 'PJA Offline',
-                                    perusahaan: 'INTERNAL',
-                                  );
-                                } else {
-                                  SnackBarMsg.danger(context, 'PJA baru wajib dipilih atau diketik dari pencarian.');
-                                  return;
-                                }
+                              if (selectedNewPja == null || selectedNewPja!.nik.trim().isEmpty || selectedNewPja!.nik == 'MANUAL') {
+                                SnackBarMsg.danger(context, 'PJA baru wajib dipilih dari karyawan yang terdaftar di sistem.');
+                                return;
                               }
                               final reason = reasonCtrl.text.trim();
                               if (reason.isEmpty) {

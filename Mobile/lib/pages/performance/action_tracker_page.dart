@@ -2190,10 +2190,10 @@ class _ActionTrackerPageState extends State<ActionTrackerPage> {
                                 final targetDept = deptCtrl.text.trim();
                                 final alasan = alasanCtrl.text.trim();
 
-                                if (targetNik.isEmpty) {
+                                if (targetNik.isEmpty || (selectedNewPic == null && targetNama.isEmpty)) {
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     const SnackBar(
-                                      content: Text('Harap pilih atau masukkan NIK PIC baru.'),
+                                      content: Text('PIC baru wajib dipilih dari karyawan yang terdaftar di sistem.'),
                                       backgroundColor: Colors.red,
                                     ),
                                   );
@@ -2621,6 +2621,7 @@ class _ActionTrackerPageState extends State<ActionTrackerPage> {
                             controller: picCtrl,
                             label: 'Nama PIC (Otomatis)',
                             hint: 'Nama PIC Perbaikan',
+                            readOnly: true,
                           ),
                         ),
                         const SizedBox(width: 8),
@@ -2629,6 +2630,7 @@ class _ActionTrackerPageState extends State<ActionTrackerPage> {
                             controller: deptPicCtrl,
                             label: 'Departemen PIC (Otomatis)',
                             hint: 'Departemen PIC',
+                            readOnly: true,
                           ),
                         ),
                       ],

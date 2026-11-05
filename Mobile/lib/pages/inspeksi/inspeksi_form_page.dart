@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 
+import '../../services/api.dart';
 import '../../services/database.dart';
 import '../../services/offline_sync_service.dart';
 import '../../services/preference.dart';
@@ -85,6 +86,7 @@ class _PjaCandidate {
 
 class _InspeksiFormPageState extends State<InspeksiFormPage> {
   final _db = DatabaseService();
+  final _api = ApiService();
   final _profile = PreferenceService.getProfile();
 
   // Controllers
@@ -109,7 +111,6 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
   _PjaCandidate? _selectedPja;
   List<_PjaCandidate> _pjaSearchResults = [];
   bool _isSearchingPja = false;
-  bool _isMitraMode = false;
 
   // 15 Standard Checkpoints dari Web /Inspection/Index
   late final List<_CheckpointItem> _checkpoints;
@@ -383,9 +384,32 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
         );
       }
 
-      setState(() => _pjaSearchResults = results);
+      // Online search fallback (lintas mitra / perusahaan)
+      if (results.length < 5 && query.trim().isNotEmpty) {
+        try {
+          final res = await _api.searchPja(query.trim(), lintasPerusahaan: true);
+          res.fold((_) {}, (serverData) {
+            for (final item in serverData) {
+              final nik = item['nik']?.toString().trim() ?? '';
+              final nama = item['nama']?.toString().trim() ?? '';
+              if (nik.isNotEmpty && nama.isNotEmpty && !results.any((x) => x.nik == nik)) {
+                results.add(_PjaCandidate(
+                  id: (item['id'] as num?)?.toInt() ?? 0,
+                  nik: nik,
+                  nama: nama,
+                  jabatan: (item['jabatan'] ?? item['posisi'])?.toString().trim() ?? '',
+                  departemen: (item['departemen'] ?? item['depart'])?.toString().trim() ?? '',
+                  perusahaan: item['perusahaan']?.toString().trim() ?? 'Mitra Kerja',
+                ));
+              }
+            }
+          });
+        } catch (_) {}
+      }
+
+      if (mounted) setState(() => _pjaSearchResults = results);
     } catch (_) {
-      setState(() => _pjaSearchResults = []);
+      if (mounted) setState(() => _pjaSearchResults = []);
     } finally {
       if (mounted) setState(() => _isSearchingPja = false);
     }
@@ -1060,9 +1084,9 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
     }
 
     // 2. Validasi PJA
-    if (_selectedPja == null && _pjaSearchCtrl.text.trim().isEmpty) {
+    if (_selectedPja == null || _selectedPja!.nik.trim().isEmpty || _selectedPja!.nik == '-' || _selectedPja!.nik == 'MANUAL') {
       SnackBarMsg.danger(
-          context, 'Harap tetapkan Penanggung Jawab Area (PJA).');
+          context, 'Penanggung Jawab Area (PJA) wajib dipilih dari karyawan yang terdaftar di sistem.');
       return;
     }
 
@@ -1090,10 +1114,10 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
       final profileId = _profile?.id ?? 0;
       final nowStr = DateTime.now().toIso8601String();
 
-      final pjaName = _selectedPja?.nama ?? _pjaSearchCtrl.text.trim();
-      final pjaNik = _selectedPja?.nik ?? '';
-      final pjaDept = _selectedPja?.departemen ?? '';
-      final pjaId = _selectedPja?.id ?? 0;
+      final pjaName = _selectedPja!.nama;
+      final pjaNik = _selectedPja!.nik;
+      final pjaDept = _selectedPja!.departemen;
+      final pjaId = _selectedPja!.id;
 
       // Kumpulkan skor checkpoint
       final Map<String, dynamic> payload = {
@@ -1238,10 +1262,7 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
                 '${profile?.namaLengkap ?? "Auditor"} (${profile?.noNik ?? "-"})'),
         SuccessReceiptItem(
             label: 'Penanggung Jawab (PJA)',
-            value: _selectedPja?.nama ??
-                (_pjaSearchCtrl.text.trim().isEmpty
-                    ? '-'
-                    : _pjaSearchCtrl.text.trim())),
+            value: _selectedPja != null ? '${_selectedPja!.nama} (${_selectedPja!.nik})' : '-'),
         SuccessReceiptItem(
             label: 'Butir Checklist',
             value:
@@ -1463,7 +1484,7 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
     }
 
     // 2. PJA
-    if (_selectedPja != null || _pjaSearchCtrl.text.trim().isNotEmpty) {
+    if (_selectedPja != null && _selectedPja!.nik.trim().isNotEmpty && _selectedPja!.nik != '-' && _selectedPja!.nik != 'MANUAL') {
       completed++;
     } else {
       missing.add('PJA');
@@ -1955,34 +1976,24 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
                 icon: Icons.person_pin_rounded,
                 accentColor: primaryGreen,
                 children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text('STATUS PJA MITRA',
-                          style: TextStyle(
-                              color: Color(0xFF0F172A),
-                              fontSize: 11.5,
-                              fontWeight: FontWeight.bold,
-                              letterSpacing: 0.5)),
-                      Row(
-                        children: [
-                          const Text('Lintas Mitra / Bebas Ketik',
-                              style: TextStyle(
-                                  fontSize: 11, color: Color(0xFF64748B))),
-                          const SizedBox(width: 6),
-                          Switch(
-                            value: _isMitraMode,
-                            activeThumbColor: primaryGreen,
-                            onChanged: (val) {
-                              setState(() {
-                                _isMitraMode = val;
-                                if (val) _selectedPja = null;
-                              });
-                            },
-                          ),
-                        ],
-                      ),
-                    ],
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF1F5F9),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.verified_user_rounded, size: 14, color: primaryGreen),
+                        SizedBox(width: 6),
+                        Text('Wajib Karyawan Terdaftar',
+                            style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF334155))),
+                      ],
+                    ),
                   ),
                   const SizedBox(height: 6),
                   if (_selectedPja != null)
@@ -2052,9 +2063,7 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
                         controller: _pjaSearchCtrl,
                         onChanged: _searchPja,
                         decoration: InputDecoration(
-                          hintText: _isMitraMode
-                              ? 'Ketik nama PJA / Pengawas Mitra...'
-                              : 'Ketik nama atau NIK pengawas...',
+                          hintText: 'Cari nama atau NIK pengawas / PJA terdaftar...',
                           hintStyle: const TextStyle(
                               fontSize: 13, color: Color(0xFF94A3B8)),
                           icon: const Icon(Icons.search_rounded,
@@ -2073,45 +2082,25 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
                         style: const TextStyle(fontSize: 13),
                       ),
                     ),
-                    if (_pjaSearchCtrl.text.trim().isNotEmpty &&
-                        _isMitraMode) ...[
+                    if (_pjaSearchResults.isEmpty &&
+                        _pjaSearchCtrl.text.trim().isNotEmpty &&
+                        !_isSearchingPja) ...[
                       const SizedBox(height: 8),
-                      InkWell(
-                        onTap: () {
-                          final name = _pjaSearchCtrl.text.trim();
-                          setState(() {
-                            _selectedPja = _PjaCandidate(
-                              id: 0,
-                              nik: '-',
-                              nama: name,
-                              jabatan: 'Pengawas Mitra',
-                              departemen: 'Mitra Kerja',
-                              perusahaan: 'Kontraktor Eksternal',
-                            );
-                          });
-                        },
-                        borderRadius: BorderRadius.circular(10),
-                        child: Container(
-                          padding: const EdgeInsets.all(10),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFEFF6FF),
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(color: const Color(0xFFBFDBFE)),
-                          ),
-                          child: Row(
-                            children: [
-                              const Icon(Icons.check_circle_rounded,
-                                  color: Color(0xFF2563EB), size: 18),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                    'Gunakan: "${_pjaSearchCtrl.text.trim()}" sebagai PJA Mitra',
-                                    style: const TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 11.5,
-                                        color: Color(0xFF1D4ED8))),
-                              ),
-                            ],
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFEF2F2),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: const Color(0xFFFECACA)),
+                        ),
+                        child: const Center(
+                          child: Text(
+                            'Karyawan / PJA tidak ditemukan. Wajib memilih karyawan yang terdaftar di sistem.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                                fontSize: 11,
+                                color: Color(0xFFDC2626),
+                                fontWeight: FontWeight.w600),
                           ),
                         ),
                       ),
