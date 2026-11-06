@@ -6025,27 +6025,18 @@ class DatabaseService {
 
 
 
-      // Pastikan kolom nik, departemen, jabatan, perusahaan ada di tabel employees
-
-
-
-      for (var col in ['nik', 'departemen', 'jabatan', 'perusahaan']) {
-
-
-
+      // Pastikan kolom nik, nama, departemen, jabatan, perusahaan ada di tabel employees
+      for (var col in ['nik', 'nama', 'departemen', 'jabatan', 'perusahaan']) {
         try {
-
-
-
           await db.execute('ALTER TABLE employees ADD COLUMN `$col` TEXT;');
-
-
-
         } catch (_) {}
-
-
-
       }
+      try {
+        await db.execute('UPDATE employees SET nik = no_nik WHERE (nik IS NULL OR nik = "") AND no_nik IS NOT NULL;');
+      } catch (_) {}
+      try {
+        await db.execute('UPDATE employees SET nama = nama_lengkap WHERE (nama IS NULL OR nama = "") AND nama_lengkap IS NOT NULL;');
+      } catch (_) {}
 
 
 

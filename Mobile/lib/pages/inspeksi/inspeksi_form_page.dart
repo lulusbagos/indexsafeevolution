@@ -147,6 +147,8 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
     _initCheckpoints();
     _loadAreasFromMaster();
     _fillGpsFromDevice(silent: true);
+    // Preload daftar PJA / pengawas agar saat offline langsung muncul pilihan
+    _searchPja('');
   }
 
   @override
@@ -347,52 +349,175 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
     );
   }
 
-  Future<void> _searchPja(String query) async {
-    if (query.trim().isEmpty) {
-      setState(() {
-        _pjaSearchResults = [];
-        _isSearchingPja = false;
-      });
-      return;
-    }
+  void _selectSelfAsPja() {
+    final profile = _profile;
+    if (profile == null) return;
+    final myNik = (profile.noNik ?? '').trim();
+    final myNama = (profile.namaLengkap ?? '').trim();
+    if (myNik.isEmpty && myNama.isEmpty) return;
 
+    setState(() {
+      _selectedPja = _PjaCandidate(
+        id: profile.id ?? 0,
+        nik: myNik,
+        nama: myNama,
+        jabatan: (profile.posisi ?? profile.jabatan ?? 'Foreman/Officer').toString(),
+        departemen: (profile.depart ?? 'SYSTEM INTEGRATIONS').toString(),
+        perusahaan: (profile.company ?? 'PT INDEXIM COALINDO').toString(),
+      );
+      _pjaSearchResults = [];
+      _pjaSearchCtrl.clear();
+    });
+  }
+
+  Future<void> _searchPja(String query) async {
+    final cleanQ = query.trim();
     setState(() => _isSearchingPja = true);
+
     try {
       final db = await _db.database;
-      final q = '%${query.trim()}%';
-      final rows = await db.rawQuery(
-        '''
-        SELECT id, nik, nama, jabatan, departemen, perusahaan 
-        FROM employees 
-        WHERE (nama LIKE ? OR nik LIKE ? OR departemen LIKE ?)
-        LIMIT 25
-        ''',
-        [q, q, q],
-      );
-
+      final safeQ = cleanQ.replaceAll("'", "''");
       final List<_PjaCandidate> results = [];
-      for (var r in rows) {
-        results.add(
-          _PjaCandidate(
-            id: (r['id'] as num?)?.toInt() ?? 0,
-            nik: r['nik']?.toString() ?? '',
-            nama: r['nama']?.toString() ?? '',
-            jabatan: r['jabatan']?.toString() ?? '',
-            departemen: r['departemen']?.toString() ?? '',
-            perusahaan: r['perusahaan']?.toString() ?? 'PT Indexim Coalindo',
-          ),
-        );
+      final Set<String> seenNiks = {};
+
+      // 1. Current user profile match / shortcut
+      final profile = _profile;
+      if (profile != null) {
+        final myNik = (profile.noNik ?? '').trim();
+        final myNama = (profile.namaLengkap ?? '').trim();
+        final myDept = (profile.depart ?? 'GENERAL').trim();
+        final myJab = (profile.posisi ?? profile.jabatan ?? 'Pengawas').trim();
+        final myComp = (profile.company ?? 'PT INDEXIM COALINDO').trim();
+
+        bool matchMyProfile = false;
+        if (cleanQ.isEmpty) {
+          matchMyProfile = true;
+        } else {
+          final qLower = cleanQ.toLowerCase();
+          // Check exact match, partial match, and fuzzy extra-zero typo (e.g. 240519400986 vs 24051940986)
+          final strippedZeroQ = cleanQ.replaceAll('00', '0');
+          final digitsOnly = cleanQ.replaceAll(RegExp(r'\D'), '');
+          final myNikDigits = myNik.replaceAll(RegExp(r'\D'), '');
+
+          matchMyProfile = myNik.toLowerCase().contains(qLower) ||
+              myNama.toLowerCase().contains(qLower) ||
+              myDept.toLowerCase().contains(qLower) ||
+              (strippedZeroQ.isNotEmpty && myNik.toLowerCase().contains(strippedZeroQ.toLowerCase())) ||
+              (digitsOnly.isNotEmpty && myNikDigits.isNotEmpty && (digitsOnly.contains(myNikDigits) || myNikDigits.contains(digitsOnly)));
+        }
+
+        if (matchMyProfile && myNik.isNotEmpty && seenNiks.add(myNik.toLowerCase())) {
+          results.add(_PjaCandidate(
+            id: profile.id ?? 0,
+            nik: myNik,
+            nama: myNama,
+            jabatan: myJab,
+            departemen: myDept,
+            perusahaan: myComp,
+          ));
+        }
       }
 
-      // Online search fallback (lintas mitra / perusahaan)
-      if (results.length < 5 && query.trim().isNotEmpty) {
+      // 2. Query local SQLite table 'employees'
+      // Use COALESCE / fallback columns so it works on any schema version without crashing
+      final String sql;
+      if (cleanQ.isEmpty) {
+        sql = '''
+          SELECT id, 
+                 COALESCE(no_nik, nik, '') as emp_nik, 
+                 COALESCE(nama_lengkap, nama, '') as emp_nama, 
+                 COALESCE(departemen, depart, 'GENERAL') as emp_dept, 
+                 COALESCE(jabatan, posisi, 'Karyawan') as emp_jab, 
+                 COALESCE(perusahaan, 'PT INDEXIM COALINDO') as emp_perush 
+          FROM employees 
+          WHERE (nama_lengkap IS NOT NULL AND nama_lengkap != '') OR (no_nik IS NOT NULL AND no_nik != '')
+          ORDER BY nama_lengkap ASC 
+          LIMIT 50
+        ''';
+      } else {
+        // Support stripped double zero for typo tolerance (e.g. 240519400986 vs 24051940986)
+        final strippedQ = safeQ.replaceAll('00', '0');
+        sql = '''
+          SELECT id, 
+                 COALESCE(no_nik, nik, '') as emp_nik, 
+                 COALESCE(nama_lengkap, nama, '') as emp_nama, 
+                 COALESCE(departemen, depart, 'GENERAL') as emp_dept, 
+                 COALESCE(jabatan, posisi, 'Karyawan') as emp_jab, 
+                 COALESCE(perusahaan, 'PT INDEXIM COALINDO') as emp_perush 
+          FROM employees 
+          WHERE (
+            no_nik LIKE '%$safeQ%' 
+            OR no_nik LIKE '%$strippedQ%'
+            OR nama_lengkap LIKE '%$safeQ%' 
+            OR depart LIKE '%$safeQ%' 
+            OR departemen LIKE '%$safeQ%' 
+            OR jabatan LIKE '%$safeQ%' 
+            OR posisi LIKE '%$safeQ%'
+          )
+          ORDER BY nama_lengkap ASC 
+          LIMIT 50
+        ''';
+      }
+
+      try {
+        final rows = await db.rawQuery(sql);
+        for (var r in rows) {
+          final nik = (r['emp_nik'] ?? r['no_nik'] ?? r['nik'] ?? '').toString().trim();
+          final nama = (r['emp_nama'] ?? r['nama_lengkap'] ?? r['nama'] ?? '').toString().trim();
+          if (nik.isNotEmpty && nama.isNotEmpty && seenNiks.add(nik.toLowerCase())) {
+            results.add(_PjaCandidate(
+              id: (r['id'] as num?)?.toInt() ?? 0,
+              nik: nik,
+              nama: nama,
+              jabatan: (r['emp_jab'] ?? r['jabatan'] ?? r['posisi'])?.toString().trim() ?? 'Karyawan',
+              departemen: (r['emp_dept'] ?? r['departemen'] ?? r['depart'])?.toString().trim() ?? 'GENERAL',
+              perusahaan: (r['emp_perush'] ?? r['perusahaan'])?.toString().trim() ?? 'PT INDEXIM COALINDO',
+            ));
+          }
+        }
+      } catch (e) {
+        debugPrint('[InspeksiForm] SQLite employee query error: $e');
+      }
+
+      // 3. Fallback: Search from past inspections and hazards in SQLite
+      if (results.length < 5) {
         try {
-          final res = await _api.searchPja(query.trim(), lintasPerusahaan: true);
+          final pastInsp = await db.rawQuery(
+            "SELECT DISTINCT nik_pja, pja, departemen_pja FROM inspection_trans WHERE nik_pja IS NOT NULL AND nik_pja != '' LIMIT 30"
+          );
+          for (var r in pastInsp) {
+            final nik = (r['nik_pja'] ?? '').toString().trim();
+            final nama = (r['pja'] ?? '').toString().trim();
+            if (nik.isNotEmpty && nama.isNotEmpty) {
+              final strippedZeroQ = cleanQ.replaceAll('00', '0');
+              final match = cleanQ.isEmpty ||
+                  nik.toLowerCase().contains(cleanQ.toLowerCase()) ||
+                  nama.toLowerCase().contains(cleanQ.toLowerCase()) ||
+                  (strippedZeroQ.isNotEmpty && nik.toLowerCase().contains(strippedZeroQ.toLowerCase()));
+              if (match && seenNiks.add(nik.toLowerCase())) {
+                results.add(_PjaCandidate(
+                  id: 0,
+                  nik: nik,
+                  nama: nama,
+                  jabatan: 'Pengawas Lapangan',
+                  departemen: (r['departemen_pja'] ?? 'OPERASIONAL').toString(),
+                  perusahaan: 'PT INDEXIM COALINDO',
+                ));
+              }
+            }
+          }
+        } catch (_) {}
+      }
+
+      // 4. Online API search fallback (if online)
+      if (results.length < 5 && cleanQ.isNotEmpty) {
+        try {
+          final res = await _api.searchPja(cleanQ, lintasPerusahaan: true);
           res.fold((_) {}, (serverData) {
             for (final item in serverData) {
               final nik = item['nik']?.toString().trim() ?? '';
               final nama = item['nama']?.toString().trim() ?? '';
-              if (nik.isNotEmpty && nama.isNotEmpty && !results.any((x) => x.nik == nik)) {
+              if (nik.isNotEmpty && nama.isNotEmpty && seenNiks.add(nik.toLowerCase())) {
                 results.add(_PjaCandidate(
                   id: (item['id'] as num?)?.toInt() ?? 0,
                   nik: nik,
@@ -1976,24 +2101,54 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
                 icon: Icons.person_pin_rounded,
                 accentColor: primaryGreen,
                 children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF1F5F9),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.verified_user_rounded, size: 14, color: primaryGreen),
-                        SizedBox(width: 6),
-                        Text('Wajib Karyawan Terdaftar',
-                            style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFF334155))),
-                      ],
-                    ),
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF1F5F9),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.verified_user_rounded, size: 14, color: primaryGreen),
+                            SizedBox(width: 6),
+                            Text('Wajib Karyawan Terdaftar',
+                                style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFF334155))),
+                          ],
+                        ),
+                      ),
+                      const Spacer(),
+                      if (_selectedPja == null && _profile != null)
+                        InkWell(
+                          onTap: _selectSelfAsPja,
+                          borderRadius: BorderRadius.circular(8),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: lightGreen,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: borderGreen),
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.person_add_alt_1_rounded, size: 14, color: primaryGreen),
+                                SizedBox(width: 5),
+                                Text('Pilih Saya Sendiri',
+                                    style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold,
+                                        color: primaryGreen)),
+                              ],
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
                   const SizedBox(height: 6),
                   if (_selectedPja != null)
@@ -2045,8 +2200,10 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
                           IconButton(
                             icon: const Icon(Icons.close_rounded,
                                 color: Color(0xFFDC2626), size: 20),
-                            onPressed: () =>
-                                setState(() => _selectedPja = null),
+                            onPressed: () {
+                              setState(() => _selectedPja = null);
+                              _searchPja('');
+                            },
                           ),
                         ],
                       ),
@@ -2077,7 +2234,15 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
                                       padding: EdgeInsets.all(12),
                                       child: CircularProgressIndicator(
                                           strokeWidth: 2, color: primaryGreen)))
-                              : null,
+                              : (_pjaSearchCtrl.text.isNotEmpty
+                                  ? IconButton(
+                                      icon: const Icon(Icons.close_rounded, size: 18, color: Color(0xFF94A3B8)),
+                                      onPressed: () {
+                                        _pjaSearchCtrl.clear();
+                                        _searchPja('');
+                                      },
+                                    )
+                                  : null),
                         ),
                         style: const TextStyle(fontSize: 13),
                       ),
@@ -2093,26 +2258,50 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
                           borderRadius: BorderRadius.circular(10),
                           border: Border.all(color: const Color(0xFFFECACA)),
                         ),
-                        child: const Center(
-                          child: Text(
-                            'Karyawan / PJA tidak ditemukan. Wajib memilih karyawan yang terdaftar di sistem.',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                                fontSize: 11,
-                                color: Color(0xFFDC2626),
-                                fontWeight: FontWeight.w600),
-                          ),
+                        child: Column(
+                          children: [
+                            const Text(
+                              'Karyawan / PJA tidak ditemukan. Wajib memilih karyawan yang terdaftar di sistem.',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                  fontSize: 11,
+                                  color: Color(0xFFDC2626),
+                                  fontWeight: FontWeight.w600),
+                            ),
+                            if (_profile != null) ...[
+                              const SizedBox(height: 8),
+                              OutlinedButton.icon(
+                                onPressed: _selectSelfAsPja,
+                                icon: const Icon(Icons.person_pin_rounded, size: 16, color: primaryGreen),
+                                label: Text(
+                                  'Gunakan Saya: ${_profile?.namaLengkap ?? ''} (${_profile?.noNik ?? ''})',
+                                  style: const TextStyle(fontSize: 11, color: primaryGreen, fontWeight: FontWeight.bold),
+                                ),
+                                style: OutlinedButton.styleFrom(
+                                  side: const BorderSide(color: primaryGreen),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                ),
+                              ),
+                            ],
+                          ],
                         ),
                       ),
                     ],
                     if (_pjaSearchResults.isNotEmpty) ...[
                       const SizedBox(height: 8),
                       Container(
-                        constraints: const BoxConstraints(maxHeight: 200),
+                        constraints: const BoxConstraints(maxHeight: 250),
                         decoration: BoxDecoration(
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(color: const Color(0xFFE2E8F0)),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.04),
+                              blurRadius: 8,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
                         ),
                         child: ListView.separated(
                           shrinkWrap: true,
@@ -2123,11 +2312,24 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
                             final p = _pjaSearchResults[idx];
                             return ListTile(
                               dense: true,
+                              leading: CircleAvatar(
+                                radius: 16,
+                                backgroundColor: primaryGreen.withOpacity(0.12),
+                                child: Text(
+                                  p.nama.isNotEmpty ? p.nama[0].toUpperCase() : 'P',
+                                  style: const TextStyle(
+                                      color: primaryGreen,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 12),
+                                ),
+                              ),
                               title: Text(p.nama,
                                   style: const TextStyle(
                                       fontWeight: FontWeight.bold,
                                       fontSize: 12.5)),
-                              subtitle: Text('${p.nik} • ${p.departemen}',
+                              subtitle: Text('${p.nik} • ${p.departemen} • ${p.perusahaan}',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
                                   style: const TextStyle(
                                       fontSize: 11, color: Color(0xFF64748B))),
                               onTap: () {
