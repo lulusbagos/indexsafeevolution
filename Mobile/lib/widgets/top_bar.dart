@@ -4,6 +4,7 @@ import '../pages/home_page.dart';
 import '../pages/notif_page.dart';
 import '../services/api.dart';
 import '../services/database.dart';
+import '../services/notification.dart';
 import '../services/offline_sync_service.dart';
 import '../services/preference.dart';
 import '../utils/globals.dart' as globals;
@@ -58,7 +59,7 @@ class _TopBarState extends State<TopBar> {
   @override
   void initState() {
     super.initState();
-
+    PreferenceService.notifCountNotifier.addListener(_onNotifCountChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _getData();
     });
@@ -66,42 +67,30 @@ class _TopBarState extends State<TopBar> {
 
   @override
   void dispose() {
-    /** */
-
+    PreferenceService.notifCountNotifier.removeListener(_onNotifCountChanged);
     super.dispose();
+  }
+
+  void _onNotifCountChanged() {
+    if (mounted) setState(() {});
   }
 
   Future<void> _getData() async {
     try {
       int count = 0;
-      final counts = await _api.getNotificationCounts();
-      count = counts['total'] ?? counts['unread'] ?? 0;
-      final unactioned = counts['unactioned'] ?? 0;
-      if (unactioned > count) count = unactioned;
-
-      final profile = _profile ?? PreferenceService.getProfile();
-      if (profile != null) {
-        final profileId = profile.id ?? 0;
-        final localPlans = await _db.rawQuery('''
-          select count(*) as cnt from action_plans tr
-          where tr.deleted_at is null and (
-            (tr.pja_id = $profileId and tr.status < 1) or 
-            (tr.pic_id = $profileId and tr.status < 2)
-          )
-        ''');
-        if (localPlans.isNotEmpty && localPlans.first['cnt'] != null) {
-          final localCnt = (localPlans.first['cnt'] as num).toInt();
-          if (localCnt > count) count = localCnt;
-        }
-      }
+      try {
+        final counts = await _api.getNotificationCounts();
+        count = counts['unread'] ?? counts['unactioned'] ?? 0;
+      } catch (_) {}
 
       try {
         final offlineNotifs =
             await _db.getOfflineUnreadNotificationCount(months: 3);
-        if (offlineNotifs > count) count = offlineNotifs;
+        count = offlineNotifs;
       } catch (_) {}
 
       await PreferenceService.setNotif(count);
+      await NotificationService.syncLauncherBadge(count);
       if (mounted) setState(() {});
     } catch (_) {
       if (mounted) setState(() {});

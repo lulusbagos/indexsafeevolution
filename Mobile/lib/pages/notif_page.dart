@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import 'package:intl/intl.dart';
 
@@ -641,13 +642,21 @@ class _NotifPageState extends State<NotifPage> {
       });
 
     }
-
   }
 
-
+  int _calcUnreadCount(List<dynamic> list) {
+    return list.where((item) {
+      if (item is! Map) return false;
+      final isRead = item['is_read'] == true;
+      final isActionReq = item['is_action_required'] == true;
+      final status = (item['status'] as num?)?.toInt() ?? 0;
+      if (!isRead) return true;
+      if (isActionReq && status < 2) return true;
+      return false;
+    }).length;
+  }
 
   /// 1. Ambil data lokal SQLite INSTAN (0 detik) agar mode offline langsung aktif tanpa nunggu network
-
   Future<void> _loadLocalData() async {
 
     try {
@@ -708,7 +717,9 @@ class _NotifPageState extends State<NotifPage> {
 
 
 
-      await PreferenceService.setNotif(combined.length);
+      final unreadCount = _calcUnreadCount(combined);
+      await PreferenceService.setNotif(unreadCount);
+      await NotificationService.syncLauncherBadge(unreadCount);
 
       if (mounted) {
 
@@ -1034,7 +1045,9 @@ class _NotifPageState extends State<NotifPage> {
 
       }
 
-
+      final syncUnread = _calcUnreadCount(_rawData);
+      await PreferenceService.setNotif(syncUnread);
+      await NotificationService.syncLauncherBadge(syncUnread);
 
       // Getaran fisik jika ada prioritas tinggi
 
@@ -1136,6 +1149,28 @@ class _NotifPageState extends State<NotifPage> {
 
     await _syncOnlineData();
 
+  }
+
+  Future<void> _markAllAsRead() async {
+    HapticFeedback.lightImpact();
+    for (var item in _rawData) {
+      item['is_read'] = true;
+    }
+    await _db.markAllLocalNotificationsRead();
+    _api.markAllNotificationsRead();
+    await PreferenceService.setNotif(0);
+    await NotificationService.syncLauncherBadge(0);
+    if (mounted) {
+      setState(() {});
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Semua notifikasi telah ditandai sebagai dibaca.'),
+          backgroundColor: Color(0xFF0F172A),
+          behavior: SnackBarBehavior.floating,
+          duration: Duration(seconds: 2),
+        ),
+      );
+    }
   }
 
 
@@ -1768,17 +1803,25 @@ class _NotifPageState extends State<NotifPage> {
 
 
 
-    if (item['is_server_notif'] == true) {
+    final bool wasUnread = item['is_read'] != true;
+    item['is_read'] = true;
 
-      final notifId = item['id'] as int? ?? 0;
-
-      if (notifId > 0 && item['is_read'] != true) {
-
-        _db.updateLocalNotificationRead(notifId, true);
-
+    final notifId = item['id'] as int? ?? 0;
+    if (notifId > 0) {
+      _db.updateLocalNotificationRead(notifId, true);
+      if (item['is_server_notif'] == true) {
         _api.markNotificationRead(notifId);
-
       }
+    }
+
+    if (wasUnread) {
+      final unread = _calcUnreadCount(_rawData);
+      PreferenceService.setNotif(unread);
+      NotificationService.syncLauncherBadge(unread);
+      if (mounted) setState(() {});
+    }
+
+    if (item['is_server_notif'] == true) {
 
 
 
@@ -2452,15 +2495,19 @@ class _NotifPageState extends State<NotifPage> {
                   ),
 
             onPressed: () {
-
               _syncOnlineData(isManual: true);
-
               _fetchApiActions();
-
             },
-
           ),
-
+          IconButton(
+            tooltip: 'Tandai Semua Dibaca',
+            icon: const Icon(
+              Icons.done_all_rounded,
+              color: Color(0xFF2563EB),
+              size: 21,
+            ),
+            onPressed: _markAllAsRead,
+          ),
           const SizedBox(width: 6),
 
         ],

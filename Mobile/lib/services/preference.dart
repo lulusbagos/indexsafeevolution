@@ -18,13 +18,18 @@ class PreferenceService {
   static final ValueNotifier<String?> profilePhotoNotifier =
       ValueNotifier<String?>(null);
 
+  /// Reactive notifier to instantly sync unread notification count across all widgets & badges
+  static final ValueNotifier<int> notifCountNotifier =
+      ValueNotifier<int>(0);
+
   static Future<SharedPreferences> init() async {
     prefs = await _instance;
-    // Pre-populate notifier with stored profile photo
+    // Pre-populate notifier with stored profile photo and notif count
     final p = getProfile();
     if (p?.foto != null) {
       profilePhotoNotifier.value = p!.foto;
     }
+    notifCountNotifier.value = getNotif();
     return prefs ?? await SharedPreferences.getInstance();
   }
 
@@ -172,13 +177,16 @@ class PreferenceService {
 
   static Future<void> setNotif(int total) async {
     await prefs?.setInt('notif', total);
+    notifCountNotifier.value = total;
   }
 
   static Future<void> setNotifCounts(
       {required int unread, required int unactioned}) async {
     await prefs?.setInt('notif_unread', unread);
     await prefs?.setInt('notif_unactioned', unactioned);
-    await prefs?.setInt('notif', unread + unactioned);
+    final total = unread + unactioned;
+    await prefs?.setInt('notif', total);
+    notifCountNotifier.value = total;
   }
 
   static int getNotifUnread() =>

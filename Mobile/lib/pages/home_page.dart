@@ -109,6 +109,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin, Widg
 
     _loadNavbarProfilePhoto();
     PreferenceService.profilePhotoNotifier.addListener(_onProfilePhotoChanged);
+    PreferenceService.notifCountNotifier.addListener(_onNotifCountChanged);
     WidgetsBinding.instance.addObserver(this);
     _initSecurityWatcher();
 
@@ -157,10 +158,15 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin, Widg
     _navAnimCtrl.dispose();
     _pageTransitionCtrl.dispose();
     PreferenceService.profilePhotoNotifier.removeListener(_onProfilePhotoChanged);
+    PreferenceService.notifCountNotifier.removeListener(_onNotifCountChanged);
     WidgetsBinding.instance.removeObserver(this);
     _securityCheckTimer?.cancel();
     _connectivitySub?.cancel();
     super.dispose();
+  }
+
+  void _onNotifCountChanged() {
+    if (mounted) setState(() {});
   }
 
   @override
@@ -695,6 +701,8 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin, Widg
     final primaryColor = Theme.of(context).colorScheme.primary;
     final activeColor = primaryColor;
     const inactiveColor = Color(0xFF64748B);
+    final int notifCount = PreferenceService.getNotif();
+    final bool showBadge = index == 1 && notifCount > 0;
 
     return InkWell(
       onTap: () => _onTabSelected(index),
@@ -738,10 +746,42 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin, Widg
                           ),
                         ),
                       )
-                    : Icon(
-                        selected ? activeIcon : inactiveIcon,
-                        size: 21,
-                        color: selected ? activeColor : inactiveColor,
+                    : Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          Icon(
+                            selected ? activeIcon : inactiveIcon,
+                            size: 21,
+                            color: selected ? activeColor : inactiveColor,
+                          ),
+                          if (showBadge)
+                            Positioned(
+                              right: -5,
+                              top: -2,
+                              child: Container(
+                                constraints: const BoxConstraints(
+                                    minWidth: 14, minHeight: 14),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 3, vertical: 1),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFEF4444),
+                                  borderRadius: BorderRadius.circular(99),
+                                  border: Border.all(
+                                      color: Colors.white, width: 1.5),
+                                ),
+                                child: Text(
+                                  notifCount > 99 ? '99+' : '$notifCount',
+                                  textAlign: TextAlign.center,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 7.5,
+                                    fontWeight: FontWeight.w900,
+                                    height: 1.0,
+                                  ),
+                                ),
+                              ),
+                            ),
+                        ],
                       ),
               ),
             ),

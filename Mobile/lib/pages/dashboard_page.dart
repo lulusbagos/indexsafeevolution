@@ -2768,6 +2768,7 @@ class _DashboardPageState extends State<DashboardPage>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    PreferenceService.notifCountNotifier.addListener(_onNotifCountChanged);
     print('===> DASHBOARD INIT STATE RUNNING <===');
 
     final cachedJson = PreferenceService.getCachedHazardMapJson();
@@ -3335,10 +3336,19 @@ class _DashboardPageState extends State<DashboardPage>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    PreferenceService.notifCountNotifier.removeListener(_onNotifCountChanged);
     _positionStreamSub?.cancel();
     _bannerTimer?.cancel();
     _bannerController.dispose();
     super.dispose();
+  }
+
+  void _onNotifCountChanged() {
+    if (mounted) {
+      setState(() {
+        _notifCount = PreferenceService.notifCountNotifier.value;
+      });
+    }
   }
 
   Future<void> _fetchHazardPointsFromApi(
@@ -4416,33 +4426,19 @@ class _DashboardPageState extends State<DashboardPage>
     try {
       int count = 0;
       final counts = await _api.getNotificationCounts();
-      count = counts['total'] ?? counts['unread'] ?? 0;
+      count = counts['unread'] ?? counts['unactioned'] ?? 0;
       final activeHazardCount =
           (counts['active_hazard_count'] as num?)?.toInt() ?? 0;
       final activeActionPlanCount =
           (counts['active_action_plan_count'] as num?)?.toInt() ?? 0;
       final unactionedCount =
           (counts['unactioned_count'] as num?)?.toInt() ?? 0;
+      if (unactionedCount > count) count = unactionedCount;
 
-      // Juga periksa apakah ada action_plans lokal di SQLite yang mengarah ke user
-      int localCnt = 0;
-      try {
-        final db = DatabaseService();
-        final localPlans =
-            await db.rawQuery('''select count(*) as cnt from action_plans
-               where deleted_at is null and ((pja_id=${_profile?.id} and status<1) or (pic_id=${_profile?.id} and status<2))''');
-        if (localPlans.isNotEmpty && localPlans.first['cnt'] != null) {
-          localCnt = (localPlans.first['cnt'] as num).toInt();
-          count = count > localCnt ? count : localCnt;
-        }
-      } catch (_) {}
-
-      // Juga periksa notifikasi lokal tbl_t_notifications di SQLite (Mode Offline)
+      // Unread count dari database lokal SQLite HP (langsung berkurang begitu dibuka)
       try {
         final offlineNotifs = await DatabaseService().getOfflineUnreadNotificationCount(months: 3);
-        if (offlineNotifs > count) {
-          count = offlineNotifs;
-        }
+        count = offlineNotifs;
       } catch (_) {}
 
       // Tambahkan pending approval jika user memiliki permohonan persetujuan
@@ -4466,7 +4462,7 @@ class _DashboardPageState extends State<DashboardPage>
       // GETARAN FISIK: Jika user dijadikan PIC / PJA temuan K3, ada Approval Menunggu, atau Special Permit High Risk
       if (activeHazardCount > 0 ||
           activeActionPlanCount > 0 ||
-          localCnt > 0 ||
+          count > 0 ||
           unactionedCount > 0 ||
           _pendingApprovalCount > 0 ||
           spAlertCount > 0) {
@@ -4474,6 +4470,7 @@ class _DashboardPageState extends State<DashboardPage>
       }
 
       await PreferenceService.setNotif(count);
+      await NotificationService.syncLauncherBadge(count);
       if (mounted) {
         setState(() {
           _notifCount = count;
@@ -5340,6 +5337,8 @@ class _DashboardPageState extends State<DashboardPage>
               ),
               // Quick Action Card: Approval Center (khusus user terdaftar di Bima)
               if (_isApprovalRegistered) _buildApprovalQuickCard(),
+              // Quick Alert: Temuan K3 Masuk yang Membutuhkan Respon User ("Aplikasi Depan")
+              if (_notifCount > 0) _buildIncomingFindingsAlertCard(),
               Padding(
                 padding:
                     const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
@@ -5604,6 +5603,145 @@ class _DashboardPageState extends State<DashboardPage>
             color: isSelected
                 ? (isOff ? const Color(0xFFDC2626) : const Color(0xFF1D4ED8))
                 : const Color(0xFF64748B),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildIncomingFindingsAlertCard() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 2, 20, 10),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(18),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(18),
+          onTap: () {
+            HapticFeedback.lightImpact();
+            Navigator.of(context)
+                .push(MaterialPageRoute(builder: (_) => const NotifPage()))
+                .then((_) => _fetchNotifCount());
+          },
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFF0F172A), Color(0xFF1E293B)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(
+                color: const Color(0xFFEF4444).withValues(alpha: 0.4),
+                width: 1.2,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFFEF4444).withValues(alpha: 0.15),
+                  blurRadius: 14,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEF4444).withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: const Color(0xFFEF4444).withValues(alpha: 0.4),
+                      width: 1.2,
+                    ),
+                  ),
+                  child: const Center(
+                    child: Icon(
+                      Icons.assignment_late_rounded,
+                      color: Color(0xFFF87171),
+                      size: 24,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFEF4444),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              '$_notifCount TEMUAN MASUK',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 9.5,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: 0.4,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          const Text(
+                            'Perlu Tindak Lanjut',
+                            style: TextStyle(
+                              color: Color(0xFF94A3B8),
+                              fontSize: 10,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 3),
+                      const Text(
+                        'Ada temuan K3 dan notifikasi yang menunggu respon Anda',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: Color(0xFFE2E8F0),
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF2563EB),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'Buka',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      SizedBox(width: 2),
+                      Icon(Icons.arrow_forward_ios_rounded,
+                          size: 10, color: Colors.white),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
