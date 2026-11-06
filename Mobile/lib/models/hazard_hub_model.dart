@@ -174,6 +174,7 @@ class PjaSearchResult {
   final String jabatan;
   final String departemen;
   final String perusahaan;
+  final String? foto;
 
   PjaSearchResult({
     required this.nik,
@@ -181,6 +182,7 @@ class PjaSearchResult {
     required this.jabatan,
     required this.departemen,
     required this.perusahaan,
+    this.foto,
   });
 
   factory PjaSearchResult.fromJson(Map<String, dynamic> json) {
@@ -190,6 +192,7 @@ class PjaSearchResult {
       jabatan: json['jabatan']?.toString() ?? '',
       departemen: json['departemen']?.toString() ?? '',
       perusahaan: json['perusahaan']?.toString() ?? '',
+      foto: (json['foto'] ?? json['pathFoto'] ?? json['path_foto'])?.toString(),
     );
   }
 }

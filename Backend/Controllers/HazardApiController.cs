@@ -1719,7 +1719,9 @@ namespace Indexsafe.Api.Controllers
 
                                 perusahaan = c != null ? c.NamaPerusahaan : "PT INDEXIM COALINDO",
 
-                                companyId = k.IdPerusahaan
+                                companyId = k.IdPerusahaan,
+
+                                foto = k.PathFoto
 
                             };
 
@@ -1769,7 +1771,9 @@ namespace Indexsafe.Api.Controllers
 
                     perusahaan = k.perusahaan,
 
-                    company_id = k.companyId
+                    company_id = k.companyId,
+
+                    foto = k.foto
 
                 })
 

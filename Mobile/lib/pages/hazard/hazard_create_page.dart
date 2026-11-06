@@ -3034,43 +3034,129 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
 
     try {
 
-      final safeQ = query.replaceAll("'", "''").trim();
+      final cleanQ = query.trim();
+
+      if (cleanQ.isEmpty) return [];
+
+
+
+      final results = <PjaSearchResult>[];
+
+      final seenNiks = <String>{};
+
+
+
+      // 1. Cek profil pengguna saat ini (offline fallback jika cocok)
+
+      final profile = PreferenceService.getProfile();
+
+      if (profile != null) {
+
+        final myNik = (profile.noNik ?? '').trim();
+
+        final myNama = (profile.namaLengkap ?? '').trim();
+
+        final myDept = (profile.depart ?? 'GENERAL').trim();
+
+        final myJab = (profile.posisi ?? profile.jabatan ?? 'Karyawan').trim();
+
+        final myComp = (profile.company ?? 'PT INDEXIM COALINDO').trim();
+
+
+
+        final qLower = cleanQ.toLowerCase();
+
+        final strippedZeroQ = cleanQ.replaceAll('00', '0');
+
+        final digitsOnly = cleanQ.replaceAll(RegExp(r'\D'), '');
+
+        final myNikDigits = myNik.replaceAll(RegExp(r'\D'), '');
+
+
+
+        final matchMyProfile = myNik.toLowerCase().contains(qLower) ||
+
+            myNama.toLowerCase().contains(qLower) ||
+
+            myDept.toLowerCase().contains(qLower) ||
+
+            (strippedZeroQ.isNotEmpty && myNik.toLowerCase().contains(strippedZeroQ.toLowerCase())) ||
+
+            (digitsOnly.isNotEmpty && myNikDigits.isNotEmpty && (digitsOnly.contains(myNikDigits) || myNikDigits.contains(digitsOnly)));
+
+
+
+        if (matchMyProfile && myNik.isNotEmpty && seenNiks.add(myNik.toLowerCase())) {
+
+          results.add(PjaSearchResult(
+
+            nik: myNik,
+
+            nama: myNama,
+
+            jabatan: myJab,
+
+            departemen: myDept,
+
+            perusahaan: myComp,
+
+            foto: profile.foto,
+
+          ));
+
+        }
+
+      }
+
+
+
+      final safeQ = cleanQ.replaceAll("'", "''");
+
+      final strippedZeroQ = safeQ.replaceAll('00', '0');
 
       final sqldb = await _db.database;
 
       final rows = await sqldb.rawQuery(
 
-        "SELECT no_nik, nama_lengkap, depart, posisi, departemen, jabatan, perusahaan FROM employees WHERE no_nik LIKE '%$safeQ%' OR nama_lengkap LIKE '%$safeQ%' LIMIT 30",
+        "SELECT id, COALESCE(no_nik, nik, '') as no_nik, COALESCE(nama_lengkap, nama, '') as nama_lengkap, COALESCE(departemen, depart, 'GENERAL') as depart, COALESCE(jabatan, posisi, 'Karyawan') as jabatan, COALESCE(perusahaan, 'PT INDEXIM COALINDO') as perusahaan, COALESCE(foto, '') as emp_foto FROM employees WHERE (no_nik LIKE '%$safeQ%' OR no_nik LIKE '%$strippedZeroQ%' OR nama_lengkap LIKE '%$safeQ%') LIMIT 30",
 
       );
 
-      final list = rows
-
-          .map((r) => PjaSearchResult(
-
-                nik: r['no_nik']?.toString() ?? '',
-
-                nama: r['nama_lengkap']?.toString() ?? '',
-
-                departemen:
-
-                    (r['departemen'] ?? r['depart'])?.toString() ?? 'GENERAL',
-
-                jabatan:
-
-                    (r['jabatan'] ?? r['posisi'])?.toString() ?? 'Karyawan',
-
-                perusahaan:
-
-                    r['perusahaan']?.toString() ?? 'PT INDEXIM COALINDO',
-
-              ))
-
-          .toList();
 
 
+      for (final r in rows) {
 
-      return list;
+        final nik = (r['no_nik'] ?? '').toString().trim();
+
+        final nama = (r['nama_lengkap'] ?? '').toString().trim();
+
+        final foto = (r['emp_foto'] ?? '').toString().trim();
+
+        if (nik.isNotEmpty && nama.isNotEmpty && seenNiks.add(nik.toLowerCase())) {
+
+          results.add(PjaSearchResult(
+
+            nik: nik,
+
+            nama: nama,
+
+            departemen: (r['depart'] ?? 'GENERAL').toString(),
+
+            jabatan: (r['jabatan'] ?? 'Karyawan').toString(),
+
+            perusahaan: (r['perusahaan'] ?? 'PT INDEXIM COALINDO').toString(),
+
+            foto: foto.isNotEmpty ? foto : null,
+
+          ));
+
+        }
+
+      }
+
+
+
+      return results;
 
     } catch (e) {
 
@@ -5630,6 +5716,32 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
 
                               onChanged: _searchPjaOnline,
 
+                              suffixIcon: _pjaSearchCtrl.text.isNotEmpty
+
+                                  ? IconButton(
+
+                                      icon: const Icon(Icons.close_rounded,
+
+                                          size: 18, color: Color(0xFF94A3B8)),
+
+                                      onPressed: () {
+
+                                        setState(() {
+
+                                          _pjaSearchCtrl.clear();
+
+                                          _pjaSearchResults = [];
+
+                                          _isSearchingPja = false;
+
+                                        });
+
+                                      },
+
+                                    )
+
+                                  : null,
+
                             ),
 
                             if (_isSearchingPja)
@@ -5654,9 +5766,7 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
 
                               ),
 
-                            if (_pjaSearchCtrl.text.trim().isNotEmpty ||
-
-                                _pjaSearchResults.isNotEmpty)
+                            if (_pjaSearchCtrl.text.trim().isNotEmpty)
 
                               Container(
 
@@ -5729,6 +5839,22 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
                                           return ListTile(
 
                                             dense: true,
+
+                                            leading: SapEmployeeAvatar(
+
+                                              photo: p.foto,
+
+                                              name: p.nama,
+
+                                              nik: p.nik,
+
+                                              radius: 18,
+
+                                              fallbackBg: const Color(0xFFDCFCE7),
+
+                                              fallbackFg: const Color(0xFF16A34A),
+
+                                            ),
 
                                             title: Text(p.nama,
 
@@ -5877,27 +6003,19 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
 
                                 children: [
 
-                                  CircleAvatar(
+                                  SapEmployeeAvatar(
 
-                                    radius: 18,
+                                    photo: _selectedPja!.foto,
 
-                                    backgroundColor: const Color(0xFF16A34A),
+                                    name: _selectedPja!.nama,
 
-                                    child: Text(
+                                    nik: _selectedPja!.nik,
 
-                                      _selectedPja!.nama.isNotEmpty
+                                    radius: 20,
 
-                                          ? _selectedPja!.nama[0].toUpperCase()
+                                    fallbackBg: const Color(0xFF16A34A),
 
-                                          : 'P',
-
-                                      style: const TextStyle(
-
-                                          color: Colors.white,
-
-                                          fontWeight: FontWeight.bold),
-
-                                    ),
+                                    fallbackFg: Colors.white,
 
                                   ),
 
@@ -6723,6 +6841,8 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
 
     ValueChanged<String>? onChanged,
 
+    Widget? suffixIcon,
+
   }) {
 
     return Container(
@@ -6748,6 +6868,8 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
         decoration: InputDecoration(
 
           prefixIcon: Icon(icon, color: const Color(0xFF64748B), size: 18),
+
+          suffixIcon: suffixIcon,
 
           hintText: hint,
 
