@@ -73,6 +73,7 @@ class _PjaCandidate {
   final String jabatan;
   final String departemen;
   final String perusahaan;
+  final String? foto;
 
   const _PjaCandidate({
     required this.id,
@@ -81,6 +82,7 @@ class _PjaCandidate {
     required this.jabatan,
     required this.departemen,
     required this.perusahaan,
+    this.foto,
   });
 }
 
@@ -147,8 +149,6 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
     _initCheckpoints();
     _loadAreasFromMaster();
     _fillGpsFromDevice(silent: true);
-    // Preload daftar PJA / pengawas agar saat offline langsung muncul pilihan
-    _searchPja('');
   }
 
   @override
@@ -364,6 +364,7 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
         jabatan: (profile.posisi ?? profile.jabatan ?? 'Foreman/Officer').toString(),
         departemen: (profile.depart ?? 'SYSTEM INTEGRATIONS').toString(),
         perusahaan: (profile.company ?? 'PT INDEXIM COALINDO').toString(),
+        foto: profile.foto,
       );
       _pjaSearchResults = [];
       _pjaSearchCtrl.clear();
@@ -372,6 +373,16 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
 
   Future<void> _searchPja(String query) async {
     final cleanQ = query.trim();
+    if (cleanQ.isEmpty) {
+      if (mounted) {
+        setState(() {
+          _pjaSearchResults = [];
+          _isSearchingPja = false;
+        });
+      }
+      return;
+    }
+
     setState(() => _isSearchingPja = true);
 
     try {
@@ -389,22 +400,17 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
         final myJab = (profile.posisi ?? profile.jabatan ?? 'Pengawas').trim();
         final myComp = (profile.company ?? 'PT INDEXIM COALINDO').trim();
 
-        bool matchMyProfile = false;
-        if (cleanQ.isEmpty) {
-          matchMyProfile = true;
-        } else {
-          final qLower = cleanQ.toLowerCase();
-          // Check exact match, partial match, and fuzzy extra-zero typo (e.g. 240519400986 vs 24051940986)
-          final strippedZeroQ = cleanQ.replaceAll('00', '0');
-          final digitsOnly = cleanQ.replaceAll(RegExp(r'\D'), '');
-          final myNikDigits = myNik.replaceAll(RegExp(r'\D'), '');
+        final qLower = cleanQ.toLowerCase();
+        // Check exact match, partial match, and fuzzy extra-zero typo (e.g. 240519400986 vs 24051940986)
+        final strippedZeroQ = cleanQ.replaceAll('00', '0');
+        final digitsOnly = cleanQ.replaceAll(RegExp(r'\D'), '');
+        final myNikDigits = myNik.replaceAll(RegExp(r'\D'), '');
 
-          matchMyProfile = myNik.toLowerCase().contains(qLower) ||
-              myNama.toLowerCase().contains(qLower) ||
-              myDept.toLowerCase().contains(qLower) ||
-              (strippedZeroQ.isNotEmpty && myNik.toLowerCase().contains(strippedZeroQ.toLowerCase())) ||
-              (digitsOnly.isNotEmpty && myNikDigits.isNotEmpty && (digitsOnly.contains(myNikDigits) || myNikDigits.contains(digitsOnly)));
-        }
+        final matchMyProfile = myNik.toLowerCase().contains(qLower) ||
+            myNama.toLowerCase().contains(qLower) ||
+            myDept.toLowerCase().contains(qLower) ||
+            (strippedZeroQ.isNotEmpty && myNik.toLowerCase().contains(strippedZeroQ.toLowerCase())) ||
+            (digitsOnly.isNotEmpty && myNikDigits.isNotEmpty && (digitsOnly.contains(myNikDigits) || myNikDigits.contains(digitsOnly)));
 
         if (matchMyProfile && myNik.isNotEmpty && seenNiks.add(myNik.toLowerCase())) {
           results.add(_PjaCandidate(
@@ -414,56 +420,42 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
             jabatan: myJab,
             departemen: myDept,
             perusahaan: myComp,
+            foto: profile.foto,
           ));
         }
       }
 
       // 2. Query local SQLite table 'employees'
-      // Use COALESCE / fallback columns so it works on any schema version without crashing
-      final String sql;
-      if (cleanQ.isEmpty) {
-        sql = '''
-          SELECT id, 
-                 COALESCE(no_nik, nik, '') as emp_nik, 
-                 COALESCE(nama_lengkap, nama, '') as emp_nama, 
-                 COALESCE(departemen, depart, 'GENERAL') as emp_dept, 
-                 COALESCE(jabatan, posisi, 'Karyawan') as emp_jab, 
-                 COALESCE(perusahaan, 'PT INDEXIM COALINDO') as emp_perush 
-          FROM employees 
-          WHERE (nama_lengkap IS NOT NULL AND nama_lengkap != '') OR (no_nik IS NOT NULL AND no_nik != '')
-          ORDER BY nama_lengkap ASC 
-          LIMIT 50
-        ''';
-      } else {
-        // Support stripped double zero for typo tolerance (e.g. 240519400986 vs 24051940986)
-        final strippedQ = safeQ.replaceAll('00', '0');
-        sql = '''
-          SELECT id, 
-                 COALESCE(no_nik, nik, '') as emp_nik, 
-                 COALESCE(nama_lengkap, nama, '') as emp_nama, 
-                 COALESCE(departemen, depart, 'GENERAL') as emp_dept, 
-                 COALESCE(jabatan, posisi, 'Karyawan') as emp_jab, 
-                 COALESCE(perusahaan, 'PT INDEXIM COALINDO') as emp_perush 
-          FROM employees 
-          WHERE (
-            no_nik LIKE '%$safeQ%' 
-            OR no_nik LIKE '%$strippedQ%'
-            OR nama_lengkap LIKE '%$safeQ%' 
-            OR depart LIKE '%$safeQ%' 
-            OR departemen LIKE '%$safeQ%' 
-            OR jabatan LIKE '%$safeQ%' 
-            OR posisi LIKE '%$safeQ%'
-          )
-          ORDER BY nama_lengkap ASC 
-          LIMIT 50
-        ''';
-      }
+      // Support stripped double zero for typo tolerance (e.g. 240519400986 vs 24051940986)
+      final strippedQ = safeQ.replaceAll('00', '0');
+      final String sql = '''
+        SELECT id, 
+               COALESCE(no_nik, nik, '') as emp_nik, 
+               COALESCE(nama_lengkap, nama, '') as emp_nama, 
+               COALESCE(departemen, depart, 'GENERAL') as emp_dept, 
+               COALESCE(jabatan, posisi, 'Karyawan') as emp_jab, 
+               COALESCE(perusahaan, 'PT INDEXIM COALINDO') as emp_perush,
+               COALESCE(foto, '') as emp_foto
+        FROM employees 
+        WHERE (
+          no_nik LIKE '%$safeQ%' 
+          OR no_nik LIKE '%$strippedQ%'
+          OR nama_lengkap LIKE '%$safeQ%' 
+          OR depart LIKE '%$safeQ%' 
+          OR departemen LIKE '%$safeQ%' 
+          OR jabatan LIKE '%$safeQ%' 
+          OR posisi LIKE '%$safeQ%'
+        )
+        ORDER BY nama_lengkap ASC 
+        LIMIT 50
+      ''';
 
       try {
         final rows = await db.rawQuery(sql);
         for (var r in rows) {
           final nik = (r['emp_nik'] ?? r['no_nik'] ?? r['nik'] ?? '').toString().trim();
           final nama = (r['emp_nama'] ?? r['nama_lengkap'] ?? r['nama'] ?? '').toString().trim();
+          final foto = (r['emp_foto'] ?? r['foto'])?.toString().trim();
           if (nik.isNotEmpty && nama.isNotEmpty && seenNiks.add(nik.toLowerCase())) {
             results.add(_PjaCandidate(
               id: (r['id'] as num?)?.toInt() ?? 0,
@@ -472,6 +464,7 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
               jabatan: (r['emp_jab'] ?? r['jabatan'] ?? r['posisi'])?.toString().trim() ?? 'Karyawan',
               departemen: (r['emp_dept'] ?? r['departemen'] ?? r['depart'])?.toString().trim() ?? 'GENERAL',
               perusahaan: (r['emp_perush'] ?? r['perusahaan'])?.toString().trim() ?? 'PT INDEXIM COALINDO',
+              foto: (foto != null && foto.isNotEmpty) ? foto : null,
             ));
           }
         }
@@ -490,8 +483,7 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
             final nama = (r['pja'] ?? '').toString().trim();
             if (nik.isNotEmpty && nama.isNotEmpty) {
               final strippedZeroQ = cleanQ.replaceAll('00', '0');
-              final match = cleanQ.isEmpty ||
-                  nik.toLowerCase().contains(cleanQ.toLowerCase()) ||
+              final match = nik.toLowerCase().contains(cleanQ.toLowerCase()) ||
                   nama.toLowerCase().contains(cleanQ.toLowerCase()) ||
                   (strippedZeroQ.isNotEmpty && nik.toLowerCase().contains(strippedZeroQ.toLowerCase()));
               if (match && seenNiks.add(nik.toLowerCase())) {
@@ -517,6 +509,7 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
             for (final item in serverData) {
               final nik = item['nik']?.toString().trim() ?? '';
               final nama = item['nama']?.toString().trim() ?? '';
+              final foto = (item['foto'] ?? item['pathFoto'] ?? item['path_foto'])?.toString().trim();
               if (nik.isNotEmpty && nama.isNotEmpty && seenNiks.add(nik.toLowerCase())) {
                 results.add(_PjaCandidate(
                   id: (item['id'] as num?)?.toInt() ?? 0,
@@ -525,6 +518,7 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
                   jabatan: (item['jabatan'] ?? item['posisi'])?.toString().trim() ?? '',
                   departemen: (item['departemen'] ?? item['depart'])?.toString().trim() ?? '',
                   perusahaan: item['perusahaan']?.toString().trim() ?? 'Mitra Kerja',
+                  foto: (foto != null && foto.isNotEmpty) ? foto : null,
                 ));
               }
             }
@@ -2161,17 +2155,13 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
                       ),
                       child: Row(
                         children: [
-                          CircleAvatar(
+                          SapEmployeeAvatar(
+                            photo: _selectedPja!.foto,
+                            name: _selectedPja!.nama,
+                            nik: _selectedPja!.nik,
                             radius: 20,
-                            backgroundColor: primaryGreen,
-                            child: Text(
-                              _selectedPja!.nama.isNotEmpty
-                                  ? _selectedPja!.nama[0].toUpperCase()
-                                  : 'P',
-                              style: const TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold),
-                            ),
+                            fallbackBg: primaryGreen,
+                            fallbackFg: Colors.white,
                           ),
                           const SizedBox(width: 12),
                           Expanded(
@@ -2202,7 +2192,8 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
                                 color: Color(0xFFDC2626), size: 20),
                             onPressed: () {
                               setState(() => _selectedPja = null);
-                              _searchPja('');
+                              _pjaSearchResults = [];
+                              _pjaSearchCtrl.clear();
                             },
                           ),
                         ],
@@ -2287,7 +2278,8 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
                         ),
                       ),
                     ],
-                    if (_pjaSearchResults.isNotEmpty) ...[
+                    if (_pjaSearchResults.isNotEmpty &&
+                        _pjaSearchCtrl.text.trim().isNotEmpty) ...[
                       const SizedBox(height: 8),
                       Container(
                         constraints: const BoxConstraints(maxHeight: 250),
@@ -2312,16 +2304,13 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
                             final p = _pjaSearchResults[idx];
                             return ListTile(
                               dense: true,
-                              leading: CircleAvatar(
-                                radius: 16,
-                                backgroundColor: primaryGreen.withOpacity(0.12),
-                                child: Text(
-                                  p.nama.isNotEmpty ? p.nama[0].toUpperCase() : 'P',
-                                  style: const TextStyle(
-                                      color: primaryGreen,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 12),
-                                ),
+                              leading: SapEmployeeAvatar(
+                                photo: p.foto,
+                                name: p.nama,
+                                nik: p.nik,
+                                radius: 18,
+                                fallbackBg: const Color(0xFFDCFCE7),
+                                fallbackFg: primaryGreen,
                               ),
                               title: Text(p.nama,
                                   style: const TextStyle(
