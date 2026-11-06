@@ -287,9 +287,31 @@ class _ObservationFormPageState extends State<ObservationFormPage> {
       _rawData
         ..clear()
         ..addAll(rawLocations);
-      _penilaianList = _entries(options, 'riskLevels')
-          .map((entry) => MapEntry(entry.value.toString(), entry.value))
-          .toList();
+      final seenLevels = <String>{};
+      final cleanLevels = <MapEntry<String, dynamic>>[];
+      for (final entry in _entries(options, 'riskLevels')) {
+        var str = entry.value.toString().trim();
+        if (str.toLowerCase() == 'low') {
+          str = 'Rendah';
+        } else if (str.toLowerCase() == 'medium') {
+          str = 'Sedang';
+        } else if (str.toLowerCase() == 'high') {
+          str = 'Tinggi';
+        } else if (str.toLowerCase() == 'critical' || str.toLowerCase() == 'extreme') {
+          str = 'Ekstrim';
+        }
+        if (str.isNotEmpty && seenLevels.add(str.toLowerCase())) {
+          cleanLevels.add(MapEntry(str, str));
+        }
+      }
+      _penilaianList = cleanLevels.isNotEmpty
+          ? cleanLevels
+          : [
+              const MapEntry('Rendah', 'Rendah'),
+              const MapEntry('Sedang', 'Sedang'),
+              const MapEntry('Tinggi', 'Tinggi'),
+              const MapEntry('Ekstrim', 'Ekstrim'),
+            ];
       _perihalOptions = _entries(options, 'subjects');
       _hasilOptions = _entries(options, 'results');
       _deptId = _docId = _riskId = _areaId = _locationId = null;
@@ -535,65 +557,73 @@ class _ObservationFormPageState extends State<ObservationFormPage> {
 
                             const Text('AREA UTAMA *', style: TextStyle(color: Color(0xFF0F172A), fontSize: 11.5, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
                             const SizedBox(height: 6),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 12),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFF8FAFC),
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: const Color(0xFFE2E8F0)),
-                              ),
-                              child: DropdownButtonHideUnderline(
-                                child: DropdownButton<int>(
-                                  value: _areaId,
-                                  isExpanded: true,
-                                  hint: const Text('Pilih Area Utama', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 13)),
-                                  items: _areaList.map((item) {
-                                    return DropdownMenuItem<int>(
-                                      value: item.key,
-                                      child: Text(
-                                        item.value.toString(),
-                                        style: const TextStyle(fontSize: 13, color: Color(0xFF0F172A), fontWeight: FontWeight.w600),
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    );
-                                  }).toList(),
-                                  onChanged: (int? val) {
-                                    if (val != null) setState(() => _getLocation(val));
-                                  },
+                            DropdownSearch<MapEntry<int, dynamic>>(
+                              selectedItem: _areaList.where((item) => item.key == _areaId).firstOrNull,
+                              items: _areaList,
+                              itemAsString: (item) => item?.value.toString() ?? '',
+                              dropdownDecoratorProps: DropDownDecoratorProps(
+                                dropdownSearchDecoration: InputDecoration(
+                                  hintText: 'Pilih Area Utama...',
+                                  hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
+                                  prefixIcon: const Icon(Icons.map_rounded, color: Color(0xFF0284C7), size: 20),
+                                  filled: true,
+                                  fillColor: const Color(0xFFF8FAFC),
+                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
                                 ),
                               ),
+                              popupProps: const PopupProps.menu(
+                                fit: FlexFit.loose,
+                                showSearchBox: true,
+                                searchFieldProps: TextFieldProps(
+                                  decoration: InputDecoration(
+                                    hintText: 'Cari area utama...',
+                                    prefixIcon: Icon(Icons.search_rounded),
+                                  ),
+                                ),
+                              ),
+                              onChanged: (item) {
+                                if (item != null) setState(() => _getLocation(item.key));
+                              },
                             ),
                             const SizedBox(height: 14),
 
                             const Text('DETAIL LOKASI / BENCHMARK *', style: TextStyle(color: Color(0xFF0F172A), fontSize: 11.5, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
                             const SizedBox(height: 6),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 12),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFF8FAFC),
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: const Color(0xFFE2E8F0)),
-                              ),
-                              child: DropdownButtonHideUnderline(
-                                child: DropdownButton<int>(
-                                  value: _locationId,
-                                  isExpanded: true,
-                                  hint: const Text('Pilih Detail Lokasi', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 13)),
-                                  items: _locationList.map((item) {
-                                    return DropdownMenuItem<int>(
-                                      value: item.key,
-                                      child: Text(
-                                        item.value.toString(),
-                                        style: const TextStyle(fontSize: 13, color: Color(0xFF0F172A), fontWeight: FontWeight.w600),
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    );
-                                  }).toList(),
-                                  onChanged: (int? val) {
-                                    if (val != null) setState(() => _locationId = val);
-                                  },
+                            DropdownSearch<MapEntry<int, dynamic>>(
+                              selectedItem: _locationList.where((item) => item.key == _locationId).firstOrNull,
+                              items: _locationList,
+                              enabled: _areaId != null,
+                              itemAsString: (item) => item?.value.toString() ?? '',
+                              dropdownDecoratorProps: DropDownDecoratorProps(
+                                dropdownSearchDecoration: InputDecoration(
+                                  hintText: _areaId == null
+                                      ? 'Pilih Area Utama terlebih dahulu...'
+                                      : (_locationList.isEmpty
+                                          ? '(Tidak ada benchmark di area ini)'
+                                          : 'Pilih Detail Lokasi / Benchmark...'),
+                                  hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
+                                  prefixIcon: const Icon(Icons.place_rounded, color: Color(0xFF0284C7), size: 20),
+                                  filled: true,
+                                  fillColor: const Color(0xFFF8FAFC),
+                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                                  disabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
                                 ),
                               ),
+                              popupProps: const PopupProps.menu(
+                                fit: FlexFit.loose,
+                                showSearchBox: true,
+                                searchFieldProps: TextFieldProps(
+                                  decoration: InputDecoration(
+                                    hintText: 'Cari lokasi / benchmark...',
+                                    prefixIcon: Icon(Icons.search_rounded),
+                                  ),
+                                ),
+                              ),
+                              onChanged: (item) {
+                                if (item != null) setState(() => _locationId = item.key);
+                              },
                             ),
                             const SizedBox(height: 6),
                             AddCustomLocationButton(onPressed: _addCustomLocation),
@@ -699,65 +729,67 @@ class _ObservationFormPageState extends State<ObservationFormPage> {
 
                             const Text('DOKUMEN PENDUKUNG *', style: TextStyle(color: Color(0xFF0F172A), fontSize: 11.5, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
                             const SizedBox(height: 6),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 12),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFF8FAFC),
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: const Color(0xFFE2E8F0)),
-                              ),
-                              child: DropdownButtonHideUnderline(
-                                child: DropdownButton<int>(
-                                  value: _docId,
-                                  isExpanded: true,
-                                  hint: const Text('Pilih Dokumen', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 13)),
-                                  items: _docList.map((item) {
-                                    return DropdownMenuItem<int>(
-                                      value: item.key,
-                                      child: Text(
-                                        item.value.toString(),
-                                        style: const TextStyle(fontSize: 13, color: Color(0xFF0F172A), fontWeight: FontWeight.w600),
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    );
-                                  }).toList(),
-                                  onChanged: (int? val) {
-                                    if (val != null) setState(() => _docId = val);
-                                  },
+                            DropdownSearch<MapEntry<int, dynamic>>(
+                              selectedItem: _docList.where((item) => item.key == _docId).firstOrNull,
+                              items: _docList,
+                              itemAsString: (item) => item?.value.toString() ?? '',
+                              dropdownDecoratorProps: DropDownDecoratorProps(
+                                dropdownSearchDecoration: InputDecoration(
+                                  hintText: 'Pilih Dokumen Pendukung (IK/SOP)...',
+                                  hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
+                                  prefixIcon: const Icon(Icons.description_rounded, color: Color(0xFF0284C7), size: 20),
+                                  filled: true,
+                                  fillColor: const Color(0xFFF8FAFC),
+                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
                                 ),
                               ),
+                              popupProps: const PopupProps.menu(
+                                fit: FlexFit.loose,
+                                showSearchBox: true,
+                                searchFieldProps: TextFieldProps(
+                                  decoration: InputDecoration(
+                                    hintText: 'Cari dokumen...',
+                                    prefixIcon: Icon(Icons.search_rounded),
+                                  ),
+                                ),
+                              ),
+                              onChanged: (item) {
+                                if (item != null) setState(() => _docId = item.key);
+                              },
                             ),
                             const SizedBox(height: 14),
 
                             const Text('RISIKO KRITIS *', style: TextStyle(color: Color(0xFF0F172A), fontSize: 11.5, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
                             const SizedBox(height: 6),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 12),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFF8FAFC),
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: const Color(0xFFE2E8F0)),
-                              ),
-                              child: DropdownButtonHideUnderline(
-                                child: DropdownButton<int>(
-                                  value: _riskId,
-                                  isExpanded: true,
-                                  hint: const Text('Pilih Risiko Kritis', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 13)),
-                                  items: _riskList.map((item) {
-                                    return DropdownMenuItem<int>(
-                                      value: item.key,
-                                      child: Text(
-                                        item.value.toString(),
-                                        style: const TextStyle(fontSize: 13, color: Color(0xFF0F172A), fontWeight: FontWeight.w600),
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    );
-                                  }).toList(),
-                                  onChanged: (int? val) {
-                                    if (val != null) setState(() => _riskId = val);
-                                  },
+                            DropdownSearch<MapEntry<int, dynamic>>(
+                              selectedItem: _riskList.where((item) => item.key == _riskId).firstOrNull,
+                              items: _riskList,
+                              itemAsString: (item) => item?.value.toString() ?? '',
+                              dropdownDecoratorProps: DropDownDecoratorProps(
+                                dropdownSearchDecoration: InputDecoration(
+                                  hintText: 'Pilih Risiko Kritis Terkait...',
+                                  hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
+                                  prefixIcon: const Icon(Icons.warning_amber_rounded, color: Color(0xFF0284C7), size: 20),
+                                  filled: true,
+                                  fillColor: const Color(0xFFF8FAFC),
+                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
                                 ),
                               ),
+                              popupProps: const PopupProps.menu(
+                                fit: FlexFit.loose,
+                                showSearchBox: true,
+                                searchFieldProps: TextFieldProps(
+                                  decoration: InputDecoration(
+                                    hintText: 'Cari risiko kritis...',
+                                    prefixIcon: Icon(Icons.search_rounded),
+                                  ),
+                                ),
+                              ),
+                              onChanged: (item) {
+                                if (item != null) setState(() => _riskId = item.key);
+                              },
                             ),
                             const SizedBox(height: 14),
 
@@ -770,11 +802,13 @@ class _ObservationFormPageState extends State<ObservationFormPage> {
                                 final isSel = _penilaianId == item.key;
                                 Color badgeColor = const Color(0xFF0284C7);
                                 final lower = item.value.toString().toLowerCase();
-                                if (lower.contains('critical') || lower.contains('high')) {
+                                if (lower.contains('critical') || lower.contains('ekstrim') || lower.contains('extreme')) {
                                   badgeColor = const Color(0xFFDC2626);
-                                } else if (lower.contains('medium')) {
+                                } else if (lower.contains('high') || lower.contains('tinggi')) {
+                                  badgeColor = const Color(0xFFEA580C);
+                                } else if (lower.contains('medium') || lower.contains('sedang')) {
                                   badgeColor = const Color(0xFFD97706);
-                                } else if (lower.contains('low')) {
+                                } else {
                                   badgeColor = const Color(0xFF16A34A);
                                 }
 
