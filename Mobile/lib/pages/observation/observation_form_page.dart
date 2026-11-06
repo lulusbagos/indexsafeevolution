@@ -376,6 +376,29 @@ class _ObservationFormPageState extends State<ObservationFormPage> {
           cleanLevels.add(MapEntry(str, str));
         }
       }
+
+      int getRiskRank(String val) {
+        final l = val.toLowerCase();
+        if (l.contains('rendah') || l.contains('low')) {
+          return 1;
+        }
+        if (l.contains('sedang') || l.contains('medium')) {
+          return 2;
+        }
+        if (l.contains('tinggi') || l.contains('high')) {
+          return 3;
+        }
+        if (l.contains('ekstrim') ||
+            l.contains('critical') ||
+            l.contains('extreme')) {
+          return 4;
+        }
+        return 5;
+      }
+
+      cleanLevels
+          .sort((a, b) => getRiskRank(a.key).compareTo(getRiskRank(b.key)));
+
       _penilaianList = cleanLevels.isNotEmpty
           ? cleanLevels
           : [
@@ -898,8 +921,7 @@ class _ObservationFormPageState extends State<ObservationFormPage> {
                             itemAsString: (item) => item.value.toString(),
                             dropdownDecoratorProps: DropDownDecoratorProps(
                               dropdownSearchDecoration: InputDecoration(
-                                hintText:
-                                    'Pilih hasil evaluasi observasi...',
+                                hintText: 'Pilih hasil evaluasi observasi...',
                                 hintStyle: const TextStyle(
                                     color: Color(0xFF94A3B8), fontSize: 13),
                                 prefixIcon: const Icon(
@@ -935,6 +957,53 @@ class _ObservationFormPageState extends State<ObservationFormPage> {
                               setStateModal(() => _modalHasilId = item.key);
                             },
                           ),
+                          if (_modalHasilId != null) ...[
+                            const SizedBox(height: 8),
+                            Builder(
+                              builder: (_) {
+                                final selVal = _hasilOptions
+                                    .where((i) => i.key == _modalHasilId)
+                                    .firstOrNull
+                                    ?.value
+                                    ?.toString();
+                                final bColor = _getResultBadgeColor(selVal);
+                                final bLabel = _getResultLabel(selVal);
+                                final isSafe = bLabel.contains('AMAN');
+
+                                return Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 10, vertical: 5),
+                                  decoration: BoxDecoration(
+                                    color: bColor.withValues(alpha: 0.1),
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(
+                                        color: bColor.withValues(alpha: 0.3)),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        isSafe
+                                            ? Icons.check_circle_rounded
+                                            : Icons.warning_rounded,
+                                        size: 15,
+                                        color: bColor,
+                                      ),
+                                      const SizedBox(width: 5),
+                                      Text(
+                                        'Klasifikasi: $bLabel',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.bold,
+                                          color: bColor,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              },
+                            ),
+                          ],
                           const SizedBox(height: 16),
                           const Text(
                             'KETERANGAN / TINDAKAN *',
@@ -1529,6 +1598,93 @@ class _ObservationFormPageState extends State<ObservationFormPage> {
                           badgeBorderColor: Color(0xFFE0F2FE),
                         ),
 
+                        // Observer Profile Badge
+                        Container(
+                          margin: const EdgeInsets.only(bottom: 14),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 14, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(12),
+                            border:
+                                Border.all(color: const Color(0xFFE2E8F0)),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.02),
+                                blurRadius: 4,
+                                offset: const Offset(0, 1),
+                              ),
+                            ],
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 34,
+                                height: 34,
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFE0F2FE),
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                      color: const Color(0xFFBAE6FD)),
+                                ),
+                                child: const Icon(Icons.person_rounded,
+                                    color: primaryBlue, size: 19),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Text(
+                                          _profile?.namaLengkap ??
+                                              'Pengawas K3',
+                                          style: const TextStyle(
+                                            fontSize: 12.5,
+                                            fontWeight: FontWeight.bold,
+                                            color: Color(0xFF0F172A),
+                                          ),
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                        const SizedBox(width: 6),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 6, vertical: 1.5),
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFFF1F5F9),
+                                            borderRadius:
+                                                BorderRadius.circular(6),
+                                          ),
+                                          child: const Text(
+                                            'OBSERVER',
+                                            style: TextStyle(
+                                              fontSize: 9,
+                                              fontWeight: FontWeight.bold,
+                                              color: Color(0xFF475569),
+                                              letterSpacing: 0.5,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      '${_profile?.noNik ?? "-"} • ${_profile?.depart ?? "GENERAL"} • ${_profile?.company ?? "PT INDEXIM COALINDO"}',
+                                      style: const TextStyle(
+                                        fontSize: 10.5,
+                                        color: Color(0xFF64748B),
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+
                         // SECTION 1: Waktu & Lokasi
                         SapSectionCard(
                           stepNumber: '1',
@@ -2021,57 +2177,104 @@ class _ObservationFormPageState extends State<ObservationFormPage> {
                                     fontSize: 11.5,
                                     fontWeight: FontWeight.bold,
                                     letterSpacing: 0.5)),
-                            const SizedBox(height: 6),
-                            Wrap(
-                              spacing: 8,
-                              runSpacing: 8,
+                            const SizedBox(height: 8),
+                            Row(
                               children: _penilaianList.map((item) {
                                 final isSel = _penilaianId == item.key;
-                                Color badgeColor = primaryBlue;
+                                Color baseColor;
+                                Color softBg;
+                                Color softBorder;
+                                IconData riskIcon;
                                 final lower =
                                     item.value.toString().toLowerCase();
+
                                 if (lower.contains('critical') ||
                                     lower.contains('ekstrim') ||
                                     lower.contains('extreme')) {
-                                  badgeColor = const Color(0xFFDC2626);
+                                  baseColor = const Color(0xFFDC2626);
+                                  softBg = const Color(0xFFFEF2F2);
+                                  softBorder = const Color(0xFFFECACA);
+                                  riskIcon = Icons.report_problem_rounded;
                                 } else if (lower.contains('high') ||
                                     lower.contains('tinggi')) {
-                                  badgeColor = const Color(0xFFEA580C);
+                                  baseColor = const Color(0xFFEA580C);
+                                  softBg = const Color(0xFFFFF7ED);
+                                  softBorder = const Color(0xFFFED7AA);
+                                  riskIcon = Icons.warning_amber_rounded;
                                 } else if (lower.contains('medium') ||
                                     lower.contains('sedang')) {
-                                  badgeColor = const Color(0xFFD97706);
+                                  baseColor = const Color(0xFFD97706);
+                                  softBg = const Color(0xFFFEFCE8);
+                                  softBorder = const Color(0xFFFDE68A);
+                                  riskIcon = Icons.info_outline_rounded;
                                 } else {
-                                  badgeColor = const Color(0xFF16A34A);
+                                  baseColor = const Color(0xFF16A34A);
+                                  softBg = const Color(0xFFF0FDF4);
+                                  softBorder = const Color(0xFFBBF7D0);
+                                  riskIcon = Icons.shield_outlined;
                                 }
 
-                                return InkWell(
-                                  onTap: () => setState(
-                                      () => _penilaianId = item.key),
-                                  borderRadius: BorderRadius.circular(10),
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 14, vertical: 8),
-                                    decoration: BoxDecoration(
-                                      color: isSel
-                                          ? badgeColor
-                                          : const Color(0xFFF8FAFC),
-                                      borderRadius:
-                                          BorderRadius.circular(10),
-                                      border: Border.all(
-                                          color: isSel
-                                              ? badgeColor
-                                              : const Color(0xFFE2E8F0)),
-                                    ),
-                                    child: Text(
-                                      item.value.toString(),
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        fontWeight: isSel
-                                            ? FontWeight.bold
-                                            : FontWeight.w600,
-                                        color: isSel
-                                            ? Colors.white
-                                            : const Color(0xFF334155),
+                                return Expanded(
+                                  child: Padding(
+                                    padding:
+                                        const EdgeInsets.symmetric(horizontal: 3),
+                                    child: InkWell(
+                                      onTap: () => setState(
+                                          () => _penilaianId = item.key),
+                                      borderRadius: BorderRadius.circular(12),
+                                      child: AnimatedContainer(
+                                        duration:
+                                            const Duration(milliseconds: 180),
+                                        padding: const EdgeInsets.symmetric(
+                                            vertical: 10),
+                                        decoration: BoxDecoration(
+                                          color: isSel ? baseColor : softBg,
+                                          borderRadius:
+                                              BorderRadius.circular(12),
+                                          border: Border.all(
+                                            color:
+                                                isSel ? baseColor : softBorder,
+                                            width: isSel ? 1.5 : 1,
+                                          ),
+                                          boxShadow: isSel
+                                              ? [
+                                                  BoxShadow(
+                                                    color: baseColor.withValues(
+                                                        alpha: 0.3),
+                                                    blurRadius: 6,
+                                                    offset: const Offset(0, 2),
+                                                  )
+                                                ]
+                                              : null,
+                                        ),
+                                        child: Column(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Icon(
+                                              isSel
+                                                  ? Icons.check_circle_rounded
+                                                  : riskIcon,
+                                              size: 16,
+                                              color: isSel
+                                                  ? Colors.white
+                                                  : baseColor,
+                                            ),
+                                            const SizedBox(height: 4),
+                                            Text(
+                                              item.value.toString(),
+                                              textAlign: TextAlign.center,
+                                              style: TextStyle(
+                                                fontSize: 11,
+                                                fontWeight: isSel
+                                                    ? FontWeight.bold
+                                                    : FontWeight.w600,
+                                                color: isSel
+                                                    ? Colors.white
+                                                    : baseColor,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
                                       ),
                                     ),
                                   ),
@@ -2093,33 +2296,82 @@ class _ObservationFormPageState extends State<ObservationFormPage> {
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 9, vertical: 3.5),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFFECFDF5),
-                                    borderRadius: BorderRadius.circular(10),
-                                    border:
-                                        Border.all(color: const Color(0xFFA7F3D0)),
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      const Icon(
-                                          Icons.check_circle_outline_rounded,
-                                          size: 13,
-                                          color: Color(0xFF059669)),
-                                      const SizedBox(width: 4),
-                                      Text(
-                                        '${_itemList.length} Temuan Dicatat',
-                                        style: const TextStyle(
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.bold,
-                                          color: Color(0xFF059669),
+                                Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 9, vertical: 3.5),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFECFDF5),
+                                        borderRadius: BorderRadius.circular(10),
+                                        border:
+                                            Border.all(color: const Color(0xFFA7F3D0)),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          const Icon(
+                                              Icons.check_circle_outline_rounded,
+                                              size: 13,
+                                              color: Color(0xFF059669)),
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            '${_itemList.length} Temuan',
+                                            style: const TextStyle(
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.bold,
+                                              color: Color(0xFF059669),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    if (_itemList.isNotEmpty) ...[
+                                      const SizedBox(width: 6),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 7, vertical: 3.5),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFFF0FDF4),
+                                          borderRadius:
+                                              BorderRadius.circular(8),
+                                          border: Border.all(
+                                              color: const Color(0xFFBBF7D0)),
+                                        ),
+                                        child: Text(
+                                          '${_itemList.where((i) => _getResultLabel(i.type).contains("AMAN")).length} Aman',
+                                          style: const TextStyle(
+                                            fontSize: 10.5,
+                                            fontWeight: FontWeight.bold,
+                                            color: Color(0xFF16A34A),
+                                          ),
                                         ),
                                       ),
+                                      if (_itemList.any((i) => !_getResultLabel(i.type).contains("AMAN"))) ...[
+                                        const SizedBox(width: 4),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 7, vertical: 3.5),
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFFFEF2F2),
+                                            borderRadius:
+                                                BorderRadius.circular(8),
+                                            border: Border.all(
+                                                color: const Color(0xFFFECACA)),
+                                          ),
+                                          child: Text(
+                                            '${_itemList.where((i) => !_getResultLabel(i.type).contains("AMAN")).length} Berisiko',
+                                            style: const TextStyle(
+                                              fontSize: 10.5,
+                                              fontWeight: FontWeight.bold,
+                                              color: Color(0xFFDC2626),
+                                            ),
+                                          ),
+                                        ),
+                                      ],
                                     ],
-                                  ),
+                                  ],
                                 ),
                                 if (_itemList.isNotEmpty)
                                   TextButton.icon(
@@ -2485,90 +2737,63 @@ class _ObservationFormPageState extends State<ObservationFormPage> {
               color: Colors.white,
               border: Border(top: BorderSide(color: Color(0xFFE2E8F0))),
             ),
-            child: _itemList.isEmpty
-                ? FilledButton.icon(
-                    icon:
-                        const Icon(Icons.add_circle_outline_rounded, size: 20),
-                    label: const Text(
-                      '+ Tambah Temuan Observasi',
-                      style: TextStyle(
-                          fontSize: 14.5, fontWeight: FontWeight.bold),
-                    ),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: primaryBlue,
-                      minimumSize: const Size.fromHeight(50),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14)),
-                    ),
-                    onPressed: () {
-                      _prepareNewDetail();
-                      _showFindingBottomSheet();
-                    },
-                  )
-                : Row(
-                    children: [
-                      Expanded(
-                        flex: 1,
-                        child: SizedBox(
-                          height: 50,
-                          child: OutlinedButton.icon(
-                            icon: const Icon(Icons.add_rounded, size: 20),
-                            label: const Text(
-                              'Tambah',
-                              style: TextStyle(
-                                  fontWeight: FontWeight.bold, fontSize: 13.5),
+            child: SizedBox(
+              height: 50,
+              child: FilledButton.icon(
+                icon: _isSaving
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2, color: Colors.white),
+                      )
+                    : const Icon(Icons.check_circle_rounded, size: 20),
+                label: Text(
+                  _isSaving
+                      ? 'Menyimpan...'
+                      : (widget.editData != null
+                          ? 'Simpan Perubahan'
+                          : 'Simpan Observasi'),
+                  style: const TextStyle(
+                      fontWeight: FontWeight.bold, fontSize: 14.5),
+                ),
+                style: FilledButton.styleFrom(
+                  backgroundColor:
+                      canSave ? primaryBlue : const Color(0xFF94A3B8),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14)),
+                  elevation: canSave ? 2 : 0,
+                ),
+                onPressed: _isSaving
+                    ? null
+                    : () {
+                        if (!isHeaderValid) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                  'Mohon lengkapi data kegiatan, departemen, dan risiko terlebih dahulu.'),
+                              backgroundColor: Color(0xFFDC2626),
+                              behavior: SnackBarBehavior.floating,
                             ),
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: primaryBlue,
-                              side: const BorderSide(
-                                  color: primaryBlue, width: 1.5),
-                              shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(14)),
+                          );
+                          return;
+                        }
+                        if (_itemList.isEmpty) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                  'Mohon tambahkan minimal 1 temuan observasi.'),
+                              backgroundColor: Color(0xFFD97706),
+                              behavior: SnackBarBehavior.floating,
                             ),
-                            onPressed: () {
-                              _prepareNewDetail();
-                              _showFindingBottomSheet();
-                            },
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        flex: 2,
-                        child: SizedBox(
-                          height: 50,
-                          child: FilledButton.icon(
-                            icon: _isSaving
-                                ? const SizedBox(
-                                    width: 18,
-                                    height: 18,
-                                    child: CircularProgressIndicator(
-                                        strokeWidth: 2, color: Colors.white),
-                                  )
-                                : const Icon(Icons.check_circle_rounded,
-                                    size: 20),
-                            label: Text(
-                              _isSaving
-                                  ? 'Menyimpan...'
-                                  : (widget.editData != null
-                                      ? 'Simpan Perubahan'
-                                      : 'Simpan Observasi'),
-                              style: const TextStyle(
-                                  fontWeight: FontWeight.bold, fontSize: 14),
-                            ),
-                            style: FilledButton.styleFrom(
-                              backgroundColor: canSave
-                                  ? primaryBlue
-                                  : const Color(0xFFCBD5E1),
-                              shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(14)),
-                            ),
-                            onPressed: canSave ? _saveObservation : null,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
+                          );
+                          return;
+                        }
+                        _saveObservation();
+                      },
+              ),
+            ),
           ),
         ),
       ),
