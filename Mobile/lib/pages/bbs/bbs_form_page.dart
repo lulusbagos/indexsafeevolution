@@ -146,6 +146,53 @@ class _BbsFormPageState extends State<BbsFormPage> {
     super.dispose();
   }
 
+  // ==================== STANDARD BBS CATALOG & DEFAULTS ====================
+
+  static const List<Map<String, dynamic>> _defaultCategories = [
+    {'id': 1, 'name': 'Interaksi Alat & Manusia'},
+    {'id': 2, 'name': 'Posisi & Postur Kerja (Ergonomi)'},
+    {'id': 3, 'name': 'Kepatuhan Prosedur & APD'},
+    {'id': 4, 'name': 'Housekeeping & Lingkungan Kerja'},
+    {'id': 5, 'name': 'Pengoperasian Peralatan & Perkakas'},
+  ];
+
+  static final Map<String, List<Map<String, dynamic>>> _defaultBehaviorsByCategory = {
+    'Interaksi Alat & Manusia': [
+      {'id': 1, 'behaviorText': 'Operator menjaga jarak aman dengan pekerja sekitar saat bermanuver'},
+      {'id': 2, 'behaviorText': 'Operator membunyikan klakson sebelum bergerak/bermanuver'},
+      {'id': 3, 'behaviorText': 'Pekerja tidak berada di area titik buta (blindspot) alat berat'},
+      {'id': 4, 'behaviorText': 'Pekerja menjaga kontak mata positif dengan operator sebelum mendekat'},
+      {'id': 5, 'behaviorText': 'Pejalan kaki menggunakan jalur pejalan kaki resmi (walkway / safety zone)'},
+      {'id': 6, 'behaviorText': 'Alat berat diparkir di tempat aman dengan rem parkir aktif & attachment turun'},
+    ],
+    'Posisi & Postur Kerja (Ergonomi)': [
+      {'id': 7, 'behaviorText': 'Mengangkat beban dengan punggung tegak dan bertumpu pada lutut'},
+      {'id': 8, 'behaviorText': 'Menghindari memutar pinggang secara tiba-tiba saat membawa beban'},
+      {'id': 9, 'behaviorText': 'Menjaga posisi tubuh seimbang dan stabil selama bekerja'},
+      {'id': 10, 'behaviorText': 'Menggunakan alat bantu angkat untuk beban di atas 20 kg'},
+      {'id': 11, 'behaviorText': 'Mengatur ketinggian area kerja agar tidak membungkuk berlebihan'},
+    ],
+    'Kepatuhan Prosedur & APD': [
+      {'id': 12, 'behaviorText': 'Memakai APD lengkap sesuai standar (Helm, Rompi Reflektor, Safety Shoes, Kacamata)'},
+      {'id': 13, 'behaviorText': 'Menerapkan 3 titik tumpu (three-point contact) saat naik/turun unit/tangga'},
+      {'id': 14, 'behaviorText': 'Mematuhi rambu-rambu K3 dan batas kecepatan operasional'},
+      {'id': 15, 'behaviorText': 'Memastikan izin kerja aman (JSA / permit) telah disetujui sebelum bekerja'},
+      {'id': 16, 'behaviorText': 'Memasang barikade / safety cone di sekitar area berbahaya'},
+    ],
+    'Housekeeping & Lingkungan Kerja': [
+      {'id': 17, 'behaviorText': 'Area kerja bersih, rapi, dan bebas dari ceceran oli/pelumas/air'},
+      {'id': 18, 'behaviorText': 'Peralatan kerja disimpan teratur di tool rack setelah digunakan'},
+      {'id': 19, 'behaviorText': 'Penanganan dan pemilahan sampah sesuai tempatnya (Organik, Anorganik, B3)'},
+      {'id': 20, 'behaviorText': 'Akses jalan darurat, eyewash, dan tabung APAR bebas dari halangan'},
+    ],
+    'Pengoperasian Peralatan & Perkakas': [
+      {'id': 21, 'behaviorText': 'Melakukan pemeriksaan pra-operasional (P2H / Pre-use check) sebelum digunakan'},
+      {'id': 22, 'behaviorText': 'Memastikan seluruh pelindung mesin (guarding) terpasang dengan baik'},
+      {'id': 23, 'behaviorText': 'Menerapkan Lockout-Tagout (LOTO) sebelum inspeksi/perbaikan mesin'},
+      {'id': 24, 'behaviorText': 'Menggunakan perkakas yang layak (tidak retak, rusak, atau modifikasi liar)'},
+    ],
+  };
+
   // ==================== FAST LOCAL CACHE LOADER ====================
 
   Future<void> _loadLocalCachedData() async {
@@ -183,20 +230,29 @@ class _BbsFormPageState extends State<BbsFormPage> {
       final cacheKey =
           'bbs_cached_categories_${_observationType == 'Special Case' ? 'special' : 'rutin'}';
       final cachedJson = sp.getString(cacheKey);
-      if (cachedJson != null && cachedJson.isNotEmpty && mounted) {
-        final decoded = jsonDecode(cachedJson);
-        if (decoded is List && decoded.isNotEmpty) {
-          final cats = decoded.cast<Map<String, dynamic>>();
-          final firstCat = cats.first;
-          setState(() {
-            _mbsCategories = cats;
-            _categoryId = firstCat['id'] as int?;
-            _category = firstCat['name']?.toString();
-            _mbsBehaviorItems = (firstCat['behaviors'] as List?)
-                    ?.cast<Map<String, dynamic>>() ??
-                [];
-          });
-        }
+      List<Map<String, dynamic>> cats = [];
+      if (cachedJson != null && cachedJson.isNotEmpty) {
+        try {
+          final decoded = jsonDecode(cachedJson);
+          if (decoded is List && decoded.isNotEmpty) {
+            cats = decoded.cast<Map<String, dynamic>>();
+          }
+        } catch (_) {}
+      }
+      if (cats.isEmpty) {
+        cats = _defaultCategories;
+      }
+
+      if (mounted) {
+        final firstCat = cats.first;
+        final cId = firstCat['id'] as int? ?? 1;
+        final cName = firstCat['name']?.toString() ?? 'Interaksi Alat & Manusia';
+        setState(() {
+          _mbsCategories = cats;
+          _categoryId = cId;
+          _category = cName;
+        });
+        _loadBehaviorsForCategory(cId, cName);
       }
     } catch (e) {
       debugPrint('[BbsForm] Fast cache load: $e');
@@ -1187,6 +1243,37 @@ class _BbsFormPageState extends State<BbsFormPage> {
 
   // ==================== BBS CATEGORIES & TOPICS ====================
 
+  Future<void> _loadBehaviorsForCategory(int catId, String catName) async {
+    // 1. Initial fallback immediately from default catalog so UI never shows empty
+    List<Map<String, dynamic>> fallback = [];
+    for (final entry in _defaultBehaviorsByCategory.entries) {
+      if (catName.toLowerCase().contains(entry.key.toLowerCase()) ||
+          entry.key.toLowerCase().contains(catName.toLowerCase())) {
+        fallback = entry.value;
+        break;
+      }
+    }
+    if (fallback.isEmpty) {
+      fallback = _defaultBehaviorsByCategory.values.first;
+    }
+
+    if (mounted) {
+      setState(() {
+        _mbsBehaviorItems = fallback;
+      });
+    }
+
+    // 2. Fetch live from server API if online
+    try {
+      final serverBehaviors = await _api.getBbsBehaviors(catId);
+      if (serverBehaviors.isNotEmpty && mounted) {
+        setState(() {
+          _mbsBehaviorItems = serverBehaviors;
+        });
+      }
+    } catch (_) {}
+  }
+
   Future<void> _loadMbsCategories() async {
     setState(() => _masterLoading = true);
     final type = _observationType == 'Special Case' ? 'SpecialCase' : 'Rutin';
@@ -1195,40 +1282,44 @@ class _BbsFormPageState extends State<BbsFormPage> {
       final categories = await _api.getBbsCategories(type);
       if (!mounted) return;
 
-      if (categories.isNotEmpty) {
-        // Cache to SharedPreferences
-        final sp = await SharedPreferences.getInstance();
-        final cacheKey =
-            'bbs_cached_categories_${_observationType == 'Special Case' ? 'special' : 'rutin'}';
-        await sp.setString(cacheKey, jsonEncode(categories));
+      final activeCats =
+          categories.isNotEmpty ? categories : _defaultCategories;
+      final sp = await SharedPreferences.getInstance();
+      final cacheKey =
+          'bbs_cached_categories_${_observationType == 'Special Case' ? 'special' : 'rutin'}';
+      await sp.setString(cacheKey, jsonEncode(activeCats));
 
-        Map<String, dynamic>? defaultCat;
-        if (_categoryId != null) {
-          defaultCat =
-              categories.where((c) => c['id'] == _categoryId).firstOrNull;
-        }
-        defaultCat ??= categories.first;
-
-        _categoryId = defaultCat['id'] as int?;
-        _category = defaultCat['name']?.toString();
-        final behaviorItems =
-            (defaultCat['behaviors'] as List?)?.cast<Map<String, dynamic>>() ??
-                [];
-        List<Map<String, dynamic>> topics = [];
-        if (_categoryId != null && _observationType == 'Special Case') {
-          topics = await _api.getBbsTopics(_categoryId!);
-        }
-        setState(() {
-          _mbsTopics = topics;
-          _mbsCategories = categories;
-          _mbsBehaviorItems = behaviorItems;
-          _masterLoading = false;
-        });
-        return;
+      Map<String, dynamic>? defaultCat;
+      if (_categoryId != null) {
+        defaultCat =
+            activeCats.where((c) => c['id'] == _categoryId).firstOrNull;
       }
-    } catch (_) {}
+      defaultCat ??= activeCats.first;
 
-    if (mounted) setState(() => _masterLoading = false);
+      _categoryId = defaultCat['id'] as int?;
+      _category = defaultCat['name']?.toString();
+      _mbsCategories = activeCats;
+
+      List<Map<String, dynamic>> topics = [];
+      if (_categoryId != null && _observationType == 'Special Case') {
+        topics = await _api.getBbsTopics(_categoryId!);
+      }
+      setState(() {
+        _mbsTopics = topics;
+      });
+
+      if (_categoryId != null && _category != null) {
+        await _loadBehaviorsForCategory(_categoryId!, _category!);
+      }
+    } catch (_) {
+      if (_mbsBehaviorItems.isEmpty &&
+          _categoryId != null &&
+          _category != null) {
+        await _loadBehaviorsForCategory(_categoryId!, _category!);
+      }
+    } finally {
+      if (mounted) setState(() => _masterLoading = false);
+    }
   }
 
   Future<void> _onCategoryChanged(Map<String, dynamic> cat) async {
@@ -1241,26 +1332,15 @@ class _BbsFormPageState extends State<BbsFormPage> {
       _topicName = null;
       _behaviors.clear();
       _behaviorStatuses.clear();
-      _mbsBehaviorItems = [];
       _mbsTopics = [];
-      _masterLoading = true;
     });
-    if (catId == null) return;
-    try {
-      final behaviors = await _api.getBbsBehaviors(catId);
-      List<Map<String, dynamic>> topics = [];
-      if (_observationType == 'Special Case') {
-        topics = await _api.getBbsTopics(catId);
-      }
-      if (mounted) {
-        setState(() {
-          _mbsBehaviorItems = behaviors;
-          _mbsTopics = topics;
-          _masterLoading = false;
-        });
-      }
-    } catch (_) {
-      if (mounted) setState(() => _masterLoading = false);
+    if (catId == null || catName == null) return;
+    await _loadBehaviorsForCategory(catId, catName);
+    if (_observationType == 'Special Case') {
+      try {
+        final topics = await _api.getBbsTopics(catId);
+        if (mounted) setState(() => _mbsTopics = topics);
+      } catch (_) {}
     }
   }
 
@@ -1270,13 +1350,12 @@ class _BbsFormPageState extends State<BbsFormPage> {
       _topicName = name;
       _behaviors.clear();
       _behaviorStatuses.clear();
-      _mbsBehaviorItems = [];
       _masterLoading = id != null;
     });
     if (id == null || _categoryId == null) return;
     try {
       final behaviors = await _api.getBbsBehaviors(_categoryId!, topicId: id);
-      if (mounted) {
+      if (behaviors.isNotEmpty && mounted) {
         setState(() {
           _mbsBehaviorItems = behaviors;
           _masterLoading = false;
@@ -1287,7 +1366,7 @@ class _BbsFormPageState extends State<BbsFormPage> {
     }
   }
 
-  // ==================== WORKER SEARCH (DEBOUNCED & FAST) ====================
+  // ==================== WORKER / PJA SEARCH (ONLINE & OFFLINE) ====================
 
   void _onWorkerSearchChanged(String value) {
     _workerDebounce?.cancel();
@@ -1297,17 +1376,147 @@ class _BbsFormPageState extends State<BbsFormPage> {
   }
 
   Future<void> _searchWorker(String value) async {
-    final query = value.trim();
-    if (query.length < 2) {
-      if (mounted) setState(() => _workerResults = []);
+    final cleanQ = value.trim();
+    if (cleanQ.isEmpty) {
+      if (mounted) {
+        setState(() {
+          _workerResults = [];
+          _workerSearching = false;
+        });
+      }
       return;
     }
+
     setState(() => _workerSearching = true);
-    final results = await _api.searchBbsWorkers(query, companyId: _companyId);
-    if (!mounted || _workerSearchCtrl.text.trim() != query) return;
-    setState(() {
-      _workerResults = results;
-      _workerSearching = false;
+
+    try {
+      final safeQ = cleanQ.replaceAll("'", "''");
+      final List<Map<String, dynamic>> results = [];
+      final Set<String> seenNiks = {};
+
+      // 1. Current user profile match / shortcut
+      final profile = _profile;
+      if (profile != null) {
+        final myNik = (profile.noNik ?? '').trim();
+        final myNama = (profile.namaLengkap ?? '').trim();
+        final myJab = (profile.posisi ?? profile.jabatan ?? 'Foreman/Officer').toString().trim();
+        final myDept = (profile.depart ?? 'SYSTEM INTEGRATIONS').toString().trim();
+        final myComp = (profile.company ?? 'PT INDEXIM COALINDO').toString().trim();
+
+        final matchMyProfile = myNik.toLowerCase().contains(cleanQ.toLowerCase()) ||
+            myNama.toLowerCase().contains(cleanQ.toLowerCase());
+
+        if (matchMyProfile && myNik.isNotEmpty && seenNiks.add(myNik.toLowerCase())) {
+          results.add({
+            'nik': myNik,
+            'nama': myNama,
+            'jabatan': myJab,
+            'departemen': myDept,
+            'perusahaan': myComp,
+            'perusahaanId': profile.companyId ?? 1,
+            'foto': profile.foto,
+          });
+        }
+      }
+
+      // 2. Query local SQLite employees table (synced offline)
+      try {
+        final db = await _db.database;
+        final localEmps = await db.rawQuery(
+          "SELECT * FROM employees WHERE (nama_lengkap LIKE '%$safeQ%' OR no_nik LIKE '%$safeQ%') AND deleted_at IS NULL LIMIT 25",
+        );
+        for (var r in localEmps) {
+          final nik = (r['no_nik'] ?? r['nik'] ?? '').toString().trim();
+          final nama = (r['nama_lengkap'] ?? r['nama'] ?? '').toString().trim();
+          final foto = (r['emp_foto'] ?? r['foto'])?.toString().trim();
+          if (nik.isNotEmpty && nama.isNotEmpty && seenNiks.add(nik.toLowerCase())) {
+            results.add({
+              'nik': nik,
+              'nama': nama,
+              'jabatan': (r['emp_jab'] ?? r['jabatan'] ?? r['posisi'])?.toString().trim() ?? 'Karyawan',
+              'departemen': (r['emp_dept'] ?? r['departemen'] ?? r['depart'])?.toString().trim() ?? 'GENERAL',
+              'perusahaan': (r['emp_comp'] ?? r['perusahaan'] ?? 'PT INDEXIM COALINDO').toString().trim(),
+              'perusahaanId': (r['company_id'] as num?)?.toInt() ?? 1,
+              'foto': foto,
+            });
+          }
+        }
+      } catch (e) {
+        debugPrint('[BbsForm] Local employees query error: $e');
+      }
+
+      // 3. Fallback to tbl_karyawan if available in SQLite
+      try {
+        final db = await _db.database;
+        final localKaryawan = await db.rawQuery(
+          "SELECT * FROM tbl_karyawan WHERE (nama LIKE '%$safeQ%' OR nik LIKE '%$safeQ%') LIMIT 25",
+        );
+        for (var r in localKaryawan) {
+          final nik = (r['nik'] ?? '').toString().trim();
+          final nama = (r['nama'] ?? '').toString().trim();
+          final foto = (r['path_foto'] ?? r['foto'])?.toString().trim();
+          if (nik.isNotEmpty && nama.isNotEmpty && seenNiks.add(nik.toLowerCase())) {
+            results.add({
+              'nik': nik,
+              'nama': nama,
+              'jabatan': (r['jabatan'] ?? 'Staff').toString().trim(),
+              'departemen': (r['departemen'] ?? 'OPERASIONAL').toString().trim(),
+              'perusahaan': (r['perusahaan'] ?? 'PT INDEXIM COALINDO').toString().trim(),
+              'perusahaanId': (r['perusahaan_id'] as num?)?.toInt() ?? 1,
+              'foto': foto,
+            });
+          }
+        }
+      } catch (_) {}
+
+      // 4. Query Server Backend API /bbs/workers if connected
+      if (results.length < 10) {
+        try {
+          final serverWorkers = await _api.searchBbsWorkers(cleanQ, companyId: _companyId);
+          for (final w in serverWorkers) {
+            final nik = w['nik']?.toString().trim() ?? '';
+            final nama = w['nama']?.toString().trim() ?? '';
+            if (nik.isNotEmpty && nama.isNotEmpty && seenNiks.add(nik.toLowerCase())) {
+              results.add({
+                'nik': nik,
+                'nama': nama,
+                'jabatan': w['jabatan']?.toString().trim() ?? 'Karyawan',
+                'departemen': w['departemen']?.toString().trim() ?? 'GENERAL',
+                'perusahaan': w['perusahaan']?.toString().trim() ?? (_companyName ?? 'PT INDEXIM COALINDO'),
+                'perusahaanId': w['perusahaanId'] ?? _companyId ?? 1,
+                'foto': w['foto']?.toString().trim(),
+              });
+            }
+          }
+        } catch (_) {}
+      }
+
+      if (mounted && _workerSearchCtrl.text.trim() == cleanQ) {
+        setState(() {
+          _workerResults = results;
+          _workerSearching = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _workerSearching = false);
+    }
+  }
+
+  void _selectSelfAsWorker() {
+    final profile = _profile;
+    if (profile == null) return;
+    final myNik = (profile.noNik ?? '').trim();
+    final myNama = (profile.namaLengkap ?? '').trim();
+    if (myNik.isEmpty && myNama.isEmpty) return;
+
+    _selectWorker({
+      'nik': myNik,
+      'nama': myNama,
+      'jabatan': (profile.posisi ?? profile.jabatan ?? 'Foreman/Officer').toString().trim(),
+      'departemen': (profile.depart ?? 'SYSTEM INTEGRATIONS').toString().trim(),
+      'perusahaan': (profile.company ?? 'PT INDEXIM COALINDO').toString().trim(),
+      'perusahaanId': profile.companyId ?? 1,
+      'foto': profile.foto,
     });
   }
 
@@ -1816,12 +2025,12 @@ class _BbsFormPageState extends State<BbsFormPage> {
             ),
             const SizedBox(height: 16),
 
-            // SECTION 2: PEKERJA YANG DIOBSERVASI
+            // SECTION 2: PEKERJA YANG DIOBSERVASI / PJA
             SapSectionCard(
               stepNumber: '2',
-              title: 'PEKERJA YANG DIOBSERVASI',
+              title: 'PEKERJA YANG DIOBSERVASI (PJA)',
               subtitle:
-                  'Perusahaan, unit departemen, dan data pekerja lapangan',
+                  'Perusahaan, departemen, dan pengawas / pekerja lapangan',
               icon: Icons.person_search_rounded,
               accentColor: _kPrimary,
               children: [
@@ -1911,10 +2120,10 @@ class _BbsFormPageState extends State<BbsFormPage> {
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFF0F9FF),
+                      color: const Color(0xFFF0FDF4),
                       borderRadius: BorderRadius.circular(14),
                       border: Border.all(
-                          color: const Color(0xFFBAE6FD), width: 1.2),
+                          color: const Color(0xFF86EFAC), width: 1.2),
                     ),
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.center,
@@ -1924,7 +2133,7 @@ class _BbsFormPageState extends State<BbsFormPage> {
                           name: _observedPerson.text,
                           nik: _observedNik.text,
                           radius: 24,
-                          fallbackBg: _kPrimary,
+                          fallbackBg: _kSuccess,
                           fallbackFg: Colors.white,
                         ),
                         const SizedBox(width: 12),
@@ -1974,6 +2183,69 @@ class _BbsFormPageState extends State<BbsFormPage> {
                   ),
                   const SizedBox(height: 12),
                 ] else ...[
+                  // Badges: Wajib Terdaftar & Pilih Saya Sendiri
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF1F5F9),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.verified_user_rounded,
+                                size: 14, color: _kPrimary),
+                            SizedBox(width: 6),
+                            Text(
+                              'Wajib Karyawan Terdaftar',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF334155),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Spacer(),
+                      if (_profile != null)
+                        InkWell(
+                          onTap: _selectSelfAsWorker,
+                          borderRadius: BorderRadius.circular(8),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 10, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF0F9FF),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                  color: const Color(0xFFBAE6FD)),
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.person_add_alt_1_rounded,
+                                    size: 14, color: _kPrimary),
+                                SizedBox(width: 5),
+                                Text(
+                                  'Pilih Saya Sendiri',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                    color: _kPrimary,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+
                   // Search Worker Input (Fast & Debounced)
                   const Text('CARI PEKERJA (SEMUA KARYAWAN AKTIF) *',
                       style: TextStyle(
@@ -1987,9 +2259,7 @@ class _BbsFormPageState extends State<BbsFormPage> {
                     onChanged: _onWorkerSearchChanged,
                     textCapitalization: TextCapitalization.words,
                     decoration: InputDecoration(
-                      hintText: _companyId == null
-                          ? 'Pilih perusahaan atau ketik NIK/Nama...'
-                          : 'Ketik minimal 2 huruf nama atau NIK...',
+                      hintText: 'Cari nama atau NIK pengawas / pekerja terdaftar...',
                       hintStyle: const TextStyle(
                           color: Color(0xFF94A3B8), fontSize: 13),
                       prefixIcon: const Icon(Icons.search_rounded,
@@ -2032,7 +2302,8 @@ class _BbsFormPageState extends State<BbsFormPage> {
                   ),
 
                   // Worker Search Results Card
-                  if (_workerResults.isNotEmpty) ...[
+                  if (_workerResults.isNotEmpty &&
+                      _workerSearchCtrl.text.trim().isNotEmpty) ...[
                     const SizedBox(height: 8),
                     Container(
                       constraints: const BoxConstraints(maxHeight: 260),
@@ -2100,6 +2371,54 @@ class _BbsFormPageState extends State<BbsFormPage> {
                             );
                           },
                         ),
+                      ),
+                    ),
+                  ],
+
+                  // Empty Search State
+                  if (_workerResults.isEmpty &&
+                      _workerSearchCtrl.text.trim().isNotEmpty &&
+                      !_workerSearching) ...[
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFEF2F2),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFFFECACA)),
+                      ),
+                      child: Column(
+                        children: [
+                          const Text(
+                            'Karyawan / PJA tidak ditemukan. Wajib memilih karyawan yang terdaftar di sistem.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Color(0xFFDC2626),
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          if (_profile != null) ...[
+                            const SizedBox(height: 8),
+                            OutlinedButton.icon(
+                              onPressed: _selectSelfAsWorker,
+                              icon: const Icon(Icons.person_pin_rounded,
+                                  size: 16, color: _kPrimary),
+                              label: Text(
+                                'Gunakan Saya: ${_profile?.namaLengkap ?? ''} (${_profile?.noNik ?? ''})',
+                                style: const TextStyle(
+                                    fontSize: 11,
+                                    color: _kPrimary,
+                                    fontWeight: FontWeight.bold),
+                              ),
+                              style: OutlinedButton.styleFrom(
+                                side: const BorderSide(
+                                    color: Color(0xFFBAE6FD)),
+                                backgroundColor: Colors.white,
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
                     ),
                   ],
@@ -2238,14 +2557,19 @@ class _BbsFormPageState extends State<BbsFormPage> {
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFF1F5F9),
+                      color: const Color(0xFFF8FAFC),
                       borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
                     ),
-                    child: const Center(
-                      child: Text(
-                          'Pilih kategori di atas untuk memuat butir perilaku.',
-                          style: TextStyle(
-                              color: Color(0xFF64748B), fontSize: 12)),
+                    child: Center(
+                      child: TextButton.icon(
+                        onPressed: () => _loadBehaviorsForCategory(
+                            _categoryId ?? 1,
+                            _category ?? 'Interaksi Alat & Manusia'),
+                        icon: const Icon(Icons.refresh_rounded, size: 16),
+                        label: const Text('Muat Butir Perilaku Standar',
+                            style: TextStyle(fontWeight: FontWeight.bold)),
+                      ),
                     ),
                   ),
 
@@ -2350,16 +2674,28 @@ class _BbsFormPageState extends State<BbsFormPage> {
                 }),
 
                 // Other behavior
+                const SizedBox(height: 10),
+                const Text('PERILAKU LAINNYA (OPSIONAL)',
+                    style: TextStyle(
+                        color: Color(0xFF0F172A),
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 0.5)),
                 const SizedBox(height: 6),
                 TextField(
                   controller: _otherBehavior,
                   minLines: 2,
                   maxLines: 3,
                   decoration: InputDecoration(
-                    labelText: 'Perilaku Lainnya (Opsional)',
                     hintText:
-                        'Tuliskan jika ada perilaku spesifik lain yang diamati...',
-                    alignLabelWithHint: true,
+                        'Tuliskan jika ada perilaku spesifik lain yang diamati di lapangan...',
+                    hintStyle: const TextStyle(
+                        color: Color(0xFF94A3B8), fontSize: 12.5),
+                    prefixIcon: const Padding(
+                      padding: EdgeInsets.only(bottom: 24),
+                      child: Icon(Icons.edit_note_rounded,
+                          color: _kPrimary, size: 20),
+                    ),
                     filled: true,
                     fillColor: const Color(0xFFF8FAFC),
                     border: OutlineInputBorder(
@@ -2368,6 +2704,9 @@ class _BbsFormPageState extends State<BbsFormPage> {
                     enabledBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
                         borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                    focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: _kPrimary, width: 1.5)),
                   ),
                 ),
               ],
@@ -2398,7 +2737,7 @@ class _BbsFormPageState extends State<BbsFormPage> {
                         label: 'Perilaku Aman',
                         icon: Icons.thumb_up_alt_rounded,
                         isSelected: _classification == 'Perilaku Aman',
-                        activeColor: _kSuccess,
+                        activeColor: const Color(0xFF10B981),
                         onTap: () =>
                             setState(() => _classification = 'Perilaku Aman'),
                       ),
@@ -2409,7 +2748,7 @@ class _BbsFormPageState extends State<BbsFormPage> {
                         label: 'Perilaku Berisiko',
                         icon: Icons.thumb_down_alt_rounded,
                         isSelected: _classification == 'Perilaku Berisiko',
-                        activeColor: _kDanger,
+                        activeColor: const Color(0xFFEF4444),
                         onTap: () => setState(
                             () => _classification = 'Perilaku Berisiko'),
                       ),
@@ -2432,25 +2771,25 @@ class _BbsFormPageState extends State<BbsFormPage> {
                   children: [
                     _RiskPill(
                       label: 'Rendah',
-                      color: _kSuccess,
+                      color: const Color(0xFF16A34A),
                       isSelected: _riskLevel == 'Rendah',
                       onTap: () => setState(() => _riskLevel = 'Rendah'),
                     ),
                     _RiskPill(
                       label: 'Sedang',
-                      color: _kWarning,
+                      color: const Color(0xFFD97706),
                       isSelected: _riskLevel == 'Sedang',
                       onTap: () => setState(() => _riskLevel = 'Sedang'),
                     ),
                     _RiskPill(
                       label: 'Tinggi',
-                      color: const Color(0xFFF97316),
+                      color: const Color(0xFFEA580C),
                       isSelected: _riskLevel == 'Tinggi',
                       onTap: () => setState(() => _riskLevel = 'Tinggi'),
                     ),
                     _RiskPill(
                       label: 'Sangat Tinggi',
-                      color: _kDanger,
+                      color: const Color(0xFFDC2626),
                       isSelected: _riskLevel == 'Sangat Tinggi',
                       onTap: () => setState(() => _riskLevel = 'Sangat Tinggi'),
                     ),
@@ -2484,8 +2823,9 @@ class _BbsFormPageState extends State<BbsFormPage> {
                                 'Berdebu / Kabut',
                                 'Bergelombang / Rusak',
                               ]);
-                              if (picked != null)
+                              if (picked != null) {
                                 setState(() => _roadCondition = picked);
+                              }
                             },
                           ),
                         ],
@@ -2514,8 +2854,9 @@ class _BbsFormPageState extends State<BbsFormPage> {
                                 'Sedang',
                                 'Padat / Ramai',
                               ]);
-                              if (picked != null)
+                              if (picked != null) {
                                 setState(() => _trafficCondition = picked);
+                              }
                             },
                           ),
                         ],
@@ -3226,7 +3567,7 @@ class _PickerTile extends StatelessWidget {
       onTap: enabled ? onTap : null,
       borderRadius: BorderRadius.circular(12),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
         decoration: BoxDecoration(
           color: enabled ? const Color(0xFFF8FAFC) : const Color(0xFFF1F5F9),
           borderRadius: BorderRadius.circular(12),
@@ -3278,32 +3619,42 @@ class _ChoicePill extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+      borderRadius: BorderRadius.circular(14),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
         decoration: BoxDecoration(
           color: isSelected
-              ? activeColor.withValues(alpha: 0.1)
+              ? activeColor.withValues(alpha: 0.12)
               : const Color(0xFFF8FAFC),
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(14),
           border: Border.all(
             color: isSelected ? activeColor : const Color(0xFFE2E8F0),
-            width: isSelected ? 1.6 : 1,
+            width: isSelected ? 1.8 : 1,
           ),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: activeColor.withValues(alpha: 0.15),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ]
+              : null,
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(icon,
-                size: 16,
+                size: 18,
                 color: isSelected ? activeColor : const Color(0xFF64748B)),
-            const SizedBox(width: 6),
+            const SizedBox(width: 8),
             Flexible(
               child: Text(
                 label,
                 style: TextStyle(
-                  fontSize: 12.5,
-                  fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                  fontSize: 13,
+                  fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
                   color: isSelected ? activeColor : const Color(0xFF334155),
                 ),
                 overflow: TextOverflow.ellipsis,
@@ -3334,18 +3685,28 @@ class _RiskPill extends StatelessWidget {
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(10),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
         decoration: BoxDecoration(
           color: isSelected ? color : color.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(10),
           border: Border.all(color: color, width: isSelected ? 1.5 : 1),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: color.withValues(alpha: 0.25),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2),
+                  ),
+                ]
+              : null,
         ),
         child: Text(
           label,
           style: TextStyle(
             fontSize: 12,
-            fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+            fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
             color: isSelected ? Colors.white : color,
           ),
         ),
