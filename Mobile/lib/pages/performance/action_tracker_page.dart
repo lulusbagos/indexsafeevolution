@@ -925,8 +925,6 @@ class _ActionTrackerPageState extends State<ActionTrackerPage> {
     final perbaikan = item['perbaikan']?.toString();
     final tanggalPerbaikan = item['tanggalPerbaikan']?.toString();
 
-    final aiAnalysis = item['aiAnalysis'] as Map<String, dynamic>?;
-
     // Card accent color
     final accentColor = isClosed
         ? const Color(0xFF10B981)
@@ -1158,85 +1156,55 @@ class _ActionTrackerPageState extends State<ActionTrackerPage> {
                         ),
                       ],
 
-                      // ── AI ANALYSIS ──
-                      if (aiAnalysis != null && (aiAnalysis['reasoning'] != null || aiAnalysis['recommendation'] != null)) ...[
-                        const SizedBox(height: 8),
-                        _buildAiAnalysisBox(aiAnalysis),
-                      ],
-
                       const SizedBox(height: 8),
 
-                      // ── PIHAK TERKAIT (STAKEHOLDERS STRIP) ──
+                      // ── PIHAK TERKAIT (STAKEHOLDERS CARD) ──
                       Container(
                         width: double.infinity,
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                        padding: const EdgeInsets.all(10),
                         decoration: BoxDecoration(
                           color: const Color(0xFFF8FAFC),
-                          borderRadius: BorderRadius.circular(10),
+                          borderRadius: BorderRadius.circular(12),
                           border: Border.all(color: const Color(0xFFE2E8F0)),
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            // Pelapor
-                            Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Icon(Icons.person_pin_circle_rounded, size: 14, color: Color(0xFF6366F1)),
-                                const SizedBox(width: 5),
-                                Expanded(
-                                  child: RichText(
-                                    text: TextSpan(
-                                      style: const TextStyle(fontSize: 10.5, color: Color(0xFF475569)),
-                                      children: [
-                                        const TextSpan(text: 'Pelapor: ', style: TextStyle(fontWeight: FontWeight.bold)),
-                                        TextSpan(text: '$namaPelapor ($nikPelapor) • $deptPelapor ${compPelapor.isNotEmpty ? "• $compPelapor" : ""}'),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ],
+                            _buildStakeholderRow(
+                              roleLabel: 'Pelapor',
+                              roleColor: const Color(0xFF6366F1),
+                              icon: Icons.person_pin_circle_rounded,
+                              name: namaPelapor,
+                              nik: nikPelapor,
+                              dept: deptPelapor,
+                              company: compPelapor,
                             ),
-                            const SizedBox(height: 4),
-                            // PJA
-                            Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Icon(Icons.badge_rounded, size: 14, color: Color(0xFF0284C7)),
-                                const SizedBox(width: 5),
-                                Expanded(
-                                  child: RichText(
-                                    text: TextSpan(
-                                      style: const TextStyle(fontSize: 10.5, color: Color(0xFF475569)),
-                                      children: [
-                                        const TextSpan(text: 'PJA: ', style: TextStyle(fontWeight: FontWeight.bold)),
-                                        TextSpan(text: '$pja ($nikPja) • $deptPja ${compPja.isNotEmpty ? "• $compPja" : ""}'),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ],
+                            const Padding(
+                              padding: EdgeInsets.symmetric(vertical: 5),
+                              child: Divider(height: 1, color: Color(0xFFE2E8F0)),
                             ),
-                            // PIC Eksekutor
+                            _buildStakeholderRow(
+                              roleLabel: 'PJA',
+                              roleColor: const Color(0xFF0284C7),
+                              icon: Icons.shield_rounded,
+                              name: pja,
+                              nik: nikPja,
+                              dept: deptPja,
+                              company: compPja,
+                            ),
                             if (pic.isNotEmpty) ...[
-                              const SizedBox(height: 4),
-                              Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const Icon(Icons.engineering_rounded, size: 14, color: Color(0xFF059669)),
-                                  const SizedBox(width: 5),
-                                  Expanded(
-                                    child: RichText(
-                                      text: TextSpan(
-                                        style: const TextStyle(fontSize: 10.5, color: Color(0xFF065F46)),
-                                        children: [
-                                          const TextSpan(text: 'PIC: ', style: TextStyle(fontWeight: FontWeight.bold)),
-                                          TextSpan(text: '$pic ($nikPic) • $deptPic ${compPic.isNotEmpty ? "• $compPic" : ""}'),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                ],
+                              const Padding(
+                                padding: EdgeInsets.symmetric(vertical: 5),
+                                child: Divider(height: 1, color: Color(0xFFE2E8F0)),
+                              ),
+                              _buildStakeholderRow(
+                                roleLabel: 'PIC Pelaksana',
+                                roleColor: const Color(0xFF059669),
+                                icon: Icons.engineering_rounded,
+                                name: pic,
+                                nik: nikPic,
+                                dept: deptPic,
+                                company: compPic,
                               ),
                             ],
                           ],
@@ -1323,14 +1291,14 @@ class _ActionTrackerPageState extends State<ActionTrackerPage> {
                             Expanded(
                               flex: 4,
                               child: SizedBox(
-                                height: 38,
+                                height: 40,
                                 child: OutlinedButton.icon(
                                   style: OutlinedButton.styleFrom(
                                     foregroundColor: const Color(0xFFD97706),
                                     side: const BorderSide(color: Color(0xFFFBBF24), width: 1.2),
                                     backgroundColor: const Color(0xFFFFFBEB),
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                    padding: const EdgeInsets.symmetric(horizontal: 6),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                    padding: const EdgeInsets.symmetric(horizontal: 8),
                                   ),
                                   onPressed: () => _openReassignModal(item),
                                   icon: const Icon(Icons.swap_horiz_rounded, size: 16, color: Color(0xFFD97706)),
@@ -1346,27 +1314,27 @@ class _ActionTrackerPageState extends State<ActionTrackerPage> {
                             Expanded(
                               flex: 6,
                               child: SizedBox(
-                                height: 38,
-                                child: ElevatedButton.icon(
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: isProgress ? const Color(0xFF0284C7) : const Color(0xFFF43F5E),
+                                height: 40,
+                                child: FilledButton.icon(
+                                  style: FilledButton.styleFrom(
+                                    backgroundColor: isProgress ? const Color(0xFF0284C7) : const Color(0xFFE11D48),
                                     foregroundColor: Colors.white,
-                                    elevation: 1,
-                                    shadowColor: isProgress ? const Color(0x400284C7) : const Color(0x40F43F5E),
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                    padding: const EdgeInsets.symmetric(horizontal: 6),
+                                    elevation: 2,
+                                    shadowColor: (isProgress ? const Color(0xFF0284C7) : const Color(0xFFE11D48)).withOpacity(0.35),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                    padding: const EdgeInsets.symmetric(horizontal: 8),
                                   ),
                                   onPressed: () => _openUpdateActionPlanSheet(item),
                                   icon: Icon(
                                     isProgress ? Icons.edit_note_rounded : Icons.rocket_launch_rounded,
-                                    size: 15,
+                                    size: 16,
                                   ),
                                   label: Text(
                                     isProgress ? 'UPDATE / TUTUP' : 'TINDAK LANJUT',
                                     style: const TextStyle(
-                                      fontSize: 10.5,
+                                      fontSize: 11,
                                       fontWeight: FontWeight.w900,
-                                      letterSpacing: 0.2,
+                                      letterSpacing: 0.3,
                                     ),
                                   ),
                                 ),
@@ -1377,19 +1345,19 @@ class _ActionTrackerPageState extends State<ActionTrackerPage> {
                       else
                         SizedBox(
                           width: double.infinity,
-                          height: 38,
-                          child: ElevatedButton.icon(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFFF1F5F9),
-                              foregroundColor: const Color(0xFF334155),
-                              elevation: 0,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          height: 40,
+                          child: OutlinedButton.icon(
+                            style: OutlinedButton.styleFrom(
+                              backgroundColor: const Color(0xFFF8FAFC),
+                              foregroundColor: const Color(0xFF059669),
+                              side: const BorderSide(color: Color(0xFFA7F3D0), width: 1.2),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                             ),
                             onPressed: () => _openUpdateActionPlanSheet(item),
-                            icon: const Icon(Icons.visibility_rounded, size: 16),
+                            icon: const Icon(Icons.verified_rounded, size: 17, color: Color(0xFF059669)),
                             label: const Text(
-                              'LIHAT DETAIL PERBAIKAN',
-                              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800),
+                              'LIHAT DETAIL & BUKTI PERBAIKAN',
+                              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 0.2),
                             ),
                           ),
                         ),
@@ -1408,16 +1376,21 @@ class _ActionTrackerPageState extends State<ActionTrackerPage> {
   Widget _buildRiskBadge(String risk) {
     Color bg = const Color(0xFF0284C7);
     Color fg = Colors.white;
+    IconData icon = Icons.shield_rounded;
     final r = risk.toLowerCase();
 
     if (r.contains('ekstrim') || r.contains('kritis')) {
       bg = const Color(0xFF991B1B);
+      icon = Icons.dangerous_rounded;
     } else if (r.contains('tinggi') || r.contains('high')) {
       bg = const Color(0xFFDC2626);
+      icon = Icons.warning_rounded;
     } else if (r.contains('sedang') || r.contains('medium')) {
       bg = const Color(0xFFD97706);
+      icon = Icons.error_outline_rounded;
     } else if (r.contains('rendah') || r.contains('low')) {
       bg = const Color(0xFF16A34A);
+      icon = Icons.check_circle_outline_rounded;
     }
 
     return Container(
@@ -1426,9 +1399,16 @@ class _ActionTrackerPageState extends State<ActionTrackerPage> {
         color: bg,
         borderRadius: BorderRadius.circular(6),
       ),
-      child: Text(
-        risk.toUpperCase(),
-        style: TextStyle(color: fg, fontSize: 9.5, fontWeight: FontWeight.w800),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 10, color: fg),
+          const SizedBox(width: 3),
+          Text(
+            risk.toUpperCase(),
+            style: TextStyle(color: fg, fontSize: 9, fontWeight: FontWeight.w800),
+          ),
+        ],
       ),
     );
   }
@@ -1438,15 +1418,15 @@ class _ActionTrackerPageState extends State<ActionTrackerPage> {
     Color fg = const Color(0xFF0369A1);
     IconData icon = Icons.info_outline_rounded;
 
-    if (directionType == 'assigned_to_me') {
+    if (directionType == 'assigned_to_me' || label.toLowerCase().contains('ke saya')) {
       bg = const Color(0xFFECFDF5);
       fg = const Color(0xFF059669);
       icon = Icons.inbox_rounded;
-    } else if (directionType == 'created_by_me') {
+    } else if (directionType == 'created_by_me' || label.toLowerCase().contains('dibuat')) {
       bg = const Color(0xFFEFF6FF);
       fg = const Color(0xFF2563EB);
       icon = Icons.outbox_rounded;
-    } else if (directionType == 'dept_internal') {
+    } else if (directionType == 'dept_internal' || label.toLowerCase().contains('internal')) {
       bg = const Color(0xFFF5F3FF);
       fg = const Color(0xFF7C3AED);
       icon = Icons.sync_alt_rounded;
@@ -1482,17 +1462,22 @@ class _ActionTrackerPageState extends State<ActionTrackerPage> {
   }
 
   Widget _buildStatusBadge(String statusKey) {
-    Color bg = const Color(0xFF10B981);
-    Color fg = Colors.white;
+    Color bg = const Color(0xFFECFDF5);
+    Color fg = const Color(0xFF059669);
+    Color border = const Color(0xFFA7F3D0);
     String text = 'CLOSED';
     IconData icon = Icons.check_circle_rounded;
 
     if (statusKey == 'outstanding') {
-      bg = const Color(0xFFF43F5E);
+      bg = const Color(0xFFFFF1F2);
+      fg = const Color(0xFFE11D48);
+      border = const Color(0xFFFECDD3);
       text = 'OUTSTANDING';
       icon = Icons.warning_amber_rounded;
     } else if (statusKey == 'progress') {
-      bg = const Color(0xFFF59E0B);
+      bg = const Color(0xFFFFFBEB);
+      fg = const Color(0xFFD97706);
+      border = const Color(0xFFFDE68A);
       text = 'IN PROGRESS';
       icon = Icons.construction_rounded;
     }
@@ -1502,6 +1487,7 @@ class _ActionTrackerPageState extends State<ActionTrackerPage> {
       decoration: BoxDecoration(
         color: bg,
         borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: border, width: 0.8),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -1510,7 +1496,7 @@ class _ActionTrackerPageState extends State<ActionTrackerPage> {
           const SizedBox(width: 3),
           Text(
             text,
-            style: TextStyle(color: fg, fontSize: 8.5, fontWeight: FontWeight.w900),
+            style: TextStyle(color: fg, fontSize: 9, fontWeight: FontWeight.w900),
           ),
         ],
       ),
@@ -1603,91 +1589,72 @@ class _ActionTrackerPageState extends State<ActionTrackerPage> {
     );
   }
 
-  Widget _buildAiAnalysisBox(Map<String, dynamic> ai) {
-    final reasoning = ai['reasoning']?.toString() ?? '';
-    final recommendation = ai['recommendation']?.toString() ?? '';
-    final isGolden = ai['isGoldenRule'] as bool? ?? false;
-
-    return Container(
-      decoration: BoxDecoration(
-        color: const Color(0xFFF0FDF4),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: const Color(0xFFBBF7D0)),
-      ),
-      child: Theme(
-        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-        child: ExpansionTile(
-          tilePadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
-          dense: true,
-          leading: Container(
-            padding: const EdgeInsets.all(4),
-            decoration: BoxDecoration(
-              color: const Color(0xFF0284C7).withOpacity(0.12),
-              borderRadius: BorderRadius.circular(6),
-            ),
-            child: const Icon(Icons.smart_toy_rounded, color: Color(0xFF0284C7), size: 16),
+  Widget _buildStakeholderRow({
+    required String roleLabel,
+    required Color roleColor,
+    required IconData icon,
+    required String name,
+    required String nik,
+    required String dept,
+    required String company,
+  }) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+          decoration: BoxDecoration(
+            color: roleColor.withOpacity(0.12),
+            borderRadius: BorderRadius.circular(5),
+            border: Border.all(color: roleColor.withOpacity(0.25), width: 0.8),
           ),
-          title: Row(
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              const Text(
-                'ANALISA AI K3',
+              Icon(icon, size: 10, color: roleColor),
+              const SizedBox(width: 3),
+              Text(
+                roleLabel.toUpperCase(),
                 style: TextStyle(
-                  fontSize: 10.5,
+                  fontSize: 8.5,
                   fontWeight: FontWeight.w800,
-                  color: Color(0xFF0369A1),
-                  letterSpacing: 0.4,
+                  color: roleColor,
+                  letterSpacing: 0.2,
                 ),
               ),
-              const SizedBox(width: 6),
-              if (isGolden)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFEF4444),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: const Text(
-                    'Golden Rule',
-                    style: TextStyle(color: Colors.white, fontSize: 8.5, fontWeight: FontWeight.bold),
-                  ),
-                ),
             ],
           ),
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (reasoning.isNotEmpty) ...[
-                    const Text(
-                      'Diagnosa Risiko:',
-                      style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF0284C7)),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      reasoning,
-                      style: const TextStyle(fontSize: 11, color: Color(0xFF334155), height: 1.4),
-                    ),
-                    const SizedBox(height: 6),
-                  ],
-                  if (recommendation.isNotEmpty) ...[
-                    const Text(
-                      'Rekomendasi Tindakan:',
-                      style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF059669)),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      recommendation,
-                      style: const TextStyle(fontSize: 11, color: Color(0xFF065F46), height: 1.4),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-          ],
         ),
-      ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                name.isNotEmpty ? name : '-',
+                style: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFF0F172A),
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: 1),
+              Text(
+                '$nik • $dept${company.isNotEmpty ? " • $company" : ""}',
+                style: const TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w500,
+                  color: Color(0xFF64748B),
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 

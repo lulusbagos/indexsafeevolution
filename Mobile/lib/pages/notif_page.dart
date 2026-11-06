@@ -5103,208 +5103,194 @@ class _NotifPageState extends State<NotifPage> {
 
 
 
+    final isUnread = item['is_read'] != true;
+
     return Container(
-
       margin: const EdgeInsets.only(bottom: 10),
-
       decoration: BoxDecoration(
-
         color: Colors.white,
-
-        borderRadius: BorderRadius.circular(18),
-
-        border: Border.all(color: const Color(0xFFE8EDF4)),
-
-        boxShadow: const [
-
-          BoxShadow(
-
-              color: Color(0x0A0F172A), blurRadius: 14, offset: Offset(0, 5)),
-
-        ],
-
-      ),
-
-      child: Material(
-
-        color: Colors.transparent,
-
-        borderRadius: BorderRadius.circular(18),
-
-        child: InkWell(
-
-          borderRadius: BorderRadius.circular(18),
-
-          onTap: () => _openDetail(item),
-
-          child: Padding(
-
-            padding: const EdgeInsets.all(14),
-
-            child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-
-              Container(
-
-                width: 42,
-
-                height: 42,
-
-                decoration: BoxDecoration(
-
-                  color: color.withValues(alpha: .10),
-
-                  borderRadius: BorderRadius.circular(13),
-
-                ),
-
-                child: Icon(icon, size: 21, color: color),
-
-              ),
-
-              const SizedBox(width: 12),
-
-              Expanded(
-
-                  child: Column(
-
-                      crossAxisAlignment: CrossAxisAlignment.start,
-
-                      children: [
-
-                    Row(children: [
-
-                      Container(
-
-                        padding: const EdgeInsets.symmetric(
-
-                            horizontal: 7, vertical: 3),
-
-                        decoration: BoxDecoration(
-
-                            color: color.withValues(alpha: .09),
-
-                            borderRadius: BorderRadius.circular(6)),
-
-                        child: Text(label,
-
-                            style: TextStyle(
-
-                                fontSize: 9.5,
-
-                                letterSpacing: .45,
-
-                                fontWeight: FontWeight.w900,
-
-                                color: color)),
-
-                      ),
-
-                      const Spacer(),
-
-                      Text(time,
-
-                          style: const TextStyle(
-
-                              fontSize: 10.5,
-
-                              color: Color(0xFF94A3B8),
-
-                              fontWeight: FontWeight.w600)),
-
-                    ]),
-
-                    const SizedBox(height: 7),
-
-                    Text(title,
-
-                        maxLines: 2,
-
-                        overflow: TextOverflow.ellipsis,
-
-                        style: const TextStyle(
-
-                            fontSize: 14,
-
-                            height: 1.25,
-
-                            fontWeight: FontWeight.w800,
-
-                            color: Color(0xFF0F172A))),
-
-                    if (message.isNotEmpty) ...[
-
-                      const SizedBox(height: 4),
-
-                      Text(message,
-
-                          maxLines: 2,
-
-                          overflow: TextOverflow.ellipsis,
-
-                          style: const TextStyle(
-
-                              fontSize: 11.5,
-
-                              height: 1.35,
-
-                              color: Color(0xFF64748B))),
-
-                    ],
-
-                    if (sender.isNotEmpty) ...[
-
-                      const SizedBox(height: 8),
-
-                      Row(children: [
-
-                        Icon(Icons.person_outline_rounded,
-
-                            size: 13, color: color),
-
-                        const SizedBox(width: 4),
-
-                        Expanded(
-
-                            child: Text(sender,
-
-                                maxLines: 1,
-
-                                overflow: TextOverflow.ellipsis,
-
-                                style: TextStyle(
-
-                                    fontSize: 10.5,
-
-                                    color: color,
-
-                                    fontWeight: FontWeight.w700)))
-
-                      ])
-
-                    ],
-
-                  ])),
-
-              const SizedBox(width: 4),
-
-              const Padding(
-
-                  padding: EdgeInsets.only(top: 25),
-
-                  child: Icon(Icons.chevron_right_rounded,
-
-                      size: 19, color: Color(0xFF94A3B8))),
-
-            ]),
-
-          ),
-
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isUnread
+              ? color.withValues(alpha: 0.35)
+              : const Color(0xFFE2E8F0),
+          width: isUnread ? 1.2 : 1.0,
         ),
-
+        boxShadow: [
+          BoxShadow(
+            color: isUnread
+                ? color.withValues(alpha: 0.08)
+                : const Color(0x060F172A),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
       ),
-
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Left Accent Line with Category Color
+              Container(width: 4.5, color: color),
+              Expanded(
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: () => _openDetail(item),
+                    child: Padding(
+                      padding: const EdgeInsets.all(13),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                width: 34,
+                                height: 34,
+                                decoration: BoxDecoration(
+                                  color: color.withValues(alpha: .12),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Icon(icon, size: 17, color: color),
+                              ),
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 7, vertical: 2.5),
+                                decoration: BoxDecoration(
+                                  color: color.withValues(alpha: .09),
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(
+                                      color: color.withValues(alpha: 0.25),
+                                      width: 0.8),
+                                ),
+                                child: Text(
+                                  label,
+                                  style: TextStyle(
+                                    fontSize: 9.5,
+                                    letterSpacing: .3,
+                                    fontWeight: FontWeight.w900,
+                                    color: color,
+                                  ),
+                                ),
+                              ),
+                              if (isUnread) ...[
+                                const SizedBox(width: 6),
+                                Container(
+                                  width: 7,
+                                  height: 7,
+                                  decoration: BoxDecoration(
+                                    color: color,
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
+                              ],
+                              const Spacer(),
+                              Text(
+                                time,
+                                style: TextStyle(
+                                  fontSize: 10.5,
+                                  color: isUnread
+                                      ? const Color(0xFF334155)
+                                      : const Color(0xFF94A3B8),
+                                  fontWeight: isUnread
+                                      ? FontWeight.w700
+                                      : FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            title,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 13.5,
+                              height: 1.25,
+                              fontWeight: FontWeight.w800,
+                              color: Color(0xFF0F172A),
+                            ),
+                          ),
+                          if (message.isNotEmpty) ...[
+                            const SizedBox(height: 4),
+                            Text(
+                              message,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 11.5,
+                                height: 1.35,
+                                color: Color(0xFF64748B),
+                              ),
+                            ),
+                          ],
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              if (sender.isNotEmpty) ...[
+                                Icon(Icons.person_outline_rounded,
+                                    size: 13, color: color),
+                                const SizedBox(width: 4),
+                                Expanded(
+                                  child: Text(
+                                    sender,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      fontSize: 10.5,
+                                      color: color,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ),
+                              ] else
+                                const Spacer(),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 3.5),
+                                decoration: BoxDecoration(
+                                  color: color.withValues(alpha: 0.08),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      approval
+                                          ? 'Review & Setujui'
+                                          : (urgent
+                                              ? 'Tindak Lanjut'
+                                              : (category.contains('action')
+                                                  ? 'Buka Action'
+                                                  : 'Detail')),
+                                      style: TextStyle(
+                                        fontSize: 9.5,
+                                        fontWeight: FontWeight.w800,
+                                        color: color,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 3),
+                                    Icon(Icons.chevron_right_rounded,
+                                        size: 13, color: color),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
-
   }
 
 
