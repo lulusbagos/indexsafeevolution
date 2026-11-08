@@ -108,6 +108,8 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
   bool _isLoadingAreas = false;
   bool _isLoadingBenchmarks = false;
   bool _isSaving = false;
+  VoidCallback? _onBenchmarksLoadedModal;
+  VoidCallback? _onAreasLoadedModal;
 
   // PJA Selection
   _PjaCandidate? _selectedPja;
@@ -263,81 +265,251 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
     ];
   }
 
-  Future<void> _loadAreasFromMaster() async {
+  Future<void> _loadAreasFromMaster({VoidCallback? onDone}) async {
     if (_isLoadingAreas) return;
-    setState(() => _isLoadingAreas = true);
+    if (mounted) setState(() => _isLoadingAreas = true);
+
+    final profile = PreferenceService.getProfile();
+    final companyId = profile?.companyId ?? 1;
+
     try {
-      final db = await _db.database;
-      final rows = await db.rawQuery(
-          'SELECT DISTINCT area FROM locations WHERE area IS NOT NULL ORDER BY area');
-      final list = rows
-          .map((r) => r['area']?.toString() ?? '')
-          .where((s) => s.isNotEmpty)
-          .toList();
+      final sqldb = await _db.database;
 
-      final subRows = await db.rawQuery(
-          'SELECT DISTINCT area FROM sublocations WHERE area IS NOT NULL ORDER BY area');
-      final subList = subRows
-          .map((r) => r['area']?.toString() ?? '')
-          .where((s) => s.isNotEmpty)
-          .toList();
+      // 1. Inisialisasi tabel SQLite tbl_m_benchmark lokal
+      await sqldb.execute('''
+        CREATE TABLE IF NOT EXISTS tbl_m_benchmark (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          perusahaan_id INTEGER,
+          area_utama TEXT,
+          nama_benchmark TEXT,
+          created_by_nik TEXT,
+          created_by_name TEXT,
+          created_at TEXT
+        )
+      ''');
 
-      final combined = {..._defaultAreas, ...list, ...subList}.toList()..sort();
-      setState(() {
-        _masterAreas = combined;
-        if (_area.isEmpty && _masterAreas.isNotEmpty) {
-          _area = _masterAreas.first;
+      // Bersihkan entri invalid CAMP EKSPLORASI jika ada
+      await sqldb.execute(
+          "DELETE FROM tbl_m_benchmark WHERE area_utama LIKE '%CAMP EKSPLORASI%' OR nama_benchmark = 'CAMP EKSPLORASI BLOCK CENTRAL'");
+
+      // 2. Baca dari SQLite lokal (semua area yang tersimpan di tbl_m_benchmark & locations)
+      final localAreas = await sqldb.rawQuery(
+        "SELECT DISTINCT area_utama FROM tbl_m_benchmark WHERE area_utama IS NOT NULL AND area_utama != '' AND area_utama NOT LIKE '%CAMP EKSPLORASI%' ORDER BY area_utama",
+      );
+
+      List<String> locAreas = [];
+      try {
+        final locRows = await sqldb.rawQuery(
+          "SELECT DISTINCT area FROM locations WHERE area IS NOT NULL AND area != '' ORDER BY area",
+        );
+        locAreas = locRows.map((e) => e['area'].toString().trim()).toList();
+      } catch (_) {}
+
+      final combinedLocal = {
+        ...localAreas.map((e) => e['area_utama'].toString().trim()),
+        ...locAreas,
+      }.where((s) => s.isNotEmpty && !s.toUpperCase().contains('CAMP EKSPLORASI')).toSet().toList()..sort();
+
+      if (combinedLocal.isNotEmpty && mounted) {
+        setState(() {
+          _masterAreas = combinedLocal;
+          if (_area.isEmpty && _masterAreas.isNotEmpty) {
+            _area = _masterAreas.first;
+            _loadBenchmarksForArea(_area);
+          }
+        });
+        onDone?.call();
+        _onAreasLoadedModal?.call();
+      }
+
+      // 3. Refresh dari server API tbl_m_benchmark sesuai perusahaan_id user login
+      final serverAreas = await _api.getMasterAreas(perusahaanId: companyId);
+      if (serverAreas.isNotEmpty && mounted) {
+        final cleanServer = serverAreas
+            .where((s) => !s.toUpperCase().contains('CAMP EKSPLORASI'))
+            .toList();
+        setState(() {
+          _masterAreas = {..._masterAreas, ...cleanServer}.toList()..sort();
+          if (_area.isEmpty && _masterAreas.isNotEmpty) {
+            _area = _masterAreas.first;
+            _loadBenchmarksForArea(_area);
+          }
+        });
+        onDone?.call();
+        _onAreasLoadedModal?.call();
+
+        // Simpan ke SQLite untuk mode offline
+        final batch = sqldb.batch();
+        for (final a in cleanServer) {
+          batch.rawInsert(
+            '''INSERT OR IGNORE INTO tbl_m_benchmark (perusahaan_id, area_utama, nama_benchmark, created_at)
+               VALUES (?, ?, '', ?)''',
+            [companyId, a, DateTime.now().toIso8601String()],
+          );
+        }
+        await batch.commit(noResult: true);
+      }
+    } catch (e) {
+      debugPrint('[InspeksiForm] Load areas: $e');
+    } finally {
+      if (mounted) {
+        if (_masterAreas.isEmpty) {
+          setState(() {
+            _masterAreas = _defaultAreas;
+            if (_area.isEmpty) _area = _defaultAreas.first;
+          });
           _loadBenchmarksForArea(_area);
         }
-      });
-    } catch (_) {
-      setState(() {
-        _masterAreas = _defaultAreas;
-        if (_area.isEmpty) _area = _defaultAreas.first;
-      });
-    } finally {
-      if (mounted) setState(() => _isLoadingAreas = false);
+        setState(() => _isLoadingAreas = false);
+      }
     }
   }
 
-  Future<void> _loadBenchmarksForArea(String areaName) async {
-    if (_isLoadingBenchmarks) return;
-    setState(() => _isLoadingBenchmarks = true);
+  Future<void> _loadBenchmarksForArea(String area,
+      {VoidCallback? onDone}) async {
+    final cleanArea = area.trim();
+    if (cleanArea.isEmpty) {
+      if (mounted) {
+        setState(() {
+          _benchmarksList = [];
+          _isLoadingBenchmarks = false;
+        });
+      }
+      onDone?.call();
+      _onBenchmarksLoadedModal?.call();
+      return;
+    }
+
+    if (mounted) setState(() => _isLoadingBenchmarks = true);
+    final profile = PreferenceService.getProfile();
+    final companyId = profile?.companyId ?? 1;
+
     try {
-      final db = await _db.database;
-      final rows = await db.rawQuery(
-        'SELECT nama_benchmark FROM tbl_m_benchmark WHERE area_utama = ? ORDER BY nama_benchmark',
-        [areaName],
-      );
-      final fromBench = rows
-          .map((r) => r['nama_benchmark']?.toString() ?? '')
-          .where((s) => s.isNotEmpty)
-          .toList();
+      final sqldb = await _db.database;
 
-      final subRows = await db.rawQuery(
-        'SELECT DISTINCT sublocation FROM sublocations WHERE area = ? AND sublocation IS NOT NULL ORDER BY sublocation',
-        [areaName],
-      );
-      final fromSub = subRows
-          .map((r) => r['sublocation']?.toString() ?? '')
-          .where((s) => s.isNotEmpty)
-          .toList();
+      // 1. Inisialisasi tabel SQLite jika belum ada
+      await sqldb.execute('''
+        CREATE TABLE IF NOT EXISTS tbl_m_benchmark (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          perusahaan_id INTEGER,
+          area_utama TEXT,
+          nama_benchmark TEXT,
+          created_by_nik TEXT,
+          created_by_name TEXT,
+          created_at TEXT
+        )
+      ''');
 
-      final combined = {...fromBench, ...fromSub}.toList()..sort();
-      setState(() {
-        _benchmarksList = combined;
-        if (_benchmarksList.isNotEmpty &&
-            (_selectedBenchmark == null ||
-                !_benchmarksList.contains(_selectedBenchmark))) {
-          _selectedBenchmark = _benchmarksList.first;
-          _detilLokasiCtrl.text = _selectedBenchmark!;
+      // 2. Baca cache lokal untuk area ini
+      final localRows = await sqldb.rawQuery(
+        "SELECT DISTINCT nama_benchmark FROM tbl_m_benchmark WHERE area_utama = ? AND nama_benchmark IS NOT NULL AND nama_benchmark != '' ORDER BY nama_benchmark",
+        [cleanArea],
+      );
+      if (localRows.isNotEmpty && mounted) {
+        setState(() {
+          _benchmarksList = localRows
+              .map((e) => e['nama_benchmark'].toString().trim())
+              .where((s) => s.isNotEmpty)
+              .toSet()
+              .toList()
+            ..sort();
+          if (_benchmarksList.isNotEmpty &&
+              (_selectedBenchmark == null ||
+                  !_benchmarksList.contains(_selectedBenchmark))) {
+            _selectedBenchmark = _benchmarksList.first;
+            _detilLokasiCtrl.text = _selectedBenchmark!;
+          }
+        });
+        onDone?.call();
+        _onBenchmarksLoadedModal?.call();
+      }
+
+      // 3. Ambil dari server API tbl_m_benchmark sesuai perusahaan_id user login
+      final serverBenchmarks =
+          await _api.getBenchmarks(cleanArea, perusahaanId: companyId);
+      if (serverBenchmarks.isNotEmpty && mounted) {
+        setState(() {
+          _benchmarksList = serverBenchmarks;
+          if (_benchmarksList.isNotEmpty &&
+              (_selectedBenchmark == null ||
+                  !_benchmarksList.contains(_selectedBenchmark))) {
+            _selectedBenchmark = _benchmarksList.first;
+            _detilLokasiCtrl.text = _selectedBenchmark!;
+          }
+        });
+        onDone?.call();
+        _onBenchmarksLoadedModal?.call();
+
+        // Simpan ke SQLite tbl_m_benchmark
+        final batch = sqldb.batch();
+        for (final b in serverBenchmarks) {
+          batch.rawInsert(
+            '''INSERT OR IGNORE INTO tbl_m_benchmark (perusahaan_id, area_utama, nama_benchmark, created_at)
+               VALUES (?, ?, ?, ?)''',
+            [companyId, cleanArea, b, DateTime.now().toIso8601String()],
+          );
         }
-      });
-    } catch (_) {
-      setState(() => _benchmarksList = []);
+        await batch.commit(noResult: true);
+      }
+    } catch (e) {
+      debugPrint('[InspeksiForm] Load benchmarks: $e');
     } finally {
       if (mounted) setState(() => _isLoadingBenchmarks = false);
     }
+  }
+
+  Future<void> _saveNewCustomBenchmark(String name) async {
+    final cleanName = name.trim().toUpperCase();
+    if (cleanName.isEmpty) return;
+
+    final profile = PreferenceService.getProfile();
+    final companyId = profile?.companyId ?? 1;
+    final userNik = profile?.noNik ?? '';
+    final userName = profile?.namaLengkap ?? '';
+
+    setState(() {
+      if (!_benchmarksList.contains(cleanName)) {
+        _benchmarksList.add(cleanName);
+        _benchmarksList.sort();
+      }
+      _selectedBenchmark = cleanName;
+      _detilLokasiCtrl.text = cleanName;
+    });
+
+    try {
+      final sqldb = await _db.database;
+      await sqldb.rawInsert(
+        '''INSERT INTO tbl_m_benchmark (perusahaan_id, area_utama, nama_benchmark, created_by_nik, created_by_name, created_at)
+           VALUES (?, ?, ?, ?, ?, ?)''',
+        [
+          companyId,
+          _area,
+          cleanName,
+          userNik,
+          userName,
+          DateTime.now().toIso8601String()
+        ],
+      );
+    } catch (_) {}
+
+    try {
+      final res = await _api.createBenchmark(
+        areaUtama: _area,
+        namaBenchmark: cleanName,
+        perusahaanId: companyId,
+        createdByNik: userNik,
+        createdByName: userName,
+      );
+      if (mounted) {
+        if (res != null) {
+          SnackBarMsg.success(
+              context, 'Benchmark "$cleanName" berhasil disimpan!');
+        } else {
+          SnackBarMsg.info(
+              context, 'Benchmark "$cleanName" tersimpan di HP (Mode Offline)');
+        }
+      }
+    } catch (_) {}
   }
 
   void _fillGpsFromDevice({bool silent = false}) {
@@ -666,6 +838,9 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
   }
 
   void _showAreaPickerModal() {
+    if (_masterAreas.isEmpty) {
+      _loadAreasFromMaster();
+    }
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -674,6 +849,9 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
         String filter = '';
         return StatefulBuilder(
           builder: (modalCtx, setModalState) {
+            _onAreasLoadedModal = () {
+              if (modalCtx.mounted) setModalState(() {});
+            };
             final filtered = _masterAreas
                 .where((a) => a.toLowerCase().contains(filter.toLowerCase()))
                 .toList();
@@ -749,11 +927,18 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
                   ),
                   const SizedBox(height: 12),
                   Expanded(
-                    child: filtered.isEmpty
+                    child: _isLoadingAreas
                         ? const Center(
-                            child: Text('Area standar tidak ditemukan',
-                                style: TextStyle(color: Color(0xFF94A3B8))))
-                        : ListView.separated(
+                            child: Padding(
+                              padding: EdgeInsets.all(24),
+                              child: CircularProgressIndicator(color: primaryGreen),
+                            ),
+                          )
+                        : filtered.isEmpty
+                            ? const Center(
+                                child: Text('Area standar tidak ditemukan',
+                                    style: TextStyle(color: Color(0xFF94A3B8))))
+                            : ListView.separated(
                       padding: const EdgeInsets.symmetric(
                           horizontal: 20, vertical: 8),
                       itemCount: filtered.length,
@@ -808,10 +993,13 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
           },
         );
       },
-    );
+    ).then((_) => _onAreasLoadedModal = null);
   }
 
   void _showBenchmarkPickerModal() {
+    if (_benchmarksList.isEmpty && _area.isNotEmpty) {
+      _loadBenchmarksForArea(_area);
+    }
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -820,6 +1008,9 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
         String filter = '';
         return StatefulBuilder(
           builder: (modalCtx, setModalState) {
+            _onBenchmarksLoadedModal = () {
+              if (modalCtx.mounted) setModalState(() {});
+            };
             final filtered = _benchmarksList
                 .where((b) => b.toLowerCase().contains(filter.toLowerCase()))
                 .toList();
@@ -904,31 +1095,7 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
                       padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
                       child: InkWell(
                         onTap: () async {
-                          final newBench = filter.trim().toUpperCase();
-                          try {
-                            final db = await _db.database;
-                            await db.rawInsert(
-                              '''INSERT INTO tbl_m_benchmark (perusahaan_id, area_utama, nama_benchmark, created_by_nik, created_by_name, created_at)
-                                 VALUES (?, ?, ?, ?, ?, ?)''',
-                              [
-                                _profile?.companyId ?? 1,
-                                _area,
-                                newBench,
-                                _profile?.noNik ?? '',
-                                _profile?.namaLengkap ?? '',
-                                DateTime.now().toIso8601String()
-                              ],
-                            );
-                          } catch (_) {}
-
-                          setState(() {
-                            if (!_benchmarksList.contains(newBench)) {
-                              _benchmarksList.add(newBench);
-                              _benchmarksList.sort();
-                            }
-                            _selectedBenchmark = newBench;
-                            _detilLokasiCtrl.text = newBench;
-                          });
+                          await _saveNewCustomBenchmark(filter);
                           if (modalCtx.mounted) Navigator.pop(modalCtx);
                         },
                         borderRadius: BorderRadius.circular(12),
@@ -946,7 +1113,7 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
                               const SizedBox(width: 8),
                               Expanded(
                                 child: Text(
-                                    'Simpan Benchmark Baru Offline: "$filter"',
+                                    'Simpan Titik Benchmark Baru: "$filter"',
                                     style: const TextStyle(
                                         fontWeight: FontWeight.bold,
                                         fontSize: 12,
@@ -958,19 +1125,26 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
                       ),
                     ),
                   Expanded(
-                    child: _benchmarksList.isEmpty
+                    child: _isLoadingBenchmarks
                         ? const Center(
                             child: Padding(
-                              padding: EdgeInsets.all(20),
-                              child: Text(
-                                'Belum ada data benchmark di area ini.\nKetik nama titik di atas untuk menambahkan secara offline.',
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                    fontSize: 12, color: Color(0xFF94A3B8)),
-                              ),
+                              padding: EdgeInsets.all(24),
+                              child: CircularProgressIndicator(color: primaryGreen),
                             ),
                           )
-                        : ListView.separated(
+                        : _benchmarksList.isEmpty
+                            ? const Center(
+                                child: Padding(
+                                  padding: EdgeInsets.all(20),
+                                  child: Text(
+                                    'Belum ada data benchmark di area ini.\nKetik nama titik di atas untuk menambahkan.',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                        fontSize: 12, color: Color(0xFF94A3B8)),
+                                  ),
+                                ),
+                              )
+                            : ListView.separated(
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 20, vertical: 8),
                             itemCount: filtered.length,
@@ -1025,7 +1199,7 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
           },
         );
       },
-    );
+    ).then((_) => _onBenchmarksLoadedModal = null);
   }
 
   Future<void> _showAddCustomQuestionDialog() async {
