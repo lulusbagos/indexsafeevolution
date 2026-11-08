@@ -212,6 +212,7 @@ class NotificationService {
         enableVibration: true,
         vibrationPattern: vibrationPattern,
         playSound: true,
+        onlyAlertOnce: true,
         autoCancel: true,
         channelShowBadge: true,
         number: PreferenceService.getNotif() > 0 ? PreferenceService.getNotif() : 1,
@@ -242,49 +243,11 @@ class NotificationService {
 
   static const int badgeNotificationId = 999901;
 
-  /// Sinkronisasi badge angka / dot pada launcher icon Android di Beranda HP ("aplikasi depan")
+  /// Sinkronisasi notifikasi badge sistem (dibatalkan agar tidak memunculkan popup heads-up berulang atau membajiri notification tray HP)
   static Future<void> syncLauncherBadge(int count, {String? title, String? body}) async {
     try {
-      if (count <= 0) {
-        await _localNotifications.cancel(badgeNotificationId);
-        return;
-      }
-
-      final notifTitle = title ?? 'MBS SAP • $count Temuan Masuk';
-      final notifBody = body ??
-          'Ada $count temuan K3 dan notifikasi yang memerlukan perhatian Anda.';
-
-      final details = NotificationDetails(
-        android: AndroidNotificationDetails(
-          'indexsafe_temuan_urgent_channel',
-          'Temuan K3 Ditugaskan ke Anda (Urgent)',
-          channelDescription:
-              'Peringatan Temuan Bahaya & Action Plan K3 Yang Diarahkan ke Anda (Getar Panjang)',
-          importance: Importance.high,
-          priority: Priority.high,
-          channelShowBadge: true,
-          number: count,
-          autoCancel: true,
-          ongoing: false,
-          styleInformation: BigTextStyleInformation(
-            notifBody,
-            contentTitle: notifTitle,
-          ),
-        ),
-        iOS: DarwinNotificationDetails(
-          presentAlert: true,
-          presentBadge: true,
-          badgeNumber: count,
-        ),
-      );
-
-      await _localNotifications.show(
-        badgeNotificationId,
-        notifTitle,
-        notifBody,
-        details,
-        payload: '/notif',
-      );
+      // Selalu batalkan notifikasi ID 999901 agar tidak muncul pop up berulang & tidak membajiri notifikasi HP
+      await _localNotifications.cancel(badgeNotificationId);
     } catch (e) {
       debugPrint('[NotificationService] Error syncLauncherBadge: $e');
     }

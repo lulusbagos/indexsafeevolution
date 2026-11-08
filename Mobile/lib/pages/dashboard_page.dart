@@ -4459,16 +4459,6 @@ class _DashboardPageState extends State<DashboardPage>
         );
       } catch (_) {}
 
-      // GETARAN FISIK: Jika user dijadikan PIC / PJA temuan K3, ada Approval Menunggu, atau Special Permit High Risk
-      if (activeHazardCount > 0 ||
-          activeActionPlanCount > 0 ||
-          count > 0 ||
-          unactionedCount > 0 ||
-          _pendingApprovalCount > 0 ||
-          spAlertCount > 0) {
-        NotificationService.vibrateForPicAssignment();
-      }
-
       await PreferenceService.setNotif(count);
       await NotificationService.syncLauncherBadge(count);
       if (mounted) {
