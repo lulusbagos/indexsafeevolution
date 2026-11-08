@@ -472,8 +472,26 @@ class _LoginPageState extends State<LoginPage> {
           SafeArea(
             child: LayoutBuilder(
               builder: (context, constraints) {
+                final screenH = constraints.maxHeight;
+                final isCompact = screenH < 690;
+                final isMedium = screenH >= 690 && screenH < 810;
+
+                final logoWidth = isCompact ? 95.0 : (isMedium ? 112.0 : 125.0);
+                final logoPadding = isCompact ? 10.0 : 13.0;
+                final logoBottomSpacing = isCompact ? 8.0 : 12.0;
+                final titleFontSize = isCompact ? 19.0 : 21.0;
+                final subtitleFontSize = isCompact ? 12.0 : 13.0;
+                final subtitleBottomSpacing = isCompact ? 10.0 : 14.0;
+
+                final cardPaddingV = isCompact ? 16.0 : (isMedium ? 18.0 : 20.0);
+                final cardPaddingH = isCompact ? 16.0 : 20.0;
+                final inputSpacing = isCompact ? 11.0 : 14.0;
+                final buttonTopSpacing = isCompact ? 14.0 : 18.0;
+                final footerTopSpacing = isCompact ? 8.0 : 12.0;
+                final footerBottomSpacing = isCompact ? 8.0 : 12.0;
+
                 return SingleChildScrollView(
-                  padding: const EdgeInsets.symmetric(horizontal: 30),
+                  padding: EdgeInsets.symmetric(horizontal: isCompact ? 22 : 28),
                   child: ConstrainedBox(
                     constraints: BoxConstraints(
                       minHeight: constraints.maxHeight,
@@ -483,12 +501,11 @@ class _LoginPageState extends State<LoginPage> {
                         key: _key,
                         child: Column(
                           children: [
-                            const Spacer(flex: 1),
-                            const SizedBox(height: 12),
+                            SizedBox(height: isCompact ? 4 : (isMedium ? 8 : 12)),
                             // Logo MBS with enhanced 3D Pedestal
                             Center(
                               child: Container(
-                                padding: const EdgeInsets.all(16),
+                                padding: EdgeInsets.all(logoPadding),
                                 decoration: BoxDecoration(
                                   color: Colors.white,
                                   shape: BoxShape.circle,
@@ -521,31 +538,31 @@ class _LoginPageState extends State<LoginPage> {
                                 ),
                                 child: Image.asset(
                                   'assets/images/logo-mbs.png',
-                                  width: 145,
+                                  width: logoWidth,
                                   fit: BoxFit.contain,
                                 ),
                               ),
                             ),
-                            const SizedBox(height: 18),
+                            SizedBox(height: logoBottomSpacing),
                             // Greeting text
-                            const Text(
+                            Text(
                               'Halo Semangat Pagi!',
                               style: TextStyle(
-                                fontSize: 22,
+                                fontSize: titleFontSize,
                                 fontWeight: FontWeight.bold,
-                                color: Color(0xFF0D9488),
+                                color: const Color(0xFF0D9488),
                                 letterSpacing: -0.3,
                               ),
                             ),
-                            const SizedBox(height: 5),
+                            const SizedBox(height: 3),
                             Text(
                               'Silakan masuk dengan NIK dan kata sandi Anda',
                               style: TextStyle(
-                                fontSize: 13,
+                                fontSize: subtitleFontSize,
                                 color: Colors.grey.shade600,
                               ),
                             ),
-                            const SizedBox(height: 20),
+                            SizedBox(height: subtitleBottomSpacing),
 
                             // 3D Neumorphic Form Card
                             Container(
@@ -582,9 +599,9 @@ class _LoginPageState extends State<LoginPage> {
                                   ),
                                 ],
                               ),
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 20,
-                                vertical: 24,
+                              padding: EdgeInsets.symmetric(
+                                horizontal: cardPaddingH,
+                                vertical: cardPaddingV,
                               ),
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -677,7 +694,7 @@ class _LoginPageState extends State<LoginPage> {
                                       onChanged: (String val) => setState(() {}),
                                     ),
                                   ),
-                                  const SizedBox(height: 16),
+                                  SizedBox(height: inputSpacing),
 
                                   // 3D Inset Input Password
                                   Container(
@@ -856,7 +873,7 @@ class _LoginPageState extends State<LoginPage> {
                                       ),
                                     ],
                                   ),
-                                  const SizedBox(height: 22),
+                                  SizedBox(height: buttonTopSpacing),
 
                                   // Tactile 3D Login Button with Mechanical Keycap Travel & Haptics
                                   _Tactile3DButton(
@@ -867,8 +884,8 @@ class _LoginPageState extends State<LoginPage> {
                                 ],
                               ),
                             ),
-const Spacer(flex: 1),
-                            const SizedBox(height: 16),
+                            const Spacer(flex: 1),
+                            SizedBox(height: footerTopSpacing),
 
                             // Version & Copyright Footer
                             Column(
@@ -876,17 +893,17 @@ const Spacer(flex: 1),
                                 Text(
                                   'Versi $_version',
                                   style: TextStyle(
-                                    fontSize: 12,
+                                    fontSize: isCompact ? 11 : 12,
                                     color: Colors.grey.shade500,
                                     fontWeight: FontWeight.w600,
                                   ),
                                 ),
-                                const SizedBox(height: 6),
+                                const SizedBox(height: 4),
                                 Text(
                                   'Developed and Maintained by',
                                   textAlign: TextAlign.center,
                                   style: TextStyle(
-                                    fontSize: 11,
+                                    fontSize: isCompact ? 10 : 11,
                                     color: Colors.grey.shade500,
                                     fontWeight: FontWeight.w500,
                                   ),
@@ -896,15 +913,15 @@ const Spacer(flex: 1),
                                   'System Integration Department PT Indexim Coalindo with ❤️',
                                   textAlign: TextAlign.center,
                                   style: TextStyle(
-                                    fontSize: 11,
+                                    fontSize: isCompact ? 10 : 11,
                                     color: Colors.grey.shade700,
                                     fontWeight: FontWeight.w600,
-                                    height: 1.3,
+                                    height: 1.25,
                                   ),
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 14),
+                            SizedBox(height: footerBottomSpacing),
                           ],
                         ),
                       ),
