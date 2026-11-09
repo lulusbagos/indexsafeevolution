@@ -46,6 +46,7 @@ namespace Indexsafe.Api.Data
         public DbSet<AppUser> AppUsers { get; set; } = null!;
 
         public DbSet<MasterArea> MasterAreas { get; set; } = null!;
+        public DbSet<AreaPjaRelation> AreaPjaRelations { get; set; } = null!;
 
         public DbSet<MasterBenchmark> Benchmarks { get; set; } = null!;
 
@@ -743,9 +744,20 @@ namespace Indexsafe.Api.Data
 
 
 
-            modelBuilder.Entity<MasterArea>()
+            modelBuilder.Entity<MasterArea>(entity =>
+            {
+                entity.ToTable("tbl_m_area_utama");
+                entity.HasMany(a => a.PjaList)
+                      .WithOne()
+                      .HasForeignKey(p => p.AreaId)
+                      .OnDelete(DeleteBehavior.Cascade);
+            });
 
-                .ToTable("tbl_m_area_utama");
+            modelBuilder.Entity<AreaPjaRelation>(entity =>
+            {
+                entity.ToTable("tbl_r_area_pja");
+                entity.HasIndex(e => new { e.AreaId, e.NikPja }).IsUnique();
+            });
 
 
 

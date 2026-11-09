@@ -175,6 +175,8 @@ class PjaSearchResult {
   final String departemen;
   final String perusahaan;
   final String? foto;
+  final bool isAssignedArea;
+  final bool isPicUtama;
 
   PjaSearchResult({
     required this.nik,
@@ -183,6 +185,8 @@ class PjaSearchResult {
     required this.departemen,
     required this.perusahaan,
     this.foto,
+    this.isAssignedArea = false,
+    this.isPicUtama = false,
   });
 
   factory PjaSearchResult.fromJson(Map<String, dynamic> json) {
@@ -193,6 +197,8 @@ class PjaSearchResult {
       departemen: json['departemen']?.toString() ?? '',
       perusahaan: json['perusahaan']?.toString() ?? '',
       foto: (json['foto'] ?? json['pathFoto'] ?? json['path_foto'])?.toString(),
+      isAssignedArea: json['is_assigned_area'] == true,
+      isPicUtama: json['is_pic_utama'] == true,
     );
   }
 }

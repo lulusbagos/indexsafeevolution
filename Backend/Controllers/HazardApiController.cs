@@ -1664,125 +1664,237 @@ namespace Indexsafe.Api.Controllers
         /// </summary>
 
         [HttpGet("search-pja")]
-
-        public async Task<IActionResult> SearchPja([FromQuery] string? q, [FromQuery] bool lintasPerusahaan = true)
-
+        public async Task<IActionResult> SearchPja([FromQuery] string? q, [FromQuery] string? area, [FromQuery] bool lintasPerusahaan = true)
         {
-
             var query = (q ?? string.Empty).Trim().ToLower();
+            var cleanArea = (area ?? string.Empty).Trim().ToLower();
 
-            if (string.IsNullOrWhiteSpace(query))
+            // 1. Cek apakah ada penugasan PJA khusus untuk area ini di tbl_r_area_pja
+            List<AreaPjaRelation> assignedAreaPjas = new();
+            bool isAreaConfigured = false;
+            bool isAllKaryawanArea = true;
 
+            if (!string.IsNullOrWhiteSpace(cleanArea))
             {
+                var areaRecord = await _context.MasterAreas
+                    .AsNoTracking()
+                    .Include(a => a.PjaList)
+                    .FirstOrDefaultAsync(a => a.NamaArea.ToLower() == cleanArea);
+
+                if (areaRecord != null)
+                {
+                    isAreaConfigured = true;
+                    isAllKaryawanArea = areaRecord.IsAllKaryawan;
+                    assignedAreaPjas = areaRecord.PjaList ?? new List<AreaPjaRelation>();
+                }
+                else
+                {
+                    // Fallback cek langsung ke tbl_r_area_pja berdasarkan nama_area
+                    assignedAreaPjas = await _context.AreaPjaRelations
+                        .AsNoTracking()
+                        .Where(p => p.NamaArea.ToLower() == cleanArea)
+                        .ToListAsync();
+                    if (assignedAreaPjas.Any())
+                    {
+                        isAreaConfigured = true;
+                        isAllKaryawanArea = false;
+                    }
+                }
+            }
+
+            // Jika query kosong dan area memiliki PJA khusus: langsung tampilkan PJA area tersebut
+            if (string.IsNullOrWhiteSpace(query))
+            {
+                if (assignedAreaPjas.Any())
+                {
+                    var pjaList = assignedAreaPjas.Select(p => new
+                    {
+                        nik = p.NikPja,
+                        nama = p.NamaPja,
+                        jabatan = p.JabatanPja ?? "PJA Area",
+                        departemen = p.DepartemenPja ?? "OPERATIONAL",
+                        perusahaan = p.PerusahaanPja ?? "PT INDEXIM COALINDO",
+                        company_id = 1,
+                        foto = (string?)null,
+                        is_assigned_area = true,
+                        is_pic_utama = p.IsPicUtama
+                    }).ToList();
+
+                    return Ok(new { success = true, data = pjaList, is_area_specific = true, is_all_karyawan = isAllKaryawanArea });
+                }
 
                 return Ok(new { success = true, data = new List<object>() });
-
             }
 
+            // Jika query tidak kosong:
+            // Filter dulu PJA area yang cocok dengan query
+            var matchedAssigned = assignedAreaPjas
+                .Where(p => p.NikPja.ToLower().Contains(query) ||
+                            p.NamaPja.ToLower().Contains(query) ||
+                            (p.DepartemenPja != null && p.DepartemenPja.ToLower().Contains(query)))
+                .Select(p => new
+                {
+                    nik = p.NikPja,
+                    nama = p.NamaPja,
+                    jabatan = p.JabatanPja ?? "PJA Area",
+                    departemen = p.DepartemenPja ?? "OPERATIONAL",
+                    perusahaan = p.PerusahaanPja ?? "PT INDEXIM COALINDO",
+                    company_id = 1,
+                    foto = (string?)null,
+                    is_assigned_area = true,
+                    is_pic_utama = p.IsPicUtama
+                })
+                .ToList();
 
-
+            // Sesuai requirement: "tetapi data karyawan tetap bisa muncul ketika di search di aplikasi mobile"
+            // Cari juga karyawan umum di vw_karyawan
             var cid = GetCurrentCompanyId();
-
             var allowedCompanyIds = lintasPerusahaan ? null : await _companyHierarchyService.GetAccessibleCompanyIdsAsync(cid);
 
-
-
             var baseQuery = from k in _context.Karyawans.AsNoTracking()
-
                             join p in _context.Personals.AsNoTracking() on k.IdPersonal equals p.IdPersonal
-
                             join j in _context.Jabatans.AsNoTracking() on k.IdJabatan equals j.JabatanId into jg
-
                             from j in jg.DefaultIfEmpty()
-
                             join d in _context.Departemens.AsNoTracking() on k.IdDepartemen equals d.DepartemenId into dg
-
                             from d in dg.DefaultIfEmpty()
-
                             join c in _context.Perusahaans.AsNoTracking() on k.IdPerusahaan equals c.PerusahaanId into cg
-
                             from c in cg.DefaultIfEmpty()
-
                             where k.StatusAktif
-
                             select new
-
                             {
-
                                 nik = k.NoNik,
-
                                 nama = p.NamaLengkap,
-
                                 jabatan = j != null ? j.NamaJabatan : "Staff",
-
                                 departemen = d != null ? d.NamaDepartemen : "GENERAL",
-
                                 perusahaan = c != null ? c.NamaPerusahaan : "PT INDEXIM COALINDO",
-
                                 companyId = k.IdPerusahaan,
-
                                 foto = k.PathFoto
-
                             };
 
-
-
             if (allowedCompanyIds != null && allowedCompanyIds.Count > 0)
-
             {
-
                 baseQuery = baseQuery.Where(k => allowedCompanyIds.Contains(k.companyId));
-
             }
 
-
-
             baseQuery = baseQuery.Where(k =>
-
                 k.nik.ToLower().Contains(query) ||
-
                 k.nama.ToLower().Contains(query) ||
-
                 k.departemen.ToLower().Contains(query) ||
-
                 k.perusahaan.ToLower().Contains(query)
-
             );
 
+            // Ambil NIK yang sudah ada di matchedAssigned agar tidak double
+            var existingNiks = new HashSet<string>(matchedAssigned.Select(m => m.nik.ToLower()));
 
-
-            var results = await baseQuery
-
+            var generalResults = await baseQuery
                 .OrderBy(k => k.nama)
-
                 .Take(40)
-
                 .Select(k => new
-
                 {
-
                     nik = k.nik,
-
                     nama = k.nama,
-
                     jabatan = k.jabatan,
-
                     departemen = k.departemen,
-
                     perusahaan = k.perusahaan,
-
                     company_id = k.companyId,
-
                     foto = k.foto
-
                 })
-
                 .ToListAsync();
 
+            // Gabungkan: PJA khusus area di posisi teratas, diikuti pencarian karyawan umum
+            var combined = new List<object>();
+            combined.AddRange(matchedAssigned);
 
+            foreach (var g in generalResults)
+            {
+                if (!existingNiks.Contains(g.nik.ToLower()))
+                {
+                    combined.Add(new
+                    {
+                        nik = g.nik,
+                        nama = g.nama,
+                        jabatan = g.jabatan,
+                        departemen = g.departemen,
+                        perusahaan = g.perusahaan,
+                        company_id = g.company_id,
+                        foto = g.foto,
+                        is_assigned_area = false,
+                        is_pic_utama = false
+                    });
+                }
+            }
 
-            return Ok(new { success = true, data = results });
+            return Ok(new
+            {
+                success = true,
+                data = combined,
+                is_area_specific = assignedAreaPjas.Any(),
+                is_all_karyawan = isAllKaryawanArea
+            });
+        }
 
+        /// <summary>
+        /// GET /api/hazard/area-pja
+        /// Mengambil daftar PJA terdaftar khusus untuk area tertentu.
+        /// </summary>
+        [HttpGet("area-pja")]
+        public async Task<IActionResult> GetAreaPjas([FromQuery] string? area)
+        {
+            if (string.IsNullOrWhiteSpace(area))
+            {
+                return Ok(new { success = true, area = "", isAllKaryawan = true, data = new List<object>() });
+            }
+
+            var cleanArea = area.Trim().ToLower();
+            var areaRecord = await _context.MasterAreas
+                .AsNoTracking()
+                .Include(a => a.PjaList)
+                .FirstOrDefaultAsync(a => a.NamaArea.ToLower() == cleanArea);
+
+            if (areaRecord == null)
+            {
+                var directPjas = await _context.AreaPjaRelations
+                    .AsNoTracking()
+                    .Where(p => p.NamaArea.ToLower() == cleanArea)
+                    .Select(p => new
+                    {
+                        nik = p.NikPja,
+                        nama = p.NamaPja,
+                        jabatan = p.JabatanPja ?? "PJA Area",
+                        departemen = p.DepartemenPja ?? "OPERATIONAL",
+                        perusahaan = p.PerusahaanPja ?? "PT INDEXIM COALINDO",
+                        is_pic_utama = p.IsPicUtama
+                    })
+                    .ToListAsync();
+
+                return Ok(new
+                {
+                    success = true,
+                    area = area.Trim(),
+                    isAllKaryawan = directPjas.Count == 0,
+                    pjaCount = directPjas.Count,
+                    data = directPjas
+                });
+            }
+
+            var pjas = areaRecord.PjaList.Select(p => new
+            {
+                nik = p.NikPja,
+                nama = p.NamaPja,
+                jabatan = p.JabatanPja ?? "PJA Area",
+                departemen = p.DepartemenPja ?? "OPERATIONAL",
+                perusahaan = p.PerusahaanPja ?? "PT INDEXIM COALINDO",
+                is_pic_utama = p.IsPicUtama
+            }).ToList();
+
+            return Ok(new
+            {
+                success = true,
+                area = areaRecord.NamaArea,
+                isAllKaryawan = areaRecord.IsAllKaryawan,
+                pjaCount = pjas.Count,
+                data = pjas
+            });
         }
 
 

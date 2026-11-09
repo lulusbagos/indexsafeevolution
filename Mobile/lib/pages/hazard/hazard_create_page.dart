@@ -318,6 +318,8 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
   List<PjaSearchResult> _pjaSearchResults = [];
 
   bool _isSearchingPja = false;
+  List<PjaSearchResult> _areaAssignedPjas = [];
+  bool _isLoadingAreaPjas = false;
 
   bool _isDetectingGps = false;
 
@@ -398,6 +400,7 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
       if (_area.isNotEmpty) {
 
         _loadBenchmarksForArea(_area);
+        _loadAreaPjas(_area);
 
       }
 
@@ -598,6 +601,33 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
   }
 
 
+
+  Future<void> _loadAreaPjas(String area) async {
+    final cleanArea = area.trim();
+    if (cleanArea.isEmpty) {
+      if (mounted) setState(() => _areaAssignedPjas = []);
+      return;
+    }
+    if (mounted) setState(() => _isLoadingAreaPjas = true);
+    try {
+      final res = await _api.searchPja('', area: cleanArea, lintasPerusahaan: _lintasPerusahaan);
+      res.fold(
+        (_) {
+          if (mounted) setState(() => _isLoadingAreaPjas = false);
+        },
+        (data) {
+          if (mounted) {
+            setState(() {
+              _isLoadingAreaPjas = false;
+              _areaAssignedPjas = data.map((e) => PjaSearchResult.fromJson(e)).toList();
+            });
+          }
+        },
+      );
+    } catch (_) {
+      if (mounted) setState(() => _isLoadingAreaPjas = false);
+    }
+  }
 
   Future<void> _loadBenchmarksForArea(String area,
 
@@ -1117,6 +1147,7 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
                                       });
 
                                       _loadBenchmarksForArea(item);
+                                      _loadAreaPjas(item);
 
                                     },
 
@@ -2950,7 +2981,7 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
 
       setState(() {
 
-        _pjaSearchResults = [];
+        _pjaSearchResults = _areaAssignedPjas;
 
         _isSearchingPja = false;
 
@@ -2984,7 +3015,7 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
 
     try {
 
-      final res = await _api.searchPja(q, lintasPerusahaan: _lintasPerusahaan);
+      final res = await _api.searchPja(q, area: _area, lintasPerusahaan: _lintasPerusahaan);
 
       if (!mounted) return;
 
@@ -5705,6 +5736,113 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
                           const SizedBox(height: 8),
 
                           if (_selectedPja == null) ...[
+                            if (_isLoadingAreaPjas)
+                              const Padding(
+                                padding: EdgeInsets.symmetric(vertical: 6),
+                                child: Center(
+                                  child: SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Color(0xFF16A34A),
+                                    ),
+                                  ),
+                                ),
+                              )
+                            else if (_areaAssignedPjas.isNotEmpty) ...[
+                              Container(
+                                margin: const EdgeInsets.only(bottom: 10),
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFF0FDF4),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(color: const Color(0xFFBBF7D0)),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        const Icon(Icons.verified_user_rounded,
+                                            size: 16, color: Color(0xFF16A34A)),
+                                        const SizedBox(width: 6),
+                                        Expanded(
+                                          child: Text(
+                                            'PJA KHUSUS AREA (${_area.toUpperCase()})',
+                                            style: const TextStyle(
+                                              fontSize: 11.5,
+                                              fontWeight: FontWeight.bold,
+                                              color: Color(0xFF166534),
+                                              letterSpacing: 0.3,
+                                            ),
+                                          ),
+                                        ),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 6, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFF16A34A),
+                                            borderRadius: BorderRadius.circular(6),
+                                          ),
+                                          child: Text(
+                                            ' Terdaftar',
+                                            style: const TextStyle(
+                                                color: Colors.white,
+                                                fontSize: 10,
+                                                fontWeight: FontWeight.bold),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Wrap(
+                                      spacing: 6,
+                                      runSpacing: 6,
+                                      children: _areaAssignedPjas.map((p) {
+                                        return ActionChip(
+                                          avatar: CircleAvatar(
+                                            backgroundColor: const Color(0xFF16A34A),
+                                            child: const Icon(Icons.person_rounded,
+                                                size: 14, color: Colors.white),
+                                          ),
+                                          label: Text(
+                                            ' ()',
+                                            style: const TextStyle(
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.w600,
+                                                color: Color(0xFF0F172A)),
+                                          ),
+                                          backgroundColor: Colors.white,
+                                          side: const BorderSide(
+                                              color: Color(0xFF86EFAC)),
+                                          shape: RoundedRectangleBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(20)),
+                                          elevation: 1,
+                                          shadowColor: Colors.black12,
+                                          onPressed: () {
+                                            setState(() {
+                                              _selectedPja = p;
+                                              _pjaSearchCtrl.clear();
+                                              _pjaSearchResults.clear();
+                                            });
+                                          },
+                                        );
+                                      }).toList(),
+                                    ),
+                                    const SizedBox(height: 6),
+                                    const Text(
+                                      '💡 Klik nama di atas untuk memilih langsung, atau ketik nama lain di bawah.',
+                                      style: TextStyle(
+                                          fontSize: 10.5,
+                                          color: Color(0xFF15803D),
+                                          fontStyle: FontStyle.italic),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
 
                             _buildTextField(
 

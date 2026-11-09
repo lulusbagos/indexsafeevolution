@@ -7727,41 +7727,16 @@ class ApiService {
 
 
   Future<Either<Map, List<Map<String, dynamic>>>> searchPja(String query,
-
-
-
-      {bool lintasPerusahaan = true}) async {
-
-
-
+      {String? area, bool lintasPerusahaan = true}) async {
     try {
-
-
-
       if (getToken.isNotEmpty && !getToken.startsWith('offline_token_')) {
-
-
-
-        dio.options.headers['Authorization'] = 'Bearer $getToken';
-
-
-
+        dio.options.headers['Authorization'] = 'Bearer ';
       }
 
-
-
-      final params = {
-
-
-
+      final params = <String, dynamic>{
         'q': query,
-
-
-
         'lintasPerusahaan': lintasPerusahaan.toString(),
-
-
-
+        if (area != null && area.trim().isNotEmpty) 'area': area.trim(),
       };
 
 
