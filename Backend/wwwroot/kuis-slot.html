@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Lucky Safety Slot - Kuis K3 MBS</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      background: radial-gradient(circle at top, #1e293b 0%, #0a0f1d 100%);
+      color: #f8fafc;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 14px;
+      overflow-x: hidden;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 420px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    /* Header */
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: rgba(30, 41, 59, 0.7);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 16px;
+      padding: 10px 14px;
+    }
+
+    .user-info {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .badge-icon {
+      width: 36px;
+      height: 36px;
+      background: linear-gradient(135deg, #f59e0b, #d97706);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      box-shadow: 0 4px 10px rgba(245, 158, 11, 0.4);
+    }
+
+    .user-details h3 {
+      font-size: 13px;
+      font-weight: 800;
+      letter-spacing: 0.5px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .nik-pill {
+      background: rgba(16, 185, 129, 0.2);
+      border: 1px solid rgba(16, 185, 129, 0.5);
+      color: #10b981;
+      font-size: 10px;
+      font-weight: 700;
+      padding: 1px 6px;
+      border-radius: 6px;
+    }
+
+    .user-details p {
+      font-size: 11px;
+      color: #94a3b8;
+    }
+
+    .score-badge {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      background: rgba(245, 158, 11, 0.15);
+      border: 1px solid rgba(245, 158, 11, 0.4);
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 800;
+      color: #f59e0b;
+    }
+
+    /* Slot Machine Frame */
+    .slot-frame {
+      background: linear-gradient(145deg, #1e293b, #0f172a);
+      border: 2px solid #f59e0b;
+      border-radius: 20px;
+      padding: 14px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6), 0 0 20px rgba(245, 158, 11, 0.2);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      position: relative;
+    }
+
+    .marquee-bulbs {
+      display: flex;
+      justify-content: space-around;
+      padding: 0 8px;
+    }
+
+    .bulb {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #f59e0b;
+      box-shadow: 0 0 6px #f59e0b;
+      animation: blink 1s infinite alternate;
+    }
+
+    .bulb:nth-child(even) {
+      animation-delay: 0.5s;
+      background: #10b981;
+      box-shadow: 0 0 6px #10b981;
+    }
+
+    @keyframes blink {
+      0% { opacity: 0.3; transform: scale(0.8); }
+      100% { opacity: 1; transform: scale(1.1); }
+    }
+
+    /* Reels Box */
+    .reels-container {
+      position: relative;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      background: #070b14;
+      padding: 8px;
+      border-radius: 14px;
+      border: 1px solid #334155;
+      overflow: hidden;
+    }
+
+    .laser-line {
+      position: absolute;
+      top: 50%;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, #06b6d4, transparent);
+      box-shadow: 0 0 10px #06b6d4;
+      pointer-events: none;
+      z-index: 5;
+      transform: translateY(-50%);
+    }
+
+    .reel {
+      height: 90px;
+      background: #0f172a;
+      border-radius: 10px;
+      border: 1px solid #334155;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 6px;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+      transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+
+    .reel.spinning {
+      filter: blur(1.5px);
+      animation: reelSpin 0.12s linear infinite;
+    }
+
+    @keyframes reelSpin {
+      0% { transform: translateY(-10px); }
+      50% { transform: translateY(10px); }
+      100% { transform: translateY(-10px); }
+    }
+
+    .symbol-icon {
+      font-size: 26px;
+      margin-bottom: 4px;
+    }
+
+    .symbol-title {
+      font-size: 10.5px;
+      font-weight: 800;
+      color: #e2e8f0;
+      letter-spacing: 0.2px;
+      white-space: nowrap;
+    }
+
+    /* Outcome banner */
+    .outcome-banner {
+      background: rgba(30, 41, 59, 0.8);
+      border: 1px solid rgba(245, 158, 11, 0.4);
+      padding: 6px 12px;
+      border-radius: 10px;
+      text-align: center;
+      font-size: 11.5px;
+      font-weight: 700;
+      color: #f59e0b;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+
+    /* Question Card */
+    .question-card {
+      background: #131d31;
+      border: 1px solid #334155;
+      border-radius: 16px;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .question-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .cat-pill {
+      background: rgba(59, 130, 246, 0.15);
+      border: 1px solid rgba(59, 130, 246, 0.4);
+      color: #60a5fa;
+      font-size: 10px;
+      font-weight: 800;
+      padding: 2px 8px;
+      border-radius: 6px;
+    }
+
+    .pts-pill {
+      color: #10b981;
+      font-size: 11px;
+      font-weight: 800;
+    }
+
+    .question-text {
+      font-size: 13px;
+      font-weight: 700;
+      line-height: 1.45;
+      color: #f8fafc;
+    }
+
+    .options-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .option-btn {
+      background: #1e293b;
+      border: 1.5px solid #334155;
+      border-radius: 12px;
+      padding: 10px 12px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: #e2e8f0;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      text-align: left;
+    }
+
+    .option-btn:active {
+      transform: scale(0.98);
+    }
+
+    .option-badge {
+      width: 22px;
+      height: 22px;
+      background: #334155;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10.5px;
+      font-weight: 800;
+      flex-shrink: 0;
+    }
+
+    .option-btn.correct {
+      background: rgba(16, 185, 129, 0.2) !important;
+      border-color: #10b981 !important;
+      color: #fff !important;
+    }
+    .option-btn.correct .option-badge {
+      background: #10b981 !important;
+      color: #fff !important;
+    }
+
+    .option-btn.wrong {
+      background: rgba(239, 68, 68, 0.2) !important;
+      border-color: #ef4444 !important;
+      color: #fff !important;
+    }
+    .option-btn.wrong .option-badge {
+      background: #ef4444 !important;
+      color: #fff !important;
+    }
+
+    .explanation-box {
+      margin-top: 4px;
+      padding: 10px;
+      border-radius: 10px;
+      font-size: 11px;
+      line-height: 1.4;
+      display: flex;
+      gap: 8px;
+    }
+
+    .explanation-box.correct {
+      background: rgba(16, 185, 129, 0.15);
+      border: 1px solid rgba(16, 185, 129, 0.4);
+      color: #a7f3d0;
+    }
+
+    .explanation-box.wrong {
+      background: rgba(239, 68, 68, 0.15);
+      border: 1px solid rgba(239, 68, 68, 0.4);
+      color: #fecaca;
+    }
+
+    /* Actions */
+    .actions-row {
+      display: flex;
+      gap: 10px;
+      margin-top: 4px;
+    }
+
+    .btn-spin {
+      flex: 3;
+      background: linear-gradient(135deg, #f59e0b, #d97706);
+      color: #0f172a;
+      border: none;
+      border-radius: 14px;
+      padding: 12px;
+      font-size: 13.5px;
+      font-weight: 900;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      box-shadow: 0 4px 14px rgba(245, 158, 11, 0.4);
+      transition: all 0.2s ease;
+    }
+
+    .btn-spin:active {
+      transform: scale(0.97);
+    }
+
+    .btn-spin:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    .btn-close {
+      flex: 1;
+      background: transparent;
+      border: 1.5px solid #334155;
+      color: #94a3b8;
+      border-radius: 14px;
+      font-size: 12.5px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <!-- Header -->
+  <div class="header">
+    <div class="user-info">
+      <div class="badge-icon">🎰</div>
+      <div class="user-details">
+        <h3>LUCKY SAFETY SLOT <span class="nik-pill" id="nikDisplay">24051940986</span></h3>
+        <p id="userNameDisplay">Halo Pak Lulus • Uji Ketangkasan K3</p>
+      </div>
+    </div>
+    <div class="score-badge">
+      <span>⭐</span>
+      <span id="scoreVal">250</span>
+    </div>
+  </div>
+
+  <!-- Slot Machine Box -->
+  <div class="slot-frame">
+    <div class="marquee-bulbs">
+      <div class="bulb"></div>
+      <div class="bulb"></div>
+      <div class="bulb"></div>
+      <div class="bulb"></div>
+      <div class="bulb"></div>
+      <div class="bulb"></div>
+      <div class="bulb"></div>
+      <div class="bulb"></div>
+    </div>
+
+    <div class="reels-container">
+      <div class="laser-line"></div>
+      <div class="reel" id="reel1">
+        <div class="symbol-icon">🦺</div>
+        <div class="symbol-title">APD & Hazard</div>
+      </div>
+      <div class="reel" id="reel2">
+        <div class="symbol-icon">⚡</div>
+        <div class="symbol-title">LOTO & Isolasi</div>
+      </div>
+      <div class="reel" id="reel3">
+        <div class="symbol-icon">🚛</div>
+        <div class="symbol-title">Jalur Hauling</div>
+      </div>
+    </div>
+
+    <div class="outcome-banner" id="outcomeBanner">
+      <span>🎯</span> <span id="outcomeText">Putar slot untuk mengacak kategori tantangan K3!</span>
+    </div>
+  </div>
+
+  <!-- Question Card -->
+  <div class="question-card" id="questionCard">
+    <div class="question-header">
+      <span class="cat-pill" id="questionCat">LALU LINTAS & HAULING</span>
+      <span class="pts-pill" id="questionPts">+150 Poin K3</span>
+    </div>
+    <div class="question-text" id="questionText">
+      Berapa jarak aman beriringan (following distance) antar dump truck di jalan hauling pada kondisi berdebu/licin?
+    </div>
+    <div class="options-list" id="optionsList"></div>
+    <div class="explanation-box" id="explanationBox" style="display: none;"></div>
+  </div>
+
+  <!-- Bottom Buttons -->
+  <div class="actions-row">
+    <button class="btn-spin" id="spinBtn" onclick="spinReels()">
+      <span>🎰</span> <span id="spinBtnText">Putar Slot Sekarang</span>
+    </button>
+    <button class="btn-close" onclick="closeCampaign()">Tutup</button>
+  </div>
+</div>
+
+<script>
+  // Parsing Query Parameters
+  const urlParams = new URLSearchParams(window.location.search);
+  const userNik = urlParams.get('nik') || '24051940986';
+  const userName = urlParams.get('nama') || 'Lulus Bagos Hermawan';
+
+  document.getElementById('nikDisplay').innerText = userNik;
+  document.getElementById('userNameDisplay').innerText = `Halo Pak ${userName.split(' ')[0]} • Uji Ketangkasan K3`;
+
+  // Simbol Reel
+  const symbols = [
+    { icon: '🦺', title: 'APD & Hazard', cat: 'APD & HAZARD' },
+    { icon: '⚡', title: 'LOTO & Isolasi', cat: 'LOTO & ISOLASI' },
+    { icon: '🚛', title: 'Jalur Hauling', cat: 'LALU LINTAS & HAULING' },
+    { icon: '🧗', title: 'Ketinggian', cat: 'KERJA KETINGGIAN' },
+    { icon: '🔥', title: 'Kerja Panas', cat: 'HOT WORK & FIRE' },
+    { icon: '🛡️', title: 'Golden Rules', cat: 'GOLDEN RULES MBS' },
+    { icon: '🌟', title: 'JACKPOT K3', cat: 'JACKPOT K3' }
+  ];
+
+  // Bank Soal
+  const questions = [
+    {
+      cat: 'LALU LINTAS & HAULING',
+      q: 'Berapa jarak aman beriringan (following distance) antar dump truck di jalan hauling pada kondisi berdebu/licin?',
+      opts: ['15 meter', '30 meter', 'Minimal 50 meter (atau 4x panjang unit)', '10 meter'],
+      ans: 2,
+      expl: 'Dalam standar keselamatan hauling MBS, saat visibilitas berdebu atau jalan licin jarak aman minimal adalah 50 meter.',
+      pts: 150
+    },
+    {
+      cat: 'LOTO & ISOLASI',
+      q: 'Sebelum mekanik melakukan perbaikan pada sistem hidrolik atau mesin dump truck, apa tindakan awal yang wajib dilakukan?',
+      opts: ['Langsung melepas selang oli', 'Pasang LOTO pribadi, Danger Tag, & uji Zero Energy State', 'Membunyikan klakson 3 kali', 'Matikan radio HT'],
+      ans: 1,
+      expl: 'Wajib isolasi energi (LOTO) dan lakukan tes de-energisasi (Zero Energy) sebelum kontak fisik dengan mesin.',
+      pts: 150
+    },
+    {
+      cat: 'KERJA KETINGGIAN',
+      q: 'Mulai dari ketinggian berapa pekerja wajib menggunakan Full Body Harness dengan double lanyard (100% tie-off)?',
+      opts: ['Ketinggian 1.0 meter', 'Ketinggian 1.8 meter ke atas', 'Ketinggian 4.0 meter', 'Hanya di atas conveyor'],
+      ans: 1,
+      expl: 'Golden Rules K3: Bekerja pada ketinggian 1.8 meter ke atas wajib menggunakan full body harness terpasang aman.',
+      pts: 120
+    },
+    {
+      cat: 'JACKPOT K3',
+      q: 'BONUS SUPER JACKPOT K3: Apa makna komitmen "Semangat Pagi" dalam budaya kerja K3 PT Indexim Coalindo?',
+      opts: ['Sekadar sapaan di awal waktu kerja', 'Energi, fokus, dan komitmen keselamatan prima tanpa kenal lelah sepanjang jam kerja', 'Tanda jam istirahat dimulai', 'Hanya diucapkan saat briefing'],
+      ans: 1,
+      expl: 'Semangat Pagi mencerminkan antusiasme dan komitmen zero incident yang selalu segar dan waspada sepanjang shift!',
+      pts: 300
+    }
+  ];
+
+  let currentScore = parseInt(localStorage.getItem(`kuis_score_${userNik}`) || '250', 10);
+  document.getElementById('scoreVal').innerText = currentScore;
+
+  let isSpinning = false;
+  let currentQuestion = questions[0];
+  let hasAnswered = false;
+
+  function renderQuestion(q) {
+    currentQuestion = q;
+    hasAnswered = false;
+    document.getElementById('questionCat').innerText = q.cat;
+    document.getElementById('questionPts').innerText = `+${q.pts} Poin K3`;
+    document.getElementById('questionText').innerText = q.q;
+
+    const explBox = document.getElementById('explanationBox');
+    explBox.style.display = 'none';
+
+    const list = document.getElementById('optionsList');
+    list.innerHTML = '';
+
+    q.opts.forEach((opt, idx) => {
+      const btn = document.createElement('button');
+      btn.className = 'option-btn';
+      btn.onclick = () => selectAnswer(idx);
+
+      const label = String.fromCharCode(65 + idx);
+      btn.innerHTML = `<span class="option-badge">${label}</span><span>${opt}</span>`;
+      list.appendChild(btn);
+    });
+  }
+
+  function selectAnswer(idx) {
+    if (hasAnswered) return;
+    hasAnswered = true;
+
+    const isCorrect = (idx === currentQuestion.ans);
+    const btns = document.querySelectorAll('.option-btn');
+
+    btns.forEach((b, i) => {
+      if (i === currentQuestion.ans) {
+        b.classList.add('correct');
+      } else if (i === idx) {
+        b.classList.add('wrong');
+      }
+    });
+
+    const explBox = document.getElementById('explanationBox');
+    explBox.style.display = 'flex';
+    if (isCorrect) {
+      explBox.className = 'explanation-box correct';
+      explBox.innerHTML = `<span>🏆</span> <div><strong>Hebat, Jawaban Benar! 🎉</strong> ${currentQuestion.expl}</div>`;
+      currentScore += currentQuestion.pts;
+      document.getElementById('scoreVal').innerText = currentScore;
+      localStorage.setItem(`kuis_score_${userNik}`, currentScore);
+    } else {
+      explBox.className = 'explanation-box wrong';
+      explBox.innerHTML = `<span>⚠️</span> <div><strong>Kurang Tepat.</strong> ${currentQuestion.expl}</div>`;
+    }
+  }
+
+  function spinReels() {
+    if (isSpinning) return;
+    isSpinning = true;
+
+    document.getElementById('spinBtn').disabled = true;
+    document.getElementById('spinBtnText').innerText = 'Memutar...';
+
+    const r1 = document.getElementById('reel1');
+    const r2 = document.getElementById('reel2');
+    const r3 = document.getElementById('reel3');
+
+    r1.classList.add('spinning');
+    r2.classList.add('spinning');
+    r3.classList.add('spinning');
+
+    document.getElementById('outcomeText').innerText = 'Mengacak reel tantangan K3...';
+
+    // Staggered stop
+    setTimeout(() => {
+      r1.classList.remove('spinning');
+      const idx1 = Math.floor(Math.random() * symbols.length);
+      r1.innerHTML = `<div class="symbol-icon">${symbols[idx1].icon}</div><div class="symbol-title">${symbols[idx1].title}</div>`;
+    }, 1200);
+
+    setTimeout(() => {
+      r2.classList.remove('spinning');
+      const idx2 = Math.floor(Math.random() * symbols.length);
+      r2.innerHTML = `<div class="symbol-icon">${symbols[idx2].icon}</div><div class="symbol-title">${symbols[idx2].title}</div>`;
+
+      // Reel 2 menentukan kategori soal
+      const pickedSym = symbols[idx2];
+      const matchQ = questions.filter(q => q.cat === pickedSym.cat);
+      const chosenQ = matchQ.length > 0 ? matchQ[Math.floor(Math.random() * matchQ.length)] : questions[Math.floor(Math.random() * questions.length)];
+      renderQuestion(chosenQ);
+    }, 1800);
+
+    setTimeout(() => {
+      r3.classList.remove('spinning');
+      const idx3 = Math.floor(Math.random() * symbols.length);
+      r3.innerHTML = `<div class="symbol-icon">${symbols[idx3].icon}</div><div class="symbol-title">${symbols[idx3].title}</div>`;
+
+      isSpinning = false;
+      document.getElementById('spinBtn').disabled = false;
+      document.getElementById('spinBtnText').innerText = 'Putar Slot Lagi';
+      document.getElementById('outcomeText').innerText = '🎯 Kategori Terpilih! Jawab tantangan K3 di bawah:';
+    }, 2400);
+  }
+
+  function closeCampaign() {
+    if (window.Indexsafe && typeof window.Indexsafe.close === 'function') {
+      window.Indexsafe.close();
+    } else if (window.IndexsafeBridge) {
+      window.IndexsafeBridge.postMessage(JSON.stringify({ action: "close" }));
+    } else {
+      window.history.back();
+    }
+  }
+
+  // Render initial question
+  renderQuestion(questions[0]);
+</script>
+</body>
+</html>
+
