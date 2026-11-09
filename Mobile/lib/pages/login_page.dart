@@ -474,21 +474,21 @@ class _LoginPageState extends State<LoginPage> {
               builder: (context, constraints) {
                 final screenH = constraints.maxHeight;
                 final isCompact = screenH < 690;
-                final isMedium = screenH >= 690 && screenH < 810;
+                final isMedium = screenH >= 690 && screenH < 820;
 
-                final logoWidth = isCompact ? 95.0 : (isMedium ? 112.0 : 125.0);
-                final logoPadding = isCompact ? 10.0 : 13.0;
-                final logoBottomSpacing = isCompact ? 8.0 : 12.0;
-                final titleFontSize = isCompact ? 19.0 : 21.0;
-                final subtitleFontSize = isCompact ? 12.0 : 13.0;
-                final subtitleBottomSpacing = isCompact ? 10.0 : 14.0;
+                final logoWidth = isCompact ? 72.0 : (isMedium ? 84.0 : 98.0);
+                final logoPadding = isCompact ? 8.0 : (isMedium ? 10.0 : 12.0);
+                final logoBottomSpacing = isCompact ? 6.0 : (isMedium ? 8.0 : 10.0);
+                final titleFontSize = isCompact ? 17.5 : (isMedium ? 19.0 : 20.5);
+                final subtitleFontSize = isCompact ? 11.5 : (isMedium ? 12.0 : 12.5);
+                final subtitleBottomSpacing = isCompact ? 8.0 : (isMedium ? 10.0 : 12.0);
 
-                final cardPaddingV = isCompact ? 16.0 : (isMedium ? 18.0 : 20.0);
+                final cardPaddingV = isCompact ? 12.0 : (isMedium ? 15.0 : 18.0);
                 final cardPaddingH = isCompact ? 16.0 : 20.0;
-                final inputSpacing = isCompact ? 11.0 : 14.0;
-                final buttonTopSpacing = isCompact ? 14.0 : 18.0;
-                final footerTopSpacing = isCompact ? 8.0 : 12.0;
-                final footerBottomSpacing = isCompact ? 8.0 : 12.0;
+                final inputSpacing = isCompact ? 9.0 : 11.0;
+                final buttonTopSpacing = isCompact ? 10.0 : 14.0;
+                final footerTopSpacing = isCompact ? 6.0 : 10.0;
+                final footerBottomSpacing = isCompact ? 16.0 : (isMedium ? 24.0 : 32.0);
 
                 return SingleChildScrollView(
                   padding: EdgeInsets.symmetric(horizontal: isCompact ? 22 : 28),
@@ -501,7 +501,7 @@ class _LoginPageState extends State<LoginPage> {
                         key: _key,
                         child: Column(
                           children: [
-                            SizedBox(height: isCompact ? 4 : (isMedium ? 8 : 12)),
+                            SizedBox(height: isCompact ? 2 : (isMedium ? 6 : 10)),
                             // Logo MBS with enhanced 3D Pedestal
                             Center(
                               child: Container(
@@ -682,9 +682,9 @@ class _LoginPageState extends State<LoginPage> {
                                         ),
                                         filled: false,
                                         contentPadding:
-                                            const EdgeInsets.symmetric(
+                                            EdgeInsets.symmetric(
                                           horizontal: 16,
-                                          vertical: 14,
+                                          vertical: isCompact ? 10.0 : 12.0,
                                         ),
                                         border: InputBorder.none,
                                         enabledBorder: InputBorder.none,
@@ -784,9 +784,9 @@ class _LoginPageState extends State<LoginPage> {
                                         ),
                                         filled: false,
                                         contentPadding:
-                                            const EdgeInsets.symmetric(
+                                            EdgeInsets.symmetric(
                                           horizontal: 16,
-                                          vertical: 14,
+                                          vertical: isCompact ? 10.0 : 12.0,
                                         ),
                                         border: InputBorder.none,
                                         enabledBorder: InputBorder.none,

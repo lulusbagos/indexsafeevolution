@@ -53,3 +53,4 @@ namespace Indexsafe.Api.Models
         public string? CreatedBy { get; set; }
     }
 }
+
