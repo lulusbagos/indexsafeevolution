@@ -5769,7 +5769,7 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
                                         const SizedBox(width: 6),
                                         Expanded(
                                           child: Text(
-                                            'PJA KHUSUS AREA (${_area.toUpperCase()})',
+                                            'PJA AREA UTAMA (${_area.toUpperCase()})',
                                             style: const TextStyle(
                                               fontSize: 11.5,
                                               fontWeight: FontWeight.bold,

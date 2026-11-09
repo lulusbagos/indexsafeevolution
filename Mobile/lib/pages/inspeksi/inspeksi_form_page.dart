@@ -115,6 +115,8 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
   _PjaCandidate? _selectedPja;
   List<_PjaCandidate> _pjaSearchResults = [];
   bool _isSearchingPja = false;
+  List<_PjaCandidate> _areaAssignedPjas = [];
+  bool _isLoadingAreaPjas = false;
 
   // 15 Standard Checkpoints dari Web /Inspection/Index
   late final List<_CheckpointItem> _checkpoints;
@@ -316,6 +318,7 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
           if (_area.isEmpty && _masterAreas.isNotEmpty) {
             _area = _masterAreas.first;
             _loadBenchmarksForArea(_area);
+            _loadAreaPjas(_area);
           }
         });
         onDone?.call();
@@ -333,6 +336,7 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
           if (_area.isEmpty && _masterAreas.isNotEmpty) {
             _area = _masterAreas.first;
             _loadBenchmarksForArea(_area);
+            _loadAreaPjas(_area);
           }
         });
         onDone?.call();
@@ -359,6 +363,7 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
             if (_area.isEmpty) _area = _defaultAreas.first;
           });
           _loadBenchmarksForArea(_area);
+          _loadAreaPjas(_area);
         }
         setState(() => _isLoadingAreas = false);
       }
@@ -543,12 +548,53 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
     });
   }
 
+  Future<void> _loadAreaPjas(String area) async {
+    final cleanArea = area.trim();
+    if (cleanArea.isEmpty) {
+      if (mounted) setState(() => _areaAssignedPjas = []);
+      return;
+    }
+    if (mounted) setState(() => _isLoadingAreaPjas = true);
+    try {
+      final res = await _api.searchPja('', area: cleanArea, lintasPerusahaan: true);
+      res.fold(
+        (_) {
+          if (mounted) setState(() => _isLoadingAreaPjas = false);
+        },
+        (data) {
+          if (mounted) {
+            final list = data.map((e) {
+              final nik = e['nik']?.toString().trim() ?? '';
+              final nama = e['nama']?.toString().trim() ?? '';
+              final foto = (e['foto'] ?? e['pathFoto'] ?? e['path_foto'])?.toString().trim();
+              return _PjaCandidate(
+                id: (e['id'] as num?)?.toInt() ?? 0,
+                nik: nik,
+                nama: nama,
+                jabatan: (e['jabatan'] ?? e['posisi'])?.toString().trim() ?? '',
+                departemen: (e['departemen'] ?? e['depart'])?.toString().trim() ?? '',
+                perusahaan: e['perusahaan']?.toString().trim() ?? 'Mitra Kerja',
+                foto: (foto != null && foto.isNotEmpty) ? foto : null,
+              );
+            }).toList();
+            setState(() {
+              _isLoadingAreaPjas = false;
+              _areaAssignedPjas = list;
+            });
+          }
+        },
+      );
+    } catch (_) {
+      if (mounted) setState(() => _isLoadingAreaPjas = false);
+    }
+  }
+
   Future<void> _searchPja(String query) async {
     final cleanQ = query.trim();
     if (cleanQ.isEmpty) {
       if (mounted) {
         setState(() {
-          _pjaSearchResults = [];
+          _pjaSearchResults = _areaAssignedPjas;
           _isSearchingPja = false;
         });
       }
@@ -676,7 +722,7 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
       // 4. Online API search fallback (if online)
       if (results.length < 5 && cleanQ.isNotEmpty) {
         try {
-          final res = await _api.searchPja(cleanQ, lintasPerusahaan: true);
+          final res = await _api.searchPja(cleanQ, area: _area, lintasPerusahaan: true);
           res.fold((_) {}, (serverData) {
             for (final item in serverData) {
               final nik = item['nik']?.toString().trim() ?? '';
@@ -954,6 +1000,7 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
                               _selectedBenchmark = null;
                             });
                             _loadBenchmarksForArea(a);
+                            _loadAreaPjas(a);
                             Navigator.pop(modalCtx);
                           },
                           leading: Container(
@@ -2374,6 +2421,125 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
                       ),
                     )
                   else ...[
+                    if (_isLoadingAreaPjas)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 6),
+                        child: Center(
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              SizedBox(
+                                width: 14,
+                                height: 14,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: primaryGreen,
+                                ),
+                              ),
+                              SizedBox(width: 8),
+                              Text(
+                                'Memuat PJA Area Utama...',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: Color(0xFF64748B),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      )
+                    else if (_areaAssignedPjas.isNotEmpty) ...[
+                      Container(
+                        margin: const EdgeInsets.only(bottom: 10),
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFECFDF5),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFFA7F3D0)),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                const Icon(Icons.verified_user_rounded,
+                                    size: 16, color: primaryGreen),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: Text(
+                                    'PJA AREA UTAMA (${_area.toUpperCase()})',
+                                    style: const TextStyle(
+                                      fontSize: 11.5,
+                                      fontWeight: FontWeight.bold,
+                                      color: Color(0xFF0F766E),
+                                      letterSpacing: 0.3,
+                                    ),
+                                  ),
+                                ),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: primaryGreen,
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Text(
+                                    '${_areaAssignedPjas.length} Terdaftar',
+                                    style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.bold),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            Wrap(
+                              spacing: 6,
+                              runSpacing: 6,
+                              children: _areaAssignedPjas.map((p) {
+                                return ActionChip(
+                                  avatar: const CircleAvatar(
+                                    backgroundColor: primaryGreen,
+                                    child: Icon(Icons.person_rounded,
+                                        size: 14, color: Colors.white),
+                                  ),
+                                  label: Text(
+                                    '${p.nama} (${p.nik})',
+                                    style: const TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                        color: Color(0xFF0F172A)),
+                                  ),
+                                  backgroundColor: Colors.white,
+                                  side: const BorderSide(
+                                      color: Color(0xFF86EFAC)),
+                                  shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(20)),
+                                  elevation: 1,
+                                  shadowColor: Colors.black12,
+                                  onPressed: () {
+                                    setState(() {
+                                      _selectedPja = p;
+                                      _pjaSearchCtrl.clear();
+                                      _pjaSearchResults.clear();
+                                    });
+                                  },
+                                );
+                              }).toList(),
+                            ),
+                            const SizedBox(height: 6),
+                            const Text(
+                              '💡 Klik nama di atas untuk memilih langsung, atau cari karyawan lain di bawah.',
+                              style: TextStyle(
+                                  fontSize: 10.5,
+                                  color: Color(0xFF047857),
+                                  fontStyle: FontStyle.italic),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                     Container(
                       decoration: BoxDecoration(
                         color: const Color(0xFFF8FAFC),
