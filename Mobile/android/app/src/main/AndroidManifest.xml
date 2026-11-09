@@ -27,6 +27,7 @@
         android:label="MBS SAP"
         android:name="${applicationName}"
         android:icon="@mipmap/launcher_icon"
+        android:roundIcon="@mipmap/launcher_icon"
         android:enableOnBackInvokedCallback="true"
         android:allowBackup="false"
         android:usesCleartextTraffic="false">

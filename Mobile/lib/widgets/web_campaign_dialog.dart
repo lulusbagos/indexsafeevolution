@@ -123,19 +123,29 @@ class _WebCampaignDialogState extends State<WebCampaignDialog> {
   void _initWebViewController() {
     _hasError = false;
 
-    // 1. Bangun URL dengan query parameters NIK, Nama, dan Departemen
-    var rawUrl = widget.url.trim();
-    if (!rawUrl.startsWith('http://') && !rawUrl.startsWith('https://')) {
-      rawUrl = 'https://$rawUrl';
-    }
-    final initialUri = Uri.tryParse(rawUrl) ?? Uri.parse('https://google.com');
-    final queryParams = Map<String, String>.from(initialUri.queryParameters);
-    queryParams['nik'] = widget.nik;
-    queryParams['nama'] = widget.nama;
-    queryParams['dept'] = widget.depart;
-    queryParams['source'] = 'indexsafe_mobile';
+    final trimmed = widget.url.trim();
+    final isDirectHtml = trimmed.toLowerCase().startsWith('<!doctype') ||
+        trimmed.toLowerCase().startsWith('<html') ||
+        trimmed.toLowerCase().startsWith('<div') ||
+        trimmed.toLowerCase().startsWith('data:text/html');
 
-    final finalUri = initialUri.replace(queryParameters: queryParams);
+    Uri? finalUri;
+    if (!isDirectHtml) {
+      var rawUrl = trimmed;
+      if (!rawUrl.startsWith('http://') && !rawUrl.startsWith('https://')) {
+        rawUrl = 'https://$rawUrl';
+      }
+      final initialUri =
+          Uri.tryParse(rawUrl) ?? Uri.parse('https://google.com');
+      final queryParams =
+          Map<String, String>.from(initialUri.queryParameters);
+      queryParams['nik'] = widget.nik;
+      queryParams['nama'] = widget.nama;
+      queryParams['dept'] = widget.depart;
+      queryParams['source'] = 'indexsafe_mobile';
+
+      finalUri = initialUri.replace(queryParameters: queryParams);
+    }
 
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
@@ -164,6 +174,9 @@ class _WebCampaignDialogState extends State<WebCampaignDialog> {
                     }
                   }
                 };
+                window.UserNik = "${widget.nik}";
+                window.UserName = "${widget.nama}";
+                window.UserDept = "${widget.depart}";
               ''');
             } catch (_) {}
           },
@@ -196,8 +209,13 @@ class _WebCampaignDialogState extends State<WebCampaignDialog> {
             }
           }
         },
-      )
-      ..loadRequest(finalUri);
+      );
+
+    if (isDirectHtml) {
+      _controller.loadHtmlString(trimmed);
+    } else if (finalUri != null) {
+      _controller.loadRequest(finalUri);
+    }
   }
 
   @override
