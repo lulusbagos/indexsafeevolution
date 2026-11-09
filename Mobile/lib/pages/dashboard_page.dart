@@ -37,6 +37,7 @@ import 'safety_updates_page.dart';
 import 'special_permit/special_permit_followup_page.dart';
 import 'special_permit/special_permit_list_page.dart';
 import '../widgets/home_weather_widget.dart';
+import '../widgets/safety_quiz_slot_dialog.dart';
 
 class _HomeModuleCard extends StatelessWidget {
   const _HomeModuleCard({
@@ -2854,6 +2855,7 @@ class _DashboardPageState extends State<DashboardPage>
       _fetchNotifCount();
       _checkApprovalAccess();
       _checkSpecialPermitHighRiskAlerts();
+      _checkAndPromptKuisSlot();
       _initLocationAndProximity();
       _fetchHazardPointsFromApi();
 
@@ -5327,6 +5329,8 @@ class _DashboardPageState extends State<DashboardPage>
               ),
               // Quick Action Card: Approval Center (khusus user terdaftar di Bima)
               if (_isApprovalRegistered) _buildApprovalQuickCard(),
+              // Kuis K3 & Slot Berputar (Khusus NIK 24051940986)
+              if (_isKuisSlotEligible) _buildKuisSlotBanner(),
               // Quick Alert: Temuan K3 Masuk yang Membutuhkan Respon User ("Aplikasi Depan")
               if (_notifCount > 0) _buildIncomingFindingsAlertCard(),
               Padding(
@@ -5727,6 +5731,200 @@ class _DashboardPageState extends State<DashboardPage>
                       SizedBox(width: 2),
                       Icon(Icons.arrow_forward_ios_rounded,
                           size: 10, color: Colors.white),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Cek hak akses khusus Kuis Slot Berputar untuk NIK 24051940986
+  bool get _isKuisSlotEligible {
+    final profile = PreferenceService.getProfile();
+    final rawUserNik = (profile?.noNik ??
+            PreferenceService.getUser() ??
+            PreferenceService.getOfflineNik() ??
+            '')
+        .trim();
+    final cleanNik = rawUserNik.replaceAll(RegExp(r'[^0-9]'), '');
+    return cleanNik == '24051940986';
+  }
+
+  void _checkAndPromptKuisSlot() {
+    if (!_isKuisSlotEligible) return;
+    Future.delayed(const Duration(milliseconds: 1400), () {
+      if (!mounted) return;
+      SafetyQuizSlotDialog.show(
+        context,
+        userNik: '24051940986',
+        userName: PreferenceService.getProfile()?.namaLengkap ??
+            'Lulus Bagos Hermawan',
+      );
+    });
+  }
+
+  /// Banner Card Kuis K3 & Slot Berputar Khusus NIK 24051940986
+  Widget _buildKuisSlotBanner() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 2, 20, 10),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(18),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(18),
+          onTap: () {
+            HapticFeedback.lightImpact();
+            SafetyQuizSlotDialog.show(
+              context,
+              userNik: '24051940986',
+              userName: PreferenceService.getProfile()?.namaLengkap ??
+                  'Lulus Bagos Hermawan',
+            );
+          },
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFF0F172A), Color(0xFF1E293B)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(
+                color: const Color(0xFFF59E0B).withValues(alpha: 0.5),
+                width: 1.3,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFFF59E0B).withValues(alpha: 0.2),
+                  blurRadius: 14,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFFF59E0B), Color(0xFFD97706)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFFF59E0B).withValues(alpha: 0.4),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: const Center(
+                    child: Icon(
+                      Icons.casino_rounded,
+                      color: Colors.white,
+                      size: 24,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF59E0B)
+                                  .withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(
+                                color: const Color(0xFFF59E0B)
+                                    .withValues(alpha: 0.5),
+                              ),
+                            ),
+                            child: const Text(
+                              'KHUSUS NIK 24051940986',
+                              style: TextStyle(
+                                fontSize: 9.5,
+                                fontWeight: FontWeight.w800,
+                                color: Color(0xFFF59E0B),
+                                letterSpacing: 0.4,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          const Text(
+                            '🎰 LUCKY SLOT',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF94A3B8),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 3),
+                      const Text(
+                        'Kuis Tangkas K3 & Slot Berputar',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      const Text(
+                        'Putar reel, jawab tantangan K3, & raih poin!',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: Color(0xFF94A3B8),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF59E0B),
+                    borderRadius: BorderRadius.circular(8),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFFF59E0B).withValues(alpha: 0.4),
+                        blurRadius: 6,
+                      ),
+                    ],
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'Main',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w900,
+                          color: Color(0xFF0F172A),
+                        ),
+                      ),
+                      SizedBox(width: 2),
+                      Icon(Icons.arrow_forward_ios_rounded,
+                          size: 10, color: Color(0xFF0F172A)),
                     ],
                   ),
                 ),
