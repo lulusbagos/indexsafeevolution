@@ -394,13 +394,8 @@ namespace Indexsafe.Api.Controllers
             var departments = await _companyHierarchyService.GetDepartmentsByCompanyAsync(companyId);
             var companyDeptMap = await _companyHierarchyService.GetAllCompanyDepartmentsMapAsync();
 
-            var benchmarkQuery = _context.Benchmarks.AsNoTracking();
-            if (await benchmarkQuery.AnyAsync(b => b.PerusahaanId == companyId))
-                benchmarkQuery = benchmarkQuery.Where(b => b.PerusahaanId == companyId);
-            else
-                benchmarkQuery = benchmarkQuery.Where(b => b.PerusahaanId == 1);
-            var locations = await benchmarkQuery
-                .Where(b => !string.IsNullOrWhiteSpace(b.NamaBenchmark))
+            var locations = await _context.Benchmarks.AsNoTracking()
+                .Where(b => (b.PerusahaanId == companyId || b.PerusahaanId == 1 || b.PerusahaanId == null) && !string.IsNullOrWhiteSpace(b.NamaBenchmark))
                 .OrderBy(b => b.AreaUtama).ThenBy(b => b.NamaBenchmark)
                 .Select(b => new { id = b.Id, name = b.NamaBenchmark!.Trim(), area = b.AreaUtama ?? string.Empty })
                 .ToListAsync();
@@ -569,15 +564,8 @@ namespace Indexsafe.Api.Controllers
 
             if (targetCid > 0)
             {
-                var hasCompanyRows = await query.AnyAsync(b => b.PerusahaanId == targetCid && (string.IsNullOrEmpty(areaUtama) || b.AreaUtama == areaUtama));
-                if (hasCompanyRows)
-                {
-                    query = query.Where(b => b.PerusahaanId == targetCid);
-                }
-                else
-                {
-                    query = query.Where(b => b.PerusahaanId == 1);
-                }
+                // Ambil benchmark site-wide (perusahaan_id == 1) maupun benchmark khusus perusahaan tersebut jika ada
+                query = query.Where(b => b.PerusahaanId == targetCid || b.PerusahaanId == 1 || b.PerusahaanId == null);
             }
 
             if (!string.IsNullOrWhiteSpace(areaUtama))
@@ -618,20 +606,18 @@ namespace Indexsafe.Api.Controllers
             }
 
             var cleanArea = request.AreaUtama.Trim();
-            var cleanBench = request.NamaBenchmark.Trim();
+            var cleanBench = request.NamaBenchmark.Trim().ToUpper();
 
-            var cidClaim = User.FindFirst("CompanyId")?.Value;
-            var cid = request.PerusahaanId ?? (int.TryParse(cidClaim, out var c) ? c : 1);
             var nik = User.FindFirst("Nik")?.Value ?? request.CreatedByNik ?? "USER";
             var nama = User.FindFirst("Nama")?.Value ?? request.CreatedByName ?? "User Mobile";
 
+            // 1. Cek apakah benchmark dengan nama yang sama sudah ada di Area Utama ini (site-wide)
             var existing = await _context.Benchmarks
                 .AsNoTracking()
-                .FirstOrDefaultAsync(b => b.PerusahaanId == cid &&
-                                          b.AreaUtama != null && 
+                .FirstOrDefaultAsync(b => b.AreaUtama != null && 
                                           b.AreaUtama.ToLower() == cleanArea.ToLower() && 
                                           b.NamaBenchmark != null && 
-                                          b.NamaBenchmark.ToLower() == cleanBench.ToLower());
+                                          b.NamaBenchmark.Trim().ToLower() == cleanBench.ToLower());
             if (existing != null)
             {
                 return Ok(new { id = existing.Id, namaBenchmark = existing.NamaBenchmark, areaUtama = existing.AreaUtama, perusahaanId = existing.PerusahaanId });
@@ -639,7 +625,7 @@ namespace Indexsafe.Api.Controllers
 
             var item = new MasterBenchmark
             {
-                PerusahaanId = cid,
+                PerusahaanId = 1, // Didaftarkan sebagai site-wide master agar langsung dapat dipakai bersama
                 AreaUtama = cleanArea,
                 NamaBenchmark = cleanBench,
                 CreatedByNik = nik,
@@ -647,8 +633,26 @@ namespace Indexsafe.Api.Controllers
                 CreatedAt = DateTime.Now
             };
 
-            _context.Benchmarks.Add(item);
-            await _context.SaveChangesAsync();
+            try
+            {
+                _context.Benchmarks.Add(item);
+                await _context.SaveChangesAsync();
+            }
+            catch (DbUpdateException)
+            {
+                // Tangkal race condition tertangkap oleh UNIQUE INDEX di database
+                var fallback = await _context.Benchmarks
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(b => b.AreaUtama != null && 
+                                              b.AreaUtama.ToLower() == cleanArea.ToLower() && 
+                                              b.NamaBenchmark != null && 
+                                              b.NamaBenchmark.Trim().ToLower() == cleanBench.ToLower());
+                if (fallback != null)
+                {
+                    return Ok(new { id = fallback.Id, namaBenchmark = fallback.NamaBenchmark, areaUtama = fallback.AreaUtama, perusahaanId = fallback.PerusahaanId });
+                }
+                return BadRequest(new { message = $"Benchmark '{cleanBench}' sudah terdaftar di area ini." });
+            }
 
             return Ok(new { id = item.Id, namaBenchmark = item.NamaBenchmark, areaUtama = item.AreaUtama, perusahaanId = item.PerusahaanId });
         }
