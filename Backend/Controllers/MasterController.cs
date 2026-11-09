@@ -529,15 +529,7 @@ namespace Indexsafe.Api.Controllers
 
             if (targetCid > 0)
             {
-                var hasCompanyAreas = await query.AnyAsync(b => b.PerusahaanId == targetCid && !string.IsNullOrEmpty(b.AreaUtama));
-                if (hasCompanyAreas)
-                {
-                    query = query.Where(b => b.PerusahaanId == targetCid);
-                }
-                else
-                {
-                    query = query.Where(b => b.PerusahaanId == 1);
-                }
+                query = query.Where(b => b.PerusahaanId == targetCid || b.PerusahaanId == 1 || b.PerusahaanId == null);
             }
 
             var areaNames = await query
