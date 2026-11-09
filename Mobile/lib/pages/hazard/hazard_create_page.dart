@@ -2802,124 +2802,74 @@ class _HazardCreatePageState extends State<HazardCreatePage> {
 
 
   Future<void> _addNewBenchmark(String name) async {
-
-    final cleanName = name.trim();
-
+    final cleanName = name.trim().toUpperCase();
     if (cleanName.isEmpty) return;
-
     if (_area.isEmpty) {
-
       SnackBarMsg.warning(context, 'Pilih Area Utama terlebih dahulu.');
-
       return;
-
     }
 
-
+    final existingMatch = _benchmarksList.firstWhere(
+      (b) => b.trim().toUpperCase() == cleanName,
+      orElse: () => '',
+    );
+    if (existingMatch.isNotEmpty) {
+      setState(() => _detilLokasiCtrl.text = existingMatch);
+      if (mounted) {
+        SnackBarMsg.info(
+            context, 'Benchmark "$existingMatch" sudah terdaftar dan telah dipilih.');
+      }
+      return;
+    }
 
     final profile = PreferenceService.getProfile();
-
     final userNik = profile?.noNik ?? 'USER';
-
     final userName = profile?.namaLengkap ?? 'User Mobile';
 
-
-
     setState(() {
-
-      if (!_benchmarksList.contains(cleanName)) {
-
-        _benchmarksList.add(cleanName);
-
-        _benchmarksList.sort();
-
-      }
-
+      _benchmarksList.add(cleanName);
+      _benchmarksList.sort();
       _detilLokasiCtrl.text = cleanName;
-
     });
 
-
-
     try {
-
       final sqldb = await _db.database;
-
+      await sqldb.execute('CREATE UNIQUE INDEX IF NOT EXISTS idx_bm_area_name ON tbl_m_benchmark (area_utama, nama_benchmark);');
       await sqldb.rawInsert(
-
-        '''INSERT INTO tbl_m_benchmark (perusahaan_id, area_utama, nama_benchmark, created_by_nik, created_by_name, created_at)
-
+        '''INSERT OR IGNORE INTO tbl_m_benchmark (perusahaan_id, area_utama, nama_benchmark, created_by_nik, created_by_name, created_at)
            VALUES (?, ?, ?, ?, ?, ?)''',
-
         [
-
-          profile?.companyId ?? 1,
-
+          1,
           _area,
-
           cleanName,
-
           userNik,
-
           userName,
-
           DateTime.now().toIso8601String()
-
         ],
-
       );
-
     } catch (_) {}
 
-
-
     try {
-
       final result = await _api.createBenchmark(
-
         areaUtama: _area,
-
         namaBenchmark: cleanName,
-
-        perusahaanId: profile?.companyId ?? 1,
-
+        perusahaanId: 1,
         createdByNik: userNik,
-
         createdByName: userName,
-
       );
-
       if (mounted) {
-
         if (result != null) {
-
           SnackBarMsg.success(
-
               context, 'Data acuan "$cleanName" berhasil disimpan.');
-
         } else {
-
           SnackBarMsg.info(
-
               context, 'Benchmark "$cleanName" tersimpan di HP (Mode Offline)');
-
         }
-
       }
-
     } catch (e) {
-
-      if (mounted) {
-
-        SnackBarMsg.info(context, 'Benchmark "$cleanName" tersimpan lokal');
-
-      }
-
+      debugPrint('[HazardCreate] Error saving benchmark: $e');
     }
-
   }
-
-
 
   Future<void> _fetchCurrentGps({bool silent = false}) async {
 

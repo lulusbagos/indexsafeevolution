@@ -850,32 +850,43 @@ class _BbsFormPageState extends State<BbsFormPage> {
   }
 
   Future<void> _addNewBenchmark(String name) async {
-    final cleanName = name.trim();
+    final cleanName = name.trim().toUpperCase();
     if (cleanName.isEmpty) return;
     if (_area.isEmpty) {
       SnackBarMsg.warning(context, 'Pilih Area Utama terlebih dahulu.');
       return;
     }
 
+    final existingMatch = _benchmarksList.firstWhere(
+      (b) => b.trim().toUpperCase() == cleanName,
+      orElse: () => '',
+    );
+    if (existingMatch.isNotEmpty) {
+      setState(() => _benchmark = existingMatch);
+      if (mounted) {
+        SnackBarMsg.info(
+            context, 'Benchmark "$existingMatch" sudah terdaftar dan telah dipilih.');
+      }
+      return;
+    }
+
     final userNik = _profile?.noNik ?? 'USER';
     final userName = _profile?.namaLengkap ?? 'User Mobile';
-    final companyId = _companyId ?? _profile?.companyId ?? 1;
 
     setState(() {
-      if (!_benchmarksList.contains(cleanName)) {
-        _benchmarksList.add(cleanName);
-        _benchmarksList.sort();
-      }
+      _benchmarksList.add(cleanName);
+      _benchmarksList.sort();
       _benchmark = cleanName;
     });
 
     try {
       final sqldb = await _db.database;
+      await sqldb.execute('CREATE UNIQUE INDEX IF NOT EXISTS idx_bm_area_name ON tbl_m_benchmark (area_utama, nama_benchmark);');
       await sqldb.rawInsert(
-        '''INSERT INTO tbl_m_benchmark (perusahaan_id, area_utama, nama_benchmark, created_by_nik, created_by_name, created_at)
+        '''INSERT OR IGNORE INTO tbl_m_benchmark (perusahaan_id, area_utama, nama_benchmark, created_by_nik, created_by_name, created_at)
            VALUES (?, ?, ?, ?, ?, ?)''',
         [
-          companyId,
+          1,
           _area,
           cleanName,
           userNik,
@@ -889,7 +900,7 @@ class _BbsFormPageState extends State<BbsFormPage> {
       final res = await _api.createBenchmark(
         areaUtama: _area,
         namaBenchmark: cleanName,
-        perusahaanId: companyId,
+        perusahaanId: 1,
         createdByNik: userNik,
         createdByName: userName,
       );
