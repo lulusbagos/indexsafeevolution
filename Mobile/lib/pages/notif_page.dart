@@ -69,7 +69,12 @@ class _NotifPageState extends State<NotifPage> {
 
   final _profile = PreferenceService.getProfile();
 
+  // Static in-memory cache agar saat halaman dibuka langsung muncul instan (0 detik)
+  static List<dynamic> _cachedNotifs = [];
+
   List<dynamic> _rawData = [];
+
+  bool _isLoading = true;
 
   bool _isSyncing = false;
 
@@ -77,7 +82,7 @@ class _NotifPageState extends State<NotifPage> {
 
   DateTime? _lastSyncTime;
 
-  String _selectedFilter = 'all'; // 'all', 'hazard', 'inspection'
+  String _selectedFilter = 'all'; // 'all', 'pending_takeup', 'unread', 'hazard', 'inspection'
 
 
 
@@ -87,16 +92,21 @@ class _NotifPageState extends State<NotifPage> {
 
     super.initState();
 
+    // 1. Tampilkan data dari memory cache jika sudah ada (0 ms latency, instan)
+    if (_cachedNotifs.isNotEmpty) {
+      _rawData = List<dynamic>.from(_cachedNotifs);
+      _isLoading = false;
+    } else {
+      _isLoading = true;
+    }
 
+    // 2. Ambil data SQLite lokal langsung tanpa menunda
+    _loadLocalData();
 
+    // 3. Jalankan sync online dan actions di background
     WidgetsBinding.instance.addPostFrameCallback((_) {
-
-      _loadLocalData();
-
       _syncOnlineData();
-
       _fetchApiActions();
-
     });
 
   }
@@ -644,6 +654,53 @@ class _NotifPageState extends State<NotifPage> {
     }
   }
 
+  bool _isItemPendingTakeUp(Map<String, dynamic> item) {
+    final status = (item['status'] as num?)?.toInt() ?? 0;
+    final isActioned = item['is_actioned'] == true;
+    if (isActioned || status >= 2) return false;
+
+    final title = (item['title'] ?? '').toString().toLowerCase();
+    final remark = (item['remark'] ?? '').toString().toLowerCase();
+
+    // Bukan pending take up jika hanya konfirmasi pengajuan / dalam proses
+    if (title.contains('dalam proses') ||
+        title.contains('berhasil diajukan') ||
+        title.contains('telah diajukan') ||
+        remark.contains('sedang menunggu persetujuan dari')) {
+      return false;
+    }
+
+    final isActionReq = item['is_action_required'] == true;
+    final isApproval = item['is_approval_item'] == true;
+    final isSpecialPermit = item['is_special_permit'] == true;
+    final cat = (item['category'] ?? '').toString().toLowerCase();
+    final notifType = (item['notif_type'] ?? '').toString().toLowerCase();
+    final priority = (item['priority'] ?? '').toString().toLowerCase();
+
+    // Pending take up jika:
+    // 1. Approval item yang belum diapprove
+    if (isApproval || cat.contains('approval') || notifType.contains('approval')) return true;
+    // 2. Special permit observation high-risk yang belum diobservasi
+    if (isSpecialPermit || cat.contains('special_permit')) return true;
+    // 3. Penugasan PJA atau PIC yang statusnya masih 0 (belum di-take up / belum ditentukan PIC)
+    if (title.contains('penugasan pja') ||
+        title.contains('penugasan pic') ||
+        remark.contains('take up') ||
+        remark.contains('tentukan pic')) {
+      return true;
+    }
+    // 4. Action required dengan status 0
+    if (isActionReq && status < 1) return true;
+    // 5. Urgent priority yang belum actioned
+    if (priority == 'urgent' && status < 1) return true;
+
+    return false;
+  }
+
+  bool _isItemUnread(Map<String, dynamic> item) {
+    return item['is_read'] != true;
+  }
+
   int _calcUnreadCount(List<dynamic> list) {
     return list.where((item) {
       if (item is! Map) return false;
@@ -656,91 +713,80 @@ class _NotifPageState extends State<NotifPage> {
     }).length;
   }
 
-  /// 1. Ambil data lokal SQLite INSTAN (0 detik) agar mode offline langsung aktif tanpa nunggu network
+  /// 1. Ambil data lokal SQLite INSTAN (0 detik) agar data langsung tampil tanpa nunggu network
   Future<void> _loadLocalData() async {
-
     try {
-
       final List<Map<String, dynamic>> combined = [];
 
-
-
       // Notifikasi dari database lokal SQLite (3 bulan terakhir)
-
       final localNotifs = await _db.getLocalNotifications(months: 3);
-
       _processRawNotificationItems(localNotifs, combined);
 
-
-
       // Action plans lokal dari SQLite
-
       final profileId = _profile?.id ?? 0;
-
       if (profileId > 0) {
-
         try {
-
           final val = await _db.rawQuery(
-
               '''select tr.*, me1.name as area_name, me2.name as location_name, 1 as sync_id,
-
                 (select e.nama_lengkap from employees e where e.id=tr.pja_id) as pja_name,
-
                 (select e.nama_lengkap from employees e where e.id=tr.pic_id) as pic_name
-
                 from action_plans tr
-
                 left join enum_masters me1 on me1.type='area' and me1.id=tr.area_id and me1.deleted_at is null
-
                 left join enum_masters me2 on me2.type='location' and me2.id=tr.location_id and me2.deleted_at is null
-
                 where tr.deleted_at is null and ((tr.pja_id=$profileId and tr.status<1) or (tr.pic_id=$profileId and tr.status<2))
-
                 order by tr.id desc''');
 
-
-
           for (var row in val) {
-
             final m = Map<String, dynamic>.from(row);
-
             m['is_server_notif'] = false;
-
             combined.add(m);
-
           }
-
         } catch (_) {}
-
       }
 
+      // Pertahankan item online (approval & special permit) yang sudah ada di memori agar tidak hilang
+      final existingOnlineItems = _rawData.where((item) {
+        if (item is! Map) return false;
+        return item['is_approval_item'] == true || item['is_special_permit'] == true;
+      }).toList();
 
+      for (var onlineItem in existingOnlineItems) {
+        final onlineId = onlineItem['id'];
+        final isAppr = onlineItem['is_approval_item'] == true;
+        final exists = combined.any((c) =>
+            c['id'] == onlineId &&
+            (isAppr ? c['is_approval_item'] == true : c['is_special_permit'] == true));
+        if (!exists) {
+          combined.add(Map<String, dynamic>.from(onlineItem));
+        }
+      }
 
-      final unreadCount = _calcUnreadCount(combined);
-      await PreferenceService.setNotif(unreadCount);
-      await NotificationService.syncLauncherBadge(unreadCount);
+      // Urutkan berdasarkan waktu terbaru (created_at_dt descending)
+      combined.sort((a, b) {
+        final dtA = a['created_at_dt'] as DateTime? ?? DateTime.fromMillisecondsSinceEpoch(0);
+        final dtB = b['created_at_dt'] as DateTime? ?? DateTime.fromMillisecondsSinceEpoch(0);
+        return dtB.compareTo(dtA);
+      });
 
       if (mounted) {
-
         setState(() {
-
           _rawData = combined;
-
-          // loaded
-
+          _cachedNotifs = List<dynamic>.from(combined);
+          _isLoading = false;
         });
-
       }
 
+      final unreadCount = _calcUnreadCount(combined);
+      PreferenceService.setNotif(unreadCount);
+      NotificationService.syncLauncherBadge(unreadCount);
     } catch (e) {
-
       debugPrint('[NotifPage] Error _loadLocalData: $e');
-
-      // loaded
-
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
-
   }
 
 
@@ -828,221 +874,123 @@ class _NotifPageState extends State<NotifPage> {
 
 
       // Jika online, tarik data approval dan special permit
-
       if (isSuccess) {
-
         try {
-
           final approvalRes = await _api.getPendingApprovals();
-
           approvalRes.fold(
-
             (_) {},
-
             (data) {
-
               final items = (data['data'] as List<dynamic>?) ?? [];
-
+              _rawData.removeWhere((item) => item is Map && item['is_approval_item'] == true);
               for (var a in items) {
-
                 final aMap = a as Map<String, dynamic>;
-
                 final aId = aMap['approvalId'] as int? ?? 0;
-
                 final mod = aMap['module']?.toString() ?? 'Persetujuan';
-
                 final nomor = aMap['nomor']?.toString() ?? '-';
-
                 final applicant =
-
                     aMap['applicantName']?.toString() ?? 'Pemohon';
-
                 final comp = aMap['companyName']?.toString() ?? '-';
-
                 final dept = aMap['department']?.toString() ?? '-';
-
                 final roleTarget = aMap['roleName']?.toString() ?? 'Approver';
-
                 final reqTimeStr = aMap['reqTime']?.toString();
-
                 DateTime? reqDate;
-
                 if (reqTimeStr != null) reqDate = DateTime.tryParse(reqTimeStr);
 
-
-
                 _rawData.add({
-
                   'id': aId,
-
                   'is_server_notif': true,
-
                   'is_approval_item': true,
-
                   'title': 'Persetujuan $mod: $nomor',
-
                   'remark':
-
                       'Permohonan $mod oleh $applicant ($dept • $comp). Menunggu persetujuan Anda ($roleTarget).',
-
                   'category': 'approval',
-
                   'notif_type': 'approval_request',
-
                   'url': '/approval_center',
-
                   'sender_name': applicant,
-
                   'priority': 'urgent',
-
                   'payload': aId.toString(),
-
                   'action_text': 'Tinjau Persetujuan',
-
                   'is_read': false,
-
                   'is_actioned': false,
-
                   'is_action_required': true,
-
                   'date': reqDate != null
-
                       ? DateFormat('yyyy-MM-dd').format(reqDate)
-
                       : '',
-
                   'time': reqDate != null
-
                       ? DateFormat('HH:mm').format(reqDate)
-
                       : '',
-
                   'created_at_dt': reqDate ?? DateTime.now(),
-
                   'status': 0,
-
                   'area_name': 'Approval Center',
-
                   'location_name': mod,
-
                 });
-
               }
-
             },
-
           );
-
         } catch (_) {}
-
-
 
         try {
-
           final spRes = await _api.getSpecialPermitAlerts();
-
           spRes.fold(
-
             (_) {},
-
             (spData) {
-
               final list = (spData['data'] as List<dynamic>?) ?? [];
-
+              _rawData.removeWhere((item) => item is Map && item['is_special_permit'] == true);
               for (var sp in list) {
-
                 final spMap = sp as Map<String, dynamic>;
-
                 final reqId = spMap['reqId']?.toString() ?? '-';
-
                 final actType =
-
                     (spMap['activityType']?.toString() ?? 'Pekerjaan Khusus')
-
                         .replaceAll('_', ' ');
-
                 final loc = spMap['workLocation']?.toString() ??
-
                     'Area Operasional Tambang';
-
                 final picName = spMap['applicantName']?.toString() ??
-
                     spMap['pjoName']?.toString() ??
-
                     'PIC Tim';
-
                 final issueTime = spMap['issueTime']?.toString() ?? '';
-
                 final issueDate = spMap['issueDate']?.toString() ?? '';
 
-
-
                 _rawData.add({
-
                   'id': spMap['id'],
-
                   'is_server_notif': true,
-
                   'is_special_permit': true,
-
                   'raw_permit': spMap,
-
                   'title': '⚠️ Observasi High Risk: $reqId',
-
                   'remark':
-
                       'Kegiatan risiko tinggi $actType di $loc. Pengawas/PJO: $picName. Segera lakukan verifikasi & observasi lapangan!',
-
                   'category': 'special_permit',
-
                   'notif_type': 'special_permit_high_risk',
-
                   'url': 'special_permit_obs',
-
                   'sender_name': picName,
-
                   'priority': 'urgent',
-
                   'payload': spMap['id'],
-
                   'action_text': 'Observasi Sekarang',
-
                   'is_read': false,
-
                   'is_actioned': false,
-
                   'is_action_required': true,
-
                   'date': issueDate.isNotEmpty
-
                       ? issueDate.substring(0, 10.clamp(0, issueDate.length))
-
                       : '',
-
                   'time': issueTime,
-
                   'created_at_dt': DateTime.now(),
-
                   'status': 0,
-
                   'area_name': 'Special Permit',
-
                   'location_name': loc,
-
                 });
-
               }
-
             },
-
           );
-
         } catch (_) {}
 
-
+        // Urutkan kembali berdasarkan waktu terbaru
+        _rawData.sort((a, b) {
+          final dtA = (a is Map ? a['created_at_dt'] : null) as DateTime? ?? DateTime.fromMillisecondsSinceEpoch(0);
+          final dtB = (b is Map ? b['created_at_dt'] : null) as DateTime? ?? DateTime.fromMillisecondsSinceEpoch(0);
+          return dtB.compareTo(dtA);
+        });
+        _cachedNotifs = List<dynamic>.from(_rawData);
 
         if (mounted) setState(() {});
-
       }
 
       final syncUnread = _calcUnreadCount(_rawData);
@@ -1176,133 +1124,93 @@ class _NotifPageState extends State<NotifPage> {
 
 
   List<dynamic> get _filteredData {
-
     if (_selectedFilter == 'all') return _rawData;
 
+    if (_selectedFilter == 'pending_takeup') {
+      return _rawData.where((item) => item is Map<String, dynamic> && _isItemPendingTakeUp(item)).toList();
+    }
+
+    if (_selectedFilter == 'unread') {
+      return _rawData.where((item) => item is Map<String, dynamic> && _isItemUnread(item)).toList();
+    }
+
     if (_selectedFilter == 'violation_approval') {
-
       return _rawData.where((item) {
-
         final notifType = (item['notif_type'] ?? '').toString().toLowerCase();
-
         final title = (item['title'] ?? '').toString().toLowerCase();
-
         final cat = (item['category'] ?? '').toString().toLowerCase();
-
         return notifType == 'permit_violation_approval' ||
-
             (title.contains('persetujuan') && title.contains('pelanggaran')) ||
-
             (cat.contains('violation') && cat.contains('approval'));
-
       }).toList();
-
     }
 
     if (_selectedFilter == 'approval') {
-
       return _rawData.where((item) {
-
         final cat = (item['category'] ?? '').toString().toLowerCase();
-
         return cat.contains('approval') || item['is_approval_item'] == true;
-
       }).toList();
-
     }
 
     if (_selectedFilter == 'special_permit') {
-
       return _rawData.where((item) {
-
         final cat = (item['category'] ?? '').toString().toLowerCase();
-
         return cat.contains('special_permit') ||
-
             item['is_special_permit'] == true;
-
       }).toList();
-
     }
 
     if (_selectedFilter == 'hazard') {
-
       return _rawData.where((item) {
-
         final cat = (item['category'] ?? '').toString().toLowerCase();
-
         final notifType = (item['notif_type'] ?? '').toString().toLowerCase();
-
         return cat.contains('hazard') ||
-
             cat.contains('action') ||
-
             notifType.contains('hazard') ||
-
             notifType.contains('action');
-
       }).toList();
-
     }
 
     if (_selectedFilter == 'inspection') {
-
       return _rawData.where((item) {
-
         final cat = (item['category'] ?? '').toString().toLowerCase();
-
         final notifType = (item['notif_type'] ?? '').toString().toLowerCase();
-
         return cat.contains('inspect') ||
-
             cat.contains('simama') ||
-
             notifType.contains('inspect');
-
       }).toList();
-
     }
 
     if (_selectedFilter == 'coaching') {
-
       return _rawData.where((item) {
-
         final cat = (item['category'] ?? '').toString().toLowerCase();
-
         return cat.contains('coaching');
-
       }).toList();
-
     }
 
     return _rawData;
-
   }
 
-
-
   int _countFor(String type) {
-
     if (type == 'all') return _rawData.length;
 
+    if (type == 'pending_takeup') {
+      return _rawData.where((item) => item is Map<String, dynamic> && _isItemPendingTakeUp(item)).length;
+    }
+
+    if (type == 'unread') {
+      return _rawData.where((item) => item is Map<String, dynamic> && _isItemUnread(item)).length;
+    }
+
     if (type == 'violation_approval') {
-
       return _rawData.where((item) {
-
         final notifType = (item['notif_type'] ?? '').toString().toLowerCase();
-
         final title = (item['title'] ?? '').toString().toLowerCase();
-
         final cat = (item['category'] ?? '').toString().toLowerCase();
-
         return notifType == 'permit_violation_approval' ||
-
             (title.contains('persetujuan') && title.contains('pelanggaran')) ||
-
             (cat.contains('violation') && cat.contains('approval'));
-
       }).length;
-
     }
 
     if (type == 'approval') {
@@ -2529,17 +2437,21 @@ class _NotifPageState extends State<NotifPage> {
               physics: const BouncingScrollPhysics(),
 
               child: Row(
-
                 children: [
-
                   _buildFilterChip('all', 'Semua', _countFor('all')),
-
-                  if (_countFor('violation_approval') > 0) ...[
-
+                  if (_countFor('pending_takeup') > 0) ...[
                     const SizedBox(width: 8),
-
+                    _buildFilterChip('pending_takeup', 'Perlu Take Up',
+                        _countFor('pending_takeup')),
+                  ],
+                  if (_countFor('unread') > 0) ...[
+                    const SizedBox(width: 8),
+                    _buildFilterChip('unread', 'Belum Dibaca',
+                        _countFor('unread')),
+                  ],
+                  if (_countFor('violation_approval') > 0) ...[
+                    const SizedBox(width: 8),
                     _buildFilterChip('violation_approval', 'Persetujuan PJA', _countFor('violation_approval')),
-
                   ],
 
                   const SizedBox(width: 8),
@@ -2847,29 +2759,19 @@ class _NotifPageState extends State<NotifPage> {
               ),
 
             Expanded(
-
-              child: filtered.isNotEmpty
-
-                  ? ListView.builder(
-
-                      controller: _scrollCtrl,
-
-                      padding: const EdgeInsets.fromLTRB(16, 10, 16, 32),
-
-                      itemCount: filtered.length,
-
-                      itemBuilder: (context, index) {
-
-                        final item = filtered[index] as Map<String, dynamic>;
-
-                        return _buildNotificationCard(item);
-
-                      },
-
-                    )
-
-                  : _buildEmptyState(),
-
+              child: _isLoading && _rawData.isEmpty
+                  ? _buildLoadingSkeleton()
+                  : (filtered.isNotEmpty
+                      ? ListView.builder(
+                          controller: _scrollCtrl,
+                          padding: const EdgeInsets.fromLTRB(16, 10, 16, 32),
+                          itemCount: filtered.length,
+                          itemBuilder: (context, index) {
+                            final item = filtered[index] as Map<String, dynamic>;
+                            return _buildNotificationCard(item);
+                          },
+                        )
+                      : _buildEmptyState()),
             ),
 
           ],
@@ -2995,157 +2897,146 @@ class _NotifPageState extends State<NotifPage> {
 
 
   Widget _buildActivitySummary(int visibleCount) {
-
+    final pendingTakeUpCount = _rawData
+        .where((item) => item is Map<String, dynamic> && _isItemPendingTakeUp(item))
+        .length;
+    final unreadCount = _rawData
+        .where((item) => item is Map<String, dynamic> && _isItemUnread(item))
+        .length;
     final urgentCount = _rawData.where((item) {
-
+      if (item is! Map) return false;
       final priority = (item['priority'] ?? '').toString().toLowerCase();
-
       return priority == 'urgent' ||
-
           item['is_approval_item'] == true ||
-
           item['is_special_permit'] == true;
-
     }).length;
 
+    final hasActionRequired = pendingTakeUpCount > 0 || urgentCount > 0;
+
     final syncLabel = _isOfflineMode
-
         ? 'Tersimpan di perangkat'
-
         : (_lastSyncTime == null
-
             ? 'Memperbarui aktivitas'
-
             : 'Diperbarui ${DateFormat('HH:mm').format(_lastSyncTime!)}');
 
-
-
     return Container(
-
       margin: const EdgeInsets.fromLTRB(16, 14, 16, 6),
-
       padding: const EdgeInsets.fromLTRB(16, 14, 14, 14),
-
       decoration: BoxDecoration(
-
         color: Colors.white,
-
         borderRadius: BorderRadius.circular(18),
-
         border: Border.all(color: const Color(0xFFE8EDF4)),
-
         boxShadow: const [
-
           BoxShadow(
-
               color: Color(0x0A0F172A), blurRadius: 14, offset: Offset(0, 5)),
-
         ],
-
       ),
-
       child: Row(children: [
-
         Container(
-
           width: 42,
-
           height: 42,
-
           decoration: BoxDecoration(
-
-            color: urgentCount > 0
-
-                ? const Color(0xFFFFF1F2)
-
+            color: hasActionRequired
+                ? const Color(0xFFFFF7ED)
                 : const Color(0xFFEFF6FF),
-
             borderRadius: BorderRadius.circular(14),
-
+            border: Border.all(
+              color: hasActionRequired
+                  ? const Color(0xFFFDBA74)
+                  : const Color(0xFFBFDBFE),
+              width: 1,
+            ),
           ),
-
           child: Icon(
-
-            urgentCount > 0
-
-                ? Icons.priority_high_rounded
-
+            hasActionRequired
+                ? Icons.pending_actions_rounded
                 : Icons.notifications_none_rounded,
-
-            color: urgentCount > 0
-
-                ? const Color(0xFFE11D48)
-
+            color: hasActionRequired
+                ? const Color(0xFFEA580C)
                 : const Color(0xFF2563EB),
-
             size: 22,
-
           ),
-
         ),
-
         const SizedBox(width: 12),
-
         Expanded(
-
-            child:
-
-                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-
-          Text(
-
-            visibleCount == 0
-
-                ? 'Tidak ada aktivitas baru'
-
-                : '$visibleCount aktivitas untuk Anda',
-
-            style: const TextStyle(
-
-                fontSize: 14,
-
-                fontWeight: FontWeight.w800,
-
-                color: Color(0xFF0F172A)),
-
-          ),
-
-          const SizedBox(height: 3),
-
-          Text(syncLabel,
-
-              style: const TextStyle(fontSize: 11.5, color: Color(0xFF64748B))),
-
-        ])),
-
-        if (urgentCount > 0)
-
-          Container(
-
-            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
-
-            decoration: BoxDecoration(
-
-                color: const Color(0xFFFFF1F2),
-
-                borderRadius: BorderRadius.circular(10)),
-
-            child: Text('$urgentCount perlu atensi',
-
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                visibleCount == 0
+                    ? 'Tidak ada aktivitas baru'
+                    : '$visibleCount aktivitas untuk Anda',
                 style: const TextStyle(
-
-                    fontSize: 10,
-
-                    fontWeight: FontWeight.w800,
-
-                    color: Color(0xFFE11D48))),
-
+                  fontSize: 14,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFF0F172A),
+                ),
+              ),
+              const SizedBox(height: 3),
+              Text(
+                syncLabel,
+                style: const TextStyle(fontSize: 11.5, color: Color(0xFF64748B)),
+              ),
+            ],
           ),
-
+        ),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (pendingTakeUpCount > 0)
+              Container(
+                margin: const EdgeInsets.only(bottom: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFF7ED),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: const Color(0xFFFED7AA), width: 0.8),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 5,
+                      height: 5,
+                      decoration: const BoxDecoration(
+                        color: Color(0xFFEA580C),
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      '$pendingTakeUpCount perlu take up',
+                      style: const TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFFC2410C),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            if (unreadCount > 0 && _selectedFilter != 'unread')
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEFF6FF),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: const Color(0xFFBFDBFE), width: 0.8),
+                ),
+                child: Text(
+                  '$unreadCount belum dibaca',
+                  style: const TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF1D4ED8),
+                  ),
+                ),
+              ),
+          ],
+        ),
       ]),
-
     );
-
   }
 
 
@@ -3683,1495 +3574,117 @@ class _NotifPageState extends State<NotifPage> {
     // lama yang terlalu bercabang gagal terpaint di beberapa perangkat Android.
 
     return _buildProfessionalNotificationCard(item);
-
-
-
-    final category = (item['category'] ?? '').toString().toLowerCase();
-
-    final isCoaching = category.contains('coaching') ||
-
-        (item['title'] ?? '').toString().toLowerCase().contains('coaching') ||
-
-        (item['title'] ?? '').toString().toLowerCase().contains('pembinaan') ||
-
-        (item['remark'] ?? '').toString().toLowerCase().contains('coaching') ||
-
-        (item['remark'] ?? '').toString().toLowerCase().contains('pembinaan');
-
-
-
-    final isRoster = category.contains('roster') ||
-
-        (item['notif_type'] ?? '')
-
-            .toString()
-
-            .toLowerCase()
-
-            .contains('roster') ||
-
-        (item['url'] ?? '').toString().toLowerCase().contains('roster');
-
-
-
-    final isHazard = !isCoaching &&
-
-        !isRoster &&
-
-        (category.contains('hazard') || category.contains('action'));
-
-    final isInspection = !isCoaching &&
-
-        !isRoster &&
-
-        (category.contains('inspect') || category.contains('simama'));
-
-
-
-    final notifType = (item['notif_type'] ?? '').toString().toLowerCase();
-
-    final itemTitleLower = (item['title'] ?? '').toString().toLowerCase();
-
-    final isPjaTag =
-
-        notifType.contains('pja') || itemTitleLower.contains('pja');
-
-    final isPicTag =
-
-        notifType.contains('pic') || itemTitleLower.contains('pic');
-
-
-
-    final isApproval =
-
-        item['is_approval_item'] == true || category.contains('approval');
-
-    final isSpecialPermit = item['is_special_permit'] == true ||
-
-        category.contains('special_permit');
-
-
-
-    final isViolation = category.contains('violation') ||
-
-        notifType.contains('violation') ||
-
-        itemTitleLower.contains('pelanggaran');
-
-
-
-    final isGateMovement = category.contains('movement') ||
-
-        notifType.contains('movement') ||
-
-        itemTitleLower.contains('gerbang') ||
-
-        itemTitleLower.contains('gate');
-
-
-
-    final primaryTheme = isSpecialPermit
-
-        ? const Color(0xFFDC2626)
-
-        : (isApproval
-
-            ? const Color(0xFF0D9488)
-
-            : (isViolation
-
-                ? const Color(0xFFDC2626)
-
-                : (isGateMovement
-
-                    ? const Color(0xFF0284C7)
-
-                    : (isCoaching
-
-                        ? const Color(0xFF7C3AED)
-
-                        : (isRoster
-
-                            ? const Color(0xFF7C3AED)
-
-                            : (isPicTag
-
-                                ? const Color(0xFF2563EB)
-
-                                : (isPjaTag
-
-                                    ? (isInspection
-
-                                        ? const Color(0xFF0F766E)
-
-                                        : const Color(0xFFEA580C))
-
-                                    : (isHazard
-
-                                        ? const Color(0xFFE65100)
-
-                                        : (isInspection
-
-                                            ? const Color(0xFF0288D1)
-
-                                            : const Color(0xFF00897B))))))))));
-
-
-
-    final bgTheme = isSpecialPermit
-
-        ? const Color(0xFFFEE2E2)
-
-        : (isApproval
-
-            ? const Color(0xFFCCFBF1)
-
-            : (isViolation
-
-                ? const Color(0xFFFEE2E2)
-
-                : (isGateMovement
-
-                    ? const Color(0xFFE0F2FE)
-
-                    : (isCoaching
-
-                        ? const Color(0xFFF5F3FF)
-
-                        : (isRoster
-
-                            ? const Color(0xFFF3E8FF)
-
-                            : (isPicTag
-
-                                ? const Color(0xFFEFF6FF)
-
-                                : (isPjaTag
-
-                                    ? (isInspection
-
-                                        ? const Color(0xFFF0FDF4)
-
-                                        : const Color(0xFFFFF7ED))
-
-                                    : (isHazard
-
-                                        ? const Color(0xFFFFF3E0)
-
-                                        : (isInspection
-
-                                            ? const Color(0xFFE1F5FE)
-
-                                            : const Color(0xFFE0F2F1))))))))));
-
-
-
-    final statusInt = (item['status'] as int?) ?? (isCoaching ? -1 : 0);
-
-    final String statusText =
-
-        (statusInt >= 0 && statusInt < globals.status.length)
-
-            ? (globals.status[statusInt] ?? 'Status $statusInt')
-
-            : 'Status $statusInt';
-
-    final Color statusColor =
-
-        (statusInt >= 0 && statusInt < globals.statusColor.length)
-
-            ? (globals.statusColor[statusInt] ?? Colors.grey)
-
-            : Colors.grey;
-
-
-
-    final dateStr =
-
-        _formatDisplayDate(item['date']?.toString(), item['time']?.toString());
-
-    final title = titleCase(item['title']?.toString() ?? 'Tindak Lanjut');
-
-    final remark = item['remark']?.toString() ?? '';
-
-    final areaName = titleCase(item['area_name']?.toString() ?? '-');
-
-    final locName = titleCase(item['location_name']?.toString() ?? '-');
-
-
-
-    String moduleBadge;
-
-    if (isSpecialPermit) {
-
-      moduleBadge = 'SPECIAL PERMIT';
-
-    } else if (isApproval) {
-
-      moduleBadge = 'APPROVAL CENTER';
-
-    } else if (isViolation) {
-
-      moduleBadge = 'PELANGGARAN K3';
-
-    } else if (isGateMovement) {
-
-      moduleBadge = 'AKSES GERBANG';
-
-    } else if (isCoaching) {
-
-      moduleBadge = 'COACHING';
-
-    } else if (isRoster) {
-
-      moduleBadge =
-
-          notifType.contains('tugas') ? 'PERIODE TUGAS' : 'ROSTER KERJA';
-
-    } else if (isPicTag) {
-
-      moduleBadge = 'PENUGASAN PIC';
-
-    } else if (isPjaTag) {
-
-      moduleBadge =
-
-          isInspection ? 'PENUGASAN PJA INSPEKSI' : 'PENUGASAN PJA HAZARD';
-
-    } else if (isHazard) {
-
-      moduleBadge = 'HAZARD';
-
-    } else if (category.contains('simama')) {
-
-      moduleBadge = 'SIMAMA';
-
-    } else if (category.contains('broadcast')) {
-
-      moduleBadge = 'PENGUMUMAN';
-
-    } else {
-
-      moduleBadge = isInspection ? 'INSPEKSI' : 'TINDAK LANJUT';
-
-    }
-
-
-
-    return Container(
-
-      margin: const EdgeInsets.only(bottom: 10),
-
-      decoration: BoxDecoration(
-
-        color: Colors.white,
-
-        borderRadius: BorderRadius.circular(18),
-
-        boxShadow: [
-
-          BoxShadow(
-
-            color: const Color(0xFF0F172A).withValues(alpha: 0.045),
-
-            blurRadius: 14,
-
-            offset: const Offset(0, 5),
-
-          ),
-
-        ],
-
-        border: Border(
-
-          left: BorderSide(color: primaryTheme, width: 4),
-
-          top: const BorderSide(color: Color(0xFFE8EDF4)),
-
-          right: const BorderSide(color: Color(0xFFE8EDF4)),
-
-          bottom: const BorderSide(color: Color(0xFFE8EDF4)),
-
-        ),
-
-      ),
-
-      child: Material(
-
-        color: Colors.transparent,
-
-        child: InkWell(
-
-          borderRadius: BorderRadius.circular(18),
-
-          onTap: () => _openDetail(item),
-
-          child: Padding(
-
-            padding: const EdgeInsets.fromLTRB(14, 14, 14, 13),
-
-            child: Column(
-
-              crossAxisAlignment: CrossAxisAlignment.start,
-
-              children: [
-
-                // Top header: Logo + Module Pill + Priority + Timestamp
-
-                Row(
-
-                  children: [
-
-                    _buildNotifLogo(item['logo']?.toString(), primaryTheme),
-
-                    Container(
-
-                      padding: const EdgeInsets.symmetric(
-
-                          horizontal: 8, vertical: 4),
-
-                      decoration: BoxDecoration(
-
-                        color: bgTheme,
-
-                        borderRadius: BorderRadius.circular(8),
-
-                      ),
-
-                      child: Row(
-
-                        mainAxisSize: MainAxisSize.min,
-
-                        children: [
-
-                          Icon(
-
-                            isSpecialPermit
-
-                                ? Icons.warning_amber_rounded
-
-                                : (isApproval
-
-                                    ? Icons.approval_rounded
-
-                                    : (isViolation
-
-                                        ? Icons.gavel_rounded
-
-                                        : (isGateMovement
-
-                                            ? Icons.meeting_room_rounded
-
-                                            : (isCoaching
-
-                                                ? Icons.psychology_outlined
-
-                                                : (isRoster
-
-                                                    ? (item['notif_type']
-
-                                                                ?.toString()
-
-                                                                .contains(
-
-                                                                    'tugas') ==
-
-                                                            true
-
-                                                        ? Icons
-
-                                                            .flight_takeoff_rounded
-
-                                                        : Icons
-
-                                                            .calendar_month_rounded)
-
-                                                    : (isPicTag
-
-                                                        ? Icons
-
-                                                            .assignment_ind_rounded
-
-                                                        : (isPjaTag
-
-                                                            ? Icons
-
-                                                                .shield_rounded
-
-                                                            : (isHazard
-
-                                                                ? Icons
-
-                                                                    .warning_amber_rounded
-
-                                                                : Icons
-
-                                                                    .fact_check_outlined)))))))),
-
-                            size: 13,
-
-                            color: primaryTheme,
-
-                          ),
-
-                          const SizedBox(width: 4),
-
-                          Text(
-
-                            moduleBadge,
-
-                            style: TextStyle(
-
-                              fontSize: 10,
-
-                              fontWeight: FontWeight.w800,
-
-                              color: primaryTheme,
-
-                              letterSpacing: 0.5,
-
-                            ),
-
-                          ),
-
-                        ],
-
-                      ),
-
-                    ),
-
-                    if (item['priority']?.toString().toLowerCase() ==
-
-                        'urgent') ...[
-
-                      const SizedBox(width: 6),
-
-                      Container(
-
-                        padding: const EdgeInsets.symmetric(
-
-                            horizontal: 6, vertical: 3),
-
-                        decoration: BoxDecoration(
-
-                          color: const Color(0xFFFEE2E2),
-
-                          borderRadius: BorderRadius.circular(6),
-
-                        ),
-
-                        child: const Row(
-
-                          mainAxisSize: MainAxisSize.min,
-
-                          children: [
-
-                            Icon(Icons.bolt_rounded,
-
-                                size: 11, color: Color(0xFFDC2626)),
-
-                            SizedBox(width: 2),
-
-                            Text('URGENT',
-
-                                style: TextStyle(
-
-                                    color: Color(0xFFDC2626),
-
-                                    fontSize: 9.5,
-
-                                    fontWeight: FontWeight.bold)),
-
-                          ],
-
-                        ),
-
-                      ),
-
-                    ],
-
-                    const Spacer(),
-
-                    Row(
-
-                      children: [
-
-                        const Icon(
-
-                          Icons.access_time_rounded,
-
-                          size: 13,
-
-                          color: Color(0xFF94A3B8),
-
-                        ),
-
-                        const SizedBox(width: 4),
-
-                        Text(
-
-                          dateStr,
-
-                          style: const TextStyle(
-
-                            fontSize: 11,
-
-                            fontWeight: FontWeight.w500,
-
-                            color: Color(0xFF64748B),
-
-                          ),
-
-                        ),
-
-                      ],
-
-                    ),
-
-                  ],
-
-                ),
-
-                if (item['sender_name'] != null &&
-
-                    item['sender_name'].toString().isNotEmpty) ...[
-
-                  const SizedBox(height: 6),
-
-                  Text(
-
-                    'Pengirim: ${item['sender_name']}',
-
-                    style: const TextStyle(
-
-                        fontSize: 11,
-
-                        fontWeight: FontWeight.w600,
-
-                        color: Color(0xFF0D9488)),
-
-                  ),
-
-                ],
-
-                const SizedBox(height: 10),
-
-
-
-                // Title
-
-                Text(
-
-                  title,
-
-                  maxLines: 2,
-
-                  overflow: TextOverflow.ellipsis,
-
-                  style: const TextStyle(
-
-                    fontSize: 15,
-
-                    fontWeight: FontWeight.w700,
-
-                    color: Color(0xFF0F172A),
-
-                    height: 1.3,
-
-                  ),
-
-                ),
-
-
-
-                // Remark / Note Quote Bubble
-
-                if (remark.isNotEmpty) ...[
-
-                  const SizedBox(height: 8),
-
-                  Container(
-
-                    width: double.infinity,
-
-                    padding:
-
-                        const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-
-                    decoration: BoxDecoration(
-
-                      color: const Color(0xFFF8FAFC),
-
-                      borderRadius: BorderRadius.circular(8),
-
-                      border: Border(
-
-                        left: BorderSide(
-
-                          color: primaryTheme.withValues(alpha: 0.6),
-
-                          width: 3,
-
-                        ),
-
-                      ),
-
-                    ),
-
-                    child: Text(
-
-                      titleCase(remark),
-
-                      maxLines: 2,
-
-                      overflow: TextOverflow.ellipsis,
-
-                      style: const TextStyle(
-
-                        fontSize: 12,
-
-                        color: Color(0xFF475569),
-
-                        fontStyle: FontStyle.italic,
-
-                      ),
-
-                    ),
-
-                  ),
-
-                ],
-
-
-
-                const SizedBox(height: 10),
-
-
-
-                // Area & Location Pills
-
-                Wrap(
-
-                  spacing: 6,
-
-                  runSpacing: 4,
-
-                  children: [
-
-                    Container(
-
-                      padding: const EdgeInsets.symmetric(
-
-                          horizontal: 8, vertical: 3),
-
-                      decoration: BoxDecoration(
-
-                        color: const Color(0xFFF1F5F9),
-
-                        borderRadius: BorderRadius.circular(6),
-
-                      ),
-
-                      child: Row(
-
-                        mainAxisSize: MainAxisSize.min,
-
-                        children: [
-
-                          const Icon(Icons.location_on_outlined,
-
-                              size: 12, color: Color(0xFF64748B)),
-
-                          const SizedBox(width: 3),
-
-                          Text(
-
-                            areaName,
-
-                            style: const TextStyle(
-
-                              fontSize: 11,
-
-                              fontWeight: FontWeight.w500,
-
-                              color: Color(0xFF475569),
-
-                            ),
-
-                          ),
-
-                        ],
-
-                      ),
-
-                    ),
-
-                    if (locName != '-' && locName.isNotEmpty)
-
-                      Container(
-
-                        padding: const EdgeInsets.symmetric(
-
-                            horizontal: 8, vertical: 3),
-
-                        decoration: BoxDecoration(
-
-                          color: const Color(0xFFF1F5F9),
-
-                          borderRadius: BorderRadius.circular(6),
-
-                        ),
-
-                        child: Row(
-
-                          mainAxisSize: MainAxisSize.min,
-
-                          children: [
-
-                            const Icon(Icons.place_outlined,
-
-                                size: 12, color: Color(0xFF64748B)),
-
-                            const SizedBox(width: 3),
-
-                            Text(
-
-                              locName,
-
-                              style: const TextStyle(
-
-                                fontSize: 11,
-
-                                fontWeight: FontWeight.w500,
-
-                                color: Color(0xFF475569),
-
-                              ),
-
-                            ),
-
-                          ],
-
-                        ),
-
-                      ),
-
-                  ],
-
-                ),
-
-
-
-                const Divider(
-
-                    height: 20, thickness: 0.8, color: Color(0xFFF1F5F9)),
-
-
-
-                // Bottom row: Status badge + Action link
-
-                Row(
-
-                  children: [
-
-                    if (isCoaching || statusInt < 0) ...[
-
-                      // Coaching is purely informational: "ini hanya menampilkan saya dapat coacing dari PIC nya dan tidak ada statusnya"
-
-                      Container(
-
-                        padding: const EdgeInsets.symmetric(
-
-                            horizontal: 8, vertical: 4),
-
-                        decoration: BoxDecoration(
-
-                          color: const Color(0xFFEDE9FE),
-
-                          borderRadius: BorderRadius.circular(6),
-
-                        ),
-
-                        child: const Row(
-
-                          mainAxisSize: MainAxisSize.min,
-
-                          children: [
-
-                            Icon(
-
-                              Icons.info_outline_rounded,
-
-                              size: 12,
-
-                              color: Color(0xFF7C3AED),
-
-                            ),
-
-                            SizedBox(width: 5),
-
-                            Text(
-
-                              'Informasi Pembinaan PIC',
-
-                              style: TextStyle(
-
-                                fontSize: 11,
-
-                                fontWeight: FontWeight.w600,
-
-                                color: Color(0xFF6D28D9),
-
-                              ),
-
-                            ),
-
-                          ],
-
-                        ),
-
-                      ),
-
-                      const Spacer(),
-
-                      Row(
-
-                        mainAxisSize: MainAxisSize.min,
-
-                        children: [
-
-                          Icon(
-
-                            Icons.history_rounded,
-
-                            size: 13,
-
-                            color: Colors.grey.shade400,
-
-                          ),
-
-                          const SizedBox(width: 4),
-
-                          Text(
-
-                            'Aktif 7 hari',
-
-                            style: TextStyle(
-
-                              fontSize: 10.5,
-
-                              fontWeight: FontWeight.w500,
-
-                              color: Colors.grey.shade500,
-
-                            ),
-
-                          ),
-
-                        ],
-
-                      ),
-
-                    ] else ...[
-
-                      // Status Badge
-
-                      Container(
-
-                        padding: const EdgeInsets.symmetric(
-
-                            horizontal: 8, vertical: 4),
-
-                        decoration: BoxDecoration(
-
-                          color: statusColor.withValues(alpha: 0.12),
-
-                          borderRadius: BorderRadius.circular(6),
-
-                        ),
-
-                        child: Row(
-
-                          mainAxisSize: MainAxisSize.min,
-
-                          children: [
-
-                            Container(
-
-                              width: 6,
-
-                              height: 6,
-
-                              decoration: BoxDecoration(
-
-                                color: statusColor,
-
-                                shape: BoxShape.circle,
-
-                              ),
-
-                            ),
-
-                            const SizedBox(width: 6),
-
-                            Text(
-
-                              statusText,
-
-                              style: TextStyle(
-
-                                fontSize: 11,
-
-                                fontWeight: FontWeight.w700,
-
-                                color: statusColor,
-
-                              ),
-
-                            ),
-
-                          ],
-
-                        ),
-
-                      ),
-
-                      const Spacer(),
-
-                      if (isApproval) ...[
-
-                        ElevatedButton.icon(
-
-                          style: ElevatedButton.styleFrom(
-
-                            backgroundColor: const Color(0xFF0D9488),
-
-                            foregroundColor: Colors.white,
-
-                            elevation: 0,
-
-                            padding: const EdgeInsets.symmetric(
-
-                                horizontal: 10, vertical: 4),
-
-                            minimumSize: const Size(64, 28),
-
-                            shape: RoundedRectangleBorder(
-
-                                borderRadius: BorderRadius.circular(8)),
-
-                          ),
-
-                          onPressed: () {
-
-                            Navigator.push(
-
-                              context,
-
-                              MaterialPageRoute(
-
-                                  builder: (_) => const ApprovalCenterPage()),
-
-                            ).then((_) => _getData());
-
-                          },
-
-                          icon: const Icon(Icons.check_circle_outline_rounded,
-
-                              size: 13),
-
-                          label: const Text('Tinjau Persetujuan',
-
-                              style: TextStyle(
-
-                                  fontSize: 11, fontWeight: FontWeight.bold)),
-
-                        ),
-
-                      ] else if (isSpecialPermit) ...[
-
-                        ElevatedButton.icon(
-
-                          style: ElevatedButton.styleFrom(
-
-                            backgroundColor: const Color(0xFFDC2626),
-
-                            foregroundColor: Colors.white,
-
-                            elevation: 0,
-
-                            padding: const EdgeInsets.symmetric(
-
-                                horizontal: 10, vertical: 4),
-
-                            minimumSize: const Size(64, 28),
-
-                            shape: RoundedRectangleBorder(
-
-                                borderRadius: BorderRadius.circular(8)),
-
-                          ),
-
-                          onPressed: () {
-
-                            Navigator.push(
-
-                              context,
-
-                              MaterialPageRoute(
-
-                                  builder: (_) =>
-
-                                      const SpecialPermitListPage()),
-
-                            ).then((_) => _getData());
-
-                          },
-
-                          icon: const Icon(Icons.assignment_turned_in_rounded,
-
-                              size: 13),
-
-                          label: const Text('Inspeksi Lapangan',
-
-                              style: TextStyle(
-
-                                  fontSize: 11, fontWeight: FontWeight.bold)),
-
-                        ),
-
-                      ] else if (item['is_server_notif'] == true &&
-
-                          (item['notif_type'] == 'hazard_assigned' ||
-
-                              item['notif_type'] == 'hazard_new' ||
-
-                              item['notif_type'] == 'hazard_reassigned') &&
-
-                          item['is_actioned'] != true) ...[
-
-                        ElevatedButton.icon(
-
-                          style: ElevatedButton.styleFrom(
-
-                            backgroundColor: const Color(0xFF0284C7),
-
-                            foregroundColor: Colors.white,
-
-                            elevation: 0,
-
-                            padding: const EdgeInsets.symmetric(
-
-                                horizontal: 8, vertical: 3),
-
-                            minimumSize: const Size(54, 28),
-
-                            shape: RoundedRectangleBorder(
-
-                                borderRadius: BorderRadius.circular(8)),
-
-                          ),
-
-                          onPressed: () {
-
-                            final notifId = item['id'] as int? ?? 0;
-
-                            if (notifId > 0) {
-
-                              _db.updateLocalNotificationActioned(
-
-                                  notifId, true);
-
-                              _db.updateLocalNotificationRead(notifId, true);
-
-                              _api.markNotificationActioned(notifId);
-
-                            }
-
-                            Navigator.push(
-
-                              context,
-
-                              MaterialPageRoute(
-
-                                  builder: (_) => const HazardHubPage()),
-
-                            ).then((_) => _getData());
-
-                          },
-
-                          icon: const Icon(Icons.touch_app_rounded, size: 12),
-
-                          label: const Text('Take Up',
-
-                              style: TextStyle(
-
-                                  fontSize: 10.5, fontWeight: FontWeight.bold)),
-
-                        ),
-
-                        const SizedBox(width: 6),
-
-                        OutlinedButton(
-
-                          style: OutlinedButton.styleFrom(
-
-                            foregroundColor: const Color(0xFFD97706),
-
-                            side: const BorderSide(color: Color(0xFFFDE68A)),
-
-                            padding: const EdgeInsets.symmetric(
-
-                                horizontal: 8, vertical: 3),
-
-                            minimumSize: const Size(48, 28),
-
-                            shape: RoundedRectangleBorder(
-
-                                borderRadius: BorderRadius.circular(8)),
-
-                          ),
-
-                          onPressed: () {
-
-                            Navigator.push(
-
-                              context,
-
-                              MaterialPageRoute(
-
-                                  builder: (_) => const HazardHubPage()),
-
-                            ).then((_) => _getData());
-
-                          },
-
-                          child: const Text('Alihkan',
-
-                              style: TextStyle(
-
-                                  fontSize: 10.5, fontWeight: FontWeight.bold)),
-
-                        ),
-
-                      ] else if (item['is_server_notif'] == true &&
-
-                          (item['notif_type'] == 'inspection_assigned') &&
-
-                          item['is_actioned'] != true) ...[
-
-                        ElevatedButton.icon(
-
-                          style: ElevatedButton.styleFrom(
-
-                            backgroundColor: const Color(0xFF0F766E),
-
-                            foregroundColor: Colors.white,
-
-                            elevation: 0,
-
-                            padding: const EdgeInsets.symmetric(
-
-                                horizontal: 10, vertical: 3),
-
-                            minimumSize: const Size(60, 28),
-
-                            shape: RoundedRectangleBorder(
-
-                                borderRadius: BorderRadius.circular(8)),
-
-                          ),
-
-                          onPressed: () {
-
-                            final notifId = item['id'] as int? ?? 0;
-
-                            if (notifId > 0) {
-
-                              _db.updateLocalNotificationRead(notifId, true);
-
-                              _api.markNotificationRead(notifId);
-
-                            }
-
-                            Navigator.push(
-
-                              context,
-
-                              MaterialPageRoute(
-
-                                  builder: (_) => const InspectionHubPage(
-
-                                      initialTab: InspectionHubTab.pjaArea)),
-
-                            ).then((_) => _getData());
-
-                          },
-
-                          icon: const Icon(Icons.shield_rounded, size: 12),
-
-                          label: const Text('Area PJA',
-
-                              style: TextStyle(
-
-                                  fontSize: 10.5, fontWeight: FontWeight.bold)),
-
-                        ),
-
-                      ] else if (item['is_server_notif'] == true &&
-
-                          (item['notif_type'] == 'actionplan_assigned' ||
-
-                              item['notif_type'] ==
-
-                                  'actionplan_pja_assigned') &&
-
-                          item['is_actioned'] != true) ...[
-
-                        ElevatedButton.icon(
-
-                          style: ElevatedButton.styleFrom(
-
-                            backgroundColor: const Color(0xFF2563EB),
-
-                            foregroundColor: Colors.white,
-
-                            elevation: 0,
-
-                            padding: const EdgeInsets.symmetric(
-
-                                horizontal: 10, vertical: 3),
-
-                            minimumSize: const Size(60, 28),
-
-                            shape: RoundedRectangleBorder(
-
-                                borderRadius: BorderRadius.circular(8)),
-
-                          ),
-
-                          onPressed: () {
-
-                            final notifId = item['id'] as int? ?? 0;
-
-                            if (notifId > 0) {
-
-                              _db.updateLocalNotificationRead(notifId, true);
-
-                              _api.markNotificationRead(notifId);
-
-                            }
-
-                            Navigator.push(
-
-                              context,
-
-                              MaterialPageRoute(
-
-                                  builder: (_) => const ActionTrackerPage()),
-
-                            ).then((_) => _getData());
-
-                          },
-
-                          icon: const Icon(Icons.assignment_ind_rounded,
-
-                              size: 12),
-
-                          label: Text(
-
-                            item['notif_type'] == 'actionplan_assigned'
-
-                                ? 'Perbaiki'
-
-                                : 'Pilih PIC',
-
-                            style: const TextStyle(
-
-                                fontSize: 10.5, fontWeight: FontWeight.bold),
-
-                          ),
-
-                        ),
-
-                      ] else ...[
-
-                        InkWell(
-
-                          onTap: () => _openDetail(item),
-
-                          child: const Row(
-
-                            children: [
-
-                              Text(
-
-                                'Tindak Lanjuti',
-
-                                style: TextStyle(
-
-                                  fontSize: 12,
-
-                                  fontWeight: FontWeight.w700,
-
-                                  color: Color(0xFF009688),
-
-                                ),
-
-                              ),
-
-                              SizedBox(width: 2),
-
-                              Icon(
-
-                                Icons.arrow_forward_ios_rounded,
-
-                                size: 11,
-
-                                color: Color(0xFF009688),
-
-                              ),
-
-                            ],
-
-                          ),
-
-                        ),
-
-                      ],
-
-                    ],
-
-                  ],
-
-                ),
-
-              ],
-
-            ),
-
-          ),
-
-        ),
-
-      ),
-
-    );
-
   }
 
-
-
   Widget _buildProfessionalNotificationCard(Map<String, dynamic> item) {
-
     final category = (item['category'] ?? '').toString().toLowerCase();
-
     final title = titleCase(item['title']?.toString() ?? 'Pemberitahuan');
-
     final message = item['remark']?.toString() ?? '';
-
     final sender = item['sender_name']?.toString() ?? '';
-
     final time =
-
         _formatDisplayDate(item['date']?.toString(), item['time']?.toString());
-
     final urgent =
-
         (item['priority'] ?? '').toString().toLowerCase() == 'urgent' ||
-
             item['is_special_permit'] == true;
-
     final approval =
-
         item['is_approval_item'] == true || category.contains('approval');
-
     final hazard = category.contains('hazard') || category.contains('action');
-
     final inspection =
-
         category.contains('inspect') || category.contains('simama');
 
+    // Evaluasi 3 status utama:
+    // 1. Belum di-take up / Menunggu tindak lanjut
+    // 2. Belum dibaca (informasi/umum)
+    // 3. Sudah dibaca & sudah ditindaklanjuti / selesai
+    final isPendingTakeUp = _isItemPendingTakeUp(item);
+    final isUnread = _isItemUnread(item);
+    final status = (item['status'] as num?)?.toInt() ?? 0;
 
-
-    final Color color = urgent
-
+    // Warna tema kategori
+    final Color categoryColor = urgent
         ? const Color(0xFFE11D48)
-
         : approval
-
             ? const Color(0xFF0F766E)
-
             : hazard
-
                 ? const Color(0xFFEA580C)
-
                 : inspection
-
                     ? const Color(0xFF2563EB)
-
                     : const Color(0xFF6366F1);
 
-    final IconData icon = urgent
+    // 1. Background Card Berbeda Warna:
+    // - Belum di-take up: Soft Warm Coral/Amber tint (0xFFFFF7ED) / (0xFFFEF2F2 jika urgent)
+    // - Belum dibaca: Soft Ice Sky Blue tint (0xFFF0F7FF)
+    // - Sudah dibaca & selesai: Clean Crisp White (Colors.white)
+    final Color cardBgColor = isPendingTakeUp
+        ? (urgent ? const Color(0xFFFEF2F2) : const Color(0xFFFFF7ED))
+        : (isUnread ? const Color(0xFFF0F7FF) : Colors.white);
 
-        ? Icons.priority_high_rounded
+    // 2. Border Card Berbeda:
+    final Border cardBorder = Border.all(
+      color: isPendingTakeUp
+          ? (urgent ? const Color(0xFFFCA5A5) : const Color(0xFFFDBA74))
+          : (isUnread ? const Color(0xFFBAE6FD) : const Color(0xFFE2E8F0)),
+      width: isPendingTakeUp ? 1.5 : (isUnread ? 1.3 : 1.0),
+    );
 
-        : approval
+    // 3. Left Accent Strip Line:
+    final Color stripColor = isPendingTakeUp
+        ? (urgent ? const Color(0xFFDC2626) : const Color(0xFFEA580C))
+        : (isUnread ? const Color(0xFF2563EB) : const Color(0xFFCBD5E1));
 
-            ? Icons.approval_outlined
+    // 4. Box Shadow:
+    final List<BoxShadow> cardShadow = [
+      BoxShadow(
+        color: isPendingTakeUp
+            ? (urgent
+                ? const Color(0xFFDC2626).withValues(alpha: 0.12)
+                : const Color(0xFFEA580C).withValues(alpha: 0.12))
+            : (isUnread
+                ? const Color(0xFF2563EB).withValues(alpha: 0.08)
+                : const Color(0x060F172A)),
+        blurRadius: isPendingTakeUp ? 12 : 8,
+        offset: const Offset(0, 3),
+      ),
+    ];
 
-            : hazard
+    // Icon
+    final IconData icon = isPendingTakeUp
+        ? (urgent
+            ? Icons.priority_high_rounded
+            : (approval
+                ? Icons.gavel_rounded
+                : Icons.assignment_late_rounded))
+        : (urgent
+            ? Icons.priority_high_rounded
+            : approval
+                ? Icons.approval_outlined
+                : hazard
+                    ? Icons.warning_amber_rounded
+                    : inspection
+                        ? Icons.fact_check_outlined
+                        : Icons.notifications_none_rounded);
 
-                ? Icons.warning_amber_rounded
-
-                : inspection
-
-                    ? Icons.fact_check_outlined
-
-                    : Icons.notifications_none_rounded;
+    final Color iconColor = isPendingTakeUp
+        ? (urgent ? const Color(0xFFDC2626) : const Color(0xFFEA580C))
+        : (isUnread ? categoryColor : const Color(0xFF64748B));
 
     final String label = urgent
-
         ? 'PERLU ATENSI'
-
         : approval
-
             ? 'PERSETUJUAN'
-
             : hazard
-
                 ? 'HAZARD'
-
                 : inspection
-
                     ? 'INSPEKSI'
-
                     : 'INFORMASI';
 
-
-
-    final isUnread = item['is_read'] != true;
-
     return Container(
-      margin: const EdgeInsets.only(bottom: 10),
+      margin: const EdgeInsets.only(bottom: 11),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: cardBgColor,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: isUnread
-              ? color.withValues(alpha: 0.35)
-              : const Color(0xFFE2E8F0),
-          width: isUnread ? 1.2 : 1.0,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: isUnread
-                ? color.withValues(alpha: 0.08)
-                : const Color(0x060F172A),
-            blurRadius: 10,
-            offset: const Offset(0, 3),
-          ),
-        ],
+        border: cardBorder,
+        boxShadow: cardShadow,
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(16),
@@ -5179,8 +3692,8 @@ class _NotifPageState extends State<NotifPage> {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Left Accent Line with Category Color
-              Container(width: 4.5, color: color),
+              // Left Accent Line with 3 distinct indicator states
+              Container(width: isPendingTakeUp ? 5.5 : 4.5, color: stripColor),
               Expanded(
                 child: Material(
                   color: Colors.transparent,
@@ -5197,20 +3710,20 @@ class _NotifPageState extends State<NotifPage> {
                                 width: 34,
                                 height: 34,
                                 decoration: BoxDecoration(
-                                  color: color.withValues(alpha: .12),
+                                  color: iconColor.withValues(alpha: .12),
                                   borderRadius: BorderRadius.circular(10),
                                 ),
-                                child: Icon(icon, size: 17, color: color),
+                                child: Icon(icon, size: 17, color: iconColor),
                               ),
                               const SizedBox(width: 8),
                               Container(
                                 padding: const EdgeInsets.symmetric(
                                     horizontal: 7, vertical: 2.5),
                                 decoration: BoxDecoration(
-                                  color: color.withValues(alpha: .09),
+                                  color: categoryColor.withValues(alpha: .09),
                                   borderRadius: BorderRadius.circular(6),
                                   border: Border.all(
-                                      color: color.withValues(alpha: 0.25),
+                                      color: categoryColor.withValues(alpha: 0.25),
                                       width: 0.8),
                                 ),
                                 child: Text(
@@ -5219,32 +3732,131 @@ class _NotifPageState extends State<NotifPage> {
                                     fontSize: 9.5,
                                     letterSpacing: .3,
                                     fontWeight: FontWeight.w900,
-                                    color: color,
+                                    color: categoryColor,
                                   ),
                                 ),
                               ),
-                              if (isUnread) ...[
-                                const SizedBox(width: 6),
+                              const SizedBox(width: 6),
+                              // Status Indicator Chip: Belum di-take up vs Belum dibaca vs Selesai
+                              if (isPendingTakeUp)
                                 Container(
-                                  width: 7,
-                                  height: 7,
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 7, vertical: 2.5),
                                   decoration: BoxDecoration(
-                                    color: color,
-                                    shape: BoxShape.circle,
+                                    color: urgent
+                                        ? const Color(0xFFFEE2E2)
+                                        : const Color(0xFFFFEDD5),
+                                    borderRadius: BorderRadius.circular(6),
+                                    border: Border.all(
+                                      color: urgent
+                                          ? const Color(0xFFFCA5A5)
+                                          : const Color(0xFFFDBA74),
+                                      width: 0.8,
+                                    ),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Container(
+                                        width: 6,
+                                        height: 6,
+                                        decoration: BoxDecoration(
+                                          color: urgent
+                                              ? const Color(0xFFDC2626)
+                                              : const Color(0xFFEA580C),
+                                          shape: BoxShape.circle,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        approval
+                                            ? 'PERLU PERSETUJUAN'
+                                            : (urgent
+                                                ? 'PERLU ATENSI'
+                                                : 'BELUM DI-TAKE UP'),
+                                        style: TextStyle(
+                                          fontSize: 9,
+                                          letterSpacing: .2,
+                                          fontWeight: FontWeight.w900,
+                                          color: urgent
+                                              ? const Color(0xFFB91C1C)
+                                              : const Color(0xFFC2410C),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                )
+                              else if (isUnread)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 7, vertical: 2.5),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFDBEAFE),
+                                    borderRadius: BorderRadius.circular(6),
+                                    border: Border.all(
+                                        color: const Color(0xFF93C5FD),
+                                        width: 0.8),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Container(
+                                        width: 6,
+                                        height: 6,
+                                        decoration: const BoxDecoration(
+                                          color: Color(0xFF2563EB),
+                                          shape: BoxShape.circle,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 4),
+                                      const Text(
+                                        'BELUM DIBACA',
+                                        style: TextStyle(
+                                          fontSize: 9,
+                                          letterSpacing: .2,
+                                          fontWeight: FontWeight.w900,
+                                          color: Color(0xFF1D4ED8),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                )
+                              else
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFF1F5F9),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Icon(Icons.check_rounded,
+                                          size: 10, color: Color(0xFF64748B)),
+                                      const SizedBox(width: 3),
+                                      Text(
+                                        status >= 1 ? 'SELESAI' : 'SUDAH DIBACA',
+                                        style: const TextStyle(
+                                          fontSize: 8.5,
+                                          fontWeight: FontWeight.w700,
+                                          color: Color(0xFF64748B),
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
-                              ],
                               const Spacer(),
                               Text(
                                 time,
                                 style: TextStyle(
                                   fontSize: 10.5,
-                                  color: isUnread
+                                  color: (isPendingTakeUp || isUnread)
                                       ? const Color(0xFF334155)
                                       : const Color(0xFF94A3B8),
-                                  fontWeight: isUnread
+                                  fontWeight: (isPendingTakeUp || isUnread)
                                       ? FontWeight.w700
-                                      : FontWeight.w600,
+                                      : FontWeight.w500,
                                 ),
                               ),
                             ],
@@ -5254,11 +3866,19 @@ class _NotifPageState extends State<NotifPage> {
                             title,
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 13.5,
                               height: 1.25,
-                              fontWeight: FontWeight.w800,
-                              color: Color(0xFF0F172A),
+                              fontWeight: isPendingTakeUp
+                                  ? FontWeight.w900
+                                  : (isUnread
+                                      ? FontWeight.w800
+                                      : FontWeight.w600),
+                              color: isPendingTakeUp
+                                  ? const Color(0xFF0F172A)
+                                  : (isUnread
+                                      ? const Color(0xFF0F172A)
+                                      : const Color(0xFF475569)),
                             ),
                           ),
                           if (message.isNotEmpty) ...[
@@ -5267,19 +3887,21 @@ class _NotifPageState extends State<NotifPage> {
                               message,
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 11.5,
                                 height: 1.35,
-                                color: Color(0xFF64748B),
+                                color: (isPendingTakeUp || isUnread)
+                                    ? const Color(0xFF475569)
+                                    : const Color(0xFF94A3B8),
                               ),
                             ),
                           ],
-                          const SizedBox(height: 8),
+                          const SizedBox(height: 9),
                           Row(
                             children: [
                               if (sender.isNotEmpty) ...[
                                 Icon(Icons.person_outline_rounded,
-                                    size: 13, color: color),
+                                    size: 13, color: iconColor),
                                 const SizedBox(width: 4),
                                 Expanded(
                                   child: Text(
@@ -5288,43 +3910,116 @@ class _NotifPageState extends State<NotifPage> {
                                     overflow: TextOverflow.ellipsis,
                                     style: TextStyle(
                                       fontSize: 10.5,
-                                      color: color,
+                                      color: iconColor,
                                       fontWeight: FontWeight.w700,
                                     ),
                                   ),
                                 ),
                               ] else
                                 const Spacer(),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 8, vertical: 3.5),
-                                decoration: BoxDecoration(
-                                  color: color.withValues(alpha: 0.08),
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Text(
-                                      approval
-                                          ? 'Review & Setujui'
-                                          : (urgent
-                                              ? 'Tindak Lanjut'
-                                              : (category.contains('action')
-                                                  ? 'Buka Action'
-                                                  : 'Detail')),
-                                      style: TextStyle(
-                                        fontSize: 9.5,
-                                        fontWeight: FontWeight.w800,
-                                        color: color,
+                              // Action Button: High contrast filled button if pending take-up
+                              if (isPendingTakeUp)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 10, vertical: 5),
+                                  decoration: BoxDecoration(
+                                    color: urgent
+                                        ? const Color(0xFFDC2626)
+                                        : (approval
+                                            ? const Color(0xFF0F766E)
+                                            : const Color(0xFFEA580C)),
+                                    borderRadius: BorderRadius.circular(8),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: (urgent
+                                                ? const Color(0xFFDC2626)
+                                                : const Color(0xFFEA580C))
+                                            .withValues(alpha: 0.28),
+                                        blurRadius: 6,
+                                        offset: const Offset(0, 2),
                                       ),
-                                    ),
-                                    const SizedBox(width: 3),
-                                    Icon(Icons.chevron_right_rounded,
-                                        size: 13, color: color),
-                                  ],
+                                    ],
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Text(
+                                        approval
+                                            ? 'Review & Setujui'
+                                            : (urgent
+                                                ? 'Tindak Lanjut'
+                                                : (title.toLowerCase().contains('pja') ||
+                                                        message.toLowerCase().contains('take up')
+                                                    ? 'Take Up Sekarang'
+                                                    : 'Tindak Lanjut')),
+                                        style: const TextStyle(
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.w900,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 3),
+                                      const Icon(Icons.arrow_forward_rounded,
+                                          size: 12, color: Colors.white),
+                                    ],
+                                  ),
+                                )
+                              else if (isUnread)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 9, vertical: 4.5),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFEFF6FF),
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(
+                                        color: const Color(0xFFBFDBFE),
+                                        width: 0.9),
+                                  ),
+                                  child: const Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Text(
+                                        'Buka Detail',
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.w800,
+                                          color: Color(0xFF1D4ED8),
+                                        ),
+                                      ),
+                                      SizedBox(width: 3),
+                                      Icon(Icons.chevron_right_rounded,
+                                          size: 13, color: Color(0xFF1D4ED8)),
+                                    ],
+                                  ),
+                                )
+                              else
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 8, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFF8FAFC),
+                                    borderRadius: BorderRadius.circular(7),
+                                    border: Border.all(
+                                        color: const Color(0xFFE2E8F0),
+                                        width: 0.8),
+                                  ),
+                                  child: const Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Text(
+                                        'Detail',
+                                        style: TextStyle(
+                                          fontSize: 9.5,
+                                          fontWeight: FontWeight.w600,
+                                          color: Color(0xFF64748B),
+                                        ),
+                                      ),
+                                      SizedBox(width: 2),
+                                      Icon(Icons.chevron_right_rounded,
+                                          size: 12, color: Color(0xFF64748B)),
+                                    ],
+                                  ),
                                 ),
-                              ),
                             ],
                           ),
                         ],
@@ -5340,7 +4035,89 @@ class _NotifPageState extends State<NotifPage> {
     );
   }
 
-
+  Widget _buildLoadingSkeleton() {
+    return ListView.builder(
+      physics: const NeverScrollableScrollPhysics(),
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 32),
+      itemCount: 4,
+      itemBuilder: (context, index) {
+        return Container(
+          margin: const EdgeInsets.only(bottom: 10),
+          height: 115,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0xFFE2E8F0)),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(13),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF1F5F9),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      width: 80,
+                      height: 16,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF1F5F9),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      width: 100,
+                      height: 16,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ),
+                    const Spacer(),
+                    Container(
+                      width: 50,
+                      height: 12,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF1F5F9),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                Container(
+                  width: double.infinity,
+                  height: 14,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF1F5F9),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  width: 220,
+                  height: 12,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
 
   Widget _buildEmptyState() {
 
