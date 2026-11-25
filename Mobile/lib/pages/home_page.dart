@@ -127,10 +127,10 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin, Widg
             await PopupAdService.checkAndShowPopupAd(context);
           } catch (_) {}
 
-          // Cek dan tampilkan pop up pengaturan roster jika belum disetting
+          // Cek dan tampilkan pop up Re-Induksi bulanan di awal bulan jika belum diisi
           if (!mounted) return;
           try {
-            await RosterPromptDialog.checkAndPromptRoster(context);
+            await ReinductionPromptDialog.checkAndPrompt(context);
           } catch (_) {}
 
           if (!mounted) return;

@@ -2,6 +2,7 @@ import '../utils/app_date_time_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/profile_model.dart';
 import '../services/api.dart';
@@ -58,12 +59,12 @@ class PermitSimperInfo {
 }
 
 class ReinductionFormPage extends StatefulWidget {
-  final Map<String, dynamic> rosterData;
+  final Map<String, dynamic>? rosterData;
   final ProfileModel? profile;
 
   const ReinductionFormPage({
     super.key,
-    required this.rosterData,
+    this.rosterData,
     this.profile,
   });
 
@@ -215,8 +216,8 @@ class _ReinductionFormPageState extends State<ReinductionFormPage> {
   }
 
   void _initDates() {
-    final awalCutiStr = widget.rosterData['awalCuti']?.toString() ?? '';
-    final awalDinasStr = widget.rosterData['awalDinas']?.toString() ?? '';
+    final awalCutiStr = widget.rosterData?['awalCuti']?.toString() ?? '';
+    final awalDinasStr = widget.rosterData?['awalDinas']?.toString() ?? '';
 
     _tanggalOffsite =
         DateTime.tryParse(awalCutiStr) ?? DateTime.now().subtract(const Duration(days: 14));
@@ -579,13 +580,7 @@ class _ReinductionFormPageState extends State<ReinductionFormPage> {
     setState(() => _isSubmitting = true);
 
     final payload = <String, dynamic>{
-      'id': widget.rosterData['id'],
-      'tipeRoster': widget.rosterData['tipeRoster'] ?? 'REGULER',
-      'keterangan': widget.rosterData['keterangan'],
-      'awalDinas': widget.rosterData['awalDinas'],
-      'akhirDinas': widget.rosterData['akhirDinas'],
-      'awalCuti': widget.rosterData['awalCuti'],
-      'akhirCuti': widget.rosterData['akhirCuti'],
+      if (widget.rosterData != null) ...widget.rosterData!,
 
       // Form Re-Induction
       'nama': _profile?.namaLengkap ?? '',
@@ -624,6 +619,7 @@ class _ReinductionFormPageState extends State<ReinductionFormPage> {
 
     res.fold(
       (err) {
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(err['message'] ?? 'Gagal menyimpan Form Re-Induksi'),
@@ -632,7 +628,13 @@ class _ReinductionFormPageState extends State<ReinductionFormPage> {
           ),
         );
       },
-      (data) {
+      (data) async {
+        try {
+          final prefs = await SharedPreferences.getInstance();
+          final now = DateTime.now();
+          await prefs.setBool('reinduksi_filled_${now.year}_${now.month}', true);
+        } catch (_) {}
+
         NotificationService.display(
           title: _isExempt
               ? 'Roster & Re-Induksi Disetujui'
@@ -644,6 +646,7 @@ class _ReinductionFormPageState extends State<ReinductionFormPage> {
           notifType: _isExempt ? 'roster_reinduksi_approved' : 'roster_reinduksi_pending',
         );
 
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(data['message'] ?? 'Form Re-Induksi berhasil disimpan!'),

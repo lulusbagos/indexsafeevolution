@@ -47,6 +47,10 @@ class _RosterSettingsPageState extends State<RosterSettingsPage>
   int _computedOnsiteDays = 0;
   int _totalDaysInMonth = 30;
   double _ratio = 1.0;
+  bool _isIndexim = false;
+  bool _isOneSync = false;
+  bool _hasConfiguredRoster = true;
+  bool _hasFilledReinduksiThisMonth = false;
 
   final DateFormat _dateFormat = DateFormat('yyyy-MM-dd');
   final DateFormat _displayFormat = DateFormat('dd MMM yyyy');
@@ -86,6 +90,10 @@ class _RosterSettingsPageState extends State<RosterSettingsPage>
           _computedOnsiteDays = info.computedOnsiteDays;
           _totalDaysInMonth = info.totalDaysInMonth;
           _ratio = info.ratio;
+          _isIndexim = info.isIndexim || (PreferenceService.getProfile()?.company?.toUpperCase().contains('INDEXIM') == true);
+          _isOneSync = info.isOneSync;
+          _hasConfiguredRoster = info.hasConfiguredRoster;
+          _hasFilledReinduksiThisMonth = info.hasFilledReinduksiThisMonth;
 
           // Default initial fields if there's active/latest roster on initial page load
           if (_isFirstLoad && _editingId == null) {
@@ -177,8 +185,28 @@ class _RosterSettingsPageState extends State<RosterSettingsPage>
     }
   }
 
+  Future<void> _openReinductionForm() async {
+    HapticFeedback.lightImpact();
+    final profile = PreferenceService.getProfile();
+    final saved = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => ReinductionFormPage(
+          profile: profile,
+        ),
+      ),
+    );
+    if (saved == true) {
+      _fetchRosterData();
+    }
+  }
+
   Future<void> _saveRoster() async {
     HapticFeedback.mediumImpact();
+
+    if (_selectedTab == 0 && _isIndexim) {
+      _openReinductionForm();
+      return;
+    }
 
     if (_selectedTab == 1) {
       // Validasi Periode Tugas
@@ -235,18 +263,23 @@ class _RosterSettingsPageState extends State<RosterSettingsPage>
 
     final profile = PreferenceService.getProfile();
 
-    final saved = await Navigator.of(context).push<bool>(
-      MaterialPageRoute(
-        builder: (_) => ReinductionFormPage(
-          rosterData: rosterData,
-          profile: profile,
+    setState(() => _isSaving = true);
+    try {
+      final saved = await Navigator.of(context).push<bool>(
+        MaterialPageRoute(
+          builder: (_) => ReinductionFormPage(
+            rosterData: rosterData,
+            profile: profile,
+          ),
         ),
-      ),
-    );
+      );
 
-    if (saved == true) {
-      _editingId = null;
-      _fetchRosterData();
+      if (saved == true) {
+        _editingId = null;
+        _fetchRosterData();
+      }
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
     }
   }
 
@@ -395,6 +428,12 @@ class _RosterSettingsPageState extends State<RosterSettingsPage>
                       // Status SAP Banner Card
                       _buildTargetStatusCard(),
 
+                      // ONE DB Integration Banner jika PT Indexim Coalindo
+                      if (_isIndexim) _buildOneDbSyncCard(),
+
+                      // Re-Induksi Bulanan Card
+                      _buildMonthlyReinductionCard(),
+
                       const SizedBox(height: 18),
 
                       // Edit mode banner if editing
@@ -480,7 +519,9 @@ class _RosterSettingsPageState extends State<RosterSettingsPage>
                     ),
                     const SizedBox(width: 5),
                     Text(
-                      _isTugasExempt ? 'BEBAS TARGET SAP' : 'STATUS ON-SITE SAP',
+                      _isTugasExempt
+                          ? 'BEBAS TARGET SAP'
+                          : (_isOneSync ? 'ONE DB ROSTER' : (_hasConfiguredRoster ? 'ROSTER TERPASANG' : 'STATUS ON-SITE SAP')),
                       style: const TextStyle(
                         fontSize: 10.5,
                         fontWeight: FontWeight.w800,
@@ -1124,8 +1165,269 @@ class _RosterSettingsPageState extends State<RosterSettingsPage>
     );
   }
 
+  // ONE DB Sync Card for PT Indexim Coalindo
+  Widget _buildOneDbSyncCard() {
+    return Container(
+      margin: const EdgeInsets.only(top: 14),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0F172A),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFF38BDF8).withValues(alpha: 0.35)),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF0284C7).withValues(alpha: 0.12),
+            blurRadius: 14,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF0284C7).withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.sync_rounded, color: Color(0xFF38BDF8), size: 20),
+              ),
+              const SizedBox(width: 10),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'ROSTER TERINTEGRASI ONE DB',
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w900,
+                        color: Color(0xFF38BDF8),
+                        letterSpacing: 0.6,
+                      ),
+                    ),
+                    Text(
+                      'Khusus PT Indexim Coalindo',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Color(0xFF94A3B8),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF059669),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Text(
+                  'SYNC AKTIF',
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w900,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          const Text(
+            'Jadwal roster dinas dan cuti Anda diambil secara otomatis dari database ONE DB PT Indexim Coalindo. Jika terdapat kesalahan roster, silakan update roster di aplikasi ONE DB.',
+            style: TextStyle(
+              fontSize: 12,
+              color: Color(0xFFE2E8F0),
+              height: 1.45,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Monthly Re-Induction Card
+  Widget _buildMonthlyReinductionCard() {
+    final now = DateTime.now();
+    final monthName = _displayFormat.format(now).substring(3);
+
+    return Container(
+      margin: const EdgeInsets.only(top: 14),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: _hasFilledReinduksiThisMonth ? const Color(0xFFF0FDF4) : const Color(0xFFFFFBEB),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: _hasFilledReinduksiThisMonth ? const Color(0xFF86EFAC) : const Color(0xFFFDE68A),
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: _hasFilledReinduksiThisMonth ? const Color(0xFF22C55E) : const Color(0xFFF59E0B),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(
+              _hasFilledReinduksiThisMonth ? Icons.verified_rounded : Icons.assignment_late_rounded,
+              color: Colors.white,
+              size: 20,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Re-Induksi K3LH ($monthName)',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w900,
+                        color: _hasFilledReinduksiThisMonth ? const Color(0xFF15803D) : const Color(0xFFB45309),
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: _hasFilledReinduksiThisMonth ? const Color(0xFFDCFCE7) : const Color(0xFFFEF3C7),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        _hasFilledReinduksiThisMonth ? 'Sudah Diisi' : 'Belum Diisi',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
+                          color: _hasFilledReinduksiThisMonth ? const Color(0xFF15803D) : const Color(0xFFB45309),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  _hasFilledReinduksiThisMonth
+                      ? 'Formulir Re-Induksi untuk bulan ini telah berhasil diisi. Pop up pengisian tidak akan muncul lagi di bulan ini.'
+                      : 'Wajib diisi setiap awal bulan untuk komitmen keselamatan kerja tambang.',
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    color: _hasFilledReinduksiThisMonth ? const Color(0xFF166534) : const Color(0xFF92400E),
+                    height: 1.35,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                SizedBox(
+                  height: 36,
+                  child: ElevatedButton.icon(
+                    onPressed: _openReinductionForm,
+                    icon: Icon(
+                      _hasFilledReinduksiThisMonth ? Icons.visibility_rounded : Icons.edit_note_rounded,
+                      size: 16,
+                      color: Colors.white,
+                    ),
+                    label: Text(
+                      _hasFilledReinduksiThisMonth ? 'Lihat / Isi Ulang Re-Induksi' : 'Isi Form Re-Induksi Sekarang',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.white,
+                      ),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _hasFilledReinduksiThisMonth ? const Color(0xFF15803D) : const Color(0xFFD97706),
+                      elevation: 1,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      padding: const EdgeInsets.symmetric(horizontal: 14),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   // Save Button
   Widget _buildSaveButton() {
+    final isReguler = _selectedTab == 0;
+
+    if (isReguler && _isIndexim) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF1F5F9),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: const Color(0xFFCBD5E1)),
+        ),
+        child: Column(
+          children: [
+            const Row(
+              children: [
+                Icon(Icons.info_outline_rounded, color: Color(0xFF0284C7), size: 18),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Roster Reguler Dikelola Terpusat di ONE DB',
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF0F172A),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            const Text(
+              'Jadwal roster sudah sesuai di sistem ONE DB. Jika terdapat kesalahan roster, silakan update roster di aplikasi ONE DB khusus untuk PT Indexim Coalindo.',
+              style: TextStyle(
+                fontSize: 11.5,
+                color: Color(0xFF475569),
+                height: 1.4,
+              ),
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              height: 44,
+              child: ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF0F766E),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  elevation: 2,
+                ),
+                onPressed: _openReinductionForm,
+                icon: const Icon(Icons.assignment_turned_in_rounded, size: 18),
+                label: const Text(
+                  'Buka Formulir Re-Induksi K3LH',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     return SizedBox(
       width: double.infinity,
       child: ElevatedButton(
@@ -1151,7 +1453,9 @@ class _RosterSettingsPageState extends State<RosterSettingsPage>
             : Text(
                 _editingId != null
                     ? (_selectedTab == 1 ? 'Perbarui Periode Tugas' : 'Perbarui Pengaturan Roster')
-                    : 'Lanjut ke Form Re-Induksi & Simpan Roster',
+                    : (_selectedTab == 1
+                        ? 'Lanjut ke Form Re-Induksi & Simpan Periode Tugas'
+                        : 'Lanjut ke Form Re-Induksi & Simpan Roster'),
                 textAlign: TextAlign.center,
                 style: const TextStyle(
                   fontSize: 13.5,

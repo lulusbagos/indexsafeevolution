@@ -1,22 +1,44 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import '../pages/roster_settings_page.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../pages/reinduction_form_page.dart';
 import '../services/api.dart';
+import '../services/preference.dart';
 
-class RosterPromptDialog extends StatelessWidget {
-  const RosterPromptDialog({super.key});
+class ReinductionPromptDialog extends StatelessWidget {
+  const ReinductionPromptDialog({super.key});
 
   static bool _isChecking = false;
   static bool _isShowing = false;
 
-  /// Memeriksa status roster karyawan setelah iklan muncul.
-  /// Jika belum ada roster aktif / belum disetting, pop up akan muncul.
-  /// Jika sudah disetting, pop up tidak akan muncul.
-  static Future<void> checkAndPromptRoster(BuildContext context) async {
+  static String _getMonthName(int month) {
+    const months = [
+      'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+      'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+    ];
+    if (month >= 1 && month <= 12) return months[month - 1];
+    return '';
+  }
+
+  /// Memeriksa status re-induksi bulanan karyawan saat aplikasi dibuka di awal bulan.
+  /// Jika sudah mengisi di bulan berjalan, pop up tidak akan muncul lagi di bulan tersebut.
+  /// Jika belum mengisi, pop up akan muncul mengingatkan pengisian.
+  static Future<void> checkAndPrompt(BuildContext context) async {
     if (_isChecking || _isShowing) return;
     _isChecking = true;
 
     try {
+      final now = DateTime.now();
+      final monthKey = 'reinduksi_filled_${now.year}_${now.month}';
+      final prefs = await SharedPreferences.getInstance();
+
+      // 1. Cek cache lokal: jika sudah tercatat selesai bulan ini, lewati
+      if (prefs.getBool(monthKey) == true) {
+        _isChecking = false;
+        return;
+      }
+
+      // 2. Cek status ke server
       final api = ApiService();
       final res = await api.getRosterStatus();
 
@@ -25,15 +47,22 @@ class RosterPromptDialog extends StatelessWidget {
         return;
       }
 
-      res.fold(
-        (err) {
-          debugPrint('[RosterPromptDialog] Gagal memeriksa status roster: ${err['message']}');
+      await res.fold(
+        (err) async {
+          debugPrint('[ReinductionPromptDialog] Gagal memeriksa status: ${err['message']}');
         },
         (data) async {
-          final bool hasConfigured = data['hasConfiguredRoster'] == true;
-          debugPrint('[RosterPromptDialog] hasConfiguredRoster: $hasConfigured');
+          final bool hasFilledThisMonth = data['hasFilledReinduksiThisMonth'] == true;
+          debugPrint('[ReinductionPromptDialog] hasFilledReinduksiThisMonth: $hasFilledThisMonth');
 
-          if (!hasConfigured && context.mounted) {
+          if (hasFilledThisMonth) {
+            // Sudah mengisi di server, update cache lokal agar tidak dicek berulang
+            await prefs.setBool(monthKey, true);
+            return;
+          }
+
+          // Belum mengisi di bulan ini -> Munculkan pop up Re-Induksi
+          if (context.mounted) {
             _isShowing = true;
             await showGeneralDialog(
               context: context,
@@ -41,7 +70,7 @@ class RosterPromptDialog extends StatelessWidget {
               barrierLabel: 'Tutup',
               barrierColor: Colors.black.withValues(alpha: 0.72),
               transitionDuration: const Duration(milliseconds: 320),
-              pageBuilder: (ctx, anim1, anim2) => const RosterPromptDialog(),
+              pageBuilder: (ctx, anim1, anim2) => const ReinductionPromptDialog(),
               transitionBuilder: (ctx, anim1, anim2, child) {
                 final curved = CurvedAnimation(
                   parent: anim1,
@@ -61,14 +90,20 @@ class RosterPromptDialog extends StatelessWidget {
         },
       );
     } catch (e) {
-      debugPrint('[RosterPromptDialog] Exception: $e');
+      debugPrint('[ReinductionPromptDialog] Exception: $e');
     } finally {
       _isChecking = false;
     }
   }
 
+  /// Backward-compatible alias
+  static Future<void> checkAndPromptRoster(BuildContext context) => checkAndPrompt(context);
+
   @override
   Widget build(BuildContext context) {
+    final now = DateTime.now();
+    final periodeStr = '${_getMonthName(now.month)} ${now.year}';
+
     return Center(
       child: Material(
         color: Colors.transparent,
@@ -119,14 +154,14 @@ class RosterPromptDialog extends StatelessWidget {
                           shape: BoxShape.circle,
                         ),
                         child: const Icon(
-                          Icons.calendar_month_rounded,
-                          size: 44,
+                          Icons.verified_user_rounded,
+                          size: 42,
                           color: Colors.white,
                         ),
                       ),
                       const SizedBox(height: 12),
                       const Text(
-                        'PENGATURAN ROSTER',
+                        'RE-INDUKSI K3LH',
                         style: TextStyle(
                           color: Colors.white,
                           fontSize: 18,
@@ -143,7 +178,7 @@ class RosterPromptDialog extends StatelessWidget {
                           borderRadius: BorderRadius.circular(20),
                         ),
                         child: const Text(
-                          'Wajib Diisi Karyawan',
+                          'Wajib Awal Bulan',
                           style: TextStyle(
                             color: Colors.white,
                             fontSize: 11,
@@ -155,15 +190,15 @@ class RosterPromptDialog extends StatelessWidget {
                   ),
                 ),
 
-                // Content
+                // Content Body
                 Padding(
                   padding: const EdgeInsets.all(20),
                   child: Column(
                     children: [
-                      const Text(
-                        'Jadwal Roster Belum Diatur!',
-                        style: TextStyle(
-                          fontSize: 16,
+                      Text(
+                        'Komitmen Keselamatan Periode $periodeStr',
+                        style: const TextStyle(
+                          fontSize: 15,
                           fontWeight: FontWeight.w800,
                           color: Color(0xFF1E293B),
                         ),
@@ -171,7 +206,7 @@ class RosterPromptDialog extends StatelessWidget {
                       ),
                       const SizedBox(height: 10),
                       const Text(
-                        'Anda belum mengatur jadwal Roster Kerja Anda atau periode dinas sebelumnya telah berakhir.\n\nHarap lakukan pengaturan jadwal dinas & cuti Anda serta melengkapi Form Re-Induksi untuk mengaktifkan target kepatuhan K3LH.',
+                        'Untuk menjaga kepatuhan keselamatan tambang dan kesiapan operasional di area kerja PT Indexim Coalindo & Mitra Kerja, setiap karyawan wajib mengisi Form Re-Induksi K3LH di setiap awal bulan.\n\nFormulir ini hanya perlu diisi 1 kali dalam sebulan.',
                         style: TextStyle(
                           fontSize: 13,
                           color: Color(0xFF64748B),
@@ -181,23 +216,29 @@ class RosterPromptDialog extends StatelessWidget {
                       ),
                       const SizedBox(height: 20),
 
-                      // Button Atur Sekarang
+                      // Button Isi Re-Induksi Sekarang
                       SizedBox(
                         width: double.infinity,
                         height: 46,
                         child: ElevatedButton.icon(
-                          onPressed: () {
+                          onPressed: () async {
                             HapticFeedback.mediumImpact();
                             Navigator.of(context).pop();
-                            Navigator.of(context).push(
+                            final profile = PreferenceService.getProfile();
+                            final filled = await Navigator.of(context).push<bool>(
                               MaterialPageRoute(
-                                builder: (_) => const RosterSettingsPage(),
+                                builder: (_) => ReinductionFormPage(profile: profile),
                               ),
                             );
+                            if (filled == true) {
+                              final prefs = await SharedPreferences.getInstance();
+                              final now = DateTime.now();
+                              await prefs.setBool('reinduksi_filled_${now.year}_${now.month}', true);
+                            }
                           },
-                          icon: const Icon(Icons.edit_calendar_rounded, color: Colors.white, size: 20),
+                          icon: const Icon(Icons.assignment_turned_in_rounded, color: Colors.white, size: 20),
                           label: const Text(
-                            'Atur Roster Sekarang',
+                            'Isi Re-Induksi Sekarang',
                             style: TextStyle(
                               color: Colors.white,
                               fontWeight: FontWeight.w800,
@@ -244,3 +285,5 @@ class RosterPromptDialog extends StatelessWidget {
   }
 }
 
+/// Backward compatibility alias
+typedef RosterPromptDialog = ReinductionPromptDialog;

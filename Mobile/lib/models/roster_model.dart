@@ -81,6 +81,9 @@ class RosterInfoResponse {
   final double ratio;
   final int defaultOnsite;
   final bool hasConfiguredRoster;
+  final bool isIndexim;
+  final bool isOneSync;
+  final bool hasFilledReinduksiThisMonth;
 
   RosterInfoResponse({
     required this.history,
@@ -92,6 +95,9 @@ class RosterInfoResponse {
     required this.ratio,
     required this.defaultOnsite,
     this.hasConfiguredRoster = true,
+    this.isIndexim = false,
+    this.isOneSync = false,
+    this.hasFilledReinduksiThisMonth = false,
   });
 
   factory RosterInfoResponse.fromJson(Map<String, dynamic> json) {
@@ -106,6 +112,9 @@ class RosterInfoResponse {
       ratio: (json['ratio'] is num) ? (json['ratio'] as num).toDouble() : 1.0,
       defaultOnsite: json['defaultOnsite'] is int ? json['defaultOnsite'] : int.tryParse('${json['defaultOnsite']}') ?? 42,
       hasConfiguredRoster: json['hasConfiguredRoster'] == true,
+      isIndexim: json['isIndexim'] == true,
+      isOneSync: json['isOneSync'] == true,
+      hasFilledReinduksiThisMonth: json['hasFilledReinduksiThisMonth'] == true,
     );
   }
 }

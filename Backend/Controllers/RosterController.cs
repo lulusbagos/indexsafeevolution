@@ -71,8 +71,11 @@ namespace Indexsafe.Api.Controllers
             var activeRoster = historyRaw.FirstOrDefault(r => today >= r.AwalDinas.Date && today <= r.AkhirCuti.Date && r.Status != "REJECTED");
             var latestRoster = historyRaw.FirstOrDefault(r => r.Status != "REJECTED");
 
+            var userDb = await _context.AppUsers.AsNoTracking().FirstOrDefaultAsync(u => u.Nik == userNik);
             var empKaryawan = await _context.Karyawans.AsNoTracking().FirstOrDefaultAsync(k => k.NoNik == userNik && k.StatusAktif);
-            bool isIndexim = (empKaryawan != null && empKaryawan.IdPerusahaan == IndeximRosterService.IndeximCompanyId);
+            bool isIndexim = (empKaryawan != null && empKaryawan.IdPerusahaan == IndeximRosterService.IndeximCompanyId)
+                || (!string.IsNullOrEmpty(userDb?.Perusahaan) && userDb.Perusahaan.Contains("INDEXIM", StringComparison.OrdinalIgnoreCase));
+
             IndeximRosterMonthSummary? oneSum = null;
             if (isIndexim)
             {
@@ -80,10 +83,24 @@ namespace Indexsafe.Api.Controllers
             }
             bool hasOneData = oneSum != null && oneSum.HasOneRoster;
 
-            // Roster dinyatakan sudah disetting jika memiliki roster aktif, ONE DB roster, atau jadwal terkini belum kadaluarsa
-            bool hasConfiguredRoster = hasOneData || activeRoster != null || (latestRoster != null && latestRoster.AkhirCuti >= today);
+            // Roster dinyatakan sudah disetting jika:
+            // 1. Karyawan PT Indexim Coalindo (roster dikelola di ONE DB)
+            // 2. Karyawan memiliki data ONE DB aktif
+            // 3. Karyawan memiliki roster aktif di tbl_m_roster atau roster terakhir belum kadaluarsa
+            bool hasConfiguredRoster = isIndexim || hasOneData || activeRoster != null || (latestRoster != null && latestRoster.AkhirCuti >= today);
 
-            // Cek Re-Induksi terkini
+            // Cek Re-Induksi bulan berjalan (current month)
+            var startOfMonth = new DateTime(today.Year, today.Month, 1);
+            var endOfMonth = startOfMonth.AddMonths(1);
+
+            var currentMonthReinduksi = await _context.Reinduksis.AsNoTracking()
+                .Where(x => x.Nik == userNik && !x.IsDeleted && x.CreatedAt >= startOfMonth && x.CreatedAt < endOfMonth)
+                .OrderByDescending(x => x.CreatedAt)
+                .FirstOrDefaultAsync();
+
+            bool hasFilledReinduksiThisMonth = currentMonthReinduksi != null;
+
+            // Cek Re-Induksi terkini (kapanpun)
             var latestReinduksi = await _context.Reinduksis.AsNoTracking()
                 .Where(x => x.Nik == userNik && !x.IsDeleted)
                 .OrderByDescending(x => x.CreatedAt)
@@ -94,6 +111,17 @@ namespace Indexsafe.Api.Controllers
                 success = true,
                 hasConfiguredRoster,
                 isOneSync = hasOneData,
+                isIndexim,
+                hasFilledReinduksiThisMonth,
+                currentMonthReinduksi = currentMonthReinduksi != null ? new
+                {
+                    currentMonthReinduksi.Id,
+                    currentMonthReinduksi.Status,
+                    currentMonthReinduksi.NikPengawas,
+                    currentMonthReinduksi.NamaPengawas,
+                    currentMonthReinduksi.IsExempt,
+                    CreatedAt = currentMonthReinduksi.CreatedAt.ToString("yyyy-MM-dd HH:mm")
+                } : null,
                 activeRoster = activeRoster != null ? new
                 {
                     activeRoster.Id,
@@ -218,8 +246,11 @@ namespace Indexsafe.Api.Controllers
             var activeRoster = historyRaw.FirstOrDefault(r => today >= r.AwalDinas.Date && today <= r.AkhirCuti.Date && r.Status != "REJECTED");
             var latestRoster = historyRaw.FirstOrDefault(r => r.Status != "REJECTED");
 
+            var userDb = await _context.AppUsers.AsNoTracking().FirstOrDefaultAsync(u => u.Nik == userNik);
             var empKaryawan = await _context.Karyawans.AsNoTracking().FirstOrDefaultAsync(k => k.NoNik == userNik && k.StatusAktif);
-            bool isIndexim = (empKaryawan != null && empKaryawan.IdPerusahaan == IndeximRosterService.IndeximCompanyId);
+            bool isIndexim = (empKaryawan != null && empKaryawan.IdPerusahaan == IndeximRosterService.IndeximCompanyId)
+                || (!string.IsNullOrEmpty(userDb?.Perusahaan) && userDb.Perusahaan.Contains("INDEXIM", StringComparison.OrdinalIgnoreCase));
+
             IndeximRosterMonthSummary? oneSum = null;
             if (isIndexim)
             {
@@ -243,13 +274,28 @@ namespace Indexsafe.Api.Controllers
                 ratio = Math.Min(1.0, (double)computedOnsiteDays / totalDaysInMonth);
             }
 
-            bool hasConfiguredRoster = hasOneData || activeRoster != null || (latestRoster != null && latestRoster.AkhirCuti >= today);
+            // Roster dinyatakan sudah disetting jika:
+            // 1. Karyawan PT Indexim Coalindo (roster dikelola di ONE DB)
+            // 2. Karyawan memiliki data ONE DB aktif
+            // 3. Karyawan memiliki roster aktif di tbl_m_roster atau roster terakhir belum kadaluarsa
+            bool hasConfiguredRoster = isIndexim || hasOneData || activeRoster != null || (latestRoster != null && latestRoster.AkhirCuti >= today);
+
+            // Cek Re-Induksi bulan berjalan
+            var startOfMonthRe = new DateTime(today.Year, today.Month, 1);
+            var endOfMonthRe = startOfMonthRe.AddMonths(1);
+            var currentMonthReinduksi = await _context.Reinduksis.AsNoTracking()
+                .Where(x => x.Nik == userNik && !x.IsDeleted && x.CreatedAt >= startOfMonthRe && x.CreatedAt < endOfMonthRe)
+                .OrderByDescending(x => x.CreatedAt)
+                .FirstOrDefaultAsync();
+            bool hasFilledReinduksiThisMonth = currentMonthReinduksi != null;
 
             return Ok(new
             {
                 success = true,
                 hasConfiguredRoster,
                 isOneSync = hasOneData,
+                isIndexim,
+                hasFilledReinduksiThisMonth,
                 history,
                 activeRoster = activeRoster != null ? new
                 {
@@ -372,14 +418,14 @@ namespace Indexsafe.Api.Controllers
             }
 
             // REGULER ROSTER
+            var userDb = await _context.AppUsers.AsNoTracking().FirstOrDefaultAsync(u => u.Nik == userNik);
             var empKaryawan = await _context.Karyawans.AsNoTracking().FirstOrDefaultAsync(k => k.NoNik == userNik && k.StatusAktif);
-            if (empKaryawan != null && empKaryawan.IdPerusahaan == IndeximRosterService.IndeximCompanyId)
+            bool isIndexim = (empKaryawan != null && empKaryawan.IdPerusahaan == IndeximRosterService.IndeximCompanyId)
+                || (!string.IsNullOrEmpty(userDb?.Perusahaan) && userDb.Perusahaan.Contains("INDEXIM", StringComparison.OrdinalIgnoreCase));
+
+            if (isIndexim)
             {
-                var oneCheck = await _indeximRosterService.GetEmployeeIndeximRosterAsync(userNik, DateTime.Today.Year, DateTime.Today.Month);
-                if (oneCheck != null && oneCheck.HasOneRoster)
-                {
-                    return BadRequest(new { message = "Roster reguler untuk karyawan PT Indexim Coalindo dikelola secara terpusat melalui aplikasi ONE DB HC. Silakan hubungi Admin Departemen untuk perubahan jadwal, atau gunakan opsi 'Periode Tugas'." });
-                }
+                return BadRequest(new { success = false, message = "Roster kerja untuk PT Indexim Coalindo dikelola secara terpusat melalui aplikasi ONE DB. Jika terdapat kesalahan roster, silakan perbarui jadwal di aplikasi ONE DB." });
             }
 
             if (req == null ||
@@ -491,55 +537,60 @@ namespace Indexsafe.Api.Controllers
                 return BadRequest(new { message = "Payload tidak valid." });
             }
 
-            bool isTugas = string.Equals(req.TipeRoster, "TUGAS", StringComparison.OrdinalIgnoreCase);
-            DateTime awalDinas, akhirDinas, awalCuti, akhirCuti;
+            var userDb = await _context.AppUsers.FirstOrDefaultAsync(u => u.Nik == userNik);
+            var empKaryawan = await _context.Karyawans.AsNoTracking().FirstOrDefaultAsync(k => k.NoNik == userNik && k.StatusAktif);
+            bool isIndexim = (empKaryawan != null && empKaryawan.IdPerusahaan == IndeximRosterService.IndeximCompanyId)
+                || (!string.IsNullOrEmpty(userDb?.Perusahaan) && userDb.Perusahaan.Contains("INDEXIM", StringComparison.OrdinalIgnoreCase));
 
-            if (isTugas)
+            bool isTugas = string.Equals(req.TipeRoster, "TUGAS", StringComparison.OrdinalIgnoreCase);
+            DateTime awalDinas = DateTime.MinValue, akhirDinas = DateTime.MinValue, awalCuti = DateTime.MinValue, akhirCuti = DateTime.MinValue;
+            bool hasValidDates = DateTime.TryParse(req.AwalDinas, out awalDinas) && DateTime.TryParse(req.AkhirDinas, out akhirDinas);
+
+            var existingActiveRoster = await _context.Rosters
+                .Where(r => r.Nik == userNik && r.Status != "REJECTED")
+                .OrderByDescending(r => r.AkhirCuti)
+                .FirstOrDefaultAsync();
+
+            int? targetRosterId = req.Id ?? existingActiveRoster?.Id;
+
+            if (!hasValidDates && existingActiveRoster != null)
             {
-                if (!DateTime.TryParse(req.AwalDinas, out awalDinas) || !DateTime.TryParse(req.AkhirDinas, out akhirDinas))
-                {
-                    return BadRequest(new { message = "Format tanggal periode tugas tidak valid." });
-                }
-                if (awalDinas > akhirDinas)
-                {
-                    return BadRequest(new { message = "Tanggal mulai tugas tidak boleh lebih besar dari akhir tugas." });
-                }
+                awalDinas = existingActiveRoster.AwalDinas;
+                akhirDinas = existingActiveRoster.AkhirDinas;
+                awalCuti = existingActiveRoster.AwalCuti;
+                akhirCuti = existingActiveRoster.AkhirCuti;
+            }
+            else if (!hasValidDates)
+            {
+                var now = DateTime.Now;
+                awalDinas = new DateTime(now.Year, now.Month, 1);
+                akhirDinas = awalDinas.AddMonths(1).AddDays(-1);
                 awalCuti = akhirDinas;
                 akhirCuti = akhirDinas;
             }
             else
             {
-                if (!DateTime.TryParse(req.AwalDinas, out awalDinas) ||
-                    !DateTime.TryParse(req.AkhirDinas, out akhirDinas) ||
-                    !DateTime.TryParse(req.AwalCuti, out awalCuti) ||
-                    !DateTime.TryParse(req.AkhirCuti, out akhirCuti))
+                if (isTugas)
                 {
-                    return BadRequest(new { message = "Format tanggal roster reguler tidak valid." });
+                    awalCuti = akhirDinas;
+                    akhirCuti = akhirDinas;
                 }
-                if (awalDinas > akhirDinas)
+                else
                 {
-                    return BadRequest(new { message = "Tanggal awal dinas tidak boleh lebih besar dari akhir dinas." });
-                }
-                if (akhirDinas >= awalCuti)
-                {
-                    return BadRequest(new { message = "Tanggal akhir dinas harus lebih kecil dari awal cuti." });
-                }
-                if (awalCuti > akhirCuti)
-                {
-                    return BadRequest(new { message = "Tanggal awal cuti tidak boleh lebih besar dari akhir cuti." });
+                    DateTime.TryParse(req.AwalCuti, out awalCuti);
+                    DateTime.TryParse(req.AkhirCuti, out akhirCuti);
+                    if (awalCuti == DateTime.MinValue) awalCuti = akhirDinas;
+                    if (akhirCuti == DateTime.MinValue) akhirCuti = awalCuti;
                 }
             }
 
             // Cek jabatan & pengecualian approval pengawas
             string userJabatan = req.Jabatan ?? "";
-            var userDb = await _context.AppUsers.FirstOrDefaultAsync(u => u.Nik == userNik);
             if (string.IsNullOrWhiteSpace(userJabatan) && userDb != null)
             {
-                // Cek karyawan view jika ada
-                var kw = await _context.Karyawans.FirstOrDefaultAsync(k => k.NoNik == userNik);
-                if (kw?.IdJabatan != null)
+                if (empKaryawan?.IdJabatan != null)
                 {
-                    var jb = await _context.Jabatans.FirstOrDefaultAsync(j => j.JabatanId == kw.IdJabatan.Value);
+                    var jb = await _context.Jabatans.FirstOrDefaultAsync(j => j.JabatanId == empKaryawan.IdJabatan.Value);
                     if (jb != null && !string.IsNullOrWhiteSpace(jb.NamaJabatan))
                     {
                         userJabatan = jb.NamaJabatan;
@@ -556,31 +607,61 @@ namespace Indexsafe.Api.Controllers
             }
 
             string cleanNama = !string.IsNullOrWhiteSpace(req.Nama) ? req.Nama : (userDb?.Nama ?? userNik);
-            string cleanPerusahaan = !string.IsNullOrWhiteSpace(req.Perusahaan) ? req.Perusahaan : (userDb?.Perusahaan ?? "-");
+            string cleanPerusahaan = !string.IsNullOrWhiteSpace(req.Perusahaan) ? req.Perusahaan : (userDb?.Perusahaan ?? (isIndexim ? "PT INDEXIM COALINDO" : "-"));
             string cleanDepartemen = !string.IsNullOrWhiteSpace(req.Departemen) ? req.Departemen : (userDb?.Departemen ?? "-");
             string? cleanNikPengawas = isExempt ? null : req.NikPengawas?.Trim();
             string? cleanNamaPengawas = isExempt ? null : req.NamaPengawas?.Trim();
 
             string finalStatus = isExempt ? "APPROVED" : "PENDING_APPROVAL";
 
-            // Simpan / Perbarui Roster
-            var newRoster = new Roster
+            // Simpan / Perbarui Roster HANYA jika bukan PT Indexim reguler dan user meminta buat/update roster
+            Roster? savedRoster = null;
+            if (isTugas || (!isIndexim && hasValidDates && req.Id.HasValue && req.Id.Value > 0))
             {
-                Nik = userNik,
-                AwalDinas = awalDinas,
-                AkhirDinas = akhirDinas,
-                AwalCuti = awalCuti,
-                AkhirCuti = akhirCuti,
-                TipeRoster = req.TipeRoster ?? "REGULER",
-                Keterangan = req.Keterangan,
-                Status = finalStatus,
-                NikPengawas = cleanNikPengawas,
-                NamaPengawas = cleanNamaPengawas,
-                CreatedAt = DateTime.Now,
-                UpdatedAt = DateTime.Now
-            };
-            _context.Rosters.Add(newRoster);
-            await _context.SaveChangesAsync();
+                if (req.Id.HasValue && req.Id.Value > 0)
+                {
+                    savedRoster = await _context.Rosters.FirstOrDefaultAsync(r => r.Id == req.Id.Value && r.Nik == userNik);
+                }
+                if (savedRoster != null)
+                {
+                    savedRoster.AwalDinas = awalDinas;
+                    savedRoster.AkhirDinas = akhirDinas;
+                    savedRoster.AwalCuti = awalCuti;
+                    savedRoster.AkhirCuti = akhirCuti;
+                    savedRoster.TipeRoster = req.TipeRoster ?? "REGULER";
+                    savedRoster.Keterangan = req.Keterangan;
+                    savedRoster.Status = finalStatus;
+                    savedRoster.NikPengawas = cleanNikPengawas;
+                    savedRoster.NamaPengawas = cleanNamaPengawas;
+                    savedRoster.UpdatedAt = DateTime.Now;
+                    _context.Rosters.Update(savedRoster);
+                }
+            }
+            else if (!isIndexim && hasValidDates && existingActiveRoster == null)
+            {
+                savedRoster = new Roster
+                {
+                    Nik = userNik,
+                    AwalDinas = awalDinas,
+                    AkhirDinas = akhirDinas,
+                    AwalCuti = awalCuti,
+                    AkhirCuti = akhirCuti,
+                    TipeRoster = req.TipeRoster ?? "REGULER",
+                    Keterangan = req.Keterangan,
+                    Status = finalStatus,
+                    NikPengawas = cleanNikPengawas,
+                    NamaPengawas = cleanNamaPengawas,
+                    CreatedAt = DateTime.Now,
+                    UpdatedAt = DateTime.Now
+                };
+                _context.Rosters.Add(savedRoster);
+            }
+
+            if (savedRoster != null)
+            {
+                await _context.SaveChangesAsync();
+                targetRosterId = savedRoster.Id;
+            }
 
             DateTime? tglOffsite = null;
             if (DateTime.TryParse(req.TanggalMulaiOffsite, out DateTime dtOff)) tglOffsite = dtOff;
@@ -593,7 +674,7 @@ namespace Indexsafe.Api.Controllers
             // Simpan Form Re-Induksi
             var reinduksi = new Reinduksi
             {
-                RosterId = newRoster.Id,
+                RosterId = targetRosterId,
                 Nik = userNik,
                 Nama = cleanNama,
                 Perusahaan = cleanPerusahaan,
@@ -632,8 +713,11 @@ namespace Indexsafe.Api.Controllers
             _context.Reinduksis.Add(reinduksi);
             await _context.SaveChangesAsync();
 
-            newRoster.IdReinduksi = reinduksi.Id;
-            _context.Rosters.Update(newRoster);
+            if (savedRoster != null)
+            {
+                savedRoster.IdReinduksi = reinduksi.Id;
+                _context.Rosters.Update(savedRoster);
+            }
 
             // Buat Notifikasi
             if (isExempt)
@@ -641,8 +725,8 @@ namespace Indexsafe.Api.Controllers
                 _context.Notifications.Add(new Notification
                 {
                     RecipientNik = userNik,
-                    Title = "Roster & Re-Induksi Disetujui Otomatis",
-                    Message = $"Pengaturan roster ({awalDinas:dd MMM} - {akhirDinas:dd MMM}) dan Form Re-Induksi telah disetujui otomatis sesuai jabatan {userJabatan}.",
+                    Title = "Re-Induksi Disetujui Otomatis",
+                    Message = $"Form Re-Induksi K3LH periode ini telah disetujui otomatis sesuai jabatan {userJabatan}.",
                     Url = "/roster",
                     NotifType = "roster_reinduksi_approved",
                     Category = "info",
@@ -657,11 +741,11 @@ namespace Indexsafe.Api.Controllers
                 {
                     RecipientNik = cleanNikPengawas,
                     Title = $"Persetujuan Re-Induksi: {cleanNama}",
-                    Message = $"{cleanNama} ({userNik}) telah melengkapi Form Re-Induksi & Pengaturan Roster ({awalDinas:dd MMM} - {akhirDinas:dd MMM}). Harap periksa dan berikan persetujuan.",
+                    Message = $"{cleanNama} ({userNik}) telah melengkapi Form Re-Induksi K3LH. Harap periksa dan berikan persetujuan.",
                     Url = "/reinduksi-approval",
                     NotifType = "reinduksi_approval",
                     Category = "approval",
-                    Payload = $"{{\"reinduksiId\": {reinduksi.Id}, \"rosterId\": {newRoster.Id}, \"nik\": \"{userNik}\"}}",
+                    Payload = $"{{\"reinduksiId\": {reinduksi.Id}, \"rosterId\": {(targetRosterId ?? 0)}, \"nik\": \"{userNik}\"}}",
                     IsRead = false,
                     CreatedAt = DateTime.Now
                 });
@@ -671,7 +755,7 @@ namespace Indexsafe.Api.Controllers
                 {
                     RecipientNik = userNik,
                     Title = "Form Re-Induksi Terkirim ke Pengawas",
-                    Message = $"Pengaturan roster & Form Re-Induksi berhasil dikirim. Menunggu persetujuan Pengawas ({cleanNamaPengawas}).",
+                    Message = $"Form Re-Induksi K3LH berhasil dikirim. Menunggu persetujuan Pengawas ({cleanNamaPengawas}).",
                     Url = "/roster",
                     NotifType = "roster_reinduksi_pending",
                     Category = "info",
@@ -688,9 +772,9 @@ namespace Indexsafe.Api.Controllers
                 isExempt,
                 status = finalStatus,
                 message = isExempt
-                    ? "Pengaturan roster dan Form Re-Induksi berhasil disimpan & disetujui otomatis."
-                    : $"Form Re-Induksi & Pengaturan Roster berhasil dikirim dan menanti persetujuan dari Pengawas ({cleanNamaPengawas}).",
-                rosterId = newRoster.Id,
+                    ? "Form Re-Induksi berhasil disimpan & disetujui otomatis."
+                    : $"Form Re-Induksi berhasil dikirim dan menanti persetujuan dari Pengawas ({cleanNamaPengawas}).",
+                rosterId = targetRosterId,
                 reinduksiId = reinduksi.Id
             });
         }
