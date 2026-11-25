@@ -141,6 +141,11 @@ namespace Indexsafe.Api.Controllers
                     latestReinduksi.NamaPengawas,
                     latestReinduksi.IsExempt,
                     CreatedAt = latestReinduksi.CreatedAt.ToString("yyyy-MM-dd HH:mm")
+                } : null,
+                lastSupervisor = latestReinduksi != null && !string.IsNullOrEmpty(latestReinduksi.NikPengawas) ? new
+                {
+                    nik = latestReinduksi.NikPengawas,
+                    nama = latestReinduksi.NamaPengawas
                 } : null
             });
         }
@@ -213,10 +218,11 @@ namespace Indexsafe.Api.Controllers
                 };
             }).ToList();
 
-            // Check active status for current month target
+            // Check active status for current month target (menggunakan HashSet tanggal unik agar anti multi-counting overlap)
             bool isTugasExempt = false;
             int computedOnsiteDays = 0;
             bool hasRoster = false;
+            var onsiteDaysSet = new HashSet<DateTime>();
 
             foreach (var r in historyRaw)
             {
@@ -235,13 +241,15 @@ namespace Indexsafe.Api.Controllers
                 {
                     var overlapStart = r.AwalDinas.Date > startOfMonth.Date ? r.AwalDinas.Date : startOfMonth.Date;
                     var overlapEnd = r.AkhirDinas.Date < endOfMonth.Date ? r.AkhirDinas.Date : endOfMonth.Date;
-                    if (overlapStart <= overlapEnd)
+                    for (var d = overlapStart.Date; d <= overlapEnd.Date; d = d.AddDays(1))
                     {
-                        computedOnsiteDays += (overlapEnd - overlapStart).Days + 1;
-                        hasRoster = true;
+                        onsiteDaysSet.Add(d);
                     }
                 }
             }
+
+            computedOnsiteDays = onsiteDaysSet.Count;
+            hasRoster = computedOnsiteDays > 0;
 
             var activeRoster = historyRaw.FirstOrDefault(r => today >= r.AwalDinas.Date && today <= r.AkhirCuti.Date && r.Status != "REJECTED");
             var latestRoster = historyRaw.FirstOrDefault(r => r.Status != "REJECTED");
@@ -289,6 +297,11 @@ namespace Indexsafe.Api.Controllers
                 .FirstOrDefaultAsync();
             bool hasFilledReinduksiThisMonth = currentMonthReinduksi != null;
 
+            var latestReinduksi = await _context.Reinduksis.AsNoTracking()
+                .Where(x => x.Nik == userNik && !x.IsDeleted)
+                .OrderByDescending(x => x.CreatedAt)
+                .FirstOrDefaultAsync();
+
             return Ok(new
             {
                 success = true,
@@ -321,6 +334,20 @@ namespace Indexsafe.Api.Controllers
                     TipeRoster = latestRoster.TipeRoster ?? "REGULER",
                     latestRoster.Keterangan,
                     ApprovalStatus = latestRoster.Status ?? "APPROVED"
+                } : null,
+                lastSupervisor = latestReinduksi != null && !string.IsNullOrEmpty(latestReinduksi.NikPengawas) ? new
+                {
+                    nik = latestReinduksi.NikPengawas,
+                    nama = latestReinduksi.NamaPengawas
+                } : null,
+                reinduksi = latestReinduksi != null ? new
+                {
+                    latestReinduksi.Id,
+                    latestReinduksi.Status,
+                    latestReinduksi.NikPengawas,
+                    latestReinduksi.NamaPengawas,
+                    latestReinduksi.IsExempt,
+                    CreatedAt = latestReinduksi.CreatedAt.ToString("yyyy-MM-dd HH:mm")
                 } : null,
                 isTugasExempt,
                 computedOnsiteDays,
@@ -616,12 +643,17 @@ namespace Indexsafe.Api.Controllers
 
             // Simpan / Perbarui Roster HANYA jika bukan PT Indexim reguler dan user meminta buat/update roster
             Roster? savedRoster = null;
-            if (isTugas || (!isIndexim && hasValidDates && req.Id.HasValue && req.Id.Value > 0))
+            if (isTugas || (!isIndexim && hasValidDates))
             {
                 if (req.Id.HasValue && req.Id.Value > 0)
                 {
                     savedRoster = await _context.Rosters.FirstOrDefaultAsync(r => r.Id == req.Id.Value && r.Nik == userNik);
                 }
+                else if (existingActiveRoster != null)
+                {
+                    savedRoster = existingActiveRoster;
+                }
+
                 if (savedRoster != null)
                 {
                     savedRoster.AwalDinas = awalDinas;
@@ -636,25 +668,25 @@ namespace Indexsafe.Api.Controllers
                     savedRoster.UpdatedAt = DateTime.Now;
                     _context.Rosters.Update(savedRoster);
                 }
-            }
-            else if (!isIndexim && hasValidDates && existingActiveRoster == null)
-            {
-                savedRoster = new Roster
+                else if (!isIndexim && hasValidDates)
                 {
-                    Nik = userNik,
-                    AwalDinas = awalDinas,
-                    AkhirDinas = akhirDinas,
-                    AwalCuti = awalCuti,
-                    AkhirCuti = akhirCuti,
-                    TipeRoster = req.TipeRoster ?? "REGULER",
-                    Keterangan = req.Keterangan,
-                    Status = finalStatus,
-                    NikPengawas = cleanNikPengawas,
-                    NamaPengawas = cleanNamaPengawas,
-                    CreatedAt = DateTime.Now,
-                    UpdatedAt = DateTime.Now
-                };
-                _context.Rosters.Add(savedRoster);
+                    savedRoster = new Roster
+                    {
+                        Nik = userNik,
+                        AwalDinas = awalDinas,
+                        AkhirDinas = akhirDinas,
+                        AwalCuti = awalCuti,
+                        AkhirCuti = akhirCuti,
+                        TipeRoster = req.TipeRoster ?? "REGULER",
+                        Keterangan = req.Keterangan,
+                        Status = finalStatus,
+                        NikPengawas = cleanNikPengawas,
+                        NamaPengawas = cleanNamaPengawas,
+                        CreatedAt = DateTime.Now,
+                        UpdatedAt = DateTime.Now
+                    };
+                    _context.Rosters.Add(savedRoster);
+                }
             }
 
             if (savedRoster != null)
@@ -913,6 +945,70 @@ namespace Indexsafe.Api.Controllers
             });
         }
 
+        [HttpPost("reinduksi/batch-action")]
+        public async Task<IActionResult> BatchActionReinduksi([FromBody] ReinduksiBatchActionModel req)
+        {
+            var userNik = GetCurrentNik();
+            if (req == null || req.ReinduksiIds == null || req.ReinduksiIds.Count == 0)
+            {
+                return BadRequest(new { success = false, message = "Pilih minimal satu form Re-Induksi." });
+            }
+
+            var items = await _context.Reinduksis
+                .Where(r => req.ReinduksiIds.Contains(r.Id) && r.NikPengawas == userNik && r.Status == "PENDING_APPROVAL" && !r.IsDeleted)
+                .ToListAsync();
+
+            if (items.Count == 0)
+            {
+                return BadRequest(new { success = false, message = "Tidak ada form Re-Induksi yang dapat diproses." });
+            }
+
+            bool isApprove = string.Equals(req.Action, "APPROVE", StringComparison.OrdinalIgnoreCase);
+            var supervisorUser = await _context.AppUsers.FirstOrDefaultAsync(u => u.Nik == userNik);
+            string supervisorNama = supervisorUser?.Nama ?? userNik;
+
+            var rosterIds = items.Where(i => i.RosterId.HasValue).Select(i => i.RosterId!.Value).Distinct().ToList();
+            var rosters = await _context.Rosters.Where(r => rosterIds.Contains(r.Id)).ToListAsync();
+            var rosterDict = rosters.ToDictionary(r => r.Id);
+
+            foreach (var item in items)
+            {
+                item.Status = isApprove ? "APPROVED" : "REJECTED";
+                item.ApprovedAt = isApprove ? DateTime.Now : null;
+                item.SupervisorNotes = req.Notes;
+                item.SignaturePengawas = req.SignaturePengawas;
+                item.UpdatedAt = DateTime.Now;
+
+                if (item.RosterId.HasValue && rosterDict.TryGetValue(item.RosterId.Value, out var ros))
+                {
+                    ros.Status = item.Status;
+                    ros.UpdatedAt = DateTime.Now;
+                }
+
+                _context.Notifications.Add(new Notification
+                {
+                    RecipientNik = item.Nik,
+                    Title = isApprove ? "Re-Induksi Disetujui Pengawas" : "Re-Induksi Ditolak Pengawas",
+                    Message = isApprove
+                        ? $"Form Re-Induksi K3LH Anda telah diverifikasi dan disetujui oleh {supervisorNama}."
+                        : $"Form Re-Induksi Anda ditolak oleh {supervisorNama}. Catatan: {req.Notes ?? "Periksa kembali data Anda."}",
+                    Url = "/roster",
+                    NotifType = isApprove ? "reinduksi_approved" : "reinduksi_rejected",
+                    Category = "approval",
+                    IsRead = false,
+                    CreatedAt = DateTime.Now
+                });
+            }
+
+            await _context.SaveChangesAsync();
+            return Ok(new
+            {
+                success = true,
+                count = items.Count,
+                message = $"{items.Count} formulir Re-Induksi berhasil {(isApprove ? "disetujui" : "ditolak")}."
+            });
+        }
+
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteRoster(int id)
         {
@@ -1002,6 +1098,14 @@ namespace Indexsafe.Api.Controllers
     public class ReinduksiActionModel
     {
         public int ReinduksiId { get; set; }
+        public string Action { get; set; } = string.Empty; // "APPROVE" or "REJECT"
+        public string? Notes { get; set; }
+        public string? SignaturePengawas { get; set; }
+    }
+
+    public class ReinduksiBatchActionModel
+    {
+        public List<int>? ReinduksiIds { get; set; }
         public string Action { get; set; } = string.Empty; // "APPROVE" or "REJECT"
         public string? Notes { get; set; }
         public string? SignaturePengawas { get; set; }

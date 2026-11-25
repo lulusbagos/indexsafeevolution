@@ -173,7 +173,28 @@ class _ReinductionFormPageState extends State<ReinductionFormPage> {
     _profile = widget.profile ?? PreferenceService.getProfile();
     _checkExemption();
     _initDates();
+    _loadSavedSupervisor();
     _fetchFreshProfile();
+  }
+
+  Future<void> _loadSavedSupervisor() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (_selectedSupervisorNik == null || _selectedSupervisorNik!.isEmpty) {
+        final prevNik = prefs.getString('last_reinduksi_supervisor_nik');
+        final prevNama = prefs.getString('last_reinduksi_supervisor_nama');
+        final prevDept = prefs.getString('last_reinduksi_supervisor_dept');
+        final prevComp = prefs.getString('last_reinduksi_supervisor_comp');
+        if (prevNik != null && prevNik.isNotEmpty && prevNama != null && mounted) {
+          setState(() {
+            _selectedSupervisorNik = prevNik;
+            _selectedSupervisorNama = prevNama;
+            _selectedSupervisorDept = prevDept;
+            _selectedSupervisorCompany = prevComp;
+          });
+        }
+      }
+    } catch (_) {}
   }
 
   Future<void> _fetchFreshProfile() async {
@@ -505,6 +526,17 @@ class _ReinductionFormPageState extends State<ReinductionFormPage> {
         _selectedSupervisorDept = picked.departemen;
         _selectedSupervisorCompany = picked.perusahaan;
       });
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('last_reinduksi_supervisor_nik', picked.nik);
+        await prefs.setString('last_reinduksi_supervisor_nama', picked.nama);
+        if (picked.departemen.isNotEmpty) {
+          await prefs.setString('last_reinduksi_supervisor_dept', picked.departemen);
+        }
+        if (picked.perusahaan.isNotEmpty) {
+          await prefs.setString('last_reinduksi_supervisor_comp', picked.perusahaan);
+        }
+      } catch (_) {}
     }
   }
 
@@ -633,6 +665,18 @@ class _ReinductionFormPageState extends State<ReinductionFormPage> {
           final prefs = await SharedPreferences.getInstance();
           final now = DateTime.now();
           await prefs.setBool('reinduksi_filled_${now.year}_${now.month}', true);
+          if (_selectedSupervisorNik != null && _selectedSupervisorNik!.isNotEmpty) {
+            await prefs.setString('last_reinduksi_supervisor_nik', _selectedSupervisorNik!);
+            if (_selectedSupervisorNama != null) {
+              await prefs.setString('last_reinduksi_supervisor_nama', _selectedSupervisorNama!);
+            }
+            if (_selectedSupervisorDept != null) {
+              await prefs.setString('last_reinduksi_supervisor_dept', _selectedSupervisorDept!);
+            }
+            if (_selectedSupervisorCompany != null) {
+              await prefs.setString('last_reinduksi_supervisor_comp', _selectedSupervisorCompany!);
+            }
+          }
         } catch (_) {}
 
         NotificationService.display(

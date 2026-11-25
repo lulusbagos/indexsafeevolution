@@ -251,14 +251,56 @@ class _RosterSettingsPageState extends State<RosterSettingsPage>
     }
 
     final isTugas = _selectedTab == 1;
+    final awalDinasStr = isTugas ? _dateFormat.format(_awalTugas) : _dateFormat.format(_awalDinas);
+    final akhirDinasStr = isTugas ? _dateFormat.format(_akhirTugas) : _dateFormat.format(_akhirDinas);
+    final awalCutiStr = isTugas ? _dateFormat.format(_akhirTugas) : _dateFormat.format(_awalCuti);
+    final akhirCutiStr = isTugas ? _dateFormat.format(_akhirTugas) : _dateFormat.format(_akhirCuti);
+    final ketStr = isTugas ? _keteranganTugasController.text.trim() : null;
+
+    // Jika Re-Induksi bulan ini sudah pernah diisi, simpan roster langsung tanpa memaksa isi ulang kuesioner
+    if (_hasFilledReinduksiThisMonth) {
+      setState(() => _isSaving = true);
+      final res = await _api.saveRoster(
+        id: _editingId,
+        tipeRoster: isTugas ? 'TUGAS' : 'REGULER',
+        awalDinas: awalDinasStr,
+        akhirDinas: akhirDinasStr,
+        awalCuti: awalCutiStr,
+        akhirCuti: akhirCutiStr,
+        keterangan: ketStr,
+      );
+      if (mounted) setState(() => _isSaving = false);
+      res.fold(
+        (err) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(err['message'] ?? 'Gagal menyimpan pengaturan roster'),
+              backgroundColor: const Color(0xFFDC2626),
+            ),
+          );
+        },
+        (data) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(data['message'] ?? 'Jadwal roster berhasil disimpan.'),
+              backgroundColor: const Color(0xFF10B981),
+            ),
+          );
+          _editingId = null;
+          _fetchRosterData();
+        },
+      );
+      return;
+    }
+
     final rosterData = <String, dynamic>{
       'id': _editingId,
       'tipeRoster': isTugas ? 'TUGAS' : 'REGULER',
-      'awalDinas': isTugas ? _dateFormat.format(_awalTugas) : _dateFormat.format(_awalDinas),
-      'akhirDinas': isTugas ? _dateFormat.format(_akhirTugas) : _dateFormat.format(_akhirDinas),
-      'awalCuti': isTugas ? _dateFormat.format(_akhirTugas) : _dateFormat.format(_awalCuti),
-      'akhirCuti': isTugas ? _dateFormat.format(_akhirTugas) : _dateFormat.format(_akhirCuti),
-      'keterangan': isTugas ? _keteranganTugasController.text.trim() : null,
+      'awalDinas': awalDinasStr,
+      'akhirDinas': akhirDinasStr,
+      'awalCuti': awalCutiStr,
+      'akhirCuti': akhirCutiStr,
+      'keterangan': ketStr,
     };
 
     final profile = PreferenceService.getProfile();
@@ -1451,11 +1493,13 @@ class _RosterSettingsPageState extends State<RosterSettingsPage>
                 ),
               )
             : Text(
-                _editingId != null
-                    ? (_selectedTab == 1 ? 'Perbarui Periode Tugas' : 'Perbarui Pengaturan Roster')
-                    : (_selectedTab == 1
-                        ? 'Lanjut ke Form Re-Induksi & Simpan Periode Tugas'
-                        : 'Lanjut ke Form Re-Induksi & Simpan Roster'),
+                _hasFilledReinduksiThisMonth
+                    ? (_editingId != null
+                        ? (_selectedTab == 1 ? 'Perbarui Periode Tugas' : 'Perbarui Pengaturan Roster')
+                        : (_selectedTab == 1 ? 'Simpan Periode Tugas' : 'Simpan Pengaturan Roster'))
+                    : (_editingId != null
+                        ? (_selectedTab == 1 ? 'Lanjut ke Re-Induksi & Perbarui Tugas' : 'Lanjut ke Re-Induksi & Perbarui Roster')
+                        : (_selectedTab == 1 ? 'Lanjut ke Form Re-Induksi & Simpan Tugas' : 'Lanjut ke Form Re-Induksi & Simpan Roster')),
                 textAlign: TextAlign.center,
                 style: const TextStyle(
                   fontSize: 13.5,
