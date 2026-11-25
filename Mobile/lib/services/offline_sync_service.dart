@@ -528,6 +528,25 @@ class OfflineSyncService {
         }
         final payload = Map<String, dynamic>.from(decoded)
           ..remove('localReceiptPath');
+
+        // Jika terdapat file foto bukti penindakan yang belum terunggah
+        final photoPath = payload['photoPath']?.toString();
+        final photoUrl = payload['photoUrl']?.toString();
+        if (photoPath != null &&
+            photoPath.isNotEmpty &&
+            (photoUrl == null || photoUrl.isEmpty)) {
+          final pFile = File(photoPath);
+          if (pFile.existsSync()) {
+            final uploadRes = await _api.uploadPermitViolationPhoto(pFile);
+            uploadRes.fold((_) {}, (data) {
+              if (data['photo_url'] != null) {
+                payload['photoUrl'] = data['photo_url'].toString();
+                payload.remove('photoPath');
+              }
+            });
+          }
+        }
+
         final result = await _api.recordPermitViolation(
           payload,
           queueWhenOffline: false,

@@ -24,6 +24,7 @@ import 'package:qr_flutter/qr_flutter.dart';
 import 'package:sqflite/sqflite.dart';
 
 import 'package:url_launcher/url_launcher.dart';
+import 'package:image_picker/image_picker.dart';
 
 
 
@@ -9391,6 +9392,10 @@ class _ScanPageState extends State<ScanPage>
 
     final actionController = TextEditingController();
 
+    File? violationPhotoFile;
+
+    final picker = ImagePicker();
+
     bool isSubmitting = false;
 
     bool hasLoadedMaster = false;
@@ -10531,6 +10536,262 @@ class _ScanPageState extends State<ScanPage>
 
                             ),
 
+                            const SizedBox(height: 18),
+
+                            // Foto Bukti Penindakan Pelanggaran
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                const Row(
+                                  children: [
+                                    Icon(Icons.camera_alt_outlined,
+                                        size: 16, color: Color(0xFF1E293B)),
+                                    SizedBox(width: 6),
+                                    Text(
+                                      'Foto Bukti Penindakan Pelanggaran',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w800,
+                                        fontSize: 13,
+                                        color: Color(0xFF1E293B),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFF1F5F9),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: const Text(
+                                    'Opsional / Disarankan',
+                                    style: TextStyle(
+                                        fontSize: 10,
+                                        color: Color(0xFF64748B),
+                                        fontWeight: FontWeight.w600),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+
+                            if (violationPhotoFile != null) ...[
+                              Container(
+                                padding: const EdgeInsets.all(10),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(14),
+                                  border: Border.all(
+                                      color: const Color(0xFFE2E8F0)),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color:
+                                          Colors.black.withValues(alpha: 0.04),
+                                      blurRadius: 6,
+                                      offset: const Offset(0, 2),
+                                    ),
+                                  ],
+                                ),
+                                child: Row(
+                                  children: [
+                                    ClipRRect(
+                                      borderRadius: BorderRadius.circular(10),
+                                      child: Image.file(
+                                        violationPhotoFile!,
+                                        width: 72,
+                                        height: 72,
+                                        fit: BoxFit.cover,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          const Text(
+                                            'Foto Bukti Terlampir',
+                                            style: TextStyle(
+                                                fontWeight: FontWeight.w800,
+                                                fontSize: 13,
+                                                color: Color(0xFF0F172A)),
+                                          ),
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            violationPhotoFile!.path
+                                                .split(Platform.pathSeparator)
+                                                .last,
+                                            style: const TextStyle(
+                                                fontSize: 11,
+                                                color: Color(0xFF64748B)),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                          const SizedBox(height: 6),
+                                          Row(
+                                            children: [
+                                              InkWell(
+                                                onTap: () async {
+                                                  final picked =
+                                                      await picker.pickImage(
+                                                    source: ImageSource.camera,
+                                                    imageQuality: 75,
+                                                    maxWidth: 1280,
+                                                  );
+                                                  if (picked != null) {
+                                                    setModalState(() {
+                                                      violationPhotoFile =
+                                                          File(picked.path);
+                                                    });
+                                                  }
+                                                },
+                                                child: const Padding(
+                                                  padding: EdgeInsets.symmetric(
+                                                      horizontal: 4,
+                                                      vertical: 2),
+                                                  child: Row(
+                                                    children: [
+                                                      Icon(Icons.refresh_rounded,
+                                                          size: 14,
+                                                          color: Color(
+                                                              0xFF2563EB)),
+                                                      SizedBox(width: 4),
+                                                      Text('Ulangi',
+                                                          style: TextStyle(
+                                                              fontSize: 11,
+                                                              color: Color(
+                                                                  0xFF2563EB),
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .w700)),
+                                                    ],
+                                                  ),
+                                                ),
+                                              ),
+                                              const SizedBox(width: 14),
+                                              InkWell(
+                                                onTap: () {
+                                                  setModalState(() {
+                                                    violationPhotoFile = null;
+                                                  });
+                                                },
+                                                child: const Padding(
+                                                  padding: EdgeInsets.symmetric(
+                                                      horizontal: 4,
+                                                      vertical: 2),
+                                                  child: Row(
+                                                    children: [
+                                                      Icon(
+                                                          Icons
+                                                              .delete_outline_rounded,
+                                                          size: 14,
+                                                          color: Color(
+                                                              0xFFDC2626)),
+                                                      SizedBox(width: 4),
+                                                      Text('Hapus',
+                                                          style: TextStyle(
+                                                              fontSize: 11,
+                                                              color: Color(
+                                                                  0xFFDC2626),
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .w700)),
+                                                    ],
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ] else ...[
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: OutlinedButton.icon(
+                                      onPressed: () async {
+                                        final picked = await picker.pickImage(
+                                          source: ImageSource.camera,
+                                          imageQuality: 75,
+                                          maxWidth: 1280,
+                                        );
+                                        if (picked != null) {
+                                          setModalState(() {
+                                            violationPhotoFile =
+                                                File(picked.path);
+                                          });
+                                        }
+                                      },
+                                      icon: const Icon(Icons.camera_alt_rounded,
+                                          size: 18),
+                                      label: const Text('Ambil Foto',
+                                          style: TextStyle(
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w700)),
+                                      style: OutlinedButton.styleFrom(
+                                        foregroundColor:
+                                            const Color(0xFF0F766E),
+                                        side: const BorderSide(
+                                            color: Color(0xFF0F766E),
+                                            width: 1.2),
+                                        padding: const EdgeInsets.symmetric(
+                                            vertical: 12),
+                                        shape: RoundedRectangleBorder(
+                                            borderRadius:
+                                                BorderRadius.circular(12)),
+                                        backgroundColor:
+                                            const Color(0xFFF0FDFA),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: OutlinedButton.icon(
+                                      onPressed: () async {
+                                        final picked = await picker.pickImage(
+                                          source: ImageSource.gallery,
+                                          imageQuality: 75,
+                                          maxWidth: 1280,
+                                        );
+                                        if (picked != null) {
+                                          setModalState(() {
+                                            violationPhotoFile =
+                                                File(picked.path);
+                                          });
+                                        }
+                                      },
+                                      icon: const Icon(
+                                          Icons.photo_library_outlined,
+                                          size: 18),
+                                      label: const Text('Dari Galeri',
+                                          style: TextStyle(
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w700)),
+                                      style: OutlinedButton.styleFrom(
+                                        foregroundColor:
+                                            const Color(0xFF475569),
+                                        side: const BorderSide(
+                                            color: Color(0xFFCBD5E1),
+                                            width: 1.2),
+                                        padding: const EdgeInsets.symmetric(
+                                            vertical: 12),
+                                        shape: RoundedRectangleBorder(
+                                            borderRadius:
+                                                BorderRadius.circular(12)),
+                                        backgroundColor:
+                                            const Color(0xFFF8FAFC),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+
                             const SizedBox(height: 24),
 
 
@@ -10665,13 +10926,21 @@ class _ScanPageState extends State<ScanPage>
 
                                           'approverNiks': selectedPjaList.map((p) => p['nik']).toList(),
 
+                                          if (violationPhotoFile != null)
+
+                                            'photoPath': violationPhotoFile!.path,
+
                                         };
 
 
 
-                                        final res = await _api
+                                        final res = await _api.recordPermitViolation(
 
-                                            .recordPermitViolation(payload);
+                                          payload,
+
+                                          photoFile: violationPhotoFile,
+
+                                        );
 
                                         if (!mounted) return;
 

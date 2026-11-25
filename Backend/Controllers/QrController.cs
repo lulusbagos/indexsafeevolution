@@ -38,12 +38,14 @@ namespace Indexsafe.Api.Controllers
         private readonly AppDbContext _context;
         private readonly SyncMonitorService _monitor;
         private readonly PermitService _permitService;
+        private readonly ImageUploadService _imageUploadService;
 
-        public QrController(AppDbContext context, SyncMonitorService monitor, PermitService permitService)
+        public QrController(AppDbContext context, SyncMonitorService monitor, PermitService permitService, ImageUploadService imageUploadService)
         {
             _context = context;
             _monitor = monitor;
             _permitService = permitService;
+            _imageUploadService = imageUploadService;
         }
 
         private string GetCurrentNik()
@@ -1092,6 +1094,39 @@ namespace Indexsafe.Api.Controllers
         }
 
         /// <summary>
+        /// POST /api/qr/permit/violation/upload-photo
+        /// Uploads violation evidence photo into categorized folder (violations/{yyyy-MM}) matching MBS SAP Web version.
+        /// </summary>
+        [HttpPost("permit/violation/upload-photo")]
+        public async Task<IActionResult> UploadViolationPhoto()
+        {
+            if (!Request.HasFormContentType)
+            {
+                return BadRequest(new { status = false, message = "Permintaan harus berupa multipart/form-data." });
+            }
+
+            var form = await Request.ReadFormAsync();
+            var file = form.Files["photo"] ?? form.Files["foto"] ?? form.Files["image"] ?? form.Files["file"] ?? form.Files.FirstOrDefault();
+            if (file == null || file.Length == 0)
+            {
+                return BadRequest(new { status = false, message = "File foto bukti penindakan tidak ditemukan." });
+            }
+
+            var photoUrl = await _imageUploadService.UploadAndCompressImageAsync(file, "violations", "viol");
+            if (string.IsNullOrEmpty(photoUrl))
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError, new { status = false, message = "Gagal memproses dan menyimpan foto bukti penindakan." });
+            }
+
+            return Ok(new
+            {
+                status = true,
+                message = "Foto bukti penindakan berhasil diunggah.",
+                photo_url = photoUrl
+            });
+        }
+
+        /// <summary>
         /// POST /api/qr/permit/violation
         /// Submits a safety violation pending multi-PJA approval.
         /// Violation is NOT written to active database (ONE_DB_MITRA) until ALL assigned PJAs approve.
@@ -1269,6 +1304,7 @@ namespace Indexsafe.Api.Controllers
                     violator_nik = violation.ViolatorNik,
                     violator_name = violation.ViolatorName,
                     violation_type = violation.ViolationType,
+                    photo_url = violation.PhotoUrl,
                     severity = violation.Severity,
                     created_by = violation.ReportedByName,
                     created_at = violation.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss"),

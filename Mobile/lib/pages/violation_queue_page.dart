@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -554,6 +555,7 @@ class _ViolationQueuePageState extends State<ViolationQueuePage>
             .first ??
         '-';
     final pdfPath = data['localReceiptPath']?.toString() ?? '';
+    final photoPath = data['photoPath']?.toString() ?? '';
 
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
@@ -611,6 +613,18 @@ class _ViolationQueuePageState extends State<ViolationQueuePage>
               style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
           Text('Tercatat $created',
               style: const TextStyle(fontSize: 10, color: Color(0xFF94A3B8))),
+          if (photoPath.isNotEmpty && File(photoPath).existsSync()) ...[
+            const SizedBox(height: 8),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(10),
+              child: Image.file(
+                File(photoPath),
+                width: double.infinity,
+                height: 120,
+                fit: BoxFit.cover,
+              ),
+            ),
+          ],
           if (pdfPath.isNotEmpty) ...[
             const SizedBox(height: 8),
             OutlinedButton.icon(
@@ -724,6 +738,7 @@ class _ViolationQueuePageState extends State<ViolationQueuePage>
     final createdAt = item['created_at']?.toString() ?? '-';
     final totalApp = item['total_approvers'] ?? 1;
     final approvedCount = item['approved_count'] ?? 0;
+    final photoUrl = item['photo_url']?.toString() ?? '';
 
     return Container(
       margin: const EdgeInsets.only(bottom: 14),
@@ -839,6 +854,11 @@ class _ViolationQueuePageState extends State<ViolationQueuePage>
                 _detailRow('Tindakan Awal', actionTaken),
                 const SizedBox(height: 6),
                 _detailRow('Dilaporkan Oleh', '$reportedByName ($createdAt)'),
+
+                if (photoUrl.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  _buildPhotoThumbnail(photoUrl),
+                ],
 
                 const SizedBox(height: 16),
 
@@ -1048,6 +1068,7 @@ class _ViolationQueuePageState extends State<ViolationQueuePage>
     final status = v['status']?.toString().toUpperCase() ?? 'PENDING';
     final approvers = (v['approvers'] as List?) ?? [];
     final rejectionReason = v['rejection_reason']?.toString();
+    final photoUrl = v['photo_url']?.toString() ?? '';
 
     showModalBottomSheet<void>(
       context: context,
@@ -1083,12 +1104,45 @@ class _ViolationQueuePageState extends State<ViolationQueuePage>
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text(
-                    'Detail Status Pelanggaran',
-                    style: TextStyle(
-                        fontWeight: FontWeight.w800,
-                        fontSize: 16,
-                        color: Color(0xFF0F172A)),
+                  Row(
+                    children: [
+                      const Text(
+                        'Detail Status Pelanggaran',
+                        style: TextStyle(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 16,
+                            color: Color(0xFF0F172A)),
+                      ),
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: status == 'APPROVED'
+                              ? const Color(0xFFDCFCE7)
+                              : (status == 'REJECTED'
+                                  ? const Color(0xFFFEE2E2)
+                                  : const Color(0xFFFEF3C7)),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          status == 'APPROVED'
+                              ? 'Disetujui'
+                              : (status == 'REJECTED'
+                                  ? 'Ditolak'
+                                  : 'Menunggu PJA'),
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w800,
+                            color: status == 'APPROVED'
+                                ? const Color(0xFF047857)
+                                : (status == 'REJECTED'
+                                    ? const Color(0xFFDC2626)
+                                    : const Color(0xFFB45309)),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                   IconButton(
                     onPressed: () => Navigator.pop(ctx),
@@ -1119,6 +1173,10 @@ class _ViolationQueuePageState extends State<ViolationQueuePage>
                   _detailRow('Kronologi / Uraian', desc),
                   const SizedBox(height: 10),
                   _detailRow('Tindakan Diambil', action),
+                  if (photoUrl.isNotEmpty) ...[
+                    const SizedBox(height: 10),
+                    _buildPhotoThumbnail(photoUrl),
+                  ],
                   const SizedBox(height: 14),
 
                   if (rejectionReason != null && rejectionReason.isNotEmpty) ...[
@@ -1253,6 +1311,156 @@ class _ViolationQueuePageState extends State<ViolationQueuePage>
                     );
                   }),
                   ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPhotoThumbnail(String photoUrl) {
+    if (photoUrl.isEmpty) return const SizedBox.shrink();
+    final fullUrl = _api.resolveImageUrl(photoUrl);
+
+    return Container(
+      margin: const EdgeInsets.only(top: 4, bottom: 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.photo_camera_rounded,
+                  size: 13, color: Color(0xFF64748B)),
+              SizedBox(width: 4),
+              Text(
+                'Bukti Foto Pelanggaran:',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF64748B),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          GestureDetector(
+            onTap: () => _showFullImageDialog(fullUrl),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(10),
+              child: Stack(
+                alignment: Alignment.bottomRight,
+                children: [
+                  Image.network(
+                    fullUrl,
+                    width: double.infinity,
+                    height: 150,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) => Container(
+                      width: double.infinity,
+                      height: 80,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF1F5F9),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: const Color(0xFFCBD5E1)),
+                      ),
+                      child: const Center(
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.broken_image_rounded,
+                                size: 18, color: Color(0xFF94A3B8)),
+                            SizedBox(width: 6),
+                            Text(
+                              'Foto tidak dapat dimuat',
+                              style: TextStyle(
+                                  fontSize: 11, color: Color(0xFF94A3B8)),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    loadingBuilder: (context, child, progress) {
+                      if (progress == null) return child;
+                      return Container(
+                        width: double.infinity,
+                        height: 150,
+                        color: const Color(0xFFF1F5F9),
+                        child: const Center(
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                      );
+                    },
+                  ),
+                  Container(
+                    margin: const EdgeInsets.all(8),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.65),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.zoom_in_rounded,
+                            size: 14, color: Colors.white),
+                        SizedBox(width: 4),
+                        Text(
+                          'Lihat Foto',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showFullImageDialog(String fullUrl) {
+    showDialog(
+      context: context,
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.all(12),
+        child: Stack(
+          alignment: Alignment.topRight,
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: InteractiveViewer(
+                panEnabled: true,
+                minScale: 0.5,
+                maxScale: 4.0,
+                child: Image.network(
+                  fullUrl,
+                  fit: BoxFit.contain,
+                  errorBuilder: (context, error, stackTrace) => Container(
+                    padding: const EdgeInsets.all(24),
+                    color: Colors.white,
+                    child: const Text('Gagal memuat gambar ukuran penuh.'),
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              top: 8,
+              right: 8,
+              child: CircleAvatar(
+                backgroundColor: Colors.black.withValues(alpha: 0.6),
+                child: IconButton(
+                  icon: const Icon(Icons.close_rounded, color: Colors.white),
+                  onPressed: () => Navigator.pop(ctx),
                 ),
               ),
             ),

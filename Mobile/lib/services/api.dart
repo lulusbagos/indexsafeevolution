@@ -9737,149 +9737,106 @@ class ApiService {
 
 
 
-  Future<Either<Map, Map<String, dynamic>>> recordPermitViolation(
-
-
-
-    Map<String, dynamic> payload, {
-
-
-
-    bool queueWhenOffline = true,
-
-
-
-  }) async {
-
-
-
+  Future<Either<Map, Map<String, dynamic>>> uploadPermitViolationPhoto(
+      File file) async {
     final token = getToken;
-
-
-
     if (token.isNotEmpty) {
-
-
-
       dio.options.headers['Authorization'] = 'Bearer $token';
-
-
-
     }
-
-
 
     try {
+      final fileName = file.path.split(Platform.pathSeparator).last;
+      final formData = FormData.fromMap({
+        'photo': await MultipartFile.fromFile(
+          file.path,
+          filename: fileName,
+        ),
+      });
 
-
-
-      var con = await Connectivity().checkConnectivity();
-
-
-
-      if (con.contains(ConnectivityResult.wifi) == false &&
-
-
-
-          con.contains(ConnectivityResult.mobile) == false &&
-
-
-
-          con.contains(ConnectivityResult.ethernet) == false &&
-
-
-
-          con.contains(ConnectivityResult.vpn) == false) {
-
-
-
-        if (queueWhenOffline) {
-
-
-
-          return _queueOfflinePermitViolation(payload);
-
-
-
-        }
-
-
-
-        return const Left({'message': 'Jaringan belum tersedia.'});
-
-
-
-      }
-
-
-
-
-
-
-
-      var res =
-
-
-
-          await dio.post('/qr/permit/violation', data: json.encode(payload));
-
-
-
-      if (res.data is Map) {
-
-
-
+      final res =
+          await dio.post('/qr/permit/violation/upload-photo', data: formData);
+      if (res.data is Map && res.data['status'] == true) {
         return Right(Map<String, dynamic>.from(res.data as Map));
-
-
-
       }
-
-
-
-      return const Right({});
-
-
-
+      return Left({
+        'message': res.data?['message']?.toString() ??
+            'Gagal mengunggah foto bukti penindakan.'
+      });
     } on DioException catch (err) {
-
-
-
-      // Hanya gangguan jaringan yang boleh masuk antrean. Penolakan server
-
-
-
-      // (403/401/validasi) harus tetap langsung ditampilkan ke pengguna.
-
-
-
-      if (queueWhenOffline && err.response == null) {
-
-
-
-        return _queueOfflinePermitViolation(payload);
-
-
-
-      }
-
-
-
       return Left(errorHandler(err));
-
-
-
+    } catch (e) {
+      return Left({'message': 'Gagal memproses foto: $e'});
     }
-
-
-
   }
 
+  Future<Either<Map, Map<String, dynamic>>> recordPermitViolation(
+    Map<String, dynamic> payload, {
+    File? photoFile,
+    bool queueWhenOffline = true,
+  }) async {
+    final token = getToken;
+    if (token.isNotEmpty) {
+      dio.options.headers['Authorization'] = 'Bearer $token';
+    }
 
+    try {
+      var con = await Connectivity().checkConnectivity();
+      final isOffline = !con.any((r) =>
+          r == ConnectivityResult.wifi ||
+          r == ConnectivityResult.mobile ||
+          r == ConnectivityResult.ethernet ||
+          r == ConnectivityResult.vpn);
 
+      if (isOffline) {
+        if (photoFile != null) {
+          payload['photoPath'] = photoFile.path;
+        }
+        if (queueWhenOffline) {
+          return await _queueOfflinePermitViolation(payload);
+        }
+        return const Left({'message': 'Jaringan belum tersedia.'});
+      }
 
+      // Jika ada file foto dan belum terunggah, unggah terlebih dahulu
+      if (photoFile != null &&
+          (payload['photoUrl'] == null ||
+              payload['photoUrl'].toString().isEmpty)) {
+        try {
+          final photoRes = await uploadPermitViolationPhoto(photoFile);
+          photoRes.fold((_) {}, (data) {
+            if (data['photo_url'] != null) {
+              payload['photoUrl'] = data['photo_url'].toString();
+            }
+          });
+        } catch (_) {}
+      }
 
-
+      var res =
+          await dio.post('/qr/permit/violation', data: json.encode(payload));
+      if (res.data is Map) {
+        return Right(Map<String, dynamic>.from(res.data as Map));
+      }
+      return const Right({});
+    } on DioException catch (err) {
+      // Hanya gangguan jaringan yang boleh masuk antrean. Penolakan server
+      // (403/401/validasi) harus tetap langsung ditampilkan ke pengguna.
+      if (queueWhenOffline && err.response == null) {
+        if (photoFile != null) {
+          payload['photoPath'] = photoFile.path;
+        }
+        return _queueOfflinePermitViolation(payload);
+      }
+      return Left(errorHandler(err));
+    } catch (e) {
+      if (queueWhenOffline) {
+        if (photoFile != null) {
+          payload['photoPath'] = photoFile.path;
+        }
+        return _queueOfflinePermitViolation(payload);
+      }
+      return Left({'message': 'Terjadi kesalahan: $e'});
+    }
+  }
 
   Future<Either<Map, Map<String, dynamic>>> _queueOfflinePermitViolation(
 
