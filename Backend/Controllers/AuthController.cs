@@ -145,7 +145,10 @@ namespace Indexsafe.Api.Controllers
                 });
             }
 
-            var personalMaster = await _context.Personals.FirstOrDefaultAsync(p => p.IdPersonal == (karyawanAktif != null ? karyawanAktif.IdPersonal : karyawanMaster.IdPersonal));
+            var targetIdPersonal = karyawanAktif?.IdPersonal ?? karyawanMaster?.IdPersonal ?? 0;
+            var personalMaster = targetIdPersonal > 0
+                ? await _context.Personals.FirstOrDefaultAsync(p => p.IdPersonal == targetIdPersonal)
+                : null;
             if (!string.IsNullOrWhiteSpace(karyawanAktif?.NamaLengkap))
             {
                 fullName = karyawanAktif.NamaLengkap;

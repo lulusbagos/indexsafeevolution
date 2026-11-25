@@ -1530,7 +1530,7 @@ namespace Indexsafe.Api.Controllers
                 violation.UpdatedAt = DateTime.Now;
 
                 // Notify reporter
-                var reporterNik = violation.ReportedByNik.Split(new[] { '|', ' ' }, StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? violation.ReportedByNik;
+                var reporterNik = !string.IsNullOrEmpty(violation.ReportedByNik) ? (violation.ReportedByNik.Split(new[] { '|', ' ' }, StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? violation.ReportedByNik) : userNik;
                 _context.Notifications.Add(new Notification
                 {
                     RecipientNik = reporterNik,
@@ -1564,7 +1564,7 @@ namespace Indexsafe.Api.Controllers
                 violation.ApprovedCount = approvedCount;
                 violation.UpdatedAt = DateTime.Now;
 
-                var reporterNik = violation.ReportedByNik.Split(new[] { '|', ' ' }, StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? violation.ReportedByNik;
+                var reporterNik = !string.IsNullOrEmpty(violation.ReportedByNik) ? (violation.ReportedByNik.Split(new[] { '|', ' ' }, StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? violation.ReportedByNik) : userNik;
 
                 // Check if ALL approvers have approved
                 if (approvedCount >= violation.TotalApprovers)
@@ -1941,6 +1941,7 @@ namespace Indexsafe.Api.Controllers
                 const string ftpUser = "onedb_kary";
                 const string ftpPass = "x0r4ngIDC#apps@2023";
 
+#pragma warning disable SYSLIB0014
                 // A. Cek /karyawan/{md5(idPersonal)}/
                 if (idPersonal.HasValue && idPersonal.Value > 0)
                 {
@@ -2010,6 +2011,7 @@ namespace Indexsafe.Api.Controllers
                     }
                     catch { }
                 }
+#pragma warning restore SYSLIB0014
             }
             catch (Exception ex)
             {

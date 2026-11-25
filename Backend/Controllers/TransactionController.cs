@@ -8014,7 +8014,7 @@ namespace Indexsafe.Api.Controllers
 
 
 
-                        (n.Url.Contains($"/ActionPlan/Detail/{plan.Id}") || n.Message.Contains($"#{plan.Id}") || n.Message.Contains(plan.Lokasi ?? "___")))
+                        ((n.Url != null && n.Url.Contains($"/ActionPlan/Detail/{plan.Id}")) || (n.Message != null && (n.Message.Contains($"#{plan.Id}") || n.Message.Contains(plan.Lokasi ?? "___")))))
 
 
 

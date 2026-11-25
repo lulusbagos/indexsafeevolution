@@ -163,12 +163,17 @@ app.Use(async (context, next) =>
 app.UseDefaultFiles();
 app.UseStaticFiles();
 
-// Also serve physical uploaded files from C:\MinePermitFiles\MBS if available
-if (Directory.Exists(@"C:\MinePermitFiles\MBS"))
+// Also serve physical uploaded files from C:\MinePermitFiles\MBS or configured StoragePath if available
+var configuredUploadPath = builder.Configuration["UploadSettings:StoragePath"];
+var externalUploadPath = (!string.IsNullOrEmpty(configuredUploadPath) && Directory.Exists(configuredUploadPath))
+    ? configuredUploadPath
+    : (Directory.Exists(@"C:\MinePermitFiles\MBS") ? @"C:\MinePermitFiles\MBS" : null);
+
+if (!string.IsNullOrEmpty(externalUploadPath))
 {
     app.UseStaticFiles(new StaticFileOptions
     {
-        FileProvider = new PhysicalFileProvider(@"C:\MinePermitFiles\MBS"),
+        FileProvider = new PhysicalFileProvider(externalUploadPath),
         RequestPath = "/uploads"
     });
 }

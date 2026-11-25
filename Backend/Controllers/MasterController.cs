@@ -387,7 +387,7 @@ namespace Indexsafe.Api.Controllers
                 companies = await _context.Perusahaans.AsNoTracking()
                     .Where(p => p.StatusAktif)
                     .OrderBy(p => p.NamaPerusahaan)
-                    .Select(p => new { id = p.PerusahaanId, name = p.NamaPerusahaan, code = p.KodePerusahaan ?? "" })
+                    .Select(p => new { id = p.PerusahaanId, name = p.NamaPerusahaan ?? "", code = p.KodePerusahaan ?? "" })
                     .ToListAsync();
             }
 
