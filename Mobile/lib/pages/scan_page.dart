@@ -10636,8 +10636,9 @@ class _ScanPageState extends State<ScanPage>
                                                   final picked =
                                                       await picker.pickImage(
                                                     source: ImageSource.camera,
-                                                    imageQuality: 75,
-                                                    maxWidth: 1280,
+                                                    imageQuality: 82,
+                                                    maxWidth: 1600,
+                                                    maxHeight: 1600,
                                                   );
                                                   if (picked != null) {
                                                     setModalState(() {
@@ -10717,8 +10718,9 @@ class _ScanPageState extends State<ScanPage>
                                       onPressed: () async {
                                         final picked = await picker.pickImage(
                                           source: ImageSource.camera,
-                                          imageQuality: 75,
-                                          maxWidth: 1280,
+                                          imageQuality: 82,
+                                          maxWidth: 1600,
+                                          maxHeight: 1600,
                                         );
                                         if (picked != null) {
                                           setModalState(() {
@@ -10755,8 +10757,9 @@ class _ScanPageState extends State<ScanPage>
                                       onPressed: () async {
                                         final picked = await picker.pickImage(
                                           source: ImageSource.gallery,
-                                          imageQuality: 75,
-                                          maxWidth: 1280,
+                                          imageQuality: 82,
+                                          maxWidth: 1600,
+                                          maxHeight: 1600,
                                         );
                                         if (picked != null) {
                                           setModalState(() {

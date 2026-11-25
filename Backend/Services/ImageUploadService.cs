@@ -92,14 +92,21 @@ namespace Indexsafe.Api.Services
                     {
                         using (var image = await Image.LoadAsync(stream))
                         {
-                            if (image.Width > 1280)
+                            image.Mutate(x =>
                             {
-                                var ratio = 1280.0 / image.Width;
-                                var newHeight = (int)(image.Height * ratio);
-                                image.Mutate(x => x.Resize(1280, newHeight));
-                            }
+                                x.AutoOrient();
+                                const int maxDimension = 1600;
+                                if (image.Width > maxDimension || image.Height > maxDimension)
+                                {
+                                    x.Resize(new ResizeOptions
+                                    {
+                                        Mode = ResizeMode.Max,
+                                        Size = new Size(maxDimension, maxDimension)
+                                    });
+                                }
+                            });
 
-                            var encoder = new JpegEncoder { Quality = 75 };
+                            var encoder = new JpegEncoder { Quality = 80 };
                             await image.SaveAsync(filePath, encoder);
                         }
                     }
@@ -226,14 +233,21 @@ namespace Indexsafe.Api.Services
 
                 using (var image = Image.Load(bytes))
                 {
-                    if (image.Width > 1280)
+                    image.Mutate(x =>
                     {
-                        var ratio = 1280.0 / image.Width;
-                        var newHeight = (int)(image.Height * ratio);
-                        image.Mutate(x => x.Resize(1280, newHeight));
-                    }
+                        x.AutoOrient();
+                        const int maxDimension = 1600;
+                        if (image.Width > maxDimension || image.Height > maxDimension)
+                        {
+                            x.Resize(new ResizeOptions
+                            {
+                                Mode = ResizeMode.Max,
+                                Size = new Size(maxDimension, maxDimension)
+                            });
+                        }
+                    });
 
-                    var encoder = new JpegEncoder { Quality = 75 };
+                    var encoder = new JpegEncoder { Quality = 80 };
                     await image.SaveAsync(filePath, encoder);
                 }
 

@@ -23,7 +23,9 @@ Future<File?> pickImage({ImageSource? source}) async {
     final imgPicker = ImagePicker();
     final imgPicked = await imgPicker.pickImage(
       source: source,
-      imageQuality: 15,
+      imageQuality: 82,
+      maxWidth: 1600,
+      maxHeight: 1600,
     );
     if (imgPicked == null) return null;
 
