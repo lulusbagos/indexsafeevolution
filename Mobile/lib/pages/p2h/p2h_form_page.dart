@@ -249,24 +249,27 @@ class _P2HFormPageState extends State<P2HFormPage> {
     'Dongkrak/Jack',
 
     'Kaca/Mirror',
-
   ];
 
-
+  static const List<String> _golEVQuestions = [
+    'Air Pendingin Baterai/Battery Coolant Level',
+    'Selang-selang Air Pendingin/Cooling Hoses & Pipes',
+    'Kebersihan Area Control Module/Inverter',
+    'Kabel & Soket Tegangan Tinggi/High Voltage Wiring (Orange Cable)',
+    'Status Indikator Baterai & Charging Port',
+    'Emergency High Voltage Disconnect Switch',
+  ];
 
   final List<P2HChecklistItem> _golAItems = [];
-
   final List<P2HChecklistItem> _golBItems = [];
-
   final List<P2HChecklistItem> _golCItems = [];
+  final List<P2HChecklistItem> _golEVItems = [];
 
-
-
+  bool _isElectric = false;
   bool _isGolAExpanded = true;
-
   bool _isGolBExpanded = false;
-
   bool _isGolCExpanded = false;
+  bool _isGolEVExpanded = true;
 
 
 
@@ -404,19 +407,20 @@ class _P2HFormPageState extends State<P2HFormPage> {
     }
 
     for (int i = 0; i < _golCQuestions.length; i++) {
-
       _golCItems.add(P2HChecklistItem(
-
         id: i + 1,
-
         name: _golCQuestions[i],
-
         group: 'golC',
-
       ));
-
     }
 
+    for (int i = 0; i < _golEVQuestions.length; i++) {
+      _golEVItems.add(P2HChecklistItem(
+        id: i + 1,
+        name: _golEVQuestions[i],
+        group: 'golEV',
+      ));
+    }
   }
 
 
@@ -1347,11 +1351,13 @@ class _P2HFormPageState extends State<P2HFormPage> {
       }
 
       for (var item in _golCItems) {
-
         item.status = status;
-
       }
-
+      if (_isElectric) {
+        for (var item in _golEVItems) {
+          item.status = status;
+        }
+      }
     });
 
 
@@ -1607,171 +1613,114 @@ class _P2HFormPageState extends State<P2HFormPage> {
 
 
     final missingPhotoC = _golCItems
-
         .where((x) =>
-
             x.status == 'NOT_GOOD' &&
-
             (x.localPhotoPath == null || x.localPhotoPath!.isEmpty))
-
         .toList();
-
     if (missingPhotoC.isNotEmpty) {
-
       setState(() => _isGolCExpanded = true);
-
       SnackBarMsg.danger(context,
-
           'GOLONGAN C: Foto kerusakan wajib untuk "${missingPhotoC.first.name}".');
-
       return;
-
     }
 
-
+    if (_isElectric) {
+      final missingPhotoEV = _golEVItems
+          .where((x) =>
+              x.status == 'NOT_GOOD' &&
+              (x.localPhotoPath == null || x.localPhotoPath!.isEmpty))
+          .toList();
+      if (missingPhotoEV.isNotEmpty) {
+        setState(() => _isGolEVExpanded = true);
+        SnackBarMsg.danger(context,
+            'KENDARAAN LISTRIK: Foto kerusakan wajib untuk "${missingPhotoEV.first.name}".');
+        return;
+      }
+    }
 
     setState(() => _isSubmitting = true);
 
-
-
     try {
-
       // Copy photos to permanent app directory for offline safety
-
       final appDir = await getApplicationDocumentsDirectory();
-
       final p2hDir = Directory('${appDir.path}/p2h_photos');
-
       if (!await p2hDir.exists()) await p2hDir.create(recursive: true);
-
-
 
       final timestamp = DateTime.now().millisecondsSinceEpoch;
 
-
-
       // Copy speedo photo
-
       final permanentSpeedoPath = '${p2hDir.path}/speedo_$timestamp.jpg';
-
       await _fotoSpeedometer!.copy(permanentSpeedoPath);
 
-
-
       // Copy defect photos
-
-      for (var item in [..._golAItems, ..._golBItems, ..._golCItems]) {
-
+      for (var item in [
+        ..._golAItems,
+        ..._golBItems,
+        ..._golCItems,
+        if (_isElectric) ..._golEVItems,
+      ]) {
         if (item.status == 'NOT_GOOD' && item.localPhotoPath != null) {
-
           final orig = File(item.localPhotoPath!);
-
           if (await orig.exists()) {
-
             final targetPath =
-
                 '${p2hDir.path}/${item.group}_${item.id}_$timestamp.jpg';
-
             await orig.copy(targetPath);
-
             item.localPhotoPath = targetPath;
-
           }
-
         }
-
       }
 
-
-
       final dateStr = DateFormat('yyyy-MM-dd').format(_tanggal);
-
       final timeStr =
-
           '${_waktu.hour.toString().padLeft(2, '0')}:${_waktu.minute.toString().padLeft(2, '0')}';
-
       final jsonA = jsonEncode(_golAItems.map((e) => e.toJson()).toList());
-
       final jsonB = jsonEncode(_golBItems.map((e) => e.toJson()).toList());
-
       final jsonC = jsonEncode(_golCItems.map((e) => e.toJson()).toList());
-
-
+      final jsonEV = _isElectric
+          ? jsonEncode(_golEVItems.map((e) => e.toJson()).toList())
+          : null;
 
       // 3. Save directly to SQLite (ensures 100% offline persistence)
-
       final localRow = <String, dynamic>{
-
         'code': 'P2H-$timestamp',
-
         'title': 'P2H Unit $noLambung',
-
         'date': dateStr,
-
         'time': timeStr,
-
         'no_lambung': noLambung,
-
         'merek': merek,
-
         'jenis_kendaraan': _jenisKendaraan,
-
         'km': kmVal,
-
         'simper_kimper': _simperKimper,
-
         'simper': _simperKimper == 'YA' ? 1 : 0,
-
         'image': permanentSpeedoPath,
-
         'foto_speedometer': permanentSpeedoPath,
-
         'gol_a_json': jsonA,
-
         'gol_b_json': jsonB,
-
         'gol_c_json': jsonC,
-
+        'gol_ev_json': jsonEV,
+        'is_electric': _isElectric ? 1 : 0,
         'company_id': _profile?.companyId,
-
         'employee_id': _profile?.id ?? 0,
-
         'sync_id': null, // null means pending sync
-
         'created_at': DateTime.now().toString(),
-
         'updated_at': DateTime.now().toString(),
-
       };
 
-
-
       // Migrasi kolom SQLite secara defensif
-
       try {
-
         final sqldb = await _db.database;
-
         for (final col in [
-
           'jenis_kendaraan',
-
           'simper_kimper',
-
           'simper',
-
           'foto_speedometer',
-
           'gol_a_json',
-
           'gol_b_json',
-
           'gol_c_json',
-
+          'gol_ev_json',
+          'is_electric',
           'nik',
-
           'nama',
-
           'no_lambung',
 
           'merek',
@@ -3402,6 +3351,96 @@ class _P2HFormPageState extends State<P2HFormPage> {
 
                           const SizedBox(height: 16),
 
+                          // Switch Kendaraan Listrik (Electric Vehicle / EV)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                            decoration: BoxDecoration(
+                              color: _isElectric ? const Color(0xFFF0FDF4) : const Color(0xFFF8FAFC),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color: _isElectric ? const Color(0xFF86EFAC) : const Color(0xFFE2E8F0),
+                                width: 1.2,
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(7),
+                                  decoration: BoxDecoration(
+                                    color: _isElectric ? const Color(0xFFDCFCE7) : const Color(0xFFE2E8F0),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: Icon(
+                                    Icons.electric_bolt_rounded,
+                                    color: _isElectric ? const Color(0xFF16A34A) : const Color(0xFF64748B),
+                                    size: 20,
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          const Text(
+                                            'Kendaraan Listrik (EV)',
+                                            style: TextStyle(
+                                              fontSize: 13,
+                                              fontWeight: FontWeight.bold,
+                                              color: Color(0xFF1E293B),
+                                            ),
+                                          ),
+                                          if (_isElectric) ...[
+                                            const SizedBox(width: 6),
+                                            Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                                              decoration: BoxDecoration(
+                                                color: const Color(0xFFDCFCE7),
+                                                borderRadius: BorderRadius.circular(4),
+                                                border: Border.all(color: const Color(0xFF86EFAC)),
+                                              ),
+                                              child: const Text(
+                                                'AKTIF',
+                                                style: TextStyle(
+                                                  fontSize: 9,
+                                                  fontWeight: FontWeight.w700,
+                                                  color: Color(0xFF15803D),
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ],
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        _isElectric
+                                            ? 'Menambahkan 6 item pemeriksaan khusus sistem baterai & high voltage'
+                                            : 'Aktifkan jika unit menggunakan tenaga baterai / listrik',
+                                        style: TextStyle(
+                                          fontSize: 10.5,
+                                          color: _isElectric ? const Color(0xFF166534) : const Color(0xFF64748B),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                Switch(
+                                  value: _isElectric,
+                                  activeTrackColor: const Color(0xFF86EFAC),
+                                  activeThumbColor: const Color(0xFF16A34A),
+                                  onChanged: (val) {
+                                    setState(() {
+                                      _isElectric = val;
+                                    });
+                                  },
+                                ),
+                              ],
+                            ),
+                          ),
+
+                          const SizedBox(height: 16),
+
                           // Foto Speedometer (Mandatory)
                           _buildSpeedometerUploadCard(),
 
@@ -3500,10 +3539,22 @@ class _P2HFormPageState extends State<P2HFormPage> {
                             setState(() => _isGolCExpanded = !_isGolCExpanded),
 
                         items: _golCItems,
-
                       ),
 
-
+                      // Golongan EV Accordion (Khusus Kendaraan Listrik)
+                      if (_isElectric) ...[
+                        const SizedBox(height: 12),
+                        _buildGroupAccordion(
+                          title: 'KENDARAAN LISTRIK / EV (6 Item)',
+                          badgeText: 'EV SPECIAL',
+                          badgeColor: const Color(0xFF0D9488),
+                          bgColor: const Color(0xFFF0FDFA),
+                          isExpanded: _isGolEVExpanded,
+                          onToggle: () =>
+                              setState(() => _isGolEVExpanded = !_isGolEVExpanded),
+                          items: _golEVItems,
+                        ),
+                      ],
 
                       const SizedBox(height: 24),
 

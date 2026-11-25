@@ -5,6 +5,7 @@ using System.Security.Claims;
 using System.Threading.Tasks;
 using Indexsafe.Api.Data;
 using Indexsafe.Api.Models;
+using Indexsafe.Api.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -18,10 +19,12 @@ namespace Indexsafe.Api.Controllers
     public class RosterController : ControllerBase
     {
         private readonly AppDbContext _context;
+        private readonly IndeximRosterService _indeximRosterService;
 
-        public RosterController(AppDbContext context)
+        public RosterController(AppDbContext context, IndeximRosterService indeximRosterService)
         {
             _context = context;
+            _indeximRosterService = indeximRosterService;
         }
 
         private string GetCurrentNik()
@@ -68,8 +71,17 @@ namespace Indexsafe.Api.Controllers
             var activeRoster = historyRaw.FirstOrDefault(r => today >= r.AwalDinas.Date && today <= r.AkhirCuti.Date && r.Status != "REJECTED");
             var latestRoster = historyRaw.FirstOrDefault(r => r.Status != "REJECTED");
 
-            // Roster dinyatakan sudah disetting jika memiliki roster aktif atau jadwal terkini belum kadaluarsa
-            bool hasConfiguredRoster = activeRoster != null || (latestRoster != null && latestRoster.AkhirCuti >= today);
+            var empKaryawan = await _context.Karyawans.AsNoTracking().FirstOrDefaultAsync(k => k.NoNik == userNik && k.StatusAktif);
+            bool isIndexim = (empKaryawan != null && empKaryawan.IdPerusahaan == IndeximRosterService.IndeximCompanyId);
+            IndeximRosterMonthSummary? oneSum = null;
+            if (isIndexim)
+            {
+                oneSum = await _indeximRosterService.GetEmployeeIndeximRosterAsync(userNik, today.Year, today.Month);
+            }
+            bool hasOneData = oneSum != null && oneSum.HasOneRoster;
+
+            // Roster dinyatakan sudah disetting jika memiliki roster aktif, ONE DB roster, atau jadwal terkini belum kadaluarsa
+            bool hasConfiguredRoster = hasOneData || activeRoster != null || (latestRoster != null && latestRoster.AkhirCuti >= today);
 
             // Cek Re-Induksi terkini
             var latestReinduksi = await _context.Reinduksis.AsNoTracking()
@@ -81,6 +93,7 @@ namespace Indexsafe.Api.Controllers
             {
                 success = true,
                 hasConfiguredRoster,
+                isOneSync = hasOneData,
                 activeRoster = activeRoster != null ? new
                 {
                     activeRoster.Id,
@@ -205,10 +218,23 @@ namespace Indexsafe.Api.Controllers
             var activeRoster = historyRaw.FirstOrDefault(r => today >= r.AwalDinas.Date && today <= r.AkhirCuti.Date && r.Status != "REJECTED");
             var latestRoster = historyRaw.FirstOrDefault(r => r.Status != "REJECTED");
 
-            bool hasConfiguredRoster = activeRoster != null || (latestRoster != null && latestRoster.AkhirCuti >= today);
+            var empKaryawan = await _context.Karyawans.AsNoTracking().FirstOrDefaultAsync(k => k.NoNik == userNik && k.StatusAktif);
+            bool isIndexim = (empKaryawan != null && empKaryawan.IdPerusahaan == IndeximRosterService.IndeximCompanyId);
+            IndeximRosterMonthSummary? oneSum = null;
+            if (isIndexim)
+            {
+                oneSum = await _indeximRosterService.GetEmployeeIndeximRosterAsync(userNik, today.Year, today.Month);
+            }
+            bool hasOneData = oneSum != null && oneSum.HasOneRoster;
 
             double ratio = 1.0;
-            if (isTugasExempt)
+            if (hasOneData && !hasRoster && !isTugasExempt)
+            {
+                hasRoster = true;
+                computedOnsiteDays = oneSum!.WorkDays;
+                ratio = Math.Min(1.0, (double)computedOnsiteDays / totalDaysInMonth);
+            }
+            else if (isTugasExempt)
             {
                 ratio = 0.0;
             }
@@ -217,10 +243,13 @@ namespace Indexsafe.Api.Controllers
                 ratio = Math.Min(1.0, (double)computedOnsiteDays / totalDaysInMonth);
             }
 
+            bool hasConfiguredRoster = hasOneData || activeRoster != null || (latestRoster != null && latestRoster.AkhirCuti >= today);
+
             return Ok(new
             {
                 success = true,
                 hasConfiguredRoster,
+                isOneSync = hasOneData,
                 history,
                 activeRoster = activeRoster != null ? new
                 {
@@ -343,6 +372,16 @@ namespace Indexsafe.Api.Controllers
             }
 
             // REGULER ROSTER
+            var empKaryawan = await _context.Karyawans.AsNoTracking().FirstOrDefaultAsync(k => k.NoNik == userNik && k.StatusAktif);
+            if (empKaryawan != null && empKaryawan.IdPerusahaan == IndeximRosterService.IndeximCompanyId)
+            {
+                var oneCheck = await _indeximRosterService.GetEmployeeIndeximRosterAsync(userNik, DateTime.Today.Year, DateTime.Today.Month);
+                if (oneCheck != null && oneCheck.HasOneRoster)
+                {
+                    return BadRequest(new { message = "Roster reguler untuk karyawan PT Indexim Coalindo dikelola secara terpusat melalui aplikasi ONE DB HC. Silakan hubungi Admin Departemen untuk perubahan jadwal, atau gunakan opsi 'Periode Tugas'." });
+                }
+            }
+
             if (req == null ||
                 !DateTime.TryParse(req.AwalDinas, out DateTime awalDinas) ||
                 !DateTime.TryParse(req.AkhirDinas, out DateTime akhirDinas) ||

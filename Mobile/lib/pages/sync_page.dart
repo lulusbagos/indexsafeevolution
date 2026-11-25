@@ -108,7 +108,8 @@ class _SyncPageState extends State<SyncPage> {
                   PreferenceService.setDataSync(master);
                 },
                 (response) async {
-                  final items = response as List<dynamic>;
+                  final dynamic dataVal = response['data'] ?? response['items'] ?? response['list'];
+                  final List<dynamic> items = dataVal is List ? dataVal : [];
                   final batch = sqldb.batch();
                   for (var item in items) {
                     if (name == 'areas') {

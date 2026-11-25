@@ -336,6 +336,10 @@ Future<bool> syncTran(
       cleanMap['gol_a_json'] = (row['gol_a_json'] ?? '[]').toString();
       cleanMap['gol_b_json'] = (row['gol_b_json'] ?? '[]').toString();
       cleanMap['gol_c_json'] = (row['gol_c_json'] ?? '[]').toString();
+      cleanMap['is_electric'] = (row['is_electric'] == 1 || row['is_electric'] == true || row['is_electric'] == 'true' || row['is_electric'] == '1') ? 'true' : 'false';
+      if (row['gol_ev_json'] != null && row['gol_ev_json'].toString().isNotEmpty) {
+        cleanMap['gol_ev_json'] = row['gol_ev_json'].toString();
+      }
 
       final files = <String, String>{};
       final speedoPath = row['foto_speedometer'] ?? row['image'];
@@ -346,8 +350,13 @@ Future<bool> syncTran(
         }
       }
 
-      for (var group in ['golA', 'golB', 'golC']) {
-        final jsonStr = (group == 'golA' ? row['gol_a_json'] : (group == 'golB' ? row['gol_b_json'] : row['gol_c_json']))?.toString();
+      for (var group in ['golA', 'golB', 'golC', 'golEV']) {
+        final jsonStr = (group == 'golA'
+            ? row['gol_a_json']
+            : (group == 'golB'
+                ? row['gol_b_json']
+                : (group == 'golC' ? row['gol_c_json'] : row['gol_ev_json'])))
+            ?.toString();
         if (jsonStr != null && jsonStr.isNotEmpty) {
           try {
             final items = jsonDecode(jsonStr) as List;

@@ -178,6 +178,16 @@ namespace Indexsafe.Api.Controllers
 
         };
 
+        public static readonly string[] GolEV = new string[]
+        {
+            "Air Pendingin Baterai/Battery Coolant Level",
+            "Selang-selang Air Pendingin/Cooling Hoses & Pipes",
+            "Kebersihan Area Control Module/Inverter",
+            "Kabel & Soket Tegangan Tinggi/High Voltage Wiring (Orange Cable)",
+            "Port & Tutup Pengisian Daya/Charging Port & Socket",
+            "Indikator Status Baterai & Daya di Dashboard/SOC & Power Indicator"
+        };
+
 
 
         /// <summary>
@@ -424,6 +434,10 @@ namespace Indexsafe.Api.Controllers
 
                     golC = r.GolC_Json,
 
+                    isElectric = r.IsElectric,
+
+                    golEV = r.GolEv_Json,
+
                     createdAt = r.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss")
 
                 })
@@ -497,6 +511,10 @@ namespace Indexsafe.Api.Controllers
                     golB = string.IsNullOrEmpty(report.GolB_Json) ? new List<ChecklistItem>() : JsonSerializer.Deserialize<List<ChecklistItem>>(report.GolB_Json),
 
                     golC = string.IsNullOrEmpty(report.GolC_Json) ? new List<ChecklistItem>() : JsonSerializer.Deserialize<List<ChecklistItem>>(report.GolC_Json),
+
+                    isElectric = report.IsElectric,
+
+                    golEV = string.IsNullOrEmpty(report.GolEv_Json) ? new List<ChecklistItem>() : JsonSerializer.Deserialize<List<ChecklistItem>>(report.GolEv_Json),
 
                     createdAt = report.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss")
 
@@ -798,11 +816,22 @@ namespace Indexsafe.Api.Controllers
 
                 // 4. Process Checklist JSON & Defect Photos
 
+                bool isElectric = form["is_electric"].FirstOrDefault() == "1"
+                    || string.Equals(form["is_electric"].FirstOrDefault(), "true", StringComparison.OrdinalIgnoreCase)
+                    || form["isElectric"].FirstOrDefault() == "1"
+                    || string.Equals(form["isElectric"].FirstOrDefault(), "true", StringComparison.OrdinalIgnoreCase);
+
+                report.IsElectric = isElectric;
+
                 report.GolA_Json = await ProcessGroupAsync("golA", form["gol_a_json"].FirstOrDefault() ?? form["golA_json"].FirstOrDefault(), GolA, form);
 
                 report.GolB_Json = await ProcessGroupAsync("golB", form["gol_b_json"].FirstOrDefault() ?? form["golB_json"].FirstOrDefault(), GolB, form);
 
                 report.GolC_Json = await ProcessGroupAsync("golC", form["gol_c_json"].FirstOrDefault() ?? form["golC_json"].FirstOrDefault(), GolC, form);
+
+                report.GolEv_Json = isElectric
+                    ? await ProcessGroupAsync("golEV", form["gol_ev_json"].FirstOrDefault() ?? form["golEv_json"].FirstOrDefault() ?? form["golEV_json"].FirstOrDefault(), GolEV, form)
+                    : null;
 
 
 

@@ -23,12 +23,18 @@ namespace Indexsafe.Api.Controllers
         private readonly AppDbContext _context;
         private readonly CompanyHierarchyService _companyHierarchyService;
         private readonly ImageUploadService _imageUploadService;
+        private readonly IndeximRosterService _indeximRosterService;
 
-        public PerformanceController(AppDbContext context, CompanyHierarchyService companyHierarchyService, ImageUploadService imageUploadService)
+        public PerformanceController(
+            AppDbContext context,
+            CompanyHierarchyService companyHierarchyService,
+            ImageUploadService imageUploadService,
+            IndeximRosterService indeximRosterService)
         {
             _context = context;
             _companyHierarchyService = companyHierarchyService;
             _imageUploadService = imageUploadService;
+            _indeximRosterService = indeximRosterService;
         }
 
         public class GeoSafetyPointDto
@@ -639,6 +645,12 @@ namespace Indexsafe.Api.Controllers
                 .GroupBy(r => r.Nik.Trim(), StringComparer.OrdinalIgnoreCase)
                 .ToDictionary(g => g.Key, g => g.ToList(), StringComparer.OrdinalIgnoreCase);
 
+            Dictionary<string, IndeximRosterMonthSummary>? indeximSummaries = null;
+            if (effectiveCompanyId == IndeximRosterService.IndeximCompanyId)
+            {
+                indeximSummaries = await _indeximRosterService.GetIndeximRosterSummariesAsync(selectedYear, selectedMonth);
+            }
+
             // 4. Hitung actual MTD seluruh modul
             var hazards = await _context.HazardReports.AsNoTracking()
                 .Where(h => !h.IsDeleted && h.Tanggal >= startOfMonth && h.Tanggal <= endOfMonth && h.Nik != null)
@@ -807,7 +819,27 @@ namespace Indexsafe.Api.Controllers
                     ? emp.TanggalMasuk.Value
                     : startOfMonth;
 
-                if (rostersByNik.TryGetValue(eNik, out var empRosters) && empRosters.Count > 0)
+                if (effectiveCompanyId == IndeximRosterService.IndeximCompanyId && indeximSummaries != null && indeximSummaries.TryGetValue(eNik, out var oneSum) && oneSum.HasOneRoster)
+                {
+                    hasRoster = true;
+                    int baseWorkDays = oneSum.WorkDays;
+                    int overlappingTugasDays = 0;
+                    if (rostersByNik.TryGetValue(eNik, out var empRostersList) && empRostersList.Any(r => r.TipeRoster == "TUGAS"))
+                    {
+                        for (var cur = effStart.Date; cur <= endOfMonth.Date; cur = cur.AddDays(1))
+                        {
+                            bool isTugas = empRostersList.Any(r => r.TipeRoster == "TUGAS" && r.AwalDinas.Date <= cur && cur <= r.AkhirDinas.Date);
+                            if (isTugas)
+                            {
+                                bool isWorkDay = (oneSum.DailyCategories.TryGetValue(cur, out var cat) && cat == "WORK")
+                                    || (oneSum.DailyStatuses.TryGetValue(cur, out var dayStatus) && !string.IsNullOrEmpty(dayStatus) && (dayStatus.StartsWith("0") || dayStatus.StartsWith("1") || dayStatus.Contains("IC_") || dayStatus == "Tugas" || dayStatus == "TGS" || dayStatus == "SIANG" || dayStatus == "MALAM"));
+                                if (isWorkDay) overlappingTugasDays++;
+                            }
+                        }
+                    }
+                    onsiteDays = Math.Min(Math.Max(0, baseWorkDays - overlappingTugasDays), totalDaysInMonth);
+                }
+                else if (rostersByNik.TryGetValue(eNik, out var empRosters) && empRosters.Count > 0)
                 {
                     hasRoster = true;
                     int computedOnsite = 0;
@@ -1412,6 +1444,9 @@ namespace Indexsafe.Api.Controllers
             public bool IsCurrentUser { get; set; }
             public int OnsiteDays { get; set; }
             public bool HasRoster { get; set; }
+            public bool IsOneSync { get; set; } = false;
+            public string? CompletionTimeStr { get; set; }
+            public bool IsTargetCompleted { get; set; } = false;
             public int TotalTarget { get; set; }
             public int TotalActual { get; set; } // Capped actual untuk perhitungan persentase capaian
             public int TotalActualAll { get; set; } // Total riil seluruh laporan safety yang dibuat (misal 8 Lap, 14 Lap)
@@ -1548,6 +1583,12 @@ namespace Indexsafe.Api.Controllers
                 var rostersByNik = rosters
                     .GroupBy(r => r.Nik.Trim(), StringComparer.OrdinalIgnoreCase)
                     .ToDictionary(g => g.Key, g => g.ToList(), StringComparer.OrdinalIgnoreCase);
+
+                Dictionary<string, IndeximRosterMonthSummary>? squadIndeximSummaries = null;
+                if (effectiveCompanyId == IndeximRosterService.IndeximCompanyId)
+                {
+                    squadIndeximSummaries = await _indeximRosterService.GetIndeximRosterSummariesAsync(effectiveYear, effectiveMonth);
+                }
 
                 // 4. Hitung actual MTD seluruh modul
                 var hazards = await _context.HazardReports.AsNoTracking()
@@ -1729,11 +1770,33 @@ namespace Indexsafe.Api.Controllers
 
                     int onsiteDays = totalDaysInMonth;
                     bool hasRoster = false;
+                    bool isOneSync = false;
                     DateTime effStart = (emp.TanggalMasuk.HasValue && emp.TanggalMasuk.Value > startOfMonth)
                         ? emp.TanggalMasuk.Value
                         : startOfMonth;
 
-                    if (rostersByNik.TryGetValue(eNik, out var empRosters) && empRosters.Count > 0)
+                    if (effectiveCompanyId == IndeximRosterService.IndeximCompanyId && squadIndeximSummaries != null && squadIndeximSummaries.TryGetValue(eNik, out var oneSum) && oneSum.HasOneRoster)
+                    {
+                        hasRoster = true;
+                        isOneSync = true;
+                        int baseWorkDays = oneSum.WorkDays;
+                        int overlappingTugasDays = 0;
+                        if (rostersByNik.TryGetValue(eNik, out var empRostersList) && empRostersList.Any(r => r.TipeRoster == "TUGAS"))
+                        {
+                            for (var cur = effStart.Date; cur <= endOfMonth.Date; cur = cur.AddDays(1))
+                            {
+                                bool isTugas = empRostersList.Any(r => r.TipeRoster == "TUGAS" && r.AwalDinas.Date <= cur && cur <= r.AkhirDinas.Date);
+                                if (isTugas)
+                                {
+                                    bool isWorkDay = (oneSum.DailyCategories.TryGetValue(cur, out var cat) && cat == "WORK")
+                                        || (oneSum.DailyStatuses.TryGetValue(cur, out var dayStatus) && !string.IsNullOrEmpty(dayStatus) && (dayStatus.StartsWith("0") || dayStatus.StartsWith("1") || dayStatus.Contains("IC_") || dayStatus == "Tugas" || dayStatus == "TGS" || dayStatus == "SIANG" || dayStatus == "MALAM"));
+                                    if (isWorkDay) overlappingTugasDays++;
+                                }
+                            }
+                        }
+                        onsiteDays = Math.Min(Math.Max(0, baseWorkDays - overlappingTugasDays), totalDaysInMonth);
+                    }
+                    else if (rostersByNik.TryGetValue(eNik, out var empRosters) && empRosters.Count > 0)
                     {
                         hasRoster = true;
                         int computedOnsite = 0;
@@ -1777,31 +1840,24 @@ namespace Indexsafe.Api.Controllers
 
                     double compliance = totalTarget > 0 ? Math.Min(100.0, Math.Round((double)cappedAct / totalTarget * 100.0, 1)) : 0.0;
 
+                    // Close Rate Dual Accountability: 50% Pelapor (100%) + 50% PIC Eksekutor (proporsional Closed AP)
+                    int crCreatedTotal = creatorAps.TryGetValue(eNik, out var cList) ? cList.Count : 0;
+                    int crCreatedClosed = creatorAps.TryGetValue(eNik, out var cList2) ? cList2.Count(a => IsClosedStatus(a.Status)) : 0;
+
+                    int crAssignedTotal = assignedAps.TryGetValue(eNik, out var aList) ? aList.Count : 0;
+                    int crAssignedClosed = assignedAps.TryGetValue(eNik, out var aList2) ? aList2.Count(s => IsClosedStatus(s)) : 0;
+
+                    int crTotalRelevantAp = crCreatedTotal + crAssignedTotal;
+                    int crTotalClosedAp = crCreatedClosed + crAssignedClosed;
+
                     double crCreator = 100.0;
-                    if (creatorAps.TryGetValue(eNik, out var cList) && cList.Count > 0)
-                    {
-                        int cl = cList.Count(a => IsClosedStatus(a.Status));
-                        crCreator = Math.Min(100.0, Math.Max(0.0, Math.Round(((double)cl / cList.Count) * 100.0, 1)));
-                    }
+                    double crPic = crTotalRelevantAp > 0
+                        ? Math.Min(100.0, Math.Max(0.0, Math.Round(((double)crTotalClosedAp / crTotalRelevantAp) * 100.0, 1)))
+                        : 100.0;
 
-                    double crPic = 100.0;
-                    if (assignedAps.TryGetValue(eNik, out var aList) && aList.Count > 0)
-                    {
-                        int cl = aList.Count(s => IsClosedStatus(s));
-                        crPic = Math.Min(100.0, Math.Max(0.0, Math.Round(((double)cl / aList.Count) * 100.0, 1)));
-                    }
-
-                    double closeRate;
-                    bool hasCreator = creatorAps.ContainsKey(eNik);
-                    bool hasAssigned = assignedAps.ContainsKey(eNik);
-                    if (hasCreator || hasAssigned)
-                    {
-                        closeRate = Math.Round((crCreator * 0.50) + (crPic * 0.50), 1);
-                    }
-                    else
-                    {
-                        closeRate = 100.0;
-                    }
+                    double closeRate = crTotalRelevantAp > 0
+                        ? Math.Round((crCreator * 0.50) + (crPic * 0.50), 1)
+                        : 100.0;
 
                     double qualityScore = qualityScoresByNik.TryGetValue(eNik, out double qVal)
                         ? qVal
@@ -1836,6 +1892,7 @@ namespace Indexsafe.Api.Controllers
                         IsCurrentUser = (!string.IsNullOrEmpty(userNik) && string.Equals(eNik, userNik, StringComparison.OrdinalIgnoreCase)),
                         OnsiteDays = onsiteDays,
                         HasRoster = hasRoster,
+                        IsOneSync = isOneSync,
                         TotalTarget = totalTarget,
                         TotalActual = cappedAct,
                         TotalActualAll = totalActualAll,
@@ -1879,14 +1936,13 @@ namespace Indexsafe.Api.Controllers
                     p.TotalPlayers = allTargetPlayers.Count;
                 }
 
-                // 6. Urutkan seluruh pemain di liga perusahaan persis sesuai logika tie-breaker web
+                // 6. Urutkan seluruh pemain di liga perusahaan persis sesuai logika tie-breaker web (PTS 4-Pilar konsisten)
                 var sortedLeague = allTargetPlayers
                     .OrderBy(e => (e.TotalTarget == 0 && e.TotalActualAll == 0) ? 1 : 0)
-                    .ThenByDescending(e => e.ComplianceRate >= 100.0 ? 1 : 0) // Syarat Mutlak Juara/Podium (Capaian 100% / All Green W)
-                    .ThenByDescending(e => e.TotalScore)
-                    .ThenByDescending(e => e.TotalActualAll) // Nilai tambah laporan safety riil
+                    .ThenByDescending(e => e.TotalScore) // Penempatan ranking perkaryawan mengacu pada Skor PTS (konsisten dengan Klasemen Perusahaan & Departemen)
                     .ThenByDescending(e => e.ComplianceRate)
                     .ThenByDescending(e => e.CloseRate)
+                    .ThenByDescending(e => e.TotalActualAll) // Nilai tambah: keaktifan terus membuat laporan safety riil saat skor sama
                     .ThenByDescending(e => (e.Hazard.Actual + e.Inspeksi.Actual + e.SafetyTalk.Actual + e.Observasi.Actual + e.Coaching.Actual + e.P5m.Actual))
                     .ToList();
 

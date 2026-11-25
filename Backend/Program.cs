@@ -104,6 +104,7 @@ builder.Services.AddSingleton<ImageUploadService>();
 builder.Services.AddScoped<PermitService>();
 builder.Services.AddScoped<BimaApprovalService>();
 builder.Services.AddScoped<SpecialPermitService>();
+builder.Services.AddSingleton<IndeximRosterService>();
 builder.Services.AddHttpClient();
 builder.Services.AddMemoryCache();
 
