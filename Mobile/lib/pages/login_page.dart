@@ -1,5 +1,4 @@
 import 'dart:math' as math;
-import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
@@ -500,9 +499,10 @@ class _LoginPageState extends State<LoginPage>
                 final isCompact = screenH < 690;
                 final isMedium = screenH >= 690 && screenH < 820;
 
-                final logoWidth = isCompact ? 72.0 : (isMedium ? 84.0 : 98.0);
-                final logoPadding = isCompact ? 8.0 : (isMedium ? 10.0 : 12.0);
-                final logoBottomSpacing = isCompact ? 6.0 : (isMedium ? 8.0 : 10.0);
+                final logoSize = isCompact ? 100.0 : (isMedium ? 114.0 : 126.0);
+                final circleSize = isCompact ? 110.0 : (isMedium ? 124.0 : 136.0);
+                final haloSize = isCompact ? 132.0 : (isMedium ? 148.0 : 162.0);
+                final logoBottomSpacing = isCompact ? 8.0 : (isMedium ? 10.0 : 12.0);
                 final titleFontSize = isCompact ? 17.5 : (isMedium ? 19.0 : 20.5);
                 final subtitleFontSize = isCompact ? 11.5 : (isMedium ? 12.0 : 12.5);
                 final subtitleBottomSpacing = isCompact ? 8.0 : (isMedium ? 10.0 : 12.0);
@@ -529,72 +529,14 @@ class _LoginPageState extends State<LoginPage>
                             SizedBox(height: isCompact ? 12 : 20),
                             const Spacer(flex: 2),
 
-                            // Futuristic Cyber Gateway Status Badge
-                            Container(
-                              margin: EdgeInsets.only(
-                                  bottom: isCompact ? 8.0 : 12.0),
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 4.5,
-                              ),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withValues(alpha: 0.85),
-                                borderRadius: BorderRadius.circular(20),
-                                border: Border.all(
-                                  color: const Color(0xFF00E5FF)
-                                      .withValues(alpha: 0.35),
-                                  width: 1.2,
-                                ),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: const Color(0xFF00E5FF)
-                                        .withValues(alpha: 0.12),
-                                    blurRadius: 10,
-                                    spreadRadius: 1,
-                                  ),
-                                ],
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Container(
-                                    width: 7,
-                                    height: 7,
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFF10B981),
-                                      shape: BoxShape.circle,
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: const Color(0xFF10B981)
-                                              .withValues(alpha: 0.65),
-                                          blurRadius: 6,
-                                          spreadRadius: 1.5,
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  const SizedBox(width: 7),
-                                  const Text(
-                                    'INDEXSAFE GATEWAY // ONLINE',
-                                    style: TextStyle(
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.w700,
-                                      letterSpacing: 1.2,
-                                      color: Color(0xFF0369A1),
-                                      fontFamily: 'monospace',
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-
                             // Logo MBS with Rotating Sci-Fi Halo Pedestal
                             Center(
                               child: _FuturisticLogoHalo(
                                 animation: _animCtrl,
-                                size: logoWidth + logoPadding * 2 + 24,
+                                size: haloSize,
                                 child: Container(
-                                  padding: EdgeInsets.all(logoPadding),
+                                  width: circleSize,
+                                  height: circleSize,
                                   decoration: BoxDecoration(
                                     color: Colors.white,
                                     shape: BoxShape.circle,
@@ -625,10 +567,13 @@ class _LoginPageState extends State<LoginPage>
                                       ),
                                     ],
                                   ),
-                                  child: Image.asset(
-                                    'assets/images/logo-mbs.png',
-                                    width: logoWidth,
-                                    fit: BoxFit.contain,
+                                  child: Center(
+                                    child: Image.asset(
+                                      'assets/images/logo-mbs.png',
+                                      width: logoSize,
+                                      height: logoSize,
+                                      fit: BoxFit.contain,
+                                    ),
                                   ),
                                 ),
                               ),
@@ -654,72 +599,46 @@ class _LoginPageState extends State<LoginPage>
                             ),
                             SizedBox(height: subtitleBottomSpacing),
 
-                            // 3D Cyber Form Card with Holographic Accent & Neon Strip
+                            // 3D Neumorphic Form Card
                             Container(
                               decoration: BoxDecoration(
                                 color: Colors.white,
                                 borderRadius: BorderRadius.circular(26),
                                 border: Border.all(
-                                  color: const Color(0xFF00E5FF)
-                                      .withValues(alpha: 0.28),
-                                  width: 1.5,
+                                  color: Colors.white,
+                                  width: 2.0,
                                 ),
                                 boxShadow: [
                                   // Deep 3D ambient shadow
                                   BoxShadow(
                                     color: const Color(0xFF0F172A)
-                                        .withValues(alpha: 0.08),
+                                        .withValues(alpha: 0.06),
                                     offset: const Offset(0, 20),
-                                    blurRadius: 36,
-                                    spreadRadius: 2,
+                                    blurRadius: 32,
+                                    spreadRadius: -2,
                                   ),
-                                  // Cyber Cyan ambient glow
                                   BoxShadow(
-                                    color: const Color(0xFF00E5FF)
-                                        .withValues(alpha: 0.08),
-                                    offset: const Offset(0, 6),
+                                    color: const Color(0xFF0D9488)
+                                        .withValues(alpha: 0.05),
+                                    offset: const Offset(0, 4),
                                     blurRadius: 16,
                                   ),
                                   // Top reflection highlight
                                   const BoxShadow(
                                     color: Colors.white,
-                                    offset: Offset(-3, -3),
-                                    blurRadius: 10,
+                                    offset: Offset(-4, -4),
+                                    blurRadius: 12,
                                     spreadRadius: 2,
                                   ),
                                 ],
                               ),
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular(24.5),
-                                child: Stack(
-                                  children: [
-                                    // Top Glowing Cyber Neon Gradient Strip
-                                    Positioned(
-                                      top: 0,
-                                      left: 0,
-                                      right: 0,
-                                      height: 3.5,
-                                      child: Container(
-                                        decoration: const BoxDecoration(
-                                          gradient: LinearGradient(
-                                            colors: [
-                                              Color(0xFF00E5FF),
-                                              Color(0xFF2563EB),
-                                              Color(0xFF10B981),
-                                            ],
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                    Padding(
-                                      padding: EdgeInsets.symmetric(
-                                        horizontal: cardPaddingH,
-                                        vertical: cardPaddingV,
-                                      ),
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.stretch,
-                                        children: [
+                              padding: EdgeInsets.symmetric(
+                                horizontal: cardPaddingH,
+                                vertical: cardPaddingV,
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
                                           // Micro HUD Tag for NIK
                                           Padding(
                                             padding: const EdgeInsets.only(
@@ -1109,53 +1028,10 @@ class _LoginPageState extends State<LoginPage>
                                             onPressed:
                                                 _isLoading ? null : _login,
                                           ),
-
-                                          // High-Tech Cyber Security Footer Banner
-                                          Container(
-                                            margin:
-                                                const EdgeInsets.only(top: 12),
-                                            padding: const EdgeInsets.symmetric(
-                                                vertical: 5.5, horizontal: 8),
-                                            decoration: BoxDecoration(
-                                              color: const Color(0xFFF8FAFC),
-                                              borderRadius:
-                                                  BorderRadius.circular(8),
-                                              border: Border.all(
-                                                color: const Color(0xFFE2E8F0),
-                                                width: 0.8,
-                                              ),
-                                            ),
-                                            child: Row(
-                                              mainAxisAlignment:
-                                                  MainAxisAlignment.center,
-                                              children: [
-                                                const Icon(
-                                                  Icons.security_rounded,
-                                                  size: 13,
-                                                  color: Color(0xFF0D9488),
-                                                ),
-                                                const SizedBox(width: 5),
-                                                Text(
-                                                  'SECURE ACCESS • PT INDEXIM COALINDO',
-                                                  style: TextStyle(
-                                                    fontSize: 9,
-                                                    fontWeight: FontWeight.w700,
-                                                    letterSpacing: 0.8,
-                                                    color: Colors.grey.shade600,
-                                                    fontFamily: 'monospace',
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          ),
                                         ],
                                       ),
                                     ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                            const Spacer(flex: 3),
+                                    const Spacer(flex: 3),
                             SizedBox(height: footerTopSpacing),
 
                             // Version & Copyright Footer
@@ -1890,144 +1766,11 @@ class _CyberGridPainter extends CustomPainter {
       }
     }
 
-    final double bPadTop = topPadding > 0 ? topPadding + 6.0 : 16.0;
-    final double bPadBottom = bottomPadding > 0 ? bottomPadding + 6.0 : 16.0;
-    const double bPad = 14.0;
-    const double bSize = 16.0;
-
-    // 3. Cyber Circuit PCB Traces & Angular Lines (Corners)
-    final pcbPaint = Paint()
-      ..color = const Color(0xFF00E5FF).withValues(alpha: 0.22)
-      ..strokeWidth = 1.0
-      ..style = PaintingStyle.stroke;
-
-    final pcbNodePaint = Paint()
-      ..color = const Color(0xFF00E5FF).withValues(alpha: 0.35)
-      ..style = PaintingStyle.fill;
-
-    final pcbY = bPadTop + 24.0;
-    // Top Left PCB Path
-    final pathTL = Path()
-      ..moveTo(16, pcbY)
-      ..lineTo(48, pcbY)
-      ..lineTo(68, pcbY + 18)
-      ..lineTo(98, pcbY + 18);
-    canvas.drawPath(pathTL, pcbPaint);
-    canvas.drawCircle(Offset(98, pcbY + 18), 2.2, pcbNodePaint);
-
-    // Top Right PCB Path
-    final pathTR = Path()
-      ..moveTo(w - 16, pcbY)
-      ..lineTo(w - 48, pcbY)
-      ..lineTo(w - 68, pcbY + 18)
-      ..lineTo(w - 98, pcbY + 18);
-    canvas.drawPath(pathTR, pcbPaint);
-    canvas.drawCircle(Offset(w - 98, pcbY + 18), 2.2, pcbNodePaint);
-
-    // 4. Sci-Fi HUD Corner Reticles / Brackets
-    final hudPaint = Paint()
-      ..color = const Color(0xFF0284C7).withValues(alpha: 0.38)
-      ..strokeWidth = 1.4
-      ..style = PaintingStyle.stroke;
-
-    // Top-Left Corner Bracket
-    canvas.drawLine(
-        Offset(bPad, bPadTop), Offset(bPad + bSize, bPadTop), hudPaint);
-    canvas.drawLine(
-        Offset(bPad, bPadTop), Offset(bPad, bPadTop + bSize), hudPaint);
-
-    // Top-Right Corner Bracket
-    canvas.drawLine(
-        Offset(w - bPad, bPadTop), Offset(w - bPad - bSize, bPadTop), hudPaint);
-    canvas.drawLine(
-        Offset(w - bPad, bPadTop), Offset(w - bPad, bPadTop + bSize), hudPaint);
-
-    // Bottom-Left Corner Bracket
-    canvas.drawLine(
-        Offset(bPad, h - bPadBottom), Offset(bPad + bSize, h - bPadBottom), hudPaint);
-    canvas.drawLine(
-        Offset(bPad, h - bPadBottom), Offset(bPad, h - bPadBottom - bSize), hudPaint);
-
-    // Bottom-Right Corner Bracket
-    canvas.drawLine(Offset(w - bPad, h - bPadBottom),
-        Offset(w - bPad - bSize, h - bPadBottom), hudPaint);
-    canvas.drawLine(Offset(w - bPad, h - bPadBottom),
-        Offset(w - bPad, h - bPadBottom - bSize), hudPaint);
-
-    // Corner Crosshairs '+'
-    _drawCrosshair(canvas, Offset(bPad + 28, bPadTop + 14), 4.5, hudPaint);
-    _drawCrosshair(canvas, Offset(w - bPad - 28, bPadTop + 14), 4.5, hudPaint);
-    _drawCrosshair(canvas, Offset(bPad + 28, h - bPadBottom - 14), 4.5, hudPaint);
-    _drawCrosshair(canvas, Offset(w - bPad - 28, h - bPadBottom - 14), 4.5, hudPaint);
-
-    // 5. Monospace Micro Telemetry Labels
-    _drawTelemetryText(
-      canvas,
-      'SYS.NODE // INDX-01',
-      Offset(bPad + 8, bPadTop + 3),
-      TextAlign.left,
-    );
-    _drawTelemetryText(
-      canvas,
-      'LAT -0.891° // LNG 117.808°',
-      Offset(w - bPad - 8, bPadTop + 3),
-      TextAlign.right,
-    );
-    _drawTelemetryText(
-      canvas,
-      'NET.SEC // TLS 1.3 AES-GCM',
-      Offset(bPad + 8, h - bPadBottom - 13),
-      TextAlign.left,
-    );
-    _drawTelemetryText(
-      canvas,
-      'PROTOCOL // ACTV',
-      Offset(w - bPad - 8, h - bPadBottom - 13),
-      TextAlign.right,
-    );
-  }
-
-  void _drawCrosshair(
-      Canvas canvas, Offset center, double size, Paint paint) {
-    canvas.drawLine(
-        Offset(center.dx - size, center.dy),
-        Offset(center.dx + size, center.dy),
-        paint);
-    canvas.drawLine(
-        Offset(center.dx, center.dy - size),
-        Offset(center.dx, center.dy + size),
-        paint);
-  }
-
-  void _drawTelemetryText(
-      Canvas canvas, String text, Offset offset, TextAlign align) {
-    final textSpan = TextSpan(
-      text: text,
-      style: TextStyle(
-        fontFamily: 'monospace',
-        fontSize: 7.5,
-        fontWeight: FontWeight.w600,
-        letterSpacing: 0.8,
-        color: const Color(0xFF64748B).withValues(alpha: 0.55),
-      ),
-    );
-    final textPainter = TextPainter(
-      text: textSpan,
-      textDirection: ui.TextDirection.ltr,
-      textAlign: align,
-    )..layout();
-
-    final dx = align == TextAlign.right
-        ? offset.dx - textPainter.width
-        : offset.dx;
-    textPainter.paint(canvas, Offset(dx, offset.dy));
   }
 
   @override
   bool shouldRepaint(covariant _CyberGridPainter oldDelegate) {
-    return oldDelegate.progress != progress ||
-        oldDelegate.topPadding != topPadding ||
-        oldDelegate.bottomPadding != bottomPadding;
+    return oldDelegate.progress != progress;
   }
 }
 
