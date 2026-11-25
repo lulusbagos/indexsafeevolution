@@ -1,4 +1,3 @@
-import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
@@ -460,9 +459,9 @@ class _LoginPageState extends State<LoginPage> {
       body: Stack(
         children: [
           // Calm, plain background: no moving or decorative visual patterns.
-          Positioned.fill(
+          const Positioned.fill(
             child: DecoratedBox(
-              decoration: const BoxDecoration(
+              decoration: BoxDecoration(
                 color: Color(0xFFFAFCFF),
               ),
             ),
@@ -491,6 +490,7 @@ class _LoginPageState extends State<LoginPage> {
                 final footerBottomSpacing = isCompact ? 16.0 : (isMedium ? 24.0 : 32.0);
 
                 return SingleChildScrollView(
+                  clipBehavior: Clip.none,
                   padding: EdgeInsets.symmetric(horizontal: isCompact ? 22 : 28),
                   child: ConstrainedBox(
                     constraints: BoxConstraints(
@@ -501,7 +501,8 @@ class _LoginPageState extends State<LoginPage> {
                         key: _key,
                         child: Column(
                           children: [
-                            SizedBox(height: isCompact ? 2 : (isMedium ? 6 : 10)),
+                            SizedBox(height: isCompact ? 12 : 20),
+                            const Spacer(flex: 2),
                             // Logo MBS with enhanced 3D Pedestal
                             Center(
                               child: Container(
@@ -884,7 +885,7 @@ class _LoginPageState extends State<LoginPage> {
                                 ],
                               ),
                             ),
-                            const Spacer(flex: 1),
+                            const Spacer(flex: 3),
                             SizedBox(height: footerTopSpacing),
 
                             // Version & Copyright Footer
@@ -934,223 +935,6 @@ class _LoginPageState extends State<LoginPage> {
         ],
       ),
     );
-  }
-}
-
-class _DynamicCorporateBackgroundPainter extends CustomPainter {
-  final double animationValue;
-
-  _DynamicCorporateBackgroundPainter(this.animationValue);
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final t = animationValue;
-    final w = size.width;
-    final h = size.height;
-
-    // 1. Soft Base Gradient
-    final bgPaint = Paint()
-      ..shader = const LinearGradient(
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-        colors: [
-          Color(0xFFF8FAFC),
-          Color(0xFFF1F5F9),
-          Color(0xFFEFF6FF),
-        ],
-      ).createShader(Rect.fromLTWH(0, 0, w, h));
-    canvas.drawRect(Rect.fromLTWH(0, 0, w, h), bgPaint);
-
-    // 2. Animated Aurora Glow Blobs (moving in organic Lissajous paths)
-    // Blob 1: Teal / Emerald (MBS Brand)
-    final blob1X = w * 0.80 + 55 * math.cos(t * 2 * math.pi);
-    final blob1Y = h * 0.15 + 45 * math.sin(t * 2 * math.pi);
-    final blob1Radius = w * 0.65;
-    final paint1 = Paint()
-      ..shader = RadialGradient(
-        colors: [
-          const Color(0xFF0D9488).withValues(alpha: 0.16),
-          const Color(0xFF0D9488).withValues(alpha: 0.0),
-        ],
-      ).createShader(Rect.fromCircle(
-          center: Offset(blob1X, blob1Y), radius: blob1Radius));
-    canvas.drawCircle(Offset(blob1X, blob1Y), blob1Radius, paint1);
-
-    // Blob 2: Warm Amber (MBS Safety)
-    final blob2X = w * 0.15 + 50 * math.sin((t * 2 * math.pi) + 1.2);
-    final blob2Y = h * 0.32 + 40 * math.cos((t * 2 * math.pi) + 1.2);
-    final blob2Radius = w * 0.55;
-    final paint2 = Paint()
-      ..shader = RadialGradient(
-        colors: [
-          const Color(0xFFF59E0B).withValues(alpha: 0.14),
-          const Color(0xFFF59E0B).withValues(alpha: 0.0),
-        ],
-      ).createShader(Rect.fromCircle(
-          center: Offset(blob2X, blob2Y), radius: blob2Radius));
-    canvas.drawCircle(Offset(blob2X, blob2Y), blob2Radius, paint2);
-
-    // Blob 3: Sapphire Blue (Corporate Depth)
-    final blob3X = w * 0.20 + 60 * math.cos((t * 2 * math.pi) + 2.5);
-    final blob3Y = h * 0.82 + 50 * math.sin((t * 2 * math.pi) + 2.5);
-    final blob3Radius = w * 0.70;
-    final paint3 = Paint()
-      ..shader = RadialGradient(
-        colors: [
-          const Color(0xFF1E40AF).withValues(alpha: 0.13),
-          const Color(0xFF1E40AF).withValues(alpha: 0.0),
-        ],
-      ).createShader(Rect.fromCircle(
-          center: Offset(blob3X, blob3Y), radius: blob3Radius));
-    canvas.drawCircle(Offset(blob3X, blob3Y), blob3Radius, paint3);
-
-    // Blob 4: Cyan Light (Modern Accent)
-    final blob4X = w * 0.82 + 45 * math.sin((t * 2 * math.pi) + 3.8);
-    final blob4Y = h * 0.68 + 45 * math.cos((t * 2 * math.pi) + 3.8);
-    final blob4Radius = w * 0.55;
-    final paint4 = Paint()
-      ..shader = RadialGradient(
-        colors: [
-          const Color(0xFF0284C7).withValues(alpha: 0.12),
-          const Color(0xFF0284C7).withValues(alpha: 0.0),
-        ],
-      ).createShader(Rect.fromCircle(
-          center: Offset(blob4X, blob4Y), radius: blob4Radius));
-    canvas.drawCircle(Offset(blob4X, blob4Y), blob4Radius, paint4);
-
-    // 3. Floating Geometric Elements (Hexagons & Rings)
-    _drawFloatingParticles(canvas, size, t);
-
-    // 4. Subtle flowing wave horizon at bottom
-    _drawFlowingWave(canvas, size, t);
-  }
-
-  void _drawFloatingParticles(Canvas canvas, Size size, double t) {
-    // 12 particles with fixed seeds: [xRatio, ySeed, speed, radius, isHex, colorIndex]
-    const particles = [
-      [0.12, 0.25, 0.45, 14.0, 1.0, 0.0],
-      [0.85, 0.40, 0.55, 18.0, 1.0, 1.0],
-      [0.22, 0.65, 0.35, 12.0, 0.0, 2.0],
-      [0.78, 0.85, 0.50, 16.0, 1.0, 0.0],
-      [0.48, 0.15, 0.40, 10.0, 0.0, 1.0],
-      [0.08, 0.80, 0.60, 20.0, 1.0, 2.0],
-      [0.92, 0.18, 0.30, 14.0, 0.0, 0.0],
-      [0.35, 0.90, 0.50, 15.0, 1.0, 1.0],
-      [0.65, 0.30, 0.42, 12.0, 1.0, 2.0],
-      [0.82, 0.60, 0.38, 16.0, 0.0, 0.0],
-      [0.28, 0.10, 0.48, 14.0, 1.0, 1.0],
-      [0.60, 0.75, 0.52, 11.0, 0.0, 2.0],
-    ];
-
-    final colors = [
-      const Color(0xFF0D9488), // Teal
-      const Color(0xFF2563EB), // Sapphire
-      const Color(0xFFD97706), // Amber
-    ];
-
-    for (int i = 0; i < particles.length; i++) {
-      final p = particles[i];
-      final xRatio = p[0];
-      final ySeed = p[1];
-      final speed = p[2];
-      final radius = p[3];
-      final isHex = p[4] == 1.0;
-      final cIdx = p[5].toInt() % colors.length;
-
-      // Vertical drift upward
-      final yProg = (ySeed - (t * speed)) % 1.0;
-      final y = (yProg < 0 ? yProg + 1.0 : yProg) * size.height;
-
-      // Horizontal subtle sinusoidal sway
-      final xOffset = math.sin((t * 2 * math.pi) + (i * 0.9)) * 18.0;
-      final x = (xRatio * size.width) + xOffset;
-
-      // Smooth fade at top and bottom edges
-      double alpha = 1.0;
-      if (y < 80) {
-        alpha = (y / 80).clamp(0.0, 1.0);
-      } else if (y > size.height - 80) {
-        alpha = ((size.height - y) / 80).clamp(0.0, 1.0);
-      }
-
-      final strokePaint = Paint()
-        ..color = colors[cIdx].withValues(alpha: 0.18 * alpha)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.3;
-
-      final fillPaint = Paint()
-        ..color = colors[cIdx].withValues(alpha: 0.04 * alpha)
-        ..style = PaintingStyle.fill;
-
-      canvas.save();
-      canvas.translate(x, y);
-      canvas.rotate((t * 2 * math.pi * (i.isEven ? 0.4 : -0.4)) + (i * 0.5));
-
-      if (isHex) {
-        _drawHexagon(canvas, radius, fillPaint, strokePaint);
-      } else {
-        canvas.drawCircle(Offset.zero, radius, fillPaint);
-        canvas.drawCircle(Offset.zero, radius, strokePaint);
-        // Center micro-dot
-        final dotPaint = Paint()
-          ..color = colors[cIdx].withValues(alpha: 0.35 * alpha)
-          ..style = PaintingStyle.fill;
-        canvas.drawCircle(Offset.zero, 2.0, dotPaint);
-      }
-      canvas.restore();
-    }
-  }
-
-  void _drawHexagon(Canvas canvas, double radius, Paint fill, Paint stroke) {
-    final path = Path();
-    for (int i = 0; i < 6; i++) {
-      final angle = (i * 60) * math.pi / 180;
-      final x = radius * math.cos(angle);
-      final y = radius * math.sin(angle);
-      if (i == 0) {
-        path.moveTo(x, y);
-      } else {
-        path.lineTo(x, y);
-      }
-    }
-    path.close();
-    canvas.drawPath(path, fill);
-    canvas.drawPath(path, stroke);
-  }
-
-  void _drawFlowingWave(Canvas canvas, Size size, double t) {
-    final wavePaint = Paint()
-      ..shader = LinearGradient(
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-        colors: [
-          const Color(0xFF0D9488).withValues(alpha: 0.05),
-          const Color(0xFF2563EB).withValues(alpha: 0.07),
-          const Color(0xFF0284C7).withValues(alpha: 0.04),
-        ],
-      ).createShader(Rect.fromLTWH(0, size.height - 180, size.width, 180))
-      ..style = PaintingStyle.fill;
-
-    final path = Path();
-    path.moveTo(0, size.height);
-    path.lineTo(0, size.height - 110 + 20 * math.sin(t * 2 * math.pi));
-
-    final cp1x = size.width * 0.35;
-    final cp1y = size.height - 150 + 25 * math.cos(t * 2 * math.pi);
-    final cp2x = size.width * 0.70;
-    final cp2y = size.height - 85 + 20 * math.sin((t * 2 * math.pi) + 1.5);
-
-    path.cubicTo(cp1x, cp1y, cp2x, cp2y, size.width,
-        size.height - 120 + 15 * math.cos(t * 2 * math.pi));
-    path.lineTo(size.width, size.height);
-    path.close();
-
-    canvas.drawPath(path, wavePaint);
-  }
-
-  @override
-  bool shouldRepaint(covariant _DynamicCorporateBackgroundPainter oldDelegate) {
-    return oldDelegate.animationValue != animationValue;
   }
 }
 
