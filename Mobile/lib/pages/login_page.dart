@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
@@ -23,12 +25,14 @@ class LoginPage extends StatefulWidget {
   State<LoginPage> createState() => _LoginPageState();
 }
 
-class _LoginPageState extends State<LoginPage> {
+class _LoginPageState extends State<LoginPage>
+    with SingleTickerProviderStateMixin {
   final _key = GlobalKey<FormState>();
   final _db = DatabaseService();
   final _api = ApiService();
   final _userCtrl = TextEditingController();
   final _pswdCtrl = TextEditingController();
+  late AnimationController _animCtrl;
   String _version = '';
   bool _remember = true;
   bool _obscureText = true;
@@ -37,6 +41,10 @@ class _LoginPageState extends State<LoginPage> {
   @override
   void initState() {
     super.initState();
+    _animCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 14),
+    )..repeat();
 
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       PackageInfo packageInfo = await PackageInfo.fromPlatform();
@@ -56,6 +64,14 @@ class _LoginPageState extends State<LoginPage> {
         setState(() => _remember = true);
       }
     });
+  }
+
+  @override
+  void dispose() {
+    _animCtrl.dispose();
+    _userCtrl.dispose();
+    _pswdCtrl.dispose();
+    super.dispose();
   }
 
   Future<void> _performOfflineLogin({bool isExplicitOffline = false}) async {
@@ -458,12 +474,21 @@ class _LoginPageState extends State<LoginPage> {
       backgroundColor: const Color(0xFFFAFCFF),
       body: Stack(
         children: [
-          // Calm, plain background: no moving or decorative visual patterns.
-          const Positioned.fill(
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                color: Color(0xFFFAFCFF),
-              ),
+          // Futuristic Cyber Grid & Ambient Radiant Mesh Background
+          Positioned.fill(
+            child: AnimatedBuilder(
+              animation: _animCtrl,
+              builder: (context, _) {
+                final media = MediaQuery.of(context);
+                return CustomPaint(
+                  painter: _CyberGridPainter(
+                    progress: _animCtrl.value,
+                    topPadding: media.padding.top,
+                    bottomPadding: media.padding.bottom,
+                  ),
+                  size: Size.infinite,
+                );
+              },
             ),
           ),
 
@@ -503,44 +528,108 @@ class _LoginPageState extends State<LoginPage> {
                           children: [
                             SizedBox(height: isCompact ? 12 : 20),
                             const Spacer(flex: 2),
-                            // Logo MBS with enhanced 3D Pedestal
-                            Center(
-                              child: Container(
-                                padding: EdgeInsets.all(logoPadding),
-                                decoration: BoxDecoration(
-                                  color: Colors.white,
-                                  shape: BoxShape.circle,
-                                  border: Border.all(
-                                    color: Colors.white,
-                                    width: 3.0,
-                                  ),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: const Color(0xFF0D9488)
-                                          .withValues(alpha: 0.16),
-                                      blurRadius: 32,
-                                      spreadRadius: 6,
-                                      offset: const Offset(0, 10),
-                                    ),
-                                    BoxShadow(
-                                      color: const Color(0xFF0F172A)
-                                          .withValues(alpha: 0.08),
-                                      blurRadius: 16,
-                                      spreadRadius: 1,
-                                      offset: const Offset(0, 4),
-                                    ),
-                                    const BoxShadow(
-                                      color: Colors.white,
-                                      blurRadius: 10,
-                                      spreadRadius: 2,
-                                      offset: Offset(-3, -3),
-                                    ),
-                                  ],
+
+                            // Futuristic Cyber Gateway Status Badge
+                            Container(
+                              margin: EdgeInsets.only(
+                                  bottom: isCompact ? 8.0 : 12.0),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 4.5,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.85),
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(
+                                  color: const Color(0xFF00E5FF)
+                                      .withValues(alpha: 0.35),
+                                  width: 1.2,
                                 ),
-                                child: Image.asset(
-                                  'assets/images/logo-mbs.png',
-                                  width: logoWidth,
-                                  fit: BoxFit.contain,
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: const Color(0xFF00E5FF)
+                                        .withValues(alpha: 0.12),
+                                    blurRadius: 10,
+                                    spreadRadius: 1,
+                                  ),
+                                ],
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Container(
+                                    width: 7,
+                                    height: 7,
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF10B981),
+                                      shape: BoxShape.circle,
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: const Color(0xFF10B981)
+                                              .withValues(alpha: 0.65),
+                                          blurRadius: 6,
+                                          spreadRadius: 1.5,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(width: 7),
+                                  const Text(
+                                    'INDEXSAFE GATEWAY // ONLINE',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w700,
+                                      letterSpacing: 1.2,
+                                      color: Color(0xFF0369A1),
+                                      fontFamily: 'monospace',
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+
+                            // Logo MBS with Rotating Sci-Fi Halo Pedestal
+                            Center(
+                              child: _FuturisticLogoHalo(
+                                animation: _animCtrl,
+                                size: logoWidth + logoPadding * 2 + 24,
+                                child: Container(
+                                  padding: EdgeInsets.all(logoPadding),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                      color: Colors.white,
+                                      width: 3.0,
+                                    ),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: const Color(0xFF00E5FF)
+                                            .withValues(alpha: 0.22),
+                                        blurRadius: 28,
+                                        spreadRadius: 4,
+                                        offset: const Offset(0, 8),
+                                      ),
+                                      BoxShadow(
+                                        color: const Color(0xFF0D9488)
+                                            .withValues(alpha: 0.16),
+                                        blurRadius: 16,
+                                        spreadRadius: 2,
+                                        offset: const Offset(0, 4),
+                                      ),
+                                      const BoxShadow(
+                                        color: Colors.white,
+                                        blurRadius: 8,
+                                        spreadRadius: 2,
+                                        offset: Offset(-2, -2),
+                                      ),
+                                    ],
+                                  ),
+                                  child: Image.asset(
+                                    'assets/images/logo-mbs.png',
+                                    width: logoWidth,
+                                    fit: BoxFit.contain,
+                                  ),
                                 ),
                               ),
                             ),
@@ -565,14 +654,15 @@ class _LoginPageState extends State<LoginPage> {
                             ),
                             SizedBox(height: subtitleBottomSpacing),
 
-                            // 3D Neumorphic Form Card
+                            // 3D Cyber Form Card with Holographic Accent & Neon Strip
                             Container(
                               decoration: BoxDecoration(
                                 color: Colors.white,
                                 borderRadius: BorderRadius.circular(26),
                                 border: Border.all(
-                                  color: Colors.white,
-                                  width: 2.0,
+                                  color: const Color(0xFF00E5FF)
+                                      .withValues(alpha: 0.28),
+                                  width: 1.5,
                                 ),
                                 boxShadow: [
                                   // Deep 3D ambient shadow
@@ -583,13 +673,12 @@ class _LoginPageState extends State<LoginPage> {
                                     blurRadius: 36,
                                     spreadRadius: 2,
                                   ),
-                                  // Directional elevation shadow
+                                  // Cyber Cyan ambient glow
                                   BoxShadow(
-                                    color: const Color(0xFF0F172A)
-                                        .withValues(alpha: 0.04),
+                                    color: const Color(0xFF00E5FF)
+                                        .withValues(alpha: 0.08),
                                     offset: const Offset(0, 6),
-                                    blurRadius: 12,
-                                    spreadRadius: -2,
+                                    blurRadius: 16,
                                   ),
                                   // Top reflection highlight
                                   const BoxShadow(
@@ -600,289 +689,470 @@ class _LoginPageState extends State<LoginPage> {
                                   ),
                                 ],
                               ),
-                              padding: EdgeInsets.symmetric(
-                                horizontal: cardPaddingH,
-                                vertical: cardPaddingV,
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.stretch,
-                                children: [
-                                  // 3D Inset Input NIK
-                                  Container(
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFFF8FAFC),
-                                      borderRadius: BorderRadius.circular(16),
-                                      border: Border.all(
-                                        color: const Color(0xFFE2E8F0),
-                                        width: 1.2,
-                                      ),
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: const Color(0xFF0F172A)
-                                              .withValues(alpha: 0.035),
-                                          offset: const Offset(0, 3),
-                                          blurRadius: 6,
-                                          spreadRadius: -1,
-                                        ),
-                                        const BoxShadow(
-                                          color: Colors.white,
-                                          offset: Offset(0, -1),
-                                          blurRadius: 2,
-                                        ),
-                                      ],
-                                    ),
-                                    child: TextFormField(
-                                      controller: _userCtrl,
-                                      textCapitalization:
-                                          TextCapitalization.characters,
-                                      style: const TextStyle(
-                                        fontSize: 15,
-                                        fontWeight: FontWeight.w700,
-                                        letterSpacing: 0.5,
-                                        color: Color(0xFF0F172A),
-                                      ),
-                                      decoration: InputDecoration(
-                                        labelText: 'NIK',
-                                        hintText: 'Masukkan NIK Anda',
-                                        hintStyle: TextStyle(
-                                          fontSize: 14,
-                                          color: Colors.grey.shade400,
-                                          fontWeight: FontWeight.normal,
-                                        ),
-                                        labelStyle: TextStyle(
-                                          fontSize: 14,
-                                          color: Colors.grey.shade600,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                        prefixIcon: Container(
-                                          margin: const EdgeInsets.only(
-                                            left: 12,
-                                            right: 10,
-                                            top: 8,
-                                            bottom: 8,
-                                          ),
-                                          padding: const EdgeInsets.all(8),
-                                          decoration: BoxDecoration(
-                                            color: const Color(0xFFEFF6FF),
-                                            borderRadius:
-                                                BorderRadius.circular(10),
-                                            boxShadow: [
-                                              BoxShadow(
-                                                color: const Color(0xFF2563EB)
-                                                    .withValues(alpha: 0.12),
-                                                offset: const Offset(0, 2),
-                                                blurRadius: 4,
-                                              ),
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(24.5),
+                                child: Stack(
+                                  children: [
+                                    // Top Glowing Cyber Neon Gradient Strip
+                                    Positioned(
+                                      top: 0,
+                                      left: 0,
+                                      right: 0,
+                                      height: 3.5,
+                                      child: Container(
+                                        decoration: const BoxDecoration(
+                                          gradient: LinearGradient(
+                                            colors: [
+                                              Color(0xFF00E5FF),
+                                              Color(0xFF2563EB),
+                                              Color(0xFF10B981),
                                             ],
                                           ),
-                                          child: const Icon(
-                                            Icons.badge_rounded,
-                                            color: Color(0xFF2563EB),
-                                            size: 20,
-                                          ),
                                         ),
-                                        filled: false,
-                                        contentPadding:
-                                            EdgeInsets.symmetric(
-                                          horizontal: 16,
-                                          vertical: isCompact ? 10.0 : 12.0,
-                                        ),
-                                        border: InputBorder.none,
-                                        enabledBorder: InputBorder.none,
-                                        focusedBorder: InputBorder.none,
                                       ),
-                                      validator: validator,
-                                      onChanged: (String val) => setState(() {}),
                                     ),
-                                  ),
-                                  SizedBox(height: inputSpacing),
-
-                                  // 3D Inset Input Password
-                                  Container(
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFFF8FAFC),
-                                      borderRadius: BorderRadius.circular(16),
-                                      border: Border.all(
-                                        color: const Color(0xFFE2E8F0),
-                                        width: 1.2,
+                                    Padding(
+                                      padding: EdgeInsets.symmetric(
+                                        horizontal: cardPaddingH,
+                                        vertical: cardPaddingV,
                                       ),
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: const Color(0xFF0F172A)
-                                              .withValues(alpha: 0.035),
-                                          offset: const Offset(0, 3),
-                                          blurRadius: 6,
-                                          spreadRadius: -1,
-                                        ),
-                                        const BoxShadow(
-                                          color: Colors.white,
-                                          offset: Offset(0, -1),
-                                          blurRadius: 2,
-                                        ),
-                                      ],
-                                    ),
-                                    child: TextFormField(
-                                      controller: _pswdCtrl,
-                                      obscureText: _obscureText,
-                                      style: const TextStyle(
-                                        fontSize: 15,
-                                        fontWeight: FontWeight.w700,
-                                        color: Color(0xFF0F172A),
-                                      ),
-                                      decoration: InputDecoration(
-                                        labelText: 'Password',
-                                        hintText: 'Masukkan kata sandi',
-                                        hintStyle: TextStyle(
-                                          fontSize: 14,
-                                          color: Colors.grey.shade400,
-                                          fontWeight: FontWeight.normal,
-                                        ),
-                                        labelStyle: TextStyle(
-                                          fontSize: 14,
-                                          color: Colors.grey.shade600,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                        prefixIcon: Container(
-                                          margin: const EdgeInsets.only(
-                                            left: 12,
-                                            right: 10,
-                                            top: 8,
-                                            bottom: 8,
-                                          ),
-                                          padding: const EdgeInsets.all(8),
-                                          decoration: BoxDecoration(
-                                            color: const Color(0xFFEFF6FF),
-                                            borderRadius:
-                                                BorderRadius.circular(10),
-                                            boxShadow: [
-                                              BoxShadow(
-                                                color: const Color(0xFF2563EB)
-                                                    .withValues(alpha: 0.12),
-                                                offset: const Offset(0, 2),
-                                                blurRadius: 4,
-                                              ),
-                                            ],
-                                          ),
-                                          child: const Icon(
-                                            Icons.lock_rounded,
-                                            color: Color(0xFF2563EB),
-                                            size: 20,
-                                          ),
-                                        ),
-                                        suffixIcon: IconButton(
-                                          icon: Icon(
-                                            _obscureText
-                                                ? Icons.visibility_outlined
-                                                : Icons.visibility_off_outlined,
-                                            size: 20,
-                                            color: Colors.grey.shade600,
-                                          ),
-                                          onPressed: () {
-                                            setState(() {
-                                              _obscureText = !_obscureText;
-                                            });
-                                          },
-                                        ),
-                                        filled: false,
-                                        contentPadding:
-                                            EdgeInsets.symmetric(
-                                          horizontal: 16,
-                                          vertical: isCompact ? 10.0 : 12.0,
-                                        ),
-                                        border: InputBorder.none,
-                                        enabledBorder: InputBorder.none,
-                                        focusedBorder: InputBorder.none,
-                                      ),
-                                      validator: validator,
-                                      onChanged: (String val) => setState(() {}),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 14),
-
-                                  // Remember Me & Lupa Password Row
-                                  Row(
-                                    mainAxisAlignment:
-                                        MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      InkWell(
-                                        onTap: () {
-                                          setState(() => _remember = !_remember);
-                                        },
-                                        borderRadius: BorderRadius.circular(6),
-                                        child: Padding(
-                                          padding: const EdgeInsets.symmetric(
-                                            vertical: 4,
-                                            horizontal: 2,
-                                          ),
-                                          child: Row(
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              SizedBox(
-                                                width: 20,
-                                                height: 20,
-                                                child: Checkbox(
-                                                  value: _remember,
-                                                  activeColor:
-                                                      const Color(0xFF2563EB),
-                                                  shape: RoundedRectangleBorder(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.stretch,
+                                        children: [
+                                          // Micro HUD Tag for NIK
+                                          Padding(
+                                            padding: const EdgeInsets.only(
+                                                bottom: 5.0, left: 2.0),
+                                            child: Row(
+                                              mainAxisAlignment:
+                                                  MainAxisAlignment.spaceBetween,
+                                              children: [
+                                                const Text(
+                                                  'IDENTITAS PENGGUNA',
+                                                  style: TextStyle(
+                                                    fontSize: 10.5,
+                                                    fontWeight: FontWeight.w700,
+                                                    letterSpacing: 0.8,
+                                                    color: Color(0xFF64748B),
+                                                  ),
+                                                ),
+                                                Container(
+                                                  padding: const EdgeInsets.symmetric(
+                                                      horizontal: 6, vertical: 2),
+                                                  decoration: BoxDecoration(
+                                                    color: const Color(0xFFEFF6FF),
                                                     borderRadius:
                                                         BorderRadius.circular(4),
+                                                    border: Border.all(
+                                                      color: const Color(0xFFBFDBFE),
+                                                      width: 0.8,
+                                                    ),
                                                   ),
-                                                  side: BorderSide(
-                                                    color: _remember
-                                                        ? const Color(0xFF2563EB)
-                                                        : Colors.grey.shade400,
-                                                    width: 1.5,
+                                                  child: const Text(
+                                                    '[ ID_VERIFIED ]',
+                                                    style: TextStyle(
+                                                      fontSize: 8.5,
+                                                      fontWeight: FontWeight.w700,
+                                                      letterSpacing: 0.8,
+                                                      color: Color(0xFF2563EB),
+                                                      fontFamily: 'monospace',
+                                                    ),
                                                   ),
-                                                  onChanged: (bool? val) {
-                                                    setState(() =>
-                                                        _remember = val ?? true);
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+
+                                          // 3D Inset Input NIK
+                                          Container(
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xFFF8FAFC),
+                                              borderRadius:
+                                                  BorderRadius.circular(16),
+                                              border: Border.all(
+                                                color: const Color(0xFFE2E8F0),
+                                                width: 1.2,
+                                              ),
+                                              boxShadow: [
+                                                BoxShadow(
+                                                  color: const Color(0xFF0F172A)
+                                                      .withValues(alpha: 0.035),
+                                                  offset: const Offset(0, 3),
+                                                  blurRadius: 6,
+                                                  spreadRadius: -1,
+                                                ),
+                                                const BoxShadow(
+                                                  color: Colors.white,
+                                                  offset: Offset(0, -1),
+                                                  blurRadius: 2,
+                                                ),
+                                              ],
+                                            ),
+                                            child: TextFormField(
+                                              controller: _userCtrl,
+                                              textCapitalization:
+                                                  TextCapitalization.characters,
+                                              style: const TextStyle(
+                                                fontSize: 15,
+                                                fontWeight: FontWeight.w700,
+                                                letterSpacing: 0.5,
+                                                color: Color(0xFF0F172A),
+                                              ),
+                                              decoration: InputDecoration(
+                                                labelText: 'NIK',
+                                                hintText: 'Masukkan NIK Anda',
+                                                hintStyle: TextStyle(
+                                                  fontSize: 14,
+                                                  color: Colors.grey.shade400,
+                                                  fontWeight: FontWeight.normal,
+                                                ),
+                                                labelStyle: TextStyle(
+                                                  fontSize: 14,
+                                                  color: Colors.grey.shade600,
+                                                  fontWeight: FontWeight.w600,
+                                                ),
+                                                prefixIcon: Container(
+                                                  margin: const EdgeInsets.only(
+                                                    left: 12,
+                                                    right: 10,
+                                                    top: 8,
+                                                    bottom: 8,
+                                                  ),
+                                                  padding: const EdgeInsets.all(8),
+                                                  decoration: BoxDecoration(
+                                                    color: const Color(0xFFEFF6FF),
+                                                    borderRadius:
+                                                        BorderRadius.circular(10),
+                                                    boxShadow: [
+                                                      BoxShadow(
+                                                        color: const Color(0xFF2563EB)
+                                                            .withValues(alpha: 0.12),
+                                                        offset: const Offset(0, 2),
+                                                        blurRadius: 4,
+                                                      ),
+                                                    ],
+                                                  ),
+                                                  child: const Icon(
+                                                    Icons.badge_rounded,
+                                                    color: Color(0xFF2563EB),
+                                                    size: 20,
+                                                  ),
+                                                ),
+                                                filled: false,
+                                                contentPadding:
+                                                    EdgeInsets.symmetric(
+                                                  horizontal: 16,
+                                                  vertical:
+                                                      isCompact ? 10.0 : 12.0,
+                                                ),
+                                                border: InputBorder.none,
+                                                enabledBorder: InputBorder.none,
+                                                focusedBorder: InputBorder.none,
+                                              ),
+                                              validator: validator,
+                                              onChanged: (String val) =>
+                                                  setState(() {}),
+                                            ),
+                                          ),
+                                          SizedBox(height: inputSpacing),
+
+                                          // Micro HUD Tag for Password
+                                          Padding(
+                                            padding: const EdgeInsets.only(
+                                                bottom: 5.0, left: 2.0),
+                                            child: Row(
+                                              mainAxisAlignment:
+                                                  MainAxisAlignment.spaceBetween,
+                                              children: [
+                                                const Text(
+                                                  'KATA SANDI',
+                                                  style: TextStyle(
+                                                    fontSize: 10.5,
+                                                    fontWeight: FontWeight.w700,
+                                                    letterSpacing: 0.8,
+                                                    color: Color(0xFF64748B),
+                                                  ),
+                                                ),
+                                                Container(
+                                                  padding: const EdgeInsets.symmetric(
+                                                      horizontal: 6, vertical: 2),
+                                                  decoration: BoxDecoration(
+                                                    color: const Color(0xFFF1F5F9),
+                                                    borderRadius:
+                                                        BorderRadius.circular(4),
+                                                    border: Border.all(
+                                                      color: const Color(0xFFCBD5E1),
+                                                      width: 0.8,
+                                                    ),
+                                                  ),
+                                                  child: const Text(
+                                                    '[ 256-BIT ENCRYPTED ]',
+                                                    style: TextStyle(
+                                                      fontSize: 8.5,
+                                                      fontWeight: FontWeight.w700,
+                                                      letterSpacing: 0.8,
+                                                      color: Color(0xFF475569),
+                                                      fontFamily: 'monospace',
+                                                    ),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+
+                                          // 3D Inset Input Password
+                                          Container(
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xFFF8FAFC),
+                                              borderRadius:
+                                                  BorderRadius.circular(16),
+                                              border: Border.all(
+                                                color: const Color(0xFFE2E8F0),
+                                                width: 1.2,
+                                              ),
+                                              boxShadow: [
+                                                BoxShadow(
+                                                  color: const Color(0xFF0F172A)
+                                                      .withValues(alpha: 0.035),
+                                                  offset: const Offset(0, 3),
+                                                  blurRadius: 6,
+                                                  spreadRadius: -1,
+                                                ),
+                                                const BoxShadow(
+                                                  color: Colors.white,
+                                                  offset: Offset(0, -1),
+                                                  blurRadius: 2,
+                                                ),
+                                              ],
+                                            ),
+                                            child: TextFormField(
+                                              controller: _pswdCtrl,
+                                              obscureText: _obscureText,
+                                              style: const TextStyle(
+                                                fontSize: 15,
+                                                fontWeight: FontWeight.w700,
+                                                color: Color(0xFF0F172A),
+                                              ),
+                                              decoration: InputDecoration(
+                                                labelText: 'Password',
+                                                hintText: 'Masukkan kata sandi',
+                                                hintStyle: TextStyle(
+                                                  fontSize: 14,
+                                                  color: Colors.grey.shade400,
+                                                  fontWeight: FontWeight.normal,
+                                                ),
+                                                labelStyle: TextStyle(
+                                                  fontSize: 14,
+                                                  color: Colors.grey.shade600,
+                                                  fontWeight: FontWeight.w600,
+                                                ),
+                                                prefixIcon: Container(
+                                                  margin: const EdgeInsets.only(
+                                                    left: 12,
+                                                    right: 10,
+                                                    top: 8,
+                                                    bottom: 8,
+                                                  ),
+                                                  padding: const EdgeInsets.all(8),
+                                                  decoration: BoxDecoration(
+                                                    color: const Color(0xFFEFF6FF),
+                                                    borderRadius:
+                                                        BorderRadius.circular(10),
+                                                    boxShadow: [
+                                                      BoxShadow(
+                                                        color: const Color(0xFF2563EB)
+                                                            .withValues(alpha: 0.12),
+                                                        offset: const Offset(0, 2),
+                                                        blurRadius: 4,
+                                                      ),
+                                                    ],
+                                                  ),
+                                                  child: const Icon(
+                                                    Icons.lock_rounded,
+                                                    color: Color(0xFF2563EB),
+                                                    size: 20,
+                                                  ),
+                                                ),
+                                                suffixIcon: IconButton(
+                                                  icon: Icon(
+                                                    _obscureText
+                                                        ? Icons.visibility_outlined
+                                                        : Icons
+                                                            .visibility_off_outlined,
+                                                    size: 20,
+                                                    color: Colors.grey.shade600,
+                                                  ),
+                                                  onPressed: () {
+                                                    setState(() {
+                                                      _obscureText =
+                                                          !_obscureText;
+                                                    });
                                                   },
                                                 ),
+                                                filled: false,
+                                                contentPadding:
+                                                    EdgeInsets.symmetric(
+                                                  horizontal: 16,
+                                                  vertical:
+                                                      isCompact ? 10.0 : 12.0,
+                                                ),
+                                                border: InputBorder.none,
+                                                enabledBorder: InputBorder.none,
+                                                focusedBorder: InputBorder.none,
                                               ),
-                                              const SizedBox(width: 8),
-                                              Text(
-                                                'Remember Me',
-                                                style: TextStyle(
-                                                  fontSize: 13,
-                                                  fontWeight: FontWeight.w600,
-                                                  color: Colors.grey.shade700,
+                                              validator: validator,
+                                              onChanged: (String val) =>
+                                                  setState(() {}),
+                                            ),
+                                          ),
+                                          const SizedBox(height: 14),
+
+                                          // Remember Me & Lupa Password Row
+                                          Row(
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.spaceBetween,
+                                            children: [
+                                              InkWell(
+                                                onTap: () {
+                                                  setState(() =>
+                                                      _remember = !_remember);
+                                                },
+                                                borderRadius:
+                                                    BorderRadius.circular(6),
+                                                child: Padding(
+                                                  padding:
+                                                      const EdgeInsets.symmetric(
+                                                    vertical: 4,
+                                                    horizontal: 2,
+                                                  ),
+                                                  child: Row(
+                                                    mainAxisSize:
+                                                        MainAxisSize.min,
+                                                    children: [
+                                                      SizedBox(
+                                                        width: 20,
+                                                        height: 20,
+                                                        child: Checkbox(
+                                                          value: _remember,
+                                                          activeColor:
+                                                              const Color(
+                                                                  0xFF2563EB),
+                                                          shape:
+                                                              RoundedRectangleBorder(
+                                                            borderRadius:
+                                                                BorderRadius
+                                                                    .circular(4),
+                                                          ),
+                                                          side: BorderSide(
+                                                            color: _remember
+                                                                ? const Color(
+                                                                    0xFF2563EB)
+                                                                : Colors.grey
+                                                                    .shade400,
+                                                            width: 1.5,
+                                                          ),
+                                                          onChanged:
+                                                              (bool? val) {
+                                                            setState(() =>
+                                                                _remember =
+                                                                    val ?? true);
+                                                          },
+                                                        ),
+                                                      ),
+                                                      const SizedBox(width: 8),
+                                                      Text(
+                                                        'Remember Me',
+                                                        style: TextStyle(
+                                                          fontSize: 13,
+                                                          fontWeight:
+                                                              FontWeight.w600,
+                                                          color: Colors
+                                                              .grey.shade700,
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ),
+                                              ),
+                                              TextButton(
+                                                onPressed:
+                                                    _showForgotPasswordSheet,
+                                                style: TextButton.styleFrom(
+                                                  padding:
+                                                      const EdgeInsets.symmetric(
+                                                    horizontal: 4,
+                                                    vertical: 4,
+                                                  ),
+                                                  tapTargetSize:
+                                                      MaterialTapTargetSize
+                                                          .shrinkWrap,
+                                                ),
+                                                child: const Text(
+                                                  'Lupa Password?',
+                                                  style: TextStyle(
+                                                    fontSize: 13,
+                                                    fontWeight:
+                                                        FontWeight.w700,
+                                                    color: Color(0xFF2563EB),
+                                                  ),
                                                 ),
                                               ),
                                             ],
                                           ),
-                                        ),
-                                      ),
-                                      TextButton(
-                                        onPressed: _showForgotPasswordSheet,
-                                        style: TextButton.styleFrom(
-                                          padding: const EdgeInsets.symmetric(
-                                            horizontal: 4,
-                                            vertical: 4,
-                                          ),
-                                          tapTargetSize:
-                                              MaterialTapTargetSize.shrinkWrap,
-                                        ),
-                                        child: const Text(
-                                          'Lupa Password?',
-                                          style: TextStyle(
-                                            fontSize: 13,
-                                            fontWeight: FontWeight.w700,
-                                            color: Color(0xFF2563EB),
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  SizedBox(height: buttonTopSpacing),
+                                          SizedBox(height: buttonTopSpacing),
 
-                                  // Tactile 3D Login Button with Mechanical Keycap Travel & Haptics
-                                  _Tactile3DButton(
-                                    label: 'LOGIN',
-                                    isLoading: _isLoading,
-                                    onPressed: _isLoading ? null : _login,
-                                  ),
-                                ],
+                                          // Tactile 3D Login Button with Mechanical Keycap Travel & Haptics
+                                          _Tactile3DButton(
+                                            label: 'LOGIN',
+                                            isLoading: _isLoading,
+                                            onPressed:
+                                                _isLoading ? null : _login,
+                                          ),
+
+                                          // High-Tech Cyber Security Footer Banner
+                                          Container(
+                                            margin:
+                                                const EdgeInsets.only(top: 12),
+                                            padding: const EdgeInsets.symmetric(
+                                                vertical: 5.5, horizontal: 8),
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xFFF8FAFC),
+                                              borderRadius:
+                                                  BorderRadius.circular(8),
+                                              border: Border.all(
+                                                color: const Color(0xFFE2E8F0),
+                                                width: 0.8,
+                                              ),
+                                            ),
+                                            child: Row(
+                                              mainAxisAlignment:
+                                                  MainAxisAlignment.center,
+                                              children: [
+                                                const Icon(
+                                                  Icons.security_rounded,
+                                                  size: 13,
+                                                  color: Color(0xFF0D9488),
+                                                ),
+                                                const SizedBox(width: 5),
+                                                Text(
+                                                  'SECURE ACCESS • PT INDEXIM COALINDO',
+                                                  style: TextStyle(
+                                                    fontSize: 9,
+                                                    fontWeight: FontWeight.w700,
+                                                    letterSpacing: 0.8,
+                                                    color: Colors.grey.shade600,
+                                                    fontFamily: 'monospace',
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
                             const Spacer(flex: 3),
@@ -1528,5 +1798,390 @@ class _Tactile3DButtonState extends State<_Tactile3DButton> {
         ),
       ),
     );
+  }
+}
+
+// ============================================================================
+// FUTURISTIC CYBERNETIC VISUAL ORNAMENTS & PAINTERS
+// ============================================================================
+
+/// Ambient Cyber Grid, Holographic Bloom, and HUD Reticles
+class _CyberGridPainter extends CustomPainter {
+  final double progress;
+  final double topPadding;
+  final double bottomPadding;
+
+  _CyberGridPainter({
+    required this.progress,
+    this.topPadding = 0.0,
+    this.bottomPadding = 0.0,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final w = size.width;
+    final h = size.height;
+
+    // 1. Soft Ambient Radial Blooms
+    // Center Top Glow (Cyan / Sky)
+    final glowPaint1 = Paint()
+      ..shader = RadialGradient(
+        center: const Alignment(0.0, -0.45),
+        radius: 0.8,
+        colors: [
+          const Color(0xFF00E5FF).withValues(alpha: 0.12),
+          const Color(0xFF0284C7).withValues(alpha: 0.05),
+          Colors.transparent,
+        ],
+        stops: const [0.0, 0.5, 1.0],
+      ).createShader(Rect.fromLTWH(0, 0, w, h));
+    canvas.drawRect(Rect.fromLTWH(0, 0, w, h), glowPaint1);
+
+    // Bottom Left Glow (Indigo / Royal)
+    final glowPaint2 = Paint()
+      ..shader = RadialGradient(
+        center: const Alignment(-0.8, 0.7),
+        radius: 0.7,
+        colors: [
+          const Color(0xFF6366F1).withValues(alpha: 0.07),
+          const Color(0xFF0284C7).withValues(alpha: 0.03),
+          Colors.transparent,
+        ],
+      ).createShader(Rect.fromLTWH(0, 0, w, h));
+    canvas.drawRect(Rect.fromLTWH(0, 0, w, h), glowPaint2);
+
+    // Top Right Glow (Emerald / Mint)
+    final glowPaint3 = Paint()
+      ..shader = RadialGradient(
+        center: const Alignment(0.85, -0.85),
+        radius: 0.6,
+        colors: [
+          const Color(0xFF10B981).withValues(alpha: 0.07),
+          Colors.transparent,
+        ],
+      ).createShader(Rect.fromLTWH(0, 0, w, h));
+    canvas.drawRect(Rect.fromLTWH(0, 0, w, h), glowPaint3);
+
+    // 2. Cyber Dot Matrix Grid
+    final dotPaint = Paint()..style = PaintingStyle.fill;
+    const double stepX = 32.0;
+    const double stepY = 32.0;
+    final int cols = (w / stepX).ceil() + 1;
+    final int rows = (h / stepY).ceil() + 1;
+
+    for (int i = 0; i < cols; i++) {
+      for (int j = 0; j < rows; j++) {
+        final x = i * stepX;
+        final y = j * stepY;
+
+        // Skip middle area behind the main login card to keep it clean
+        if (x > w * 0.12 && x < w * 0.88 && y > h * 0.32 && y < h * 0.76) {
+          continue;
+        }
+
+        // Pulse calculation
+        final wave =
+            math.sin((progress * 2 * math.pi) + (i * 0.4) + (j * 0.3));
+        final alpha = (0.05 + 0.06 * (wave + 1) / 2).clamp(0.02, 0.12);
+        dotPaint.color = const Color(0xFF0284C7).withValues(alpha: alpha);
+
+        final radius = (wave > 0.7) ? 1.4 : 1.0;
+        canvas.drawCircle(Offset(x, y), radius, dotPaint);
+      }
+    }
+
+    final double bPadTop = topPadding > 0 ? topPadding + 6.0 : 16.0;
+    final double bPadBottom = bottomPadding > 0 ? bottomPadding + 6.0 : 16.0;
+    const double bPad = 14.0;
+    const double bSize = 16.0;
+
+    // 3. Cyber Circuit PCB Traces & Angular Lines (Corners)
+    final pcbPaint = Paint()
+      ..color = const Color(0xFF00E5FF).withValues(alpha: 0.22)
+      ..strokeWidth = 1.0
+      ..style = PaintingStyle.stroke;
+
+    final pcbNodePaint = Paint()
+      ..color = const Color(0xFF00E5FF).withValues(alpha: 0.35)
+      ..style = PaintingStyle.fill;
+
+    final pcbY = bPadTop + 24.0;
+    // Top Left PCB Path
+    final pathTL = Path()
+      ..moveTo(16, pcbY)
+      ..lineTo(48, pcbY)
+      ..lineTo(68, pcbY + 18)
+      ..lineTo(98, pcbY + 18);
+    canvas.drawPath(pathTL, pcbPaint);
+    canvas.drawCircle(Offset(98, pcbY + 18), 2.2, pcbNodePaint);
+
+    // Top Right PCB Path
+    final pathTR = Path()
+      ..moveTo(w - 16, pcbY)
+      ..lineTo(w - 48, pcbY)
+      ..lineTo(w - 68, pcbY + 18)
+      ..lineTo(w - 98, pcbY + 18);
+    canvas.drawPath(pathTR, pcbPaint);
+    canvas.drawCircle(Offset(w - 98, pcbY + 18), 2.2, pcbNodePaint);
+
+    // 4. Sci-Fi HUD Corner Reticles / Brackets
+    final hudPaint = Paint()
+      ..color = const Color(0xFF0284C7).withValues(alpha: 0.38)
+      ..strokeWidth = 1.4
+      ..style = PaintingStyle.stroke;
+
+    // Top-Left Corner Bracket
+    canvas.drawLine(
+        Offset(bPad, bPadTop), Offset(bPad + bSize, bPadTop), hudPaint);
+    canvas.drawLine(
+        Offset(bPad, bPadTop), Offset(bPad, bPadTop + bSize), hudPaint);
+
+    // Top-Right Corner Bracket
+    canvas.drawLine(
+        Offset(w - bPad, bPadTop), Offset(w - bPad - bSize, bPadTop), hudPaint);
+    canvas.drawLine(
+        Offset(w - bPad, bPadTop), Offset(w - bPad, bPadTop + bSize), hudPaint);
+
+    // Bottom-Left Corner Bracket
+    canvas.drawLine(
+        Offset(bPad, h - bPadBottom), Offset(bPad + bSize, h - bPadBottom), hudPaint);
+    canvas.drawLine(
+        Offset(bPad, h - bPadBottom), Offset(bPad, h - bPadBottom - bSize), hudPaint);
+
+    // Bottom-Right Corner Bracket
+    canvas.drawLine(Offset(w - bPad, h - bPadBottom),
+        Offset(w - bPad - bSize, h - bPadBottom), hudPaint);
+    canvas.drawLine(Offset(w - bPad, h - bPadBottom),
+        Offset(w - bPad, h - bPadBottom - bSize), hudPaint);
+
+    // Corner Crosshairs '+'
+    _drawCrosshair(canvas, Offset(bPad + 28, bPadTop + 14), 4.5, hudPaint);
+    _drawCrosshair(canvas, Offset(w - bPad - 28, bPadTop + 14), 4.5, hudPaint);
+    _drawCrosshair(canvas, Offset(bPad + 28, h - bPadBottom - 14), 4.5, hudPaint);
+    _drawCrosshair(canvas, Offset(w - bPad - 28, h - bPadBottom - 14), 4.5, hudPaint);
+
+    // 5. Monospace Micro Telemetry Labels
+    _drawTelemetryText(
+      canvas,
+      'SYS.NODE // INDX-01',
+      Offset(bPad + 8, bPadTop + 3),
+      TextAlign.left,
+    );
+    _drawTelemetryText(
+      canvas,
+      'LAT -0.891° // LNG 117.808°',
+      Offset(w - bPad - 8, bPadTop + 3),
+      TextAlign.right,
+    );
+    _drawTelemetryText(
+      canvas,
+      'NET.SEC // TLS 1.3 AES-GCM',
+      Offset(bPad + 8, h - bPadBottom - 13),
+      TextAlign.left,
+    );
+    _drawTelemetryText(
+      canvas,
+      'PROTOCOL // ACTV',
+      Offset(w - bPad - 8, h - bPadBottom - 13),
+      TextAlign.right,
+    );
+  }
+
+  void _drawCrosshair(
+      Canvas canvas, Offset center, double size, Paint paint) {
+    canvas.drawLine(
+        Offset(center.dx - size, center.dy),
+        Offset(center.dx + size, center.dy),
+        paint);
+    canvas.drawLine(
+        Offset(center.dx, center.dy - size),
+        Offset(center.dx, center.dy + size),
+        paint);
+  }
+
+  void _drawTelemetryText(
+      Canvas canvas, String text, Offset offset, TextAlign align) {
+    final textSpan = TextSpan(
+      text: text,
+      style: TextStyle(
+        fontFamily: 'monospace',
+        fontSize: 7.5,
+        fontWeight: FontWeight.w600,
+        letterSpacing: 0.8,
+        color: const Color(0xFF64748B).withValues(alpha: 0.55),
+      ),
+    );
+    final textPainter = TextPainter(
+      text: textSpan,
+      textDirection: ui.TextDirection.ltr,
+      textAlign: align,
+    )..layout();
+
+    final dx = align == TextAlign.right
+        ? offset.dx - textPainter.width
+        : offset.dx;
+    textPainter.paint(canvas, Offset(dx, offset.dy));
+  }
+
+  @override
+  bool shouldRepaint(covariant _CyberGridPainter oldDelegate) {
+    return oldDelegate.progress != progress ||
+        oldDelegate.topPadding != topPadding ||
+        oldDelegate.bottomPadding != bottomPadding;
+  }
+}
+
+/// Rotating Sci-Fi Orbit Halo around MBS Logo
+class _FuturisticLogoHalo extends StatelessWidget {
+  final Animation<double> animation;
+  final double size;
+  final Widget child;
+
+  const _FuturisticLogoHalo({
+    required this.animation,
+    required this.size,
+    required this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: size,
+      height: size,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          // Animated Canvas Halo & Orbits
+          AnimatedBuilder(
+            animation: animation,
+            builder: (context, _) => CustomPaint(
+              size: Size(size, size),
+              painter: _LogoOrbitPainter(progress: animation.value),
+            ),
+          ),
+          // Center Child Logo
+          child,
+        ],
+      ),
+    );
+  }
+}
+
+/// Custom Painter for Sci-Fi Orbit Rings, Dashed Tracks, and Satellites
+class _LogoOrbitPainter extends CustomPainter {
+  final double progress;
+
+  _LogoOrbitPainter({required this.progress});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final radiusOuter = size.width / 2 - 2;
+    final radiusInner = radiusOuter - 8;
+
+    // 1. Soft Pulsing Neon Ring Aura
+    final pulse = (math.sin(progress * 4 * math.pi) + 1) / 2;
+    final auraPaint = Paint()
+      ..color = const Color(0xFF00E5FF).withValues(alpha: 0.12 + 0.10 * pulse)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 3.0
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 5);
+    canvas.drawCircle(center, radiusOuter - 4, auraPaint);
+
+    // 2. Outer Segmented Orbit Ring (Rotates Clockwise)
+    final outerAngle = progress * 2 * math.pi;
+    final arcPaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round
+      ..strokeWidth = 2.0;
+
+    // Segment 1 (Cyan)
+    arcPaint.color = const Color(0xFF00E5FF).withValues(alpha: 0.85);
+    canvas.drawArc(
+      Rect.fromCircle(center: center, radius: radiusOuter),
+      outerAngle,
+      math.pi * 0.45,
+      false,
+      arcPaint,
+    );
+
+    // Segment 2 (Emerald)
+    arcPaint.color = const Color(0xFF10B981).withValues(alpha: 0.75);
+    canvas.drawArc(
+      Rect.fromCircle(center: center, radius: radiusOuter),
+      outerAngle + math.pi * 0.75,
+      math.pi * 0.45,
+      false,
+      arcPaint,
+    );
+
+    // Segment 3 (Royal Blue)
+    arcPaint.color = const Color(0xFF2563EB).withValues(alpha: 0.75);
+    canvas.drawArc(
+      Rect.fromCircle(center: center, radius: radiusOuter),
+      outerAngle + math.pi * 1.45,
+      math.pi * 0.35,
+      false,
+      arcPaint,
+    );
+
+    // Orbiting Satellite Bead (Cyan glowing bead)
+    final satelliteAngle = outerAngle;
+    final satX = center.dx + radiusOuter * math.cos(satelliteAngle);
+    final satY = center.dy + radiusOuter * math.sin(satelliteAngle);
+    final beadPaint = Paint()
+      ..color = const Color(0xFF00E5FF)
+      ..style = PaintingStyle.fill;
+    canvas.drawCircle(Offset(satX, satY), 3.2, beadPaint);
+
+    final beadGlow = Paint()
+      ..color = const Color(0xFF00E5FF).withValues(alpha: 0.45)
+      ..style = PaintingStyle.fill;
+    canvas.drawCircle(Offset(satX, satY), 6.0, beadGlow);
+
+    // 3. Inner Dashed Ring (Rotates Counter-Clockwise)
+    final innerAngle = -progress * 2 * math.pi * 0.7;
+    final innerDashedPaint = Paint()
+      ..color = const Color(0xFF0284C7).withValues(alpha: 0.28)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.0;
+
+    const int dashCount = 20;
+    const double dashSweep = (2 * math.pi) / dashCount;
+    for (int i = 0; i < dashCount; i++) {
+      if (i % 2 == 0) {
+        canvas.drawArc(
+          Rect.fromCircle(center: center, radius: radiusInner),
+          innerAngle + (i * dashSweep),
+          dashSweep * 0.55,
+          false,
+          innerDashedPaint,
+        );
+      }
+    }
+
+    // 4. Compass Diamond Reticles (N, E, S, W)
+    final diamondPaint = Paint()
+      ..color = const Color(0xFF0D9488).withValues(alpha: 0.55)
+      ..style = PaintingStyle.fill;
+
+    for (int d = 0; d < 4; d++) {
+      final angle = innerAngle + (d * math.pi / 2);
+      final dx = center.dx + radiusInner * math.cos(angle);
+      final dy = center.dy + radiusInner * math.sin(angle);
+
+      final dPath = Path()
+        ..moveTo(dx, dy - 2.5)
+        ..lineTo(dx + 2.5, dy)
+        ..lineTo(dx, dy + 2.5)
+        ..lineTo(dx - 2.5, dy)
+        ..close();
+      canvas.drawPath(dPath, diamondPaint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _LogoOrbitPainter oldDelegate) {
+    return oldDelegate.progress != progress;
   }
 }
