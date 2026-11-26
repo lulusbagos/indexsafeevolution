@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../services/api.dart';
 import '../../services/preference.dart';
+import '../../utils/helpers.dart';
 import '../../utils/routers.dart';
 
 class DepartmentEmployeeLeaguePage extends StatefulWidget {
@@ -20,7 +21,7 @@ class _DepartmentEmployeeLeaguePageState
   bool _isLoading = true;
   String _departmentName = 'Departemen';
   String _companyName = 'PT INDEXIM COALINDO';
-  String _period = 'Oktober 2026';
+  String _period = getCurrentIndonesianPeriod();
   int _userRank = 0;
   int _userPos = 0;
   int _totalLeaguePlayers = 453;
@@ -74,7 +75,7 @@ class _DepartmentEmployeeLeaguePageState
                   'Departemen';
               _companyName = data['companyName']?.toString() ??
                   'PT INDEXIM COALINDO';
-              _period = data['period']?.toString() ?? 'Oktober 2026';
+              _period = data['period']?.toString() ?? getCurrentIndonesianPeriod();
               _userRank = int.tryParse(data['userRank']?.toString() ?? '0') ?? 0;
               _userPos = int.tryParse(data['userPos']?.toString() ?? '0') ?? 0;
               _totalLeaguePlayers = int.tryParse(data['totalLeaguePlayers']?.toString() ?? '453') ?? 453;

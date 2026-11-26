@@ -211,3 +211,23 @@ String titleCase(String str) {
       .map((str) => capitalized(str))
       .join(' ');
 }
+
+String getCurrentIndonesianPeriod([DateTime? date]) {
+  final d = date ?? DateTime.now();
+  const months = [
+    'Januari',
+    'Februari',
+    'Maret',
+    'April',
+    'Mei',
+    'Juni',
+    'Juli',
+    'Agustus',
+    'September',
+    'Oktober',
+    'November',
+    'Desember'
+  ];
+  return '${months[d.month - 1]} ${d.year}';
+}
+

@@ -5,6 +5,7 @@ import '../../models/profile_model.dart';
 import '../../services/api.dart';
 import '../../services/database.dart';
 import '../../services/preference.dart';
+import '../../utils/helpers.dart';
 import '../../utils/routers.dart';
 import '../../widgets/top_bar.dart';
 import '../safety_updates_page.dart';
@@ -33,7 +34,7 @@ class _AchievementSapPageState extends State<AchievementSapPage>
   bool _isRefreshing = false;
   bool _isLoadingLeague = false;
   List<Map<String, dynamic>> _departments = List.from(_defaultCuratedDepts);
-  String _leaguePeriod = 'Oktober 2026';
+  String _leaguePeriod = getCurrentIndonesianPeriod();
   int _totalClubs = _defaultCuratedDepts.length;
   String _companyName = 'PT INDEXIM COALINDO';
   String _searchQuery = '';
@@ -905,7 +906,7 @@ class _AchievementSapPageState extends State<AchievementSapPage>
                 _departments = list
                     .map((e) => Map<String, dynamic>.from(e as Map))
                     .toList();
-                _leaguePeriod = rawData['period']?.toString() ?? 'Oktober 2026';
+                _leaguePeriod = rawData['period']?.toString() ?? getCurrentIndonesianPeriod();
                 if (rawData['companyName'] != null &&
                     rawData['companyName'].toString().isNotEmpty) {
                   _companyName = rawData['companyName'].toString();

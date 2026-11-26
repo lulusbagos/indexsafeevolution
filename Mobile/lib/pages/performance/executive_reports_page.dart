@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../services/api.dart';
 import '../../services/preference.dart';
+import '../../utils/helpers.dart';
 import '../../widgets/top_bar.dart';
 
 class ExecutiveReportsPage extends StatefulWidget {
@@ -19,7 +20,7 @@ class _ExecutiveReportsPageState extends State<ExecutiveReportsPage> {
   bool _isLoading = true;
   String _departmentName = 'Departemen';
   String _companyName = 'PT INDEXIM COALINDO';
-  String _period = 'Oktober 2026';
+  String _period = getCurrentIndonesianPeriod();
   List<dynamic> _standings = [];
   int _totalEmployees = 0;
   int _totalLeaguePlayers = 453;
@@ -69,7 +70,7 @@ class _ExecutiveReportsPageState extends State<ExecutiveReportsPage> {
                   'Departemen';
               _companyName = data['companyName']?.toString() ??
                   'PT INDEXIM COALINDO';
-              _period = data['period']?.toString() ?? 'Oktober 2026';
+              _period = data['period']?.toString() ?? getCurrentIndonesianPeriod();
               _totalEmployees = list.length;
               _totalLeaguePlayers =
                   int.tryParse(data['totalLeaguePlayers']?.toString() ?? '453') ??
