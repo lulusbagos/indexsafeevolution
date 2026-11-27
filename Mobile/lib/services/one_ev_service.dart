@@ -180,7 +180,18 @@ class OneEvService {
         if (res.statusCode == 200 && res.data != null) {
           final listRaw = res.data is Map ? res.data['data'] : jsonDecode(res.data.toString())['data'];
           if (listRaw is List) {
-            _cachedCertificates = listRaw.map((e) => Map<String, dynamic>.from(e)).toList();
+            final mapped = listRaw.map((e) => Map<String, dynamic>.from(e)).toList();
+            // Deduplikasi lokal untuk menjamin tidak ada duplikat sertifikat di mobile
+            final seen = <String>{};
+            final unique = <Map<String, dynamic>>[];
+            for (final c in mapped) {
+              final key = (c['nama_sertifikat'] ?? '').toString().trim().toLowerCase();
+              if (key.isNotEmpty && !seen.contains(key)) {
+                seen.add(key);
+                unique.add(c);
+              }
+            }
+            _cachedCertificates = unique;
             return _cachedCertificates;
           }
         }

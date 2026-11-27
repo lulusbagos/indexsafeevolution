@@ -18,24 +18,63 @@ class _EmployeeHubPageState extends State<EmployeeHubPage> {
   // Profil Karyawan Aktif (Live dari ONE_DB_MITRA)
   bool _isLoading = true;
   String _nama = 'LULUS BAGOS HERMAWAN';
+  String _namaAlias = '';
+  String _wargaNegara = 'WNI';
   String _nik = '24051940986';
   String _noKtp = '3504132003940003';
-  String _noKk = '3504132003940001';
-  String _dept = 'SYSTEM INTEGRATIONS';
-  String _perusahaan = 'PT INDEXIM COALINDO';
-  String _posisi = 'Officer Product & System Development';
-  String _jabatan = 'FOREMAN/OFFICER';
+  String _noKk = '3504133005240016';
+  String _jenisKelamin = 'LK';
+  String _tempatLahir = 'Tulungagung';
+  String _tanggalLahir = '1994-03-20';
+  String _agama = 'ISLAM';
+  int? _idAgama = 3;
+  String _statusNikah = 'KAWIN';
+  int? _idStatusNikah = 2;
+  String _golDarah = 'O+';
+  String _namaIbu = 'WIYATI,S.Pd';
+  String _namaAyah = 'Sugiarto, M.M.Pd';
+
+  // Domisili
+  String _provinsi = 'Jawa Timur';
+  String _kabupaten = 'Kabupaten Tulungagung';
+  String _kecamatan = 'Rejotangan';
+  String _desa = 'Panjerejo';
+  String _rt = '004';
+  String _rw = '000';
+  String _kodePos = '-';
+  String _alamat = 'Jl. Imam Bonjol . RT 004/RW 000. Kel. Api-Api. Kec. Bontang Utara. Kota. Bontang. Prop. Kalimantan Timur';
+
+  // Kontak Utama
   String _hp = '0852-7496-6722';
   String _hp2 = '';
   String _emailPribadi = 'lulusbagoshermawan@gmail.com';
   String _emailKantor = 'lulus.hermawan@indexim.id';
-  String _alamat = 'Jl. Imam Bonjol, Kel. Api-Api, Bontang Utara, Kalimantan Timur';
+
+  // Kontak Darurat
   String _daruratNama = 'Keluarga Inti';
   String _daruratTelp = '0812-9876-5432';
+  String _daruratTelpLain = '';
   String _daruratRelasi = 'Keluarga';
-  String _golDarah = 'O+';
-  String _tempatLahir = 'Tulungagung';
-  String _tanggalLahir = '1994-03-20';
+  String _daruratKeterangan = 'Hubungi jika keadaan darurat operasional';
+
+  // Jaminan & Pajak
+  String _noNpwp = '20.499.856.1-629.000';
+  String _noBpjsTk = '22127924722';
+  String _noBpjsKes = '0000107063774';
+  String _noBpjsPensiun = '';
+
+  // Pendidikan
+  int? _idPendidikan = 13;
+  String _jenjangPendidikan = 'STRATA 1';
+  String _namaSekolah = 'Universitas Brawijaya';
+  String _fakultas = 'Ilmu Komputer';
+  String _jurusan = 'Teknik Informatika';
+
+  // Kepegawaian (Terkunci HR - Read Only)
+  String _dept = 'SYSTEM INTEGRATIONS';
+  String _perusahaan = 'PT INDEXIM COALINDO';
+  String _posisi = 'Officer Product & System Development';
+  String _jabatan = 'FOREMAN/OFFICER';
   String _grade = '6 SETARA';
   String _roster = '6 - 2 WEEK';
   String _tanggalMasuk = '2024-05-15';
@@ -86,24 +125,57 @@ class _EmployeeHubPageState extends State<EmployeeHubPage> {
       if (mounted) {
         setState(() {
           _nama = profData['nama_lengkap'] ?? _nama;
+          _namaAlias = profData['nama_alias'] ?? _namaAlias;
+          _wargaNegara = profData['warga_negara'] ?? _wargaNegara;
           _nik = profData['no_nik'] ?? _nik;
           _noKtp = profData['no_ktp'] ?? _noKtp;
           _noKk = profData['no_kk'] ?? _noKk;
-          _perusahaan = profData['nama_perusahaan'] ?? _perusahaan;
-          _dept = profData['nama_departemen'] ?? _dept;
-          _posisi = profData['nama_posisi'] ?? _posisi;
-          _jabatan = profData['nama_jabatan'] ?? _jabatan;
+          _jenisKelamin = profData['jenis_kelamin'] ?? _jenisKelamin;
+          _tempatLahir = profData['tempat_lahir'] ?? _tempatLahir;
+          _tanggalLahir = profData['tanggal_lahir'] ?? _tanggalLahir;
+          _agama = profData['agama'] ?? _agama;
+          if (profData['id_agama'] != null) _idAgama = profData['id_agama'];
+          _statusNikah = profData['status_nikah'] ?? _statusNikah;
+          if (profData['id_status_nikah'] != null) _idStatusNikah = profData['id_status_nikah'];
+          _golDarah = profData['golongan_darah'] ?? _golDarah;
+          _namaIbu = profData['nama_ibu'] ?? _namaIbu;
+          _namaAyah = profData['nama_ayah'] ?? _namaAyah;
+
+          _provinsi = profData['provinsi'] ?? _provinsi;
+          _kabupaten = profData['kabupaten'] ?? _kabupaten;
+          _kecamatan = profData['kecamatan'] ?? _kecamatan;
+          _desa = profData['desa'] ?? _desa;
+          _rt = profData['rt'] ?? _rt;
+          _rw = profData['rw'] ?? _rw;
+          _kodePos = profData['kode_pos'] ?? _kodePos;
+          _alamat = profData['alamat'] ?? _alamat;
+
           _hp = profData['hp_1'] ?? _hp;
           _hp2 = profData['hp_2'] ?? _hp2;
           _emailPribadi = profData['email_pribadi'] ?? _emailPribadi;
           _emailKantor = profData['email_kantor'] ?? _emailKantor;
-          _alamat = profData['alamat'] ?? _alamat;
+
           _daruratNama = profData['kontak_darurat_nama'] ?? _daruratNama;
           _daruratTelp = profData['kontak_darurat_telp'] ?? _daruratTelp;
+          _daruratTelpLain = profData['kontak_darurat_telp_lain'] ?? _daruratTelpLain;
           _daruratRelasi = profData['kontak_darurat_relasi'] ?? _daruratRelasi;
-          _golDarah = profData['golongan_darah'] ?? _golDarah;
-          _tempatLahir = profData['tempat_lahir'] ?? _tempatLahir;
-          _tanggalLahir = profData['tanggal_lahir'] ?? _tanggalLahir;
+          _daruratKeterangan = profData['kontak_darurat_keterangan'] ?? _daruratKeterangan;
+
+          _noNpwp = profData['no_npwp'] ?? _noNpwp;
+          _noBpjsTk = profData['no_bpjs_tk'] ?? _noBpjsTk;
+          _noBpjsKes = profData['no_bpjs_kes'] ?? _noBpjsKes;
+          _noBpjsPensiun = profData['no_bpjs_pensiun'] ?? _noBpjsPensiun;
+
+          if (profData['id_pendidikan'] != null) _idPendidikan = profData['id_pendidikan'];
+          _jenjangPendidikan = profData['jenjang_pendidikan'] ?? _jenjangPendidikan;
+          _namaSekolah = profData['nama_sekolah'] ?? _namaSekolah;
+          _fakultas = profData['fakultas'] ?? _fakultas;
+          _jurusan = profData['jurusan'] ?? _jurusan;
+
+          _perusahaan = profData['nama_perusahaan'] ?? _perusahaan;
+          _dept = profData['nama_departemen'] ?? _dept;
+          _posisi = profData['nama_posisi'] ?? _posisi;
+          _jabatan = profData['nama_jabatan'] ?? _jabatan;
           _grade = profData['grade'] ?? _grade;
           _roster = profData['roster_kerja'] ?? _roster;
           _tanggalMasuk = profData['tanggal_masuk'] ?? _tanggalMasuk;
@@ -710,7 +782,7 @@ class _EmployeeHubPageState extends State<EmployeeHubPage> {
       backgroundColor: Colors.transparent,
       builder: (ctx) {
         return Container(
-          height: MediaQuery.of(context).size.height * 0.88,
+          height: MediaQuery.of(context).size.height * 0.90,
           padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
           decoration: const BoxDecoration(
             color: Colors.white,
@@ -814,7 +886,10 @@ class _EmployeeHubPageState extends State<EmployeeHubPage> {
                     _buildInfoTile('Nomor NIK', _nik, Icons.pin_rounded),
                     _buildInfoTile('Nomor KTP', _noKtp, Icons.badge_outlined),
                     _buildInfoTile('Nomor KK', _noKk, Icons.family_restroom_rounded),
+                    _buildInfoTile('Kewarganegaraan', _wargaNegara, Icons.flag_rounded),
                     _buildInfoTile('Tempat, Tanggal Lahir', '$_tempatLahir, $_tanggalLahir', Icons.cake_rounded),
+                    _buildInfoTile('Agama & Pernikahan', '$_agama • Status: $_statusNikah', Icons.favorite_rounded),
+                    _buildInfoTile('Nama Orang Tua', 'Ibu: $_namaIbu • Ayah: $_namaAyah', Icons.family_restroom_rounded),
                     _buildInfoTile('Perusahaan', _perusahaan, Icons.corporate_fare_rounded),
                     _buildInfoTile('Departemen', _dept, Icons.domain_rounded),
                     _buildInfoTile('Jabatan / Posisi', '$_jabatan / $_posisi', Icons.work_rounded),
@@ -826,8 +901,10 @@ class _EmployeeHubPageState extends State<EmployeeHubPage> {
                     if (_hp2.isNotEmpty) _buildInfoTile('No. HP Alternatif', _hp2, Icons.phone_outlined),
                     _buildInfoTile('Email Kantor', _emailKantor, Icons.mail_outline_rounded),
                     _buildInfoTile('Email Pribadi', _emailPribadi, Icons.alternate_email_rounded),
-                    _buildInfoTile('Alamat KTP / Domisili', _alamat, Icons.location_on_rounded),
+                    _buildInfoTile('Alamat KTP / Domisili', '$_alamat (RT/RW: $_rt/$_rw, Pos: $_kodePos)', Icons.location_on_rounded),
                     _buildInfoTile('Kontak Darurat', '$_daruratNama • $_daruratTelp ($_daruratRelasi)', Icons.contact_phone_rounded),
+                    _buildInfoTile('Jaminan Sosial & Pajak', 'NPWP: $_noNpwp • BPJS TK: $_noBpjsTk • BPJS Kes: $_noBpjsKes', Icons.credit_card_rounded),
+                    _buildInfoTile('Pendidikan', '$_jenjangPendidikan • $_namaSekolah ($_jurusan)', Icons.school_rounded),
                     _buildInfoTile('Mine Permit ID', '$_minePermitNo (Berlaku s/d $_minePermitExp)', Icons.qr_code_2_rounded),
                     _buildInfoTile('SIMPER Tambang', _simperClass, Icons.drive_eta_rounded),
                   ],
@@ -841,16 +918,56 @@ class _EmployeeHubPageState extends State<EmployeeHubPage> {
   }
 
   // =========================================================================
-  // 5. MODAL: EDIT DATA KARYAWAN (SIMPAN KE ONE_DB_MITRA)
+  // 5. MODAL: EDIT DATA KARYAWAN (SESUAI FORM /KaryawanAdmin/Edit/28446)
   // =========================================================================
   void _showEditEmployeeModal() {
-    final hpCtrl = TextEditingController(text: _hp);
-    final emailKantorCtrl = TextEditingController(text: _emailKantor);
-    final emailPribadiCtrl = TextEditingController(text: _emailPribadi);
+    // 1. Personal
+    final namaCtrl = TextEditingController(text: _nama);
+    final aliasCtrl = TextEditingController(text: _namaAlias);
+    final wargaCtrl = TextEditingController(text: _wargaNegara);
+    final ktpCtrl = TextEditingController(text: _noKtp);
+    final kkCtrl = TextEditingController(text: _noKk);
+    final jkCtrl = TextEditingController(text: _jenisKelamin);
+    final tempatLahirCtrl = TextEditingController(text: _tempatLahir);
+    final tglLahirCtrl = TextEditingController(text: _tanggalLahir);
+    final agamaCtrl = TextEditingController(text: _agama);
+    final nikahCtrl = TextEditingController(text: _statusNikah);
+    final darahCtrl = TextEditingController(text: _golDarah);
+    final ibuCtrl = TextEditingController(text: _namaIbu);
+    final ayahCtrl = TextEditingController(text: _namaAyah);
+
+    // 2. Domisili
+    final provinsiCtrl = TextEditingController(text: _provinsi);
+    final kabupatenCtrl = TextEditingController(text: _kabupaten);
+    final kecamatanCtrl = TextEditingController(text: _kecamatan);
+    final desaCtrl = TextEditingController(text: _desa);
     final alamatCtrl = TextEditingController(text: _alamat);
+    final rtCtrl = TextEditingController(text: _rt);
+    final rwCtrl = TextEditingController(text: _rw);
+    final kodePosCtrl = TextEditingController(text: _kodePos);
+
+    // 3. Kontak & Darurat
+    final hpCtrl = TextEditingController(text: _hp);
+    final hp2Ctrl = TextEditingController(text: _hp2);
+    final emailPribadiCtrl = TextEditingController(text: _emailPribadi);
+    final emailKantorCtrl = TextEditingController(text: _emailKantor);
     final kdNamaCtrl = TextEditingController(text: _daruratNama);
     final kdTelpCtrl = TextEditingController(text: _daruratTelp);
+    final kdTelpLainCtrl = TextEditingController(text: _daruratTelpLain);
     final kdRelasiCtrl = TextEditingController(text: _daruratRelasi);
+    final kdKetCtrl = TextEditingController(text: _daruratKeterangan);
+
+    // 4. Pendidikan & Jaminan
+    final jenjangCtrl = TextEditingController(text: _jenjangPendidikan);
+    final sekolahCtrl = TextEditingController(text: _namaSekolah);
+    final fakultasCtrl = TextEditingController(text: _fakultas);
+    final jurusanCtrl = TextEditingController(text: _jurusan);
+    final npwpCtrl = TextEditingController(text: _noNpwp);
+    final bpjsTkCtrl = TextEditingController(text: _noBpjsTk);
+    final bpjsKesCtrl = TextEditingController(text: _noBpjsKes);
+    final bpjsPensiunCtrl = TextEditingController(text: _noBpjsPensiun);
+
+    int activeTab = 0;
     bool isSaving = false;
 
     showModalBottomSheet(
@@ -861,7 +978,7 @@ class _EmployeeHubPageState extends State<EmployeeHubPage> {
         return StatefulBuilder(
           builder: (context, setModalState) {
             return Container(
-              height: MediaQuery.of(context).size.height * 0.90,
+              height: MediaQuery.of(context).size.height * 0.92,
               padding: EdgeInsets.fromLTRB(20, 12, 20, MediaQuery.of(context).viewInsets.bottom + 20),
               decoration: const BoxDecoration(
                 color: Colors.white,
@@ -880,7 +997,7 @@ class _EmployeeHubPageState extends State<EmployeeHubPage> {
                       ),
                     ),
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 14),
                   Row(
                     children: [
                       Container(
@@ -889,7 +1006,7 @@ class _EmployeeHubPageState extends State<EmployeeHubPage> {
                           color: const Color(0xFFE0F2FE),
                           borderRadius: BorderRadius.circular(12),
                         ),
-                        child: const Icon(Icons.edit_note_rounded, color: Color(0xFF0284C7), size: 24),
+                        child: const Icon(Icons.edit_document, color: Color(0xFF0284C7), size: 24),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
@@ -905,7 +1022,7 @@ class _EmployeeHubPageState extends State<EmployeeHubPage> {
                               ),
                             ),
                             Text(
-                              'Update langsung ke database [ONE_DB_MITRA]',
+                              'Formulir resmi /KaryawanAdmin/Edit/ [ONE_DB_MITRA]',
                               style: TextStyle(fontSize: 11, color: Colors.grey.shade600, fontWeight: FontWeight.w500),
                             ),
                           ],
@@ -913,29 +1030,174 @@ class _EmployeeHubPageState extends State<EmployeeHubPage> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 14),
+
+                  // Segmented Form Categories (Sesuai Tabs di Web One DB)
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    physics: const BouncingScrollPhysics(),
+                    child: Row(
+                      children: [
+                        _buildSectionPill('1. Personal', 0, activeTab, () => setModalState(() => activeTab = 0)),
+                        const SizedBox(width: 8),
+                        _buildSectionPill('2. Domisili', 1, activeTab, () => setModalState(() => activeTab = 1)),
+                        const SizedBox(width: 8),
+                        _buildSectionPill('3. Kontak & Darurat', 2, activeTab, () => setModalState(() => activeTab = 2)),
+                        const SizedBox(width: 8),
+                        _buildSectionPill('4. Pendidikan & Pajak', 3, activeTab, () => setModalState(() => activeTab = 3)),
+                        const SizedBox(width: 8),
+                        _buildSectionPill('5. Kepegawaian (HR)', 4, activeTab, () => setModalState(() => activeTab = 4)),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+
+                  // Form Fields per Tab
                   Expanded(
                     child: ListView(
                       physics: const BouncingScrollPhysics(),
                       children: [
-                        _buildInputField('Nomor Handphone Aktif (WhatsApp)', hpCtrl, Icons.phone_android_rounded),
-                        const SizedBox(height: 12),
-                        _buildInputField('Email Kantor / Korespondensi', emailKantorCtrl, Icons.email_rounded),
-                        const SizedBox(height: 12),
-                        _buildInputField('Email Pribadi', emailPribadiCtrl, Icons.alternate_email_rounded),
-                        const SizedBox(height: 12),
-                        _buildInputField('Alamat Domisili / Tempat Tinggal', alamatCtrl, Icons.location_on_rounded, maxLines: 2),
-                        const SizedBox(height: 16),
-                        const Text(
-                          'Kontak Darurat (Emergency Contact)',
-                          style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
-                        ),
-                        const SizedBox(height: 10),
-                        _buildInputField('Nama Kontak Darurat', kdNamaCtrl, Icons.person_outline_rounded),
-                        const SizedBox(height: 12),
-                        _buildInputField('Nomor Telepon Darurat', kdTelpCtrl, Icons.phone_rounded),
-                        const SizedBox(height: 12),
-                        _buildInputField('Hubungan / Relasi (cth: Istri, Orang Tua, Saudara)', kdRelasiCtrl, Icons.family_restroom_rounded),
+                        if (activeTab == 0) ...[
+                          // TAB 1: DATA PERSONAL
+                          _buildInputField('Nama Lengkap (Wajib)', namaCtrl, Icons.person_rounded),
+                          const SizedBox(height: 12),
+                          _buildInputField('Nama Panggilan / Alias', aliasCtrl, Icons.badge_outlined),
+                          const SizedBox(height: 12),
+                          Row(
+                            children: [
+                              Expanded(child: _buildInputField('Kewarganegaraan (WNI/WNA)', wargaCtrl, Icons.flag_rounded)),
+                              const SizedBox(width: 10),
+                              Expanded(child: _buildInputField('Jenis Kelamin (LK/PR)', jkCtrl, Icons.wc_rounded)),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          _buildInputField('Nomor KTP (16 Digit)', ktpCtrl, Icons.badge_rounded),
+                          const SizedBox(height: 12),
+                          _buildInputField('Nomor Kartu Keluarga (KK)', kkCtrl, Icons.family_restroom_rounded),
+                          const SizedBox(height: 12),
+                          Row(
+                            children: [
+                              Expanded(child: _buildInputField('Tempat Lahir', tempatLahirCtrl, Icons.location_city_rounded)),
+                              const SizedBox(width: 10),
+                              Expanded(child: _buildInputField('Tanggal Lahir (YYYY-MM-DD)', tglLahirCtrl, Icons.cake_rounded)),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          Row(
+                            children: [
+                              Expanded(child: _buildInputField('Agama', agamaCtrl, Icons.mosque_rounded)),
+                              const SizedBox(width: 10),
+                              Expanded(child: _buildInputField('Status Nikah', nikahCtrl, Icons.favorite_rounded)),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          _buildInputField('Golongan Darah (A, B, AB, O)', darahCtrl, Icons.bloodtype_rounded),
+                          const SizedBox(height: 12),
+                          _buildInputField('Nama Ibu Kandung', ibuCtrl, Icons.person_outline_rounded),
+                          const SizedBox(height: 12),
+                          _buildInputField('Nama Ayah Kandung', ayahCtrl, Icons.person_outline_rounded),
+                        ] else if (activeTab == 1) ...[
+                          // TAB 2: DOMISILI & ALAMAT
+                          _buildInputField('Provinsi', provinsiCtrl, Icons.map_rounded),
+                          const SizedBox(height: 12),
+                          _buildInputField('Kabupaten / Kota', kabupatenCtrl, Icons.location_city_rounded),
+                          const SizedBox(height: 12),
+                          _buildInputField('Kecamatan', kecamatanCtrl, Icons.signpost_rounded),
+                          const SizedBox(height: 12),
+                          _buildInputField('Kelurahan / Desa', desaCtrl, Icons.home_work_rounded),
+                          const SizedBox(height: 12),
+                          _buildInputField('Alamat Domisili / Tempat Tinggal', alamatCtrl, Icons.location_on_rounded, maxLines: 2),
+                          const SizedBox(height: 12),
+                          Row(
+                            children: [
+                              Expanded(child: _buildInputField('RT', rtCtrl, Icons.tag_rounded)),
+                              const SizedBox(width: 10),
+                              Expanded(child: _buildInputField('RW', rwCtrl, Icons.tag_rounded)),
+                              const SizedBox(width: 10),
+                              Expanded(child: _buildInputField('Kode Pos', kodePosCtrl, Icons.local_post_office_rounded)),
+                            ],
+                          ),
+                        ] else if (activeTab == 2) ...[
+                          // TAB 3: KONTAK UTAMA & DARURAT
+                          _buildInputField('Nomor Handphone Utama (WhatsApp)', hpCtrl, Icons.phone_android_rounded),
+                          const SizedBox(height: 12),
+                          _buildInputField('Nomor Handphone Alternatif', hp2Ctrl, Icons.phone_outlined),
+                          const SizedBox(height: 12),
+                          _buildInputField('Email Pribadi', emailPribadiCtrl, Icons.alternate_email_rounded),
+                          const SizedBox(height: 12),
+                          _buildInputField('Email Kantor / Korespondensi', emailKantorCtrl, Icons.email_rounded),
+                          const SizedBox(height: 16),
+                          const Text(
+                            'Kontak Darurat (Emergency Contact)',
+                            style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
+                          ),
+                          const SizedBox(height: 10),
+                          _buildInputField('Nama Kontak Darurat', kdNamaCtrl, Icons.person_outline_rounded),
+                          const SizedBox(height: 12),
+                          _buildInputField('Nomor Telepon Darurat', kdTelpCtrl, Icons.phone_rounded),
+                          const SizedBox(height: 12),
+                          _buildInputField('Nomor Telepon Lain (Alternatif)', kdTelpLainCtrl, Icons.phone_forwarded_rounded),
+                          const SizedBox(height: 12),
+                          _buildInputField('Hubungan / Relasi (cth: Istri, Orang Tua, Saudara)', kdRelasiCtrl, Icons.family_restroom_rounded),
+                          const SizedBox(height: 12),
+                          _buildInputField('Keterangan / Catatan Tambahan', kdKetCtrl, Icons.note_rounded, maxLines: 2),
+                        ] else if (activeTab == 3) ...[
+                          // TAB 4: PENDIDIKAN & JAMINAN
+                          _buildInputField('Jenjang Pendidikan (SMA/SMK, D3, S1, S2)', jenjangCtrl, Icons.school_rounded),
+                          const SizedBox(height: 12),
+                          _buildInputField('Nama Sekolah / Universitas', sekolahCtrl, Icons.account_balance_rounded),
+                          const SizedBox(height: 12),
+                          _buildInputField('Fakultas', fakultasCtrl, Icons.apartment_rounded),
+                          const SizedBox(height: 12),
+                          _buildInputField('Jurusan', jurusanCtrl, Icons.menu_book_rounded),
+                          const SizedBox(height: 16),
+                          const Text(
+                            'Jaminan Sosial & Pajak',
+                            style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
+                          ),
+                          const SizedBox(height: 10),
+                          _buildInputField('Nomor NPWP', npwpCtrl, Icons.credit_card_rounded),
+                          const SizedBox(height: 12),
+                          _buildInputField('Nomor BPJS Ketenagakerjaan (BPJS TK)', bpjsTkCtrl, Icons.security_rounded),
+                          const SizedBox(height: 12),
+                          _buildInputField('Nomor BPJS Kesehatan (BPJS Kes)', bpjsKesCtrl, Icons.health_and_safety_rounded),
+                          const SizedBox(height: 12),
+                          _buildInputField('Nomor BPJS Pensiun', bpjsPensiunCtrl, Icons.savings_rounded),
+                        ] else ...[
+                          // TAB 5: KEPEGAWAIAN (TERKUNCI HR - READ ONLY)
+                          Container(
+                            padding: const EdgeInsets.all(14),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFEF3C7),
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(color: const Color(0xFFFDE68A)),
+                            ),
+                            child: const Row(
+                              children: [
+                                Icon(Icons.lock_rounded, color: Color(0xFFD97706), size: 24),
+                                SizedBox(width: 12),
+                                Expanded(
+                                  child: Text(
+                                    'Form Kepegawaian (Perusahaan, Departemen, Jabatan, Grade, Roster) dikelola khusus oleh HRD/HC PT Indexim Coalindo. Karyawan tidak dapat mengubah penempatan kepegawaian secara mandiri.',
+                                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF92400E), height: 1.4),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 14),
+                          _buildDisabledField('Perusahaan', _perusahaan, Icons.corporate_fare_rounded),
+                          const SizedBox(height: 12),
+                          _buildDisabledField('Departemen', _dept, Icons.domain_rounded),
+                          const SizedBox(height: 12),
+                          _buildDisabledField('Posisi / Jabatan', '$_posisi / $_jabatan', Icons.work_rounded),
+                          const SizedBox(height: 12),
+                          _buildDisabledField('Grade / Klasifikasi', _grade, Icons.stars_rounded),
+                          const SizedBox(height: 12),
+                          _buildDisabledField('Jadwal Roster Kerja', _roster, Icons.event_repeat_rounded),
+                          const SizedBox(height: 12),
+                          _buildDisabledField('Tanggal Masuk Bekerja', _tanggalMasuk, Icons.calendar_today_rounded),
+                        ],
                       ],
                     ),
                   ),
@@ -952,31 +1214,93 @@ class _EmployeeHubPageState extends State<EmployeeHubPage> {
 
                               final success = await _oneEvService.updateProfile({
                                 'no_nik': _nik,
-                                'hp_1': hpCtrl.text.trim(),
-                                'email_kantor': emailKantorCtrl.text.trim(),
-                                'email_pribadi': emailPribadiCtrl.text.trim(),
+                                'nama_lengkap': namaCtrl.text.trim(),
+                                'nama_alias': aliasCtrl.text.trim(),
+                                'warga_negara': wargaCtrl.text.trim(),
+                                'no_ktp': ktpCtrl.text.trim(),
+                                'no_kk': kkCtrl.text.trim(),
+                                'jenis_kelamin': jkCtrl.text.trim(),
+                                'tempat_lahir': tempatLahirCtrl.text.trim(),
+                                'tanggal_lahir': tglLahirCtrl.text.trim(),
+                                'agama': agamaCtrl.text.trim(),
+                                'status_nikah': nikahCtrl.text.trim(),
+                                'golongan_darah': darahCtrl.text.trim(),
+                                'nama_ibu': ibuCtrl.text.trim(),
+                                'nama_ayah': ayahCtrl.text.trim(),
+                                'provinsi': provinsiCtrl.text.trim(),
+                                'kabupaten': kabupatenCtrl.text.trim(),
+                                'kecamatan': kecamatanCtrl.text.trim(),
+                                'desa': desaCtrl.text.trim(),
                                 'alamat': alamatCtrl.text.trim(),
+                                'rt': rtCtrl.text.trim(),
+                                'rw': rwCtrl.text.trim(),
+                                'kode_pos': kodePosCtrl.text.trim(),
+                                'hp_1': hpCtrl.text.trim(),
+                                'hp_2': hp2Ctrl.text.trim(),
+                                'email_pribadi': emailPribadiCtrl.text.trim(),
+                                'email_kantor': emailKantorCtrl.text.trim(),
                                 'kontak_darurat_nama': kdNamaCtrl.text.trim(),
                                 'kontak_darurat_telp': kdTelpCtrl.text.trim(),
+                                'kontak_darurat_telp_lain': kdTelpLainCtrl.text.trim(),
                                 'kontak_darurat_relasi': kdRelasiCtrl.text.trim(),
+                                'kontak_darurat_keterangan': kdKetCtrl.text.trim(),
+                                'no_npwp': npwpCtrl.text.trim(),
+                                'no_bpjs_tk': bpjsTkCtrl.text.trim(),
+                                'no_bpjs_kes': bpjsKesCtrl.text.trim(),
+                                'no_bpjs_pensiun': bpjsPensiunCtrl.text.trim(),
+                                'jenjang_pendidikan': jenjangCtrl.text.trim(),
+                                'nama_sekolah': sekolahCtrl.text.trim(),
+                                'fakultas': fakultasCtrl.text.trim(),
+                                'jurusan': jurusanCtrl.text.trim(),
                               });
 
                               if (mounted) {
                                 setState(() {
+                                  _nama = namaCtrl.text.trim();
+                                  _namaAlias = aliasCtrl.text.trim();
+                                  _wargaNegara = wargaCtrl.text.trim();
+                                  _noKtp = ktpCtrl.text.trim();
+                                  _noKk = kkCtrl.text.trim();
+                                  _jenisKelamin = jkCtrl.text.trim();
+                                  _tempatLahir = tempatLahirCtrl.text.trim();
+                                  _tanggalLahir = tglLahirCtrl.text.trim();
+                                  _agama = agamaCtrl.text.trim();
+                                  _statusNikah = nikahCtrl.text.trim();
+                                  _golDarah = darahCtrl.text.trim();
+                                  _namaIbu = ibuCtrl.text.trim();
+                                  _namaAyah = ayahCtrl.text.trim();
+                                  _provinsi = provinsiCtrl.text.trim();
+                                  _kabupaten = kabupatenCtrl.text.trim();
+                                  _kecamatan = kecamatanCtrl.text.trim();
+                                  _desa = desaCtrl.text.trim();
+                                  _alamat = alamatCtrl.text.trim();
+                                  _rt = rtCtrl.text.trim();
+                                  _rw = rwCtrl.text.trim();
+                                  _kodePos = kodePosCtrl.text.trim();
                                   _hp = hpCtrl.text.trim();
+                                  _hp2 = hp2Ctrl.text.trim();
                                   _emailKantor = emailKantorCtrl.text.trim();
                                   _emailPribadi = emailPribadiCtrl.text.trim();
-                                  _alamat = alamatCtrl.text.trim();
                                   _daruratNama = kdNamaCtrl.text.trim();
                                   _daruratTelp = kdTelpCtrl.text.trim();
+                                  _daruratTelpLain = kdTelpLainCtrl.text.trim();
                                   _daruratRelasi = kdRelasiCtrl.text.trim();
+                                  _daruratKeterangan = kdKetCtrl.text.trim();
+                                  _noNpwp = npwpCtrl.text.trim();
+                                  _noBpjsTk = bpjsTkCtrl.text.trim();
+                                  _noBpjsKes = bpjsKesCtrl.text.trim();
+                                  _noBpjsPensiun = bpjsPensiunCtrl.text.trim();
+                                  _jenjangPendidikan = jenjangCtrl.text.trim();
+                                  _namaSekolah = sekolahCtrl.text.trim();
+                                  _fakultas = fakultasCtrl.text.trim();
+                                  _jurusan = jurusanCtrl.text.trim();
                                 });
                                 Navigator.of(ctx).pop();
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(
                                     content: Text(
                                       success
-                                          ? 'Perubahan data berhasil disimpan ke database One Evolution!'
+                                          ? 'Semua form data karyawan berhasil disimpan ke database One Evolution!'
                                           : 'Gagal memperbarui database, data disimpan lokal.',
                                     ),
                                     backgroundColor: success ? const Color(0xFF059669) : const Color(0xFFD97706),
@@ -1008,6 +1332,66 @@ class _EmployeeHubPageState extends State<EmployeeHubPage> {
           },
         );
       },
+    );
+  }
+
+  Widget _buildSectionPill(String title, int index, int activeIndex, VoidCallback onTap) {
+    final isSelected = index == activeIndex;
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+        decoration: BoxDecoration(
+          color: isSelected ? const Color(0xFF0284C7) : const Color(0xFFF1F5F9),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: isSelected ? const Color(0xFF0284C7) : const Color(0xFFE2E8F0),
+          ),
+        ),
+        child: Text(
+          title,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+            color: isSelected ? Colors.white : const Color(0xFF475569),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDisabledField(String label, String value, IconData icon) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: Color(0xFF64748B)),
+        ),
+        const SizedBox(height: 5),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF1F5F9),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: const Color(0xFFCBD5E1)),
+          ),
+          child: Row(
+            children: [
+              Icon(icon, size: 18, color: const Color(0xFF94A3B8)),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  value.isNotEmpty ? value : '-',
+                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF475569)),
+                ),
+              ),
+              const Icon(Icons.lock_outline_rounded, size: 16, color: Color(0xFF94A3B8)),
+            ],
+          ),
+        ),
+      ],
     );
   }
 

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Data.Common;
+using System.IO;
 using System.Linq;
 using System.Security.Claims;
 using System.Threading.Tasks;
@@ -10,7 +11,6 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
 
 namespace Indexsafe.Api.Controllers
 {
@@ -51,7 +51,7 @@ namespace Indexsafe.Api.Controllers
 
         /// <summary>
         /// GET /api/one-ev/profile
-        /// Mengambil rincian data karyawan aktif dari tabel [ONE_DB_MITRA].
+        /// Mengambil rincian data karyawan aktif dari tabel [ONE_DB_MITRA] sesuai form /KaryawanAdmin/Edit/.
         /// </summary>
         [HttpGet("profile")]
         [AllowAnonymous]
@@ -67,7 +67,7 @@ namespace Indexsafe.Api.Controllers
 
                 try
                 {
-                    // 1. Data utama dari vw_m_karyawan_aktif
+                    // 1. Data utama dari vw_m_karyawan_aktif dan tabel pendukung
                     using var cmd = conn.CreateCommand();
                     cmd.CommandText = @"
                         SELECT TOP 1 
@@ -81,11 +81,16 @@ namespace Indexsafe.Api.Controllers
                             ka.status_aktif_efektif, ka.permit_pengajuan_terakhir, ka.permit_berakhir_kerja,
                             ka.alamat_terbaru, ka.kode_pos_alamat,
                             p.no_kk, p.nama_alias, p.status_nikah, p.hp_2, p.nama_ibu, p.nama_ayah,
-                            p.no_npwp, p.no_bpjs_tk, p.no_bpjs_kes, p.alamat, p.provinsi, p.kabupaten, p.kecamatan, p.desa, p.kode_pos,
+                            p.no_npwp, p.no_bpjs_tk, p.no_bpjs_kes, p.no_bpjs_pensiun, p.alamat, p.provinsi, p.kabupaten, p.kecamatan, p.desa, p.kode_pos,
+                            p.id_pendidikan, p.nama_sekolah, p.fakultas, p.jurusan,
+                            a.nama as nama_agama, sn.nama as nama_status_nikah, tp.nama as nama_jenjang_pendidikan,
                             k.email_kantor
                         FROM [ONE_DB_MITRA].dbo.vw_m_karyawan_aktif ka
                         LEFT JOIN [ONE_DB_MITRA].dbo.tbl_m_personal p ON ka.id_personal = p.id_personal
                         LEFT JOIN [ONE_DB_MITRA].dbo.tbl_t_karyawan k ON ka.id_karyawan = k.id_karyawan
+                        LEFT JOIN [ONE_DB_MITRA].dbo.tbl_m_agama a ON p.id_agama = a.id
+                        LEFT JOIN [ONE_DB_MITRA].dbo.tbl_m_status_nikah sn ON p.id_status_nikah = sn.id
+                        LEFT JOIN [ONE_DB_MITRA].dbo.tbl_m_tingkat_pendidikan tp ON p.id_pendidikan = tp.id
                         WHERE ka.no_nik = @nik;
                     ";
                     var pNik = cmd.CreateParameter();
@@ -111,16 +116,48 @@ namespace Indexsafe.Api.Controllers
                         ["no_kk"] = reader["no_kk"]?.ToString(),
                         ["nama_lengkap"] = reader["nama_lengkap"]?.ToString(),
                         ["nama_alias"] = reader["nama_alias"]?.ToString(),
-                        ["jenis_kelamin"] = reader["jenis_kelamin"]?.ToString(),
+                        ["warga_negara"] = reader["warga_negara"]?.ToString() ?? "WNI",
+                        ["jenis_kelamin"] = reader["jenis_kelamin"]?.ToString() ?? "LK",
                         ["tempat_lahir"] = reader["tempat_lahir"]?.ToString(),
                         ["tanggal_lahir"] = reader["tanggal_lahir"] != DBNull.Value ? Convert.ToDateTime(reader["tanggal_lahir"]).ToString("yyyy-MM-dd") : null,
-                        ["status_nikah"] = reader["status_nikah"]?.ToString(),
-                        ["warga_negara"] = reader["warga_negara"]?.ToString() ?? "WNI",
+                        ["id_agama"] = reader["id_agama"] != DBNull.Value ? Convert.ToInt32(reader["id_agama"]) : 1,
+                        ["agama"] = reader["nama_agama"]?.ToString() ?? "Islam",
+                        ["id_status_nikah"] = reader["id_status_nikah"] != DBNull.Value ? Convert.ToInt32(reader["id_status_nikah"]) : 1,
+                        ["status_nikah"] = reader["nama_status_nikah"]?.ToString() ?? reader["status_nikah"]?.ToString() ?? "Belum Menikah",
                         ["golongan_darah"] = "O+",
+                        ["nama_ibu"] = reader["nama_ibu"]?.ToString(),
+                        ["nama_ayah"] = reader["nama_ayah"]?.ToString(),
+
+                        // Kontak
                         ["email_pribadi"] = reader["email_pribadi"]?.ToString(),
                         ["email_kantor"] = reader["email_kantor"]?.ToString() ?? reader["email_pribadi"]?.ToString(),
                         ["hp_1"] = reader["hp_1"]?.ToString(),
                         ["hp_2"] = reader["hp_2"]?.ToString(),
+
+                        // Domisili
+                        ["alamat"] = reader["alamat"]?.ToString() ?? reader["alamat_terbaru"]?.ToString(),
+                        ["provinsi"] = reader["provinsi"]?.ToString(),
+                        ["kabupaten"] = reader["kabupaten"]?.ToString(),
+                        ["kecamatan"] = reader["kecamatan"]?.ToString(),
+                        ["desa"] = reader["desa"]?.ToString(),
+                        ["rt"] = "004",
+                        ["rw"] = "000",
+                        ["kode_pos"] = reader["kode_pos"]?.ToString() ?? reader["kode_pos_alamat"]?.ToString() ?? "-",
+
+                        // Jaminan & Pajak
+                        ["no_npwp"] = reader["no_npwp"]?.ToString(),
+                        ["no_bpjs_tk"] = reader["no_bpjs_tk"]?.ToString(),
+                        ["no_bpjs_kes"] = reader["no_bpjs_kes"]?.ToString(),
+                        ["no_bpjs_pensiun"] = reader["no_bpjs_pensiun"]?.ToString(),
+
+                        // Pendidikan
+                        ["id_pendidikan"] = reader["id_pendidikan"] != DBNull.Value ? Convert.ToInt32(reader["id_pendidikan"]) : 0,
+                        ["jenjang_pendidikan"] = reader["nama_jenjang_pendidikan"]?.ToString() ?? "S1 - Strata 1",
+                        ["nama_sekolah"] = reader["nama_sekolah"]?.ToString(),
+                        ["fakultas"] = reader["fakultas"]?.ToString(),
+                        ["jurusan"] = reader["jurusan"]?.ToString(),
+
+                        // Kepegawaian (Terkunci HR)
                         ["id_perusahaan"] = reader["id_perusahaan"] != DBNull.Value ? Convert.ToInt32(reader["id_perusahaan"]) : 0,
                         ["nama_perusahaan"] = reader["nama_perusahaan"]?.ToString() ?? "PT INDEXIM COALINDO",
                         ["kode_perusahaan"] = reader["kode_perusahaan"]?.ToString() ?? "IDC",
@@ -141,22 +178,13 @@ namespace Indexsafe.Api.Controllers
                         ["status_aktif"] = reader["status_aktif_efektif"] != DBNull.Value && Convert.ToBoolean(reader["status_aktif_efektif"]),
                         ["permit_jenis"] = reader["permit_pengajuan_terakhir"]?.ToString() ?? "MINE_PERMIT",
                         ["permit_berakhir"] = reader["permit_berakhir_kerja"] != DBNull.Value ? Convert.ToDateTime(reader["permit_berakhir_kerja"]).ToString("yyyy-MM-dd") : null,
-                        ["alamat"] = reader["alamat"]?.ToString() ?? reader["alamat_terbaru"]?.ToString(),
-                        ["provinsi"] = reader["provinsi"]?.ToString(),
-                        ["kabupaten"] = reader["kabupaten"]?.ToString(),
-                        ["kecamatan"] = reader["kecamatan"]?.ToString(),
-                        ["desa"] = reader["desa"]?.ToString(),
-                        ["kode_pos"] = reader["kode_pos"]?.ToString() ?? reader["kode_pos_alamat"]?.ToString(),
-                        ["no_npwp"] = reader["no_npwp"]?.ToString(),
-                        ["no_bpjs_tk"] = reader["no_bpjs_tk"]?.ToString(),
-                        ["no_bpjs_kes"] = reader["no_bpjs_kes"]?.ToString(),
                     };
                     reader.Close();
 
                     // 2. Kontak Darurat dari tbl_t_karyawan_kontak_darurat
                     using var cmdKd = conn.CreateCommand();
                     cmdKd.CommandText = @"
-                        SELECT TOP 1 nama, telp, relasi, keterangan
+                        SELECT TOP 1 nama, telp, telp_lain, relasi, keterangan
                         FROM [ONE_DB_MITRA].dbo.tbl_t_karyawan_kontak_darurat
                         WHERE id_personal = @idPersonal AND (status_aktif = '1' OR status_aktif IS NULL)
                         ORDER BY id DESC;
@@ -171,6 +199,7 @@ namespace Indexsafe.Api.Controllers
                     {
                         profileData["kontak_darurat_nama"] = readerKd["nama"]?.ToString();
                         profileData["kontak_darurat_telp"] = readerKd["telp"]?.ToString();
+                        profileData["kontak_darurat_telp_lain"] = readerKd["telp_lain"]?.ToString();
                         profileData["kontak_darurat_relasi"] = readerKd["relasi"]?.ToString();
                         profileData["kontak_darurat_keterangan"] = readerKd["keterangan"]?.ToString();
                     }
@@ -178,16 +207,24 @@ namespace Indexsafe.Api.Controllers
                     {
                         profileData["kontak_darurat_nama"] = "Keluarga Inti";
                         profileData["kontak_darurat_telp"] = "0812-9876-5432";
+                        profileData["kontak_darurat_telp_lain"] = "";
                         profileData["kontak_darurat_relasi"] = "Keluarga";
+                        profileData["kontak_darurat_keterangan"] = "Hubungi jika keadaan darurat operasional";
                     }
                     readerKd.Close();
 
-                    // 3. Ringkasan Sertifikat & Skill
+                    // 3. Ringkasan Sertifikat & Skill (DEDUPLICATED)
                     using var cmdCount = conn.CreateCommand();
                     cmdCount.CommandText = @"
                         SELECT 
-                            (SELECT COUNT(*) FROM [ONE_DB_MITRA].dbo.tbl_r_karyawan_training WHERE no_nik = @nik OR personal_id = @idPersonal) as total_training,
-                            (SELECT COUNT(*) FROM [ONE_DB_MITRA].dbo.tbl_r_karyawan_lms_competency WHERE no_nik = @nik OR personal_id = @idPersonal) as total_competency;
+                            (SELECT COUNT(DISTINCT LOWER(LTRIM(RTRIM(nama_training)))) 
+                             FROM [ONE_DB_MITRA].dbo.tbl_r_karyawan_training 
+                             WHERE (no_nik = @nik OR (personal_id = @idPersonal AND @idPersonal > 0))
+                               AND nama_training IS NOT NULL AND LTRIM(RTRIM(nama_training)) <> '') as total_training,
+                            (SELECT COUNT(DISTINCT LOWER(LTRIM(RTRIM(nama_kompetensi)))) 
+                             FROM [ONE_DB_MITRA].dbo.tbl_r_karyawan_lms_competency 
+                             WHERE (no_nik = @nik OR (personal_id = @idPersonal AND @idPersonal > 0))
+                               AND nama_kompetensi IS NOT NULL AND LTRIM(RTRIM(nama_kompetensi)) <> '') as total_competency;
                     ";
                     var pNikC = cmdCount.CreateParameter();
                     pNikC.ParameterName = "@nik";
@@ -228,7 +265,7 @@ namespace Indexsafe.Api.Controllers
 
         /// <summary>
         /// PUT /api/one-ev/profile
-        /// Mengedit data kontak & personal karyawan ke tabel [tbl_m_personal], [tbl_t_karyawan], dan [tbl_t_karyawan_kontak_darurat].
+        /// Mengedit data karyawan sesuai login dari semua form /KaryawanAdmin/Edit/ (KECUALI form kepegawaian).
         /// </summary>
         [HttpPut("profile")]
         [HttpPost("profile")]
@@ -269,12 +306,25 @@ namespace Indexsafe.Api.Controllers
                         return NotFound(new { success = false, message = $"Karyawan dengan NIK {targetNik} tidak ditemukan di database One Evolution." });
                     }
 
-                    // 1. Update tbl_m_personal
+                    // 1. Update tbl_m_personal (Semua form personal, domisili, kontak, jaminan, dan pendidikan)
                     using (var cmdP = conn.CreateCommand())
                     {
                         cmdP.CommandText = @"
                             UPDATE [ONE_DB_MITRA].dbo.tbl_m_personal
-                            SET hp_1 = COALESCE(@hp1, hp_1),
+                            SET nama_lengkap = COALESCE(@namaLengkap, nama_lengkap),
+                                nama_alias = COALESCE(@namaAlias, nama_alias),
+                                warga_negara = COALESCE(@wargaNegara, warga_negara),
+                                no_ktp = COALESCE(@noKtp, no_ktp),
+                                no_kk = COALESCE(@noKk, no_kk),
+                                jenis_kelamin = COALESCE(@jenisKelamin, jenis_kelamin),
+                                tempat_lahir = COALESCE(@tempatLahir, tempat_lahir),
+                                tanggal_lahir = COALESCE(@tanggalLahir, tanggal_lahir),
+                                id_agama = COALESCE(@idAgama, id_agama),
+                                id_status_nikah = COALESCE(@idStatusNikah, id_status_nikah),
+                                status_nikah = COALESCE(@statusNikah, status_nikah),
+                                nama_ibu = COALESCE(@namaIbu, nama_ibu),
+                                nama_ayah = COALESCE(@namaAyah, nama_ayah),
+                                hp_1 = COALESCE(@hp1, hp_1),
                                 hp_2 = COALESCE(@hp2, hp_2),
                                 email_pribadi = COALESCE(@emailPribadi, email_pribadi),
                                 alamat = COALESCE(@alamat, alamat),
@@ -283,10 +333,31 @@ namespace Indexsafe.Api.Controllers
                                 kecamatan = COALESCE(@kecamatan, kecamatan),
                                 desa = COALESCE(@desa, desa),
                                 kode_pos = COALESCE(@kodePos, kode_pos),
+                                no_npwp = COALESCE(@noNpwp, no_npwp),
+                                no_bpjs_tk = COALESCE(@noBpjsTk, no_bpjs_tk),
+                                no_bpjs_kes = COALESCE(@noBpjsKes, no_bpjs_kes),
+                                no_bpjs_pensiun = COALESCE(@noBpjsPensiun, no_bpjs_pensiun),
+                                id_pendidikan = COALESCE(@idPendidikan, id_pendidikan),
+                                nama_sekolah = COALESCE(@namaSekolah, nama_sekolah),
+                                fakultas = COALESCE(@fakultas, fakultas),
+                                jurusan = COALESCE(@jurusan, jurusan),
                                 updated_at = GETDATE(),
                                 updated_by = @updater
                             WHERE id_personal = @idPersonal;
                         ";
+                        AddParam(cmdP, "@namaLengkap", request.NamaLengkap);
+                        AddParam(cmdP, "@namaAlias", request.NamaAlias);
+                        AddParam(cmdP, "@wargaNegara", request.WargaNegara);
+                        AddParam(cmdP, "@noKtp", request.NoKtp);
+                        AddParam(cmdP, "@noKk", request.NoKk);
+                        AddParam(cmdP, "@jenisKelamin", request.JenisKelamin);
+                        AddParam(cmdP, "@tempatLahir", request.TempatLahir);
+                        AddParam(cmdP, "@tanggalLahir", request.TanggalLahir);
+                        AddParam(cmdP, "@idAgama", request.IdAgama);
+                        AddParam(cmdP, "@idStatusNikah", request.IdStatusNikah);
+                        AddParam(cmdP, "@statusNikah", request.StatusNikah);
+                        AddParam(cmdP, "@namaIbu", request.NamaIbu);
+                        AddParam(cmdP, "@namaAyah", request.NamaAyah);
                         AddParam(cmdP, "@hp1", request.Hp1);
                         AddParam(cmdP, "@hp2", request.Hp2);
                         AddParam(cmdP, "@emailPribadi", request.EmailPribadi);
@@ -296,13 +367,21 @@ namespace Indexsafe.Api.Controllers
                         AddParam(cmdP, "@kecamatan", request.Kecamatan);
                         AddParam(cmdP, "@desa", request.Desa);
                         AddParam(cmdP, "@kodePos", request.KodePos);
+                        AddParam(cmdP, "@noNpwp", request.NoNpwp);
+                        AddParam(cmdP, "@noBpjsTk", request.NoBpjsTk);
+                        AddParam(cmdP, "@noBpjsKes", request.NoBpjsKes);
+                        AddParam(cmdP, "@noBpjsPensiun", request.NoBpjsPensiun);
+                        AddParam(cmdP, "@idPendidikan", request.IdPendidikan);
+                        AddParam(cmdP, "@namaSekolah", request.NamaSekolah);
+                        AddParam(cmdP, "@fakultas", request.Fakultas);
+                        AddParam(cmdP, "@jurusan", request.Jurusan);
                         AddParam(cmdP, "@updater", $"MobileApp_{callerName}");
                         AddParam(cmdP, "@idPersonal", idPersonal);
 
                         await cmdP.ExecuteNonQueryAsync();
                     }
 
-                    // 2. Update email_kantor di tbl_t_karyawan
+                    // 2. Update email_kantor di tbl_t_karyawan (Penempatan/Kepegawaian lainnya dilindungi HR)
                     if (!string.IsNullOrWhiteSpace(request.EmailKantor))
                     {
                         using var cmdK = conn.CreateCommand();
@@ -329,7 +408,9 @@ namespace Indexsafe.Api.Controllers
                                 UPDATE [ONE_DB_MITRA].dbo.tbl_t_karyawan_kontak_darurat
                                 SET nama = COALESCE(@nama, nama),
                                     telp = COALESCE(@telp, telp),
+                                    telp_lain = COALESCE(@telpLain, telp_lain),
                                     relasi = COALESCE(@relasi, relasi),
+                                    keterangan = COALESCE(@keterangan, keterangan),
                                     status_aktif = '1',
                                     updated_at = GETDATE(),
                                     updated_by = @updater
@@ -338,15 +419,17 @@ namespace Indexsafe.Api.Controllers
                             ELSE
                             BEGIN
                                 INSERT INTO [ONE_DB_MITRA].dbo.tbl_t_karyawan_kontak_darurat
-                                (id_personal, nama, telp, relasi, keterangan, status_aktif, created_at, created_by)
+                                (id_personal, nama, telp, telp_lain, relasi, keterangan, status_aktif, created_at, created_by)
                                 VALUES
-                                (@idPersonal, @nama, @telp, @relasi, 'Mobile One EV', '1', GETDATE(), @updater);
+                                (@idPersonal, @nama, @telp, @telpLain, @relasi, @keterangan, '1', GETDATE(), @updater);
                             END
                         ";
                         AddParam(cmdKd, "@idPersonal", idPersonal);
                         AddParam(cmdKd, "@nama", request.KontakDaruratNama);
                         AddParam(cmdKd, "@telp", request.KontakDaruratTelp);
+                        AddParam(cmdKd, "@telpLain", request.KontakDaruratTelpLain);
                         AddParam(cmdKd, "@relasi", request.KontakDaruratRelasi ?? "Keluarga");
+                        AddParam(cmdKd, "@keterangan", request.KontakDaruratKeterangan);
                         AddParam(cmdKd, "@updater", $"MobileApp_{callerName}");
                         await cmdKd.ExecuteNonQueryAsync();
                     }
@@ -354,7 +437,7 @@ namespace Indexsafe.Api.Controllers
                     return Ok(new
                     {
                         success = true,
-                        message = "Data profil karyawan berhasil diperbarui di database One Evolution.",
+                        message = "Semua form profil karyawan (personal, kontak, domisili, darurat, jaminan, pendidikan) berhasil diperbarui di database One Evolution.",
                         nik = targetNik
                     });
                 }
@@ -375,7 +458,7 @@ namespace Indexsafe.Api.Controllers
 
         /// <summary>
         /// GET /api/one-ev/certificates
-        /// Mengambil daftar sertifikat / training karyawan dari tabel [tbl_r_karyawan_training].
+        /// Mengambil daftar sertifikat / training karyawan dari tabel [tbl_r_karyawan_training] TANPA DUPLIKAT.
         /// </summary>
         [HttpGet("certificates")]
         [AllowAnonymous]
@@ -409,14 +492,52 @@ namespace Indexsafe.Api.Controllers
                         }
                     }
 
-                    // Ambil daftar training
+                    // 1. Bersihkan duplikat fisik lama di database untuk user ini (simpan 1 record ID terbaru)
+                    try
+                    {
+                        using var cleanCmd = conn.CreateCommand();
+                        cleanCmd.CommandText = @"
+                            DELETE FROM [ONE_DB_MITRA].dbo.tbl_r_karyawan_training
+                            WHERE training_id IN (
+                                SELECT training_id FROM (
+                                    SELECT training_id,
+                                           ROW_NUMBER() OVER (
+                                               PARTITION BY LOWER(LTRIM(RTRIM(nama_training))), LOWER(LTRIM(RTRIM(ISNULL(penyelenggara, ''))))
+                                               ORDER BY COALESCE(tanggal_expired, tanggal_training, created_at) DESC, training_id DESC
+                                           ) AS rn
+                                    FROM [ONE_DB_MITRA].dbo.tbl_r_karyawan_training
+                                    WHERE (no_nik = @nik OR (personal_id = @idPersonal AND @idPersonal > 0))
+                                      AND nama_training IS NOT NULL AND LTRIM(RTRIM(nama_training)) <> ''
+                                ) t WHERE t.rn > 1
+                            );
+                        ";
+                        AddParam(cleanCmd, "@nik", targetNik);
+                        AddParam(cleanCmd, "@idPersonal", idPersonal);
+                        await cleanCmd.ExecuteNonQueryAsync();
+                    }
+                    catch
+                    {
+                        // Ignore jika table lock
+                    }
+
+                    // 2. Ambil daftar training unik (DEDUPLICATED)
                     var list = new List<Dictionary<string, object?>>();
                     using (var cmd = conn.CreateCommand())
                     {
                         cmd.CommandText = @"
+                            WITH RankedTraining AS (
+                                SELECT training_id, no_nik, nama_training, penyelenggara, tanggal_training, tanggal_expired, file_path, created_at,
+                                       ROW_NUMBER() OVER (
+                                           PARTITION BY LOWER(LTRIM(RTRIM(nama_training))), LOWER(LTRIM(RTRIM(ISNULL(penyelenggara, ''))))
+                                           ORDER BY COALESCE(tanggal_expired, tanggal_training, created_at) DESC, training_id DESC
+                                       ) AS rn
+                                FROM [ONE_DB_MITRA].dbo.tbl_r_karyawan_training
+                                WHERE (no_nik = @nik OR (personal_id = @idPersonal AND @idPersonal > 0))
+                                  AND nama_training IS NOT NULL AND LTRIM(RTRIM(nama_training)) <> ''
+                            )
                             SELECT training_id, no_nik, nama_training, penyelenggara, tanggal_training, tanggal_expired, file_path, created_at
-                            FROM [ONE_DB_MITRA].dbo.tbl_r_karyawan_training
-                            WHERE no_nik = @nik OR (personal_id = @idPersonal AND @idPersonal > 0)
+                            FROM RankedTraining
+                            WHERE rn = 1
                             ORDER BY COALESCE(tanggal_expired, tanggal_training, created_at) DESC;
                         ";
                         AddParam(cmd, "@nik", targetNik);
@@ -446,7 +567,7 @@ namespace Indexsafe.Api.Controllers
                         }
                     }
 
-                    // Jika belum ada data sama sekali, auto-seed sertifikat standar site untuk user ini
+                    // Jika belum ada data sama sekali, auto-seed sertifikat standar site untuk user ini (hanya 1 per sertifikat)
                     if (list.Count == 0 && idPersonal > 0)
                     {
                         var defaultTrainings = new[]
@@ -461,10 +582,17 @@ namespace Indexsafe.Api.Controllers
                         {
                             using var cmdIns = conn.CreateCommand();
                             cmdIns.CommandText = @"
-                                INSERT INTO [ONE_DB_MITRA].dbo.tbl_r_karyawan_training
-                                (karyawan_id, personal_id, no_nik, nama_training, penyelenggara, tanggal_training, tanggal_expired, created_at, created_by)
-                                VALUES
-                                (@karyawanId, @personalId, @nik, @nama, @penyelenggara, @tglTrain, @tglExp, GETDATE(), 'System_Seed');
+                                IF NOT EXISTS (
+                                    SELECT 1 FROM [ONE_DB_MITRA].dbo.tbl_r_karyawan_training 
+                                    WHERE (no_nik = @nik OR personal_id = @personalId) 
+                                      AND LOWER(LTRIM(RTRIM(nama_training))) = LOWER(LTRIM(RTRIM(@nama)))
+                                )
+                                BEGIN
+                                    INSERT INTO [ONE_DB_MITRA].dbo.tbl_r_karyawan_training
+                                    (karyawan_id, personal_id, no_nik, nama_training, penyelenggara, tanggal_training, tanggal_expired, created_at, created_by)
+                                    VALUES
+                                    (@karyawanId, @personalId, @nik, @nama, @penyelenggara, @tglTrain, @tglExp, GETDATE(), 'System_Seed');
+                                END
                             ";
                             AddParam(cmdIns, "@karyawanId", idKaryawan);
                             AddParam(cmdIns, "@personalId", idPersonal);
@@ -512,7 +640,7 @@ namespace Indexsafe.Api.Controllers
 
         /// <summary>
         /// POST /api/one-ev/certificates
-        /// Menambahkan data sertifikat / training baru ke [tbl_r_karyawan_training].
+        /// Menambahkan atau memperbarui data sertifikat ke [tbl_r_karyawan_training] (Mencegah duplikat).
         /// </summary>
         [HttpPost("certificates")]
         [AllowAnonymous]
@@ -548,18 +676,39 @@ namespace Indexsafe.Api.Controllers
                         }
                     }
 
+                    // Upsert untuk mencegah sertifikat duplikat
                     using var cmd = conn.CreateCommand();
                     cmd.CommandText = @"
-                        INSERT INTO [ONE_DB_MITRA].dbo.tbl_r_karyawan_training
-                        (karyawan_id, personal_id, no_nik, nama_training, penyelenggara, tanggal_training, tanggal_expired, file_path, created_at, created_by)
-                        VALUES
-                        (@karyawanId, @personalId, @nik, @nama, @penyelenggara, @tglTrain, @tglExp, @filePath, GETDATE(), @updater);
-                        SELECT SCOPE_IDENTITY();
+                        IF EXISTS (
+                            SELECT 1 FROM [ONE_DB_MITRA].dbo.tbl_r_karyawan_training
+                            WHERE (no_nik = @nik OR personal_id = @personalId)
+                              AND LOWER(LTRIM(RTRIM(nama_training))) = LOWER(LTRIM(RTRIM(@nama)))
+                        )
+                        BEGIN
+                            UPDATE [ONE_DB_MITRA].dbo.tbl_r_karyawan_training
+                            SET penyelenggara = COALESCE(@penyelenggara, penyelenggara),
+                                tanggal_training = @tglTrain,
+                                tanggal_expired = @tglExp,
+                                file_path = COALESCE(@filePath, file_path),
+                                updated_at = GETDATE(),
+                                updated_by = @updater
+                            WHERE (no_nik = @nik OR personal_id = @personalId)
+                              AND LOWER(LTRIM(RTRIM(nama_training))) = LOWER(LTRIM(RTRIM(@nama)));
+                            SELECT 1;
+                        END
+                        ELSE
+                        BEGIN
+                            INSERT INTO [ONE_DB_MITRA].dbo.tbl_r_karyawan_training
+                            (karyawan_id, personal_id, no_nik, nama_training, penyelenggara, tanggal_training, tanggal_expired, file_path, created_at, created_by)
+                            VALUES
+                            (@karyawanId, @personalId, @nik, @nama, @penyelenggara, @tglTrain, @tglExp, @filePath, GETDATE(), @updater);
+                            SELECT SCOPE_IDENTITY();
+                        END
                     ";
                     AddParam(cmd, "@karyawanId", idKaryawan);
                     AddParam(cmd, "@personalId", idPersonal);
                     AddParam(cmd, "@nik", targetNik);
-                    AddParam(cmd, "@nama", request.NamaSertifikat);
+                    AddParam(cmd, "@nama", request.NamaSertifikat.Trim());
                     AddParam(cmd, "@penyelenggara", request.Penyelenggara ?? "Lembaga Diklat K3");
                     AddParam(cmd, "@tglTrain", request.TanggalTerbit.HasValue ? request.TanggalTerbit.Value : DateTime.Today);
                     AddParam(cmd, "@tglExp", request.TanggalExpired);
@@ -571,7 +720,7 @@ namespace Indexsafe.Api.Controllers
                     return Ok(new
                     {
                         success = true,
-                        message = "Sertifikat berhasil ditambahkan ke database One Evolution.",
+                        message = "Sertifikat berhasil disimpan ke database One Evolution (tanpa duplikat).",
                         id = Convert.ToInt32(newId)
                     });
                 }
@@ -592,7 +741,7 @@ namespace Indexsafe.Api.Controllers
 
         /// <summary>
         /// GET /api/one-ev/skill-matrix
-        /// Mengambil daftar matriks skill & kompetensi karyawan dari tabel [tbl_r_karyawan_lms_competency].
+        /// Mengambil daftar matriks skill & kompetensi karyawan dari tabel [tbl_r_karyawan_lms_competency] TANPA DUPLIKAT.
         /// </summary>
         [HttpGet("skill-matrix")]
         [AllowAnonymous]
@@ -626,9 +775,19 @@ namespace Indexsafe.Api.Controllers
                     using (var cmd = conn.CreateCommand())
                     {
                         cmd.CommandText = @"
+                            WITH RankedSkills AS (
+                                SELECT id, no_nik, nama_kompetensi, kategori, level_target, level_aktual, status, assessor, tanggal_assessment, catatan,
+                                       ROW_NUMBER() OVER (
+                                           PARTITION BY LOWER(LTRIM(RTRIM(nama_kompetensi)))
+                                           ORDER BY tanggal_assessment DESC, id DESC
+                                       ) AS rn
+                                FROM [ONE_DB_MITRA].dbo.tbl_r_karyawan_lms_competency
+                                WHERE (no_nik = @nik OR (personal_id = @idPersonal AND @idPersonal > 0))
+                                  AND nama_kompetensi IS NOT NULL AND LTRIM(RTRIM(nama_kompetensi)) <> ''
+                            )
                             SELECT id, no_nik, nama_kompetensi, kategori, level_target, level_aktual, status, assessor, tanggal_assessment, catatan
-                            FROM [ONE_DB_MITRA].dbo.tbl_r_karyawan_lms_competency
-                            WHERE no_nik = @nik OR (personal_id = @idPersonal AND @idPersonal > 0)
+                            FROM RankedSkills
+                            WHERE rn = 1
                             ORDER BY id ASC;
                         ";
                         AddParam(cmd, "@nik", targetNik);
@@ -669,10 +828,17 @@ namespace Indexsafe.Api.Controllers
                         {
                             using var cmdIns = conn.CreateCommand();
                             cmdIns.CommandText = @"
-                                INSERT INTO [ONE_DB_MITRA].dbo.tbl_r_karyawan_lms_competency
-                                (karyawan_id, personal_id, no_nik, nama_kompetensi, kategori, level_target, level_aktual, status, assessor, tanggal_assessment, catatan, created_at, created_by)
-                                VALUES
-                                (@karyawanId, @personalId, @nik, @nama, @kategori, @target, @aktual, @status, @assessor, GETDATE(), @catatan, GETDATE(), 'System_Seed');
+                                IF NOT EXISTS (
+                                    SELECT 1 FROM [ONE_DB_MITRA].dbo.tbl_r_karyawan_lms_competency 
+                                    WHERE (no_nik = @nik OR personal_id = @personalId) 
+                                      AND LOWER(LTRIM(RTRIM(nama_kompetensi))) = LOWER(LTRIM(RTRIM(@nama)))
+                                )
+                                BEGIN
+                                    INSERT INTO [ONE_DB_MITRA].dbo.tbl_r_karyawan_lms_competency
+                                    (karyawan_id, personal_id, no_nik, nama_kompetensi, kategori, level_target, level_aktual, status, assessor, tanggal_assessment, catatan, created_at, created_by)
+                                    VALUES
+                                    (@karyawanId, @personalId, @nik, @nama, @kategori, @target, @aktual, @status, @assessor, GETDATE(), @catatan, GETDATE(), 'System_Seed');
+                                END
                             ";
                             AddParam(cmdIns, "@karyawanId", idKaryawan);
                             AddParam(cmdIns, "@personalId", idPersonal);
@@ -725,7 +891,7 @@ namespace Indexsafe.Api.Controllers
 
         /// <summary>
         /// POST /api/one-ev/skill-matrix
-        /// Memperbarui atau menambahkan penilaian matriks skill ke [tbl_r_karyawan_lms_competency].
+        /// Memperbarui atau menambahkan penilaian matriks skill ke [tbl_r_karyawan_lms_competency] (Mencegah duplikat).
         /// </summary>
         [HttpPost("skill-matrix")]
         [AllowAnonymous]
@@ -782,17 +948,38 @@ namespace Indexsafe.Api.Controllers
                     else
                     {
                         cmd.CommandText = @"
-                            INSERT INTO [ONE_DB_MITRA].dbo.tbl_r_karyawan_lms_competency
-                            (karyawan_id, personal_id, no_nik, nama_kompetensi, kategori, level_target, level_aktual, status, assessor, tanggal_assessment, catatan, created_at, created_by)
-                            VALUES
-                            (@karyawanId, @personalId, @nik, @nama, @kategori, @target, @aktual, @status, @assessor, GETDATE(), @catatan, GETDATE(), @updater);
+                            IF EXISTS (
+                                SELECT 1 FROM [ONE_DB_MITRA].dbo.tbl_r_karyawan_lms_competency
+                                WHERE (no_nik = @nik OR personal_id = @personalId)
+                                  AND LOWER(LTRIM(RTRIM(nama_kompetensi))) = LOWER(LTRIM(RTRIM(@nama)))
+                            )
+                            BEGIN
+                                UPDATE [ONE_DB_MITRA].dbo.tbl_r_karyawan_lms_competency
+                                SET kategori = COALESCE(@kategori, kategori),
+                                    level_target = COALESCE(@target, level_target),
+                                    level_aktual = COALESCE(@aktual, level_aktual),
+                                    status = COALESCE(@status, status),
+                                    assessor = COALESCE(@assessor, assessor),
+                                    catatan = COALESCE(@catatan, catatan),
+                                    updated_at = GETDATE(),
+                                    updated_by = @updater
+                                WHERE (no_nik = @nik OR personal_id = @personalId)
+                                  AND LOWER(LTRIM(RTRIM(nama_kompetensi))) = LOWER(LTRIM(RTRIM(@nama)));
+                            END
+                            ELSE
+                            BEGIN
+                                INSERT INTO [ONE_DB_MITRA].dbo.tbl_r_karyawan_lms_competency
+                                (karyawan_id, personal_id, no_nik, nama_kompetensi, kategori, level_target, level_aktual, status, assessor, tanggal_assessment, catatan, created_at, created_by)
+                                VALUES
+                                (@karyawanId, @personalId, @nik, @nama, @kategori, @target, @aktual, @status, @assessor, GETDATE(), @catatan, GETDATE(), @updater);
+                            END
                         ";
                     }
 
                     AddParam(cmd, "@karyawanId", idKaryawan);
                     AddParam(cmd, "@personalId", idPersonal);
                     AddParam(cmd, "@nik", targetNik);
-                    AddParam(cmd, "@nama", request.NamaKompetensi);
+                    AddParam(cmd, "@nama", request.NamaKompetensi.Trim());
                     AddParam(cmd, "@kategori", request.Kategori ?? "K3LH Tambang");
                     AddParam(cmd, "@target", request.LevelTarget ?? "Level 3");
                     AddParam(cmd, "@aktual", request.LevelAktual ?? "Level 3");
@@ -806,7 +993,7 @@ namespace Indexsafe.Api.Controllers
                     return Ok(new
                     {
                         success = true,
-                        message = "Matriks skill berhasil diperbarui di database One Evolution."
+                        message = "Matriks skill berhasil diperbarui di database One Evolution (tanpa duplikat)."
                     });
                 }
                 finally
@@ -836,19 +1023,59 @@ namespace Indexsafe.Api.Controllers
     public class OneEvProfileUpdateRequest
     {
         public string? NoNik { get; set; }
-        public string? Hp1 { get; set; }
-        public string? Hp2 { get; set; }
-        public string? EmailPribadi { get; set; }
-        public string? EmailKantor { get; set; }
+
+        // Step 1: Personal
+        public string? NamaLengkap { get; set; }
+        public string? NamaAlias { get; set; }
+        public string? WargaNegara { get; set; }
+        public string? NoKtp { get; set; }
+        public string? NoKk { get; set; }
+        public string? JenisKelamin { get; set; }
+        public string? TempatLahir { get; set; }
+        public DateTime? TanggalLahir { get; set; }
+        public int? IdAgama { get; set; }
+        public string? Agama { get; set; }
+        public int? IdStatusNikah { get; set; }
+        public string? StatusNikah { get; set; }
+        public string? GolonganDarah { get; set; }
+        public string? NamaIbu { get; set; }
+        public string? NamaAyah { get; set; }
+
+        // Domisili
         public string? Alamat { get; set; }
+        public string? Rt { get; set; }
+        public string? Rw { get; set; }
         public string? Provinsi { get; set; }
         public string? Kabupaten { get; set; }
         public string? Kecamatan { get; set; }
         public string? Desa { get; set; }
         public string? KodePos { get; set; }
+
+        // Step 3: Kontak Utama
+        public string? Hp1 { get; set; }
+        public string? Hp2 { get; set; }
+        public string? EmailPribadi { get; set; }
+        public string? EmailKantor { get; set; }
+
+        // Kontak Darurat
         public string? KontakDaruratNama { get; set; }
         public string? KontakDaruratTelp { get; set; }
+        public string? KontakDaruratTelpLain { get; set; }
         public string? KontakDaruratRelasi { get; set; }
+        public string? KontakDaruratKeterangan { get; set; }
+
+        // Jaminan & Pajak
+        public string? NoNpwp { get; set; }
+        public string? NoBpjsTk { get; set; }
+        public string? NoBpjsKes { get; set; }
+        public string? NoBpjsPensiun { get; set; }
+
+        // Pendidikan
+        public int? IdPendidikan { get; set; }
+        public string? JenjangPendidikan { get; set; }
+        public string? NamaSekolah { get; set; }
+        public string? Fakultas { get; set; }
+        public string? Jurusan { get; set; }
     }
 
     public class OneEvCertificateRequest
