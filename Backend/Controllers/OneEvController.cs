@@ -7,6 +7,7 @@ using System.Linq;
 using System.Security.Claims;
 using System.Threading.Tasks;
 using Indexsafe.Api.Data;
+using Indexsafe.Api.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -20,11 +21,13 @@ namespace Indexsafe.Api.Controllers
     {
         private readonly AppDbContext _context;
         private readonly IConfiguration _configuration;
+        private readonly PermitService _permitService;
 
-        public OneEvController(AppDbContext context, IConfiguration configuration)
+        public OneEvController(AppDbContext context, IConfiguration configuration, PermitService permitService)
         {
             _context = context;
             _configuration = configuration;
+            _permitService = permitService;
         }
 
         private string GetCallerNik(string? fallback = null)
@@ -47,6 +50,45 @@ namespace Indexsafe.Api.Controllers
                    ?? User?.FindFirst("nama")?.Value
                    ?? User?.FindFirst("name")?.Value
                    ?? "Karyawan";
+        }
+
+        /// <summary>
+        /// GET /api/one-ev/simper
+        /// Mengambil data SIMPER Tambang resmi dan daftar unit yang diizinkan (tb_simper & tb_simper_unit) dari PostgreSQL BIMA.
+        /// </summary>
+        [HttpGet("simper")]
+        [AllowAnonymous]
+        public async Task<IActionResult> GetSimperDetail([FromQuery] string? nik = null)
+        {
+            var targetNik = GetCallerNik(nik);
+            try
+            {
+                var simper = await _permitService.GetFullSimperDetailAsync(targetNik);
+                if (simper == null)
+                {
+                    return Ok(new
+                    {
+                        success = true,
+                        has_simper = false,
+                        message = "Data SIMPER Tambang belum terdaftar untuk karyawan ini."
+                    });
+                }
+
+                return Ok(new
+                {
+                    success = true,
+                    has_simper = true,
+                    data = simper
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new
+                {
+                    success = false,
+                    message = "Gagal mengambil data SIMPER Tambang: " + ex.Message
+                });
+            }
         }
 
         /// <summary>

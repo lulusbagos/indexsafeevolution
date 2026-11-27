@@ -15,10 +15,12 @@ class OneEvService {
   ));
 
   Map<String, dynamic>? _cachedProfile;
+  Map<String, dynamic>? _cachedSimper;
   List<Map<String, dynamic>> _cachedCertificates = [];
   List<Map<String, dynamic>> _cachedSkillMatrix = [];
 
   Map<String, dynamic>? get cachedProfile => _cachedProfile;
+  Map<String, dynamic>? get cachedSimper => _cachedSimper;
   List<Map<String, dynamic>> get cachedCertificates => _cachedCertificates;
   List<Map<String, dynamic>> get cachedSkillMatrix => _cachedSkillMatrix;
 
@@ -310,6 +312,35 @@ class OneEvService {
     }
 
     return true;
+  }
+
+  /// Mengambil data resmi SIMPER Tambang dan daftar unit yang diizinkan (tb_simper & tb_simper_unit)
+  Future<Map<String, dynamic>?> fetchSimper({String? nik}) async {
+    final targetNik = nik ?? PreferenceService.getProfile()?.noNik ?? '24051940986';
+    final candidates = _buildCandidateUrls('/api/one-ev/simper?nik=$targetNik');
+
+    for (final url in candidates) {
+      try {
+        final res = await _dio.get(
+          url,
+          options: Options(
+            headers: _buildHeaders(targetNik),
+            validateStatus: (status) => status != null && status < 500,
+          ),
+        );
+
+        if (res.statusCode == 200 && res.data != null) {
+          final body = res.data is Map ? res.data : jsonDecode(res.data.toString());
+          if (body['success'] == true && body['data'] != null) {
+            _cachedSimper = Map<String, dynamic>.from(body['data']);
+            return _cachedSimper;
+          }
+        }
+      } catch (e) {
+        debugPrint('[OneEvService] Gagal fetch simper dari $url: $e');
+      }
+    }
+    return _cachedSimper;
   }
 
   /// Mengambil daftar master Agama dari ONE_DB_MITRA

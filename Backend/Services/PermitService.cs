@@ -748,20 +748,29 @@ namespace Indexsafe.Api.Services
                 try
                 {
                     const string sqlSimper = @"
-                        SELECT id, permit_id, req_id, tanggal, nomor, status, nomor_sim, masa_berlaku, masa_berlaku_sio, kacamata, nilai_praktek, nilai_teori, employee_id, jenis_simper, ref_id, company_id, departemen, created_by, updated_by, deleted_by, created_at, updated_at, deleted_at, ketentuan_hauling, tes_simper, praktek_simper, qr_encrypt, qr_decrypt, expired_date, created_company_id, created_department_id, printed_at, printed_count, jenis_sim
-                        FROM public.tb_simper
-                        WHERE TRIM(qr_encrypt) = @code
-                           OR TRIM(qr_decrypt) = @code
-                           OR TRIM(nomor) = @code
-                           OR TRIM(req_id::text) = @code
-                           OR TRIM(employee_id) = @code
-                        ORDER BY id DESC
+                        SELECT s.id, s.permit_id, s.req_id, s.tanggal, s.nomor, s.status, s.nomor_sim, s.masa_berlaku, s.masa_berlaku_sio, 
+                               s.kacamata, s.nilai_praktek, s.nilai_teori, s.employee_id, s.jenis_simper, s.ref_id, s.company_id, 
+                               s.departemen, s.created_by, s.updated_by, s.deleted_by, s.created_at, s.updated_at, s.deleted_at, 
+                               s.ketentuan_hauling, s.tes_simper, s.praktek_simper, s.qr_encrypt, s.qr_decrypt, s.expired_date, 
+                               s.created_company_id, s.created_department_id, s.printed_at, s.printed_count, s.jenis_sim,
+                               COALESCE(p.nama, '') as nama, COALESCE(p.perusahaan, '') as perusahaan, COALESCE(p.jabatan, '') as jabatan
+                        FROM public.tb_simper s
+                        LEFT JOIN public.tb_permit p ON s.permit_id = p.id
+                        WHERE TRIM(s.qr_encrypt) = @code
+                           OR TRIM(s.qr_decrypt) = @code
+                           OR TRIM(s.nomor) = @code
+                           OR TRIM(s.req_id::text) = @code
+                           OR TRIM(s.employee_id) = @code
+                           OR (@codeNoZero <> '' AND TRIM(s.employee_id) = @codeNoZero)
+                        ORDER BY s.id DESC
                         LIMIT 1;";
 
                     SimperFullDetailDto? dto = null;
                     await using (var cmd = new NpgsqlCommand(sqlSimper, activeConn))
                     {
+                        var codeNoZero = cleanCode.TrimStart('0');
                         cmd.Parameters.AddWithValue("@code", cleanCode);
+                        cmd.Parameters.AddWithValue("@codeNoZero", codeNoZero);
                         await using var r = await cmd.ExecuteReaderAsync();
                         if (await r.ReadAsync())
                         {
@@ -779,6 +788,9 @@ namespace Indexsafe.Api.Services
                                 Departemen = r.IsDBNull(r.GetOrdinal("departemen")) ? null : r.GetString(r.GetOrdinal("departemen")),
                                 QrEncrypt = r.IsDBNull(r.GetOrdinal("qr_encrypt")) ? null : r.GetString(r.GetOrdinal("qr_encrypt")),
                                 QrDecrypt = r.IsDBNull(r.GetOrdinal("qr_decrypt")) ? null : r.GetString(r.GetOrdinal("qr_decrypt")),
+                                Nama = r.IsDBNull(r.GetOrdinal("nama")) ? null : r.GetString(r.GetOrdinal("nama")),
+                                Perusahaan = r.IsDBNull(r.GetOrdinal("perusahaan")) ? null : r.GetString(r.GetOrdinal("perusahaan")),
+                                Jabatan = r.IsDBNull(r.GetOrdinal("jabatan")) ? null : r.GetString(r.GetOrdinal("jabatan")),
                             };
 
                             if (!r.IsDBNull(r.GetOrdinal("kacamata")))
@@ -839,7 +851,9 @@ namespace Indexsafe.Api.Services
                     {
                         // Fetch units from tb_simper_unit
                         const string sqlUnits = @"
-                            SELECT id, simper_id, kendaraan, kewenangan, jam_min, jam_aktual, equipment_classification, equipment_type, equipment_model
+                            SELECT id, simper_id, kendaraan, kewenangan, jam_min, jam_aktual, 
+                                   equipment_classification, equipment_type, equipment_model,
+                                   nilai_teori, nilai_praktek, req_id, jenis_simper, equipment_classification_id
                             FROM public.tb_simper_unit
                             WHERE simper_id = @sId
                             ORDER BY id ASC;";
@@ -860,6 +874,11 @@ namespace Indexsafe.Api.Services
                                     EquipmentClassification = uReader.IsDBNull(6) ? null : uReader.GetString(6),
                                     EquipmentType = uReader.IsDBNull(7) ? null : uReader.GetString(7),
                                     EquipmentModel = uReader.IsDBNull(8) ? null : uReader.GetString(8),
+                                    NilaiTeori = uReader.IsDBNull(9) ? null : Convert.ToDouble(uReader.GetValue(9)),
+                                    NilaiPraktek = uReader.IsDBNull(10) ? null : Convert.ToDouble(uReader.GetValue(10)),
+                                    ReqId = uReader.IsDBNull(11) ? null : uReader.GetValue(11)?.ToString(),
+                                    JenisSimper = uReader.IsDBNull(12) ? null : uReader.GetString(12),
+                                    EquipmentClassificationId = uReader.IsDBNull(13) ? null : Convert.ToInt32(uReader.GetValue(13)),
                                 });
                             }
                         }
@@ -1431,6 +1450,21 @@ namespace Indexsafe.Api.Services
 
         [JsonPropertyName("equipment_model")]
         public string? EquipmentModel { get; set; }
+
+        [JsonPropertyName("nilai_teori")]
+        public double? NilaiTeori { get; set; }
+
+        [JsonPropertyName("nilai_praktek")]
+        public double? NilaiPraktek { get; set; }
+
+        [JsonPropertyName("req_id")]
+        public string? ReqId { get; set; }
+
+        [JsonPropertyName("jenis_simper")]
+        public string? JenisSimper { get; set; }
+
+        [JsonPropertyName("equipment_classification_id")]
+        public int? EquipmentClassificationId { get; set; }
     }
 
     public class SimperFullDetailDto

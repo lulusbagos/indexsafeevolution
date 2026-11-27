@@ -83,6 +83,7 @@ class _EmployeeHubPageState extends State<EmployeeHubPage> {
   String _minePermitNo = '';
   String _minePermitExp = '';
   String _simperClass = 'Tidak Ada / Belum Terdaftar';
+  Map<String, dynamic>? _simperData;
   String? _pathFoto;
 
   // MCU dari tbl_t_karyawan_mcu
@@ -166,6 +167,7 @@ class _EmployeeHubPageState extends State<EmployeeHubPage> {
       final profData = await _oneEvService.fetchProfile(nik: userNik);
       final certs = await _oneEvService.fetchCertificates(nik: userNik);
       final skills = await _oneEvService.fetchSkillMatrix(nik: userNik);
+      final simperData = await _oneEvService.fetchSimper(nik: userNik);
 
       if (mounted) {
         setState(() {
@@ -236,6 +238,12 @@ class _EmployeeHubPageState extends State<EmployeeHubPage> {
 
           _certificates = certs;
           _skillMatrix = skills;
+          _simperData = simperData;
+          if (simperData != null && simperData['has_simper'] != false) {
+            final noSimper = simperData['nomor']?.toString() ?? '';
+            final units = (simperData['units'] as List?) ?? [];
+            _simperClass = noSimper.isNotEmpty ? '$noSimper (${units.length} Unit Diizinkan)' : 'Belum Terdaftar';
+          }
           _isLoading = false;
         });
       }
@@ -2384,14 +2392,483 @@ class _EmployeeHubPageState extends State<EmployeeHubPage> {
     );
   }
 
-  void _showSimperModal() {
-    _showFeatureDetail(
-      'Surat Izin Mengemudi Perusahaan (SIMPER)',
-      'Status: Belum Terdaftar / Non-SIMPER\n\n'
-      'Karyawan dengan jabatan "$_jabatan" di departemen "$_dept" saat ini tidak memiliki lisensi SIMPER operasional alat/kendaraan tambang.\n\n'
-      'Bagi karyawan yang memerlukan pengoperasian unit sarana atau alat berat, silakan berkoordinasi dengan Driver Training Center (DTC) dan Occupational Health & Safety (OHS).',
-      Icons.drive_eta_rounded,
-      const Color(0xFF64748B),
+  void _showSimperModal() async {
+    // Jika data SIMPER belum dimuat, muat terlebih dahulu secara live
+    if (_simperData == null) {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => const Center(child: CircularProgressIndicator()),
+      );
+      try {
+        final res = await _oneEvService.fetchSimper(nik: _nik);
+        if (mounted) Navigator.pop(context);
+        if (mounted && res != null) {
+          setState(() {
+            _simperData = res;
+            final noSimper = res['nomor']?.toString() ?? '';
+            final units = (res['units'] as List?) ?? [];
+            _simperClass = noSimper.isNotEmpty ? '$noSimper (${units.length} Unit Diizinkan)' : 'Belum Terdaftar';
+          });
+        }
+      } catch (e) {
+        if (mounted) Navigator.pop(context);
+      }
+    }
+    if (!mounted) return;
+
+    final simper = _simperData;
+    if (simper == null || simper['has_simper'] == false) {
+      _showFeatureDetail(
+        'Surat Izin Mengemudi Perusahaan (SIMPER)',
+        'Status: Belum Terdaftar / Non-SIMPER\n\n'
+        'Karyawan dengan jabatan "$_jabatan" di departemen "$_dept" saat ini tidak memiliki lisensi SIMPER operasional alat/kendaraan tambang.\n\n'
+        'Bagi karyawan yang memerlukan pengoperasian unit sarana atau alat berat, silakan berkoordinasi dengan Driver Training Center (DTC) dan Occupational Health & Safety (OHS).',
+        Icons.drive_eta_rounded,
+        const Color(0xFF64748B),
+      );
+      return;
+    }
+
+    final nomorSimper = simper['nomor']?.toString() ?? '-';
+    final status = simper['status']?.toString() ?? 'WAITING';
+    final jenisSimper = simper['jenis_simper']?.toString() ?? 'PERPANJANGAN';
+    final nomorSim = simper['nomor_sim']?.toString() ?? '-';
+    final jenisSim = simper['jenis_sim']?.toString() ?? 'A';
+    final masaBerlaku = simper['masa_berlaku']?.toString() ?? '-';
+    final expiredDate = simper['expired_date']?.toString() ?? '-';
+    final kacamata = simper['kacamata']?.toString() ?? 'TIDAK';
+    final ketentuanHauling = simper['ketentuan_hauling'] == true ? 'YA (Jalan Hauling)' : 'TIDAK';
+    final nilaiTeori = simper['nilai_teori'] != null ? '${simper['nilai_teori']}' : '-';
+    final nilaiPraktek = simper['nilai_praktek'] != null ? '${simper['nilai_praktek']}' : '-';
+    final qrDecrypt = simper['qr_decrypt']?.toString() ?? '';
+    final printedAt = simper['printed_at']?.toString() ?? '-';
+    final printedCount = simper['printed_count']?.toString() ?? '0';
+    final isActive = simper['is_simper_active'] == true;
+    final List units = (simper['units'] as List?) ?? [];
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return Container(
+          height: MediaQuery.of(context).size.height * 0.90,
+          padding: EdgeInsets.fromLTRB(20, 12, 20, MediaQuery.of(context).viewInsets.bottom + 20),
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 48,
+                  height: 5,
+                  margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+              ),
+              Row(
+                children: [
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFF1E3A8A), Color(0xFF2563EB)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(14),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF2563EB).withOpacity(0.3),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: const Icon(Icons.drive_eta_rounded, color: Colors.white, size: 26),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'SIMPER Tambang',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w800,
+                            color: Color(0xFF0F172A),
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'Surat Izin Mengemudi Perusahaan • PT IDC',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey.shade600,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: isActive ? const Color(0xFFDCFCE7) : const Color(0xFFFEF3C7),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: isActive ? const Color(0xFF86EFAC) : const Color(0xFFFDE68A),
+                      ),
+                    ),
+                    child: Text(
+                      status.toUpperCase(),
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                        color: isActive ? const Color(0xFF15803D) : const Color(0xFFB45309),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              const Divider(height: 1),
+              const SizedBox(height: 12),
+              Expanded(
+                child: SingleChildScrollView(
+                  physics: const BouncingScrollPhysics(),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Card 1: Informasi SIMPER Resmi
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF8FAFC),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: const Color(0xFFE2E8F0)),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text(
+                                      'NOMOR SIMPER',
+                                      style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Color(0xFF64748B), letterSpacing: 0.5),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      nomorSimper,
+                                      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: Color(0xFF1E3A8A)),
+                                    ),
+                                  ],
+                                ),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFEFF6FF),
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(color: const Color(0xFFBFDBFE)),
+                                  ),
+                                  child: Text(
+                                    jenisSimper,
+                                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Color(0xFF1D4ED8)),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const Padding(padding: EdgeInsets.symmetric(vertical: 10), child: Divider(height: 1)),
+                            _buildSimperInfoRow('SIM Kepolisian', '$nomorSim (Gol. $jenisSim)'),
+                            _buildSimperInfoRow('Masa Berlaku SIM', masaBerlaku),
+                            _buildSimperInfoRow('Expired SIMPER', expiredDate.split(' ')[0]),
+                            _buildSimperInfoRow('Ketentuan Kacamata', kacamata),
+                            _buildSimperInfoRow('Izin Jalur Hauling', ketentuanHauling),
+                            _buildSimperInfoRow('Nilai Uji', 'Teori: $nilaiTeori  |  Praktek: $nilaiPraktek'),
+                            if (qrDecrypt.isNotEmpty)
+                              _buildSimperInfoRow('Req ID / QR Decrypt', qrDecrypt),
+                            if (printedAt != '-')
+                              _buildSimperInfoRow('Riwayat Cetak', '$printedAt (${printedCount}x)'),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      // Header Unit
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Row(
+                            children: [
+                              const Icon(Icons.car_repair_rounded, size: 20, color: Color(0xFF2563EB)),
+                              const SizedBox(width: 8),
+                              Text(
+                                'Unit yang Diperbolehkan (${units.length})',
+                                style: const TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w800,
+                                  color: Color(0xFF0F172A),
+                                ),
+                              ),
+                            ],
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF1F5F9),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const Text(
+                              'Resmi tb_simper_unit',
+                              style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Color(0xFF475569)),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      if (units.isEmpty)
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF8FAFC),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: const Color(0xFFE2E8F0)),
+                          ),
+                          child: const Center(
+                            child: Text(
+                              'Belum ada unit yang terdaftar di tb_simper_unit',
+                              style: TextStyle(fontSize: 13, color: Color(0xFF64748B)),
+                            ),
+                          ),
+                        )
+                      else
+                        ...units.map((u) {
+                          final unit = Map<String, dynamic>.from(u is Map ? u : {});
+                          final kendaraan = unit['kendaraan']?.toString() ?? 'UNIT';
+                          final eqType = unit['equipment_type']?.toString() ?? unit['equipment_model']?.toString() ?? '-';
+                          final kewenangan = unit['kewenangan']?.toString() ?? 'RESTRICTED';
+                          final jamMin = unit['jam_min']?.toString() ?? '0';
+                          final jamAktual = unit['jam_aktual']?.toString() ?? '0';
+                          final uTeori = unit['nilai_teori']?.toString();
+                          final uPraktek = unit['nilai_praktek']?.toString();
+
+                          final isFull = kewenangan.toUpperCase() == 'FULL';
+                          final isProbation = kewenangan.toUpperCase() == 'PROBATION';
+
+                          IconData unitIcon = Icons.directions_car_rounded;
+                          if (kendaraan.toUpperCase().contains('HEAVY') || eqType.toUpperCase().contains('DOZER') || eqType.toUpperCase().contains('EXCAVATOR')) {
+                            unitIcon = Icons.construction_rounded;
+                          } else if (eqType.toUpperCase().contains('AMBULANCE')) {
+                            unitIcon = Icons.emergency_rounded;
+                          } else if (eqType.toUpperCase().contains('CRANE') || eqType.toUpperCase().contains('TRUCK')) {
+                            unitIcon = Icons.local_shipping_rounded;
+                          }
+
+                          return Container(
+                            margin: const EdgeInsets.only(bottom: 10),
+                            padding: const EdgeInsets.all(14),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(color: const Color(0xFFE2E8F0)),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.02),
+                                  blurRadius: 6,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Container(
+                                  width: 42,
+                                  height: 42,
+                                  decoration: BoxDecoration(
+                                    color: isFull
+                                        ? const Color(0xFFDCFCE7)
+                                        : (isProbation ? const Color(0xFFEFF6FF) : const Color(0xFFFEF3C7)),
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: Icon(
+                                    unitIcon,
+                                    size: 22,
+                                    color: isFull
+                                        ? const Color(0xFF16A34A)
+                                        : (isProbation ? const Color(0xFF2563EB) : const Color(0xFFD97706)),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          Expanded(
+                                            child: Text(
+                                              eqType,
+                                              style: const TextStyle(
+                                                fontSize: 14,
+                                                fontWeight: FontWeight.w800,
+                                                color: Color(0xFF0F172A),
+                                              ),
+                                            ),
+                                          ),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                                            decoration: BoxDecoration(
+                                              color: isFull
+                                                  ? const Color(0xFFDCFCE7)
+                                                  : (isProbation ? const Color(0xFFEFF6FF) : const Color(0xFFFEF3C7)),
+                                              borderRadius: BorderRadius.circular(6),
+                                            ),
+                                            child: Text(
+                                              kewenangan.toUpperCase(),
+                                              style: TextStyle(
+                                                fontSize: 10,
+                                                fontWeight: FontWeight.w800,
+                                                color: isFull
+                                                    ? const Color(0xFF15803D)
+                                                    : (isProbation ? const Color(0xFF1D4ED8) : const Color(0xFFB45309)),
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 3),
+                                      Text(
+                                        kendaraan,
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w600,
+                                          color: Colors.grey.shade600,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 6),
+                                      Row(
+                                        children: [
+                                          Icon(Icons.timer_outlined, size: 13, color: Colors.grey.shade500),
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            'Jam: $jamAktual Jam (Min. $jamMin Jam)',
+                                            style: const TextStyle(
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.w600,
+                                              color: Color(0xFF334155),
+                                            ),
+                                          ),
+                                          if (uTeori != null && uTeori != 'null') ...[
+                                            const SizedBox(width: 10),
+                                            Text(
+                                              '•  Nilai: T:$uTeori / P:$uPraktek',
+                                              style: const TextStyle(
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.w600,
+                                                color: Color(0xFF2563EB),
+                                              ),
+                                            ),
+                                          ],
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        }),
+                      const SizedBox(height: 14),
+                      // Golden Rules Reminder
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFEFF6FF),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFFDBEAFE)),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.shield_outlined, color: Color(0xFF2563EB), size: 20),
+                            const SizedBox(width: 10),
+                            const Expanded(
+                              child: Text(
+                                'Pengemudi wajib mematuhi Golden Rules K3LH IDC, batas kecepatan, dan penggunaan sabuk keselamatan di area tambang.',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: Color(0xFF1E40AF),
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 48,
+                        child: ElevatedButton(
+                          onPressed: () => Navigator.pop(ctx),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF0284C7),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            elevation: 0,
+                          ),
+                          child: const Text(
+                            'Tutup Detail SIMPER',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildSimperInfoRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(fontSize: 12, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
+          ),
+          Text(
+            value,
+            style: const TextStyle(fontSize: 12, color: Color(0xFF0F172A), fontWeight: FontWeight.w700),
+          ),
+        ],
+      ),
     );
   }
 
