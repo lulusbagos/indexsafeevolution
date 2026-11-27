@@ -396,18 +396,56 @@ Future<bool> syncTran(
       final sqldb = await db.database;
       final details = await sqldb.rawQuery('SELECT * FROM p5m_details WHERE tran_id = ? ORDER BY id ASC', [id]);
       if (details.isNotEmpty) {
-        final questions = details.map((d) => d['name']?.toString() ?? '').toList();
-        final answers = details.map((d) {
+        final seenQ = <String>{};
+        final questions = <String>[];
+        final answers = <String>[];
+        for (final d in details) {
+          final qName = (d['name']?.toString() ?? '').trim();
+          if (qName.isEmpty) continue;
+          final normQ = qName.toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
+          if (seenQ.contains(normQ)) continue;
+          seenQ.add(normQ);
+
+          questions.add(qName);
           if (d['type'] == 'fatigue' && d['remark'] != null && d['remark'].toString().isNotEmpty) {
-            return d['remark'].toString();
+            answers.add(d['remark'].toString());
+          } else {
+            answers.add((d['yesno'] == 1 || d['status'] == 1) ? 'Yes' : 'No');
           }
-          return (d['yesno'] == 1 || d['status'] == 1) ? 'Yes' : 'No';
-        }).toList();
+        }
         cleanMap['questions_json'] = jsonEncode(questions);
         cleanMap['answers_json'] = jsonEncode(answers);
+        cleanMap['list_pertanyaan'] = questions.join(';');
+        cleanMap['jawaban'] = answers.join(';');
       } else if (row['questions_json'] != null) {
-        cleanMap['questions_json'] = row['questions_json'].toString();
-        cleanMap['answers_json'] = row['answers_json']?.toString() ?? '[]';
+        try {
+          final rawQ = jsonDecode(row['questions_json'].toString());
+          final rawA = row['answers_json'] != null ? jsonDecode(row['answers_json'].toString()) : [];
+          if (rawQ is List) {
+            final seenQ = <String>{};
+            final questions = <String>[];
+            final answers = <String>[];
+            for (int i = 0; i < rawQ.length; i++) {
+              final q = rawQ[i]?.toString().trim() ?? '';
+              if (q.isEmpty) continue;
+              final norm = q.toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
+              if (seenQ.contains(norm)) continue;
+              seenQ.add(norm);
+              questions.add(q);
+              answers.add((rawA is List && i < rawA.length) ? (rawA[i]?.toString() ?? 'Yes') : 'Yes');
+            }
+            cleanMap['questions_json'] = jsonEncode(questions);
+            cleanMap['answers_json'] = jsonEncode(answers);
+            cleanMap['list_pertanyaan'] = questions.join(';');
+            cleanMap['jawaban'] = answers.join(';');
+          } else {
+            cleanMap['questions_json'] = row['questions_json'].toString();
+            cleanMap['answers_json'] = row['answers_json']?.toString() ?? '[]';
+          }
+        } catch (_) {
+          cleanMap['questions_json'] = row['questions_json'].toString();
+          cleanMap['answers_json'] = row['answers_json']?.toString() ?? '[]';
+        }
       }
 
       if (row['is_pekerja_lapangan'] != null) {

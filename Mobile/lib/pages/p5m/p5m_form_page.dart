@@ -2703,6 +2703,20 @@ class _P5MFormPageState extends State<P5MFormPage> {
         ]);
       }
 
+      final List<String> distinctQuestions = [];
+      final List<String> distinctAnswers = [];
+      final Set<String> seenQText = {};
+      for (int i = 0; i < questionsList.length; i++) {
+        final q = questionsList[i].trim();
+        final a = (i < answersList.length) ? answersList[i].trim() : 'Yes';
+        final norm = q.toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
+        if (norm.isNotEmpty && !seenQText.contains(norm)) {
+          seenQText.add(norm);
+          distinctQuestions.add(q);
+          distinctAnswers.add(a);
+        }
+      }
+
       final p5mMap = <String, dynamic>{
 
         'code': code,
@@ -2735,9 +2749,9 @@ class _P5MFormPageState extends State<P5MFormPage> {
 
         'fit_status': isFit ? 'FIT TO WORK' : 'UNFIT',
 
-        'questions_json': jsonEncode(questionsList),
+        'questions_json': jsonEncode(distinctQuestions),
 
-        'answers_json': jsonEncode(answersList),
+        'answers_json': jsonEncode(distinctAnswers),
 
         'is_pekerja_lapangan': _isPekerjaLapangan ? 1 : 0,
 
@@ -5707,9 +5721,13 @@ class _P5MFormPageState extends State<P5MFormPage> {
   Future<void> _loadDepartmentPjas([String? query]) async {
     final profile = _profile;
     final myDept = (profile?.depart ?? '').trim();
+    final myCompanyId = profile?.companyId ?? _companyId;
+    final myCompany = (profile?.company ?? '').trim();
+    final myNik = (profile?.noNik ?? '').trim();
     final sqldb = await _db.database;
     final safeQuery = (query ?? '').trim().replaceAll("'", "''");
     final safeDept = myDept.replaceAll("'", "''");
+    final safeCompany = myCompany.replaceAll("'", "''");
 
     String sql = '''
       SELECT id, 
@@ -5717,40 +5735,41 @@ class _P5MFormPageState extends State<P5MFormPage> {
              COALESCE(nama_lengkap, nama, '') as nama_lengkap, 
              COALESCE(departemen, depart, 'UMUM') as departemen, 
              COALESCE(posisi, jabatan, 'Pengawas/PJA') as posisi,
-             COALESCE(foto, '') as foto
+             COALESCE(foto, '') as foto,
+             COALESCE(perusahaan, '') as perusahaan,
+             company_id
       FROM employees
       WHERE 1=1
     ''';
 
-    if (safeDept.isNotEmpty) {
-      sql += " AND (departemen LIKE '%$safeDept%' OR depart LIKE '%$safeDept%')";
+    // 1. Wajib filter Perusahaan / Company yang sama dengan login
+    if (myCompanyId != null && myCompanyId > 0 && safeCompany.isNotEmpty) {
+      sql += " AND ((company_id IS NOT NULL AND company_id = $myCompanyId) OR (perusahaan IS NOT NULL AND perusahaan != '' AND (LOWER(perusahaan) = LOWER('$safeCompany') OR perusahaan LIKE '%$safeCompany%')) OR no_nik = '$myNik')";
+    } else if (myCompanyId != null && myCompanyId > 0) {
+      sql += " AND ((company_id IS NOT NULL AND company_id = $myCompanyId) OR no_nik = '$myNik')";
+    } else if (safeCompany.isNotEmpty) {
+      sql += " AND ((perusahaan IS NOT NULL AND perusahaan != '' AND (LOWER(perusahaan) = LOWER('$safeCompany') OR perusahaan LIKE '%$safeCompany%')) OR no_nik = '$myNik')";
     }
+
+    // 2. Wajib filter Departemen yang sama dengan login
+    if (safeDept.isNotEmpty) {
+      sql += " AND (LOWER(departemen) = LOWER('$safeDept') OR LOWER(depart) = LOWER('$safeDept') OR departemen LIKE '%$safeDept%' OR depart LIKE '%$safeDept%')";
+    }
+
+    // 3. Filter query pencarian
     if (safeQuery.isNotEmpty) {
       sql += " AND (nama_lengkap LIKE '%$safeQuery%' OR no_nik LIKE '%$safeQuery%' OR posisi LIKE '%$safeQuery%')";
     }
     sql += " ORDER BY nama_lengkap ASC LIMIT 50";
 
     try {
-      var rows = await sqldb.rawQuery(sql);
-      if (rows.isEmpty && safeDept.isNotEmpty) {
-        rows = await sqldb.rawQuery('''
-          SELECT id, 
-                 COALESCE(no_nik, nik, '') as no_nik, 
-                 COALESCE(nama_lengkap, nama, '') as nama_lengkap, 
-                 COALESCE(departemen, depart, 'UMUM') as departemen, 
-                 COALESCE(posisi, jabatan, 'Pengawas/PJA') as posisi,
-                 COALESCE(foto, '') as foto
-          FROM employees
-          ORDER BY nama_lengkap ASC LIMIT 50
-        ''');
-      }
+      final rows = await sqldb.rawQuery(sql);
 
       if (mounted) {
         setState(() {
           _deptPjaCandidates = rows.map((r) => Map<String, dynamic>.from(r)).toList();
         });
         if (_selectedPjaNik == null && _deptPjaCandidates.isNotEmpty) {
-          final myNik = (profile?.noNik ?? '').trim();
           final candidate = _deptPjaCandidates.firstWhere(
             (c) => c['no_nik'].toString().trim() != myNik,
             orElse: () => _deptPjaCandidates.first,
@@ -5823,8 +5842,10 @@ class _P5MFormPageState extends State<P5MFormPage> {
                                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
                                 ),
                                 Text(
-                                  'Departemen: ${_profile?.depart ?? "Sama dengan login"}',
+                                  'Perusahaan: ${_profile?.company ?? "PT INDEXIM COALINDO"} • Dept: ${_profile?.depart ?? "Sama dengan login"}',
                                   style: const TextStyle(fontSize: 11, color: Color(0xFF0D9488), fontWeight: FontWeight.w600),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
                                 ),
                               ],
                             ),
@@ -5874,8 +5895,9 @@ class _P5MFormPageState extends State<P5MFormPage> {
                                   Icon(Icons.person_off_rounded, size: 40, color: Colors.grey.shade400),
                                   const SizedBox(height: 8),
                                   Text(
-                                    'Tidak ada data PJA di departemen ini',
-                                    style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+                                    'Tidak ada data pengawas lain di ${(_profile?.depart ?? "departemen ini").trim()} (${_profile?.company ?? "perusahaan Anda"})',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
                                   ),
                                 ],
                               ),

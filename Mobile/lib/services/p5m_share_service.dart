@@ -90,9 +90,15 @@ class P5mShareService {
 
     bool hasUnfit = false;
     List<Map<String, String>> parsedItems = [];
+    final Set<String> seenQText = {};
 
     for (int i = 0; i < questions.length; i++) {
-      final qText = questions[i];
+      final qText = questions[i].trim();
+      if (qText.isEmpty) continue;
+      final normQ = qText.toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
+      if (seenQText.contains(normQ)) continue;
+      seenQText.add(normQ);
+
       final ans = (i < answers.length) ? answers[i].trim() : 'Yes';
       final qLower = qText.toLowerCase();
 
@@ -709,19 +715,39 @@ class P5mShareService {
       }
     }
 
-    // Separate Core Fit to Work items and Fatigue items
-    final coreItems = items.where((it) => it['type'] == 'core').toList();
-    final fatigueItems = items.where((it) => it['type'] == 'fatigue').toList();
+    // Separate Core Fit to Work items and Fatigue items with strict deduplication
+    final Set<String> seenModalQ = {};
+    final coreItems = <Map<String, String>>[];
+    final fatigueItems = <Map<String, String>>[];
+
+    for (var it in items) {
+      final q = (it['question'] ?? '').trim();
+      if (q.isEmpty) continue;
+      final norm = q.toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
+      if (seenModalQ.contains(norm)) continue;
+      seenModalQ.add(norm);
+
+      if (it['type'] == 'core') {
+        coreItems.add(it);
+      } else {
+        fatigueItems.add(it);
+      }
+    }
 
     // Fallback if core questions empty
     if (coreItems.isEmpty) {
       for (var def in defaultFitToWorkQuestions) {
-        coreItems.add({
-          'question': def['question']!,
-          'answer': isFit ? 'YES (SEHAT)' : 'NO (UNFIT)',
-          'isFit': isFit.toString(),
-          'type': 'core',
-        });
+        final q = def['question']!.trim();
+        final norm = q.toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
+        if (!seenModalQ.contains(norm)) {
+          seenModalQ.add(norm);
+          coreItems.add({
+            'question': q,
+            'answer': isFit ? 'YES (SEHAT)' : 'NO (UNFIT)',
+            'isFit': isFit.toString(),
+            'type': 'core',
+          });
+        }
       }
     }
 
@@ -730,28 +756,35 @@ class P5mShareService {
       try {
         final fMap = jsonDecode(data['fatigue_json'].toString());
         if (fMap is Map) {
+          void addFatigue(String q, String a, bool fit) {
+            final norm = q.toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
+            if (!seenModalQ.contains(norm)) {
+              seenModalQ.add(norm);
+              fatigueItems.add({'question': q, 'answer': a, 'isFit': fit.toString(), 'type': 'fatigue'});
+            }
+          }
           if (fMap['jam_mulai_tidur'] != null) {
-            fatigueItems.add({'question': 'Jam berapa Anda mulai tidur terakhir?', 'answer': fMap['jam_mulai_tidur'].toString(), 'isFit': 'true', 'type': 'fatigue'});
+            addFatigue('Jam berapa Anda mulai tidur terakhir?', fMap['jam_mulai_tidur'].toString(), true);
           }
           if (fMap['jam_bangun'] != null) {
-            fatigueItems.add({'question': 'Jam berapa Anda bangun hari ini?', 'answer': fMap['jam_bangun'].toString(), 'isFit': 'true', 'type': 'fatigue'});
+            addFatigue('Jam berapa Anda bangun hari ini?', fMap['jam_bangun'].toString(), true);
           }
           if (fMap['durasi_tidur_24h'] != null) {
             final d24 = fMap['durasi_tidur_24h'].toString();
             final isDef = d24 == '< 4 Jam' || d24 == '4 Jam' || d24 == '5 Jam';
-            fatigueItems.add({'question': 'Berapa total durasi tidur Anda dalam 24 jam terakhir?', 'answer': d24, 'isFit': (!isDef).toString(), 'type': 'fatigue'});
+            addFatigue('Berapa total durasi tidur Anda dalam 24 jam terakhir?', d24, !isDef);
           }
           if (fMap['durasi_tidur_48h'] != null) {
-            fatigueItems.add({'question': 'Berapa total durasi tidur Anda dalam 48 jam terakhir?', 'answer': fMap['durasi_tidur_48h'].toString(), 'isFit': 'true', 'type': 'fatigue'});
+            addFatigue('Berapa total durasi tidur Anda dalam 48 jam terakhir?', fMap['durasi_tidur_48h'].toString(), true);
           }
           if (fMap['tidur_siang'] != null) {
-            fatigueItems.add({'question': 'Apakah Anda tidur siang dalam 24 jam terakhir?', 'answer': fMap['tidur_siang'] == true || fMap['tidur_siang'] == 'true' || fMap['tidur_siang'] == 1 ? 'Ya' : 'Tidak', 'isFit': 'true', 'type': 'fatigue'});
+            addFatigue('Apakah Anda tidur siang dalam 24 jam terakhir?', fMap['tidur_siang'] == true || fMap['tidur_siang'] == 'true' || fMap['tidur_siang'] == 1 ? 'Ya' : 'Tidak', true);
           }
           if (fMap['durasi_tidur_siang'] != null && fMap['durasi_tidur_siang'] != '-') {
-            fatigueItems.add({'question': 'Jika ya, berapa lama Anda tidur siang?', 'answer': fMap['durasi_tidur_siang'].toString(), 'isFit': 'true', 'type': 'fatigue'});
+            addFatigue('Jika ya, berapa lama Anda tidur siang?', fMap['durasi_tidur_siang'].toString(), true);
           }
           if (fMap['sering_terbangun'] != null) {
-            fatigueItems.add({'question': 'Apakah tidur Anda sering terbangun di malam hari?', 'answer': fMap['sering_terbangun'] == true || fMap['sering_terbangun'] == 'true' || fMap['sering_terbangun'] == 1 ? 'Ya' : 'Tidak', 'isFit': 'true', 'type': 'fatigue'});
+            addFatigue('Apakah tidur Anda sering terbangun di malam hari?', fMap['sering_terbangun'] == true || fMap['sering_terbangun'] == 'true' || fMap['sering_terbangun'] == 1 ? 'Ya' : 'Tidak', true);
           }
         }
       } catch (_) {}

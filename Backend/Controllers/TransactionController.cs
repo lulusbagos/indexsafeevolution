@@ -3868,6 +3868,21 @@ namespace Indexsafe.Api.Controllers
 
 
 
+                    // Also check list_pertanyaan / jawaban semicolon separated
+                    if (questionsList == null || questionsList.Count == 0)
+                    {
+                        var listPertanyaanStr = form["list_pertanyaan"].FirstOrDefault();
+                        var jawabanStr = form["jawaban"].FirstOrDefault();
+                        if (!string.IsNullOrWhiteSpace(listPertanyaanStr))
+                        {
+                            questionsList = listPertanyaanStr.Split(';').Where(x => !string.IsNullOrWhiteSpace(x)).ToList();
+                            if (!string.IsNullOrWhiteSpace(jawabanStr))
+                            {
+                                answersList = jawabanStr.Split(';').ToList();
+                            }
+                        }
+                    }
+
                     // Also check form indexed keys (e.g. questions[0], answers[0])
 
 
@@ -3992,117 +4007,80 @@ namespace Indexsafe.Api.Controllers
                     catch {}
 
                     if (questionsList != null && questionsList.Count > 0)
-
-
-
                     {
-
-
-
+                        var distinctQuestions = new List<(string Question, string Answer)>();
+                        var seenQ = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                         for (int i = 0; i < questionsList.Count; i++)
-
-
-
                         {
-
-
-
-                            var q = questionsList[i];
-
-
-
-                            var a = (answersList != null && i < answersList.Count) ? answersList[i] : "No";
-
-
-
-
-
-
-
-                            if (a.Equals("No", StringComparison.OrdinalIgnoreCase) || a.Equals("Tidak", StringComparison.OrdinalIgnoreCase) || a == "0")
-
+                            var q = questionsList[i]?.Trim() ?? "";
+                            if (string.IsNullOrWhiteSpace(q)) continue;
+                            var a = (answersList != null && i < answersList.Count) ? (answersList[i]?.Trim() ?? "No") : "No";
+                            if (seenQ.Add(q))
                             {
-
-                                if (i < 4 || q.Contains("cukup tidur") || q.Contains("sehat") || q.Contains("bebas dari masalah") || q.Contains("APD"))
-
-                                {
-
-                                    hasUnfit = true;
-
-                                }
-
+                                distinctQuestions.Add((q, a));
                             }
-
-
-
-                            var p5mRecord = new P5m
-
-                            {
-
-                                FotoKegiatan = fotoKegiatanUrl,
-
-                                Tanggal = tanggal,
-
-                                Waktu = waktu,
-
-                                Nama = userName,
-
-                                Nik = userNik,
-
-                                Departemen = dept,
-
-                                Area = area,
-
-                                Lokasi = lokasi,
-
-                                DetilLokasi = detilLokasi,
-
-                                Topik = topik,
-
-                                Judul = judul,
-
-                                Keterangan = keterangan,
-
-                                ListPertanyaan = q,
-
-                                Jawaban = a,
-
-                                Catatan = catatan,
-
-                                PerusahaanId = companyId,
-
-                                IsPekerjaLapangan = isPekerjaLapangan,
-
-                                FatigueJson = fatigueJson,
-
-                                PjaNik = pjaNik,
-
-                                PjaNama = pjaNama,
-
-                                PjaId = pjaId,
-
-                                PjaDepartemen = pjaDept,
-
-                                AtasanNik = atasanNik,
-
-                                AtasanNama = atasanNama,
-
-                                IsDeleted = false,
-
-                                CreatedAt = DateTime.Now
-
-                            };
-
-
-
-                            _context.P5ms.Add(p5mRecord);
-
-                            await _context.SaveChangesAsync();
-
-                            if (i == 0) primaryId = p5mRecord.Id;
-
                         }
 
+                        // Cegah duplikasi data jika terjadi double-sync / re-sync untuk NIK, tanggal, dan waktu yang sama
+                        try
+                        {
+                            var existingP5m = await _context.P5ms
+                                .Where(p => !p.IsDeleted && p.Nik == userNik && p.Tanggal == tanggal && p.Waktu == waktu)
+                                .ToListAsync();
+                            if (existingP5m.Count > 0)
+                            {
+                                _context.P5ms.RemoveRange(existingP5m);
+                                await _context.SaveChangesAsync();
+                            }
+                        }
+                        catch {}
+
+                        for (int i = 0; i < distinctQuestions.Count; i++)
+                        {
+                            var (q, a) = distinctQuestions[i];
+
+                            if (a.Equals("No", StringComparison.OrdinalIgnoreCase) || a.Equals("Tidak", StringComparison.OrdinalIgnoreCase) || a == "0")
+                            {
+                                if (i < 4 || q.Contains("cukup tidur") || q.Contains("sehat") || q.Contains("bebas dari masalah") || q.Contains("APD"))
+                                {
+                                    hasUnfit = true;
+                                }
+                            }
+
+                            var p5mRecord = new P5m
+                            {
+                                FotoKegiatan = fotoKegiatanUrl,
+                                Tanggal = tanggal,
+                                Waktu = waktu,
+                                Nama = userName,
+                                Nik = userNik,
+                                Departemen = dept,
+                                Area = area,
+                                Lokasi = lokasi,
+                                DetilLokasi = detilLokasi,
+                                Topik = topik,
+                                Judul = judul,
+                                Keterangan = keterangan,
+                                ListPertanyaan = q,
+                                Jawaban = a,
+                                Catatan = catatan,
+                                PerusahaanId = companyId,
+                                IsPekerjaLapangan = isPekerjaLapangan,
+                                FatigueJson = fatigueJson,
+                                PjaNik = pjaNik,
+                                PjaNama = pjaNama,
+                                PjaId = pjaId,
+                                PjaDepartemen = pjaDept,
+                                AtasanNik = atasanNik,
+                                AtasanNama = atasanNama,
+                                IsDeleted = false,
+                                CreatedAt = DateTime.Now
+                            };
+
+                            _context.P5ms.Add(p5mRecord);
+                            await _context.SaveChangesAsync();
+                            if (i == 0) primaryId = p5mRecord.Id;
+                        }
                     }
 
                     else
