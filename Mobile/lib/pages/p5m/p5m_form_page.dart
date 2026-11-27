@@ -4849,19 +4849,19 @@ class _P5MFormPageState extends State<P5MFormPage> {
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
         decoration: BoxDecoration(
           color: isSelected
-              ? (isAlert ? const Color(0xFFEF4444) : const Color(0xFF0D9488))
+              ? (isAlert ? const Color(0xFFFEF2F2) : const Color(0xFFECFDF5))
               : const Color(0xFFF8FAFC),
           borderRadius: BorderRadius.circular(10),
           border: Border.all(
             color: isSelected
-                ? (isAlert ? const Color(0xFFDC2626) : const Color(0xFF0F766E))
+                ? (isAlert ? const Color(0xFFDC2626) : const Color(0xFF059669))
                 : const Color(0xFFE2E8F0),
             width: isSelected ? 1.5 : 1,
           ),
           boxShadow: isSelected
               ? [
                   BoxShadow(
-                    color: (isAlert ? Colors.red : const Color(0xFF0D9488)).withValues(alpha: 0.25),
+                    color: (isAlert ? Colors.red : const Color(0xFF059669)).withValues(alpha: 0.15),
                     blurRadius: 4,
                     offset: const Offset(0, 2),
                   )
@@ -4872,7 +4872,11 @@ class _P5MFormPageState extends State<P5MFormPage> {
           mainAxisSize: MainAxisSize.min,
           children: [
             if (isSelected) ...[
-              const Icon(Icons.check_circle_rounded, size: 14, color: Colors.white),
+              Icon(
+                isAlert ? Icons.warning_amber_rounded : Icons.check_circle_rounded,
+                size: 13,
+                color: isAlert ? const Color(0xFFDC2626) : const Color(0xFF059669),
+              ),
               const SizedBox(width: 5),
             ],
             Text(
@@ -4880,10 +4884,113 @@ class _P5MFormPageState extends State<P5MFormPage> {
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                color: isSelected ? Colors.white : const Color(0xFF334155),
+                color: isSelected
+                    ? (isAlert ? const Color(0xFFB91C1C) : const Color(0xFF047857))
+                    : const Color(0xFF334155),
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDurationGridItem({
+    required String label,
+    required String statusHint,
+    required bool isSelected,
+    required bool isDeficit,
+    required VoidCallback onTap,
+  }) {
+    Color bgColor;
+    Color borderColor;
+    Color textColor;
+    Color hintColor;
+
+    if (isSelected) {
+      if (isDeficit) {
+        bgColor = const Color(0xFFFEF2F2);
+        borderColor = const Color(0xFFDC2626);
+        textColor = const Color(0xFFB91C1C);
+        hintColor = const Color(0xFFDC2626);
+      } else {
+        bgColor = const Color(0xFFECFDF5);
+        borderColor = const Color(0xFF059669);
+        textColor = const Color(0xFF047857);
+        hintColor = const Color(0xFF059669);
+      }
+    } else {
+      bgColor = const Color(0xFFF8FAFC);
+      borderColor = const Color(0xFFE2E8F0);
+      textColor = const Color(0xFF334155);
+      hintColor = const Color(0xFF94A3B8);
+    }
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
+          decoration: BoxDecoration(
+            color: bgColor,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: borderColor,
+              width: isSelected ? 1.5 : 1,
+            ),
+            boxShadow: isSelected
+                ? [
+                    BoxShadow(
+                      color: (isDeficit ? Colors.red : const Color(0xFF059669)).withValues(alpha: 0.16),
+                      blurRadius: 4,
+                      offset: const Offset(0, 2),
+                    ),
+                  ]
+                : null,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  if (isSelected) ...[
+                    Icon(
+                      isDeficit ? Icons.warning_amber_rounded : Icons.check_circle_rounded,
+                      size: 13,
+                      color: textColor,
+                    ),
+                    const SizedBox(width: 3),
+                  ],
+                  Flexible(
+                    child: Text(
+                      label,
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                        color: textColor,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 2),
+              Text(
+                statusHint,
+                style: TextStyle(
+                  fontSize: 9.5,
+                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                  color: hintColor,
+                ),
+                maxLines: 1,
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -5001,7 +5108,7 @@ class _P5MFormPageState extends State<P5MFormPage> {
                   ),
                   Switch.adaptive(
                     value: _isPekerjaLapangan,
-                    activeColor: const Color(0xFF0D9488),
+                    activeThumbColor: const Color(0xFF0D9488),
                     activeTrackColor: const Color(0xFF0D9488).withValues(alpha: 0.5),
                     onChanged: (val) => setState(() => _isPekerjaLapangan = val),
                   ),
@@ -5177,34 +5284,42 @@ class _P5MFormPageState extends State<P5MFormPage> {
                   const SizedBox(height: 8),
                   InkWell(
                     onTap: () => _pickTimeFor(true),
-                    borderRadius: BorderRadius.circular(10),
+                    borderRadius: BorderRadius.circular(12),
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
                       decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: const Color(0xFFCBD5E1)),
+                        color: const Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
                       ),
                       child: Row(
                         children: [
-                          const Icon(Icons.nightlight_round, size: 18, color: Color(0xFF6366F1)),
+                          Container(
+                            padding: const EdgeInsets.all(7),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF0F766E).withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Icon(Icons.nightlight_round, size: 16, color: Color(0xFF0F766E)),
+                          ),
                           const SizedBox(width: 10),
                           Text(
                             '${_jamMulaiTidur.hour.toString().padLeft(2, '0')}:${_jamMulaiTidur.minute.toString().padLeft(2, '0')} WITA',
-                            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                            style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
                           ),
                           const Spacer(),
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                             decoration: BoxDecoration(
-                              color: const Color(0xFF6366F1).withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(6),
+                              color: const Color(0xFF0F766E).withValues(alpha: 0.08),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: const Color(0xFF0F766E).withValues(alpha: 0.2)),
                             ),
                             child: const Row(
                               children: [
-                                Icon(Icons.access_time_rounded, size: 13, color: Color(0xFF6366F1)),
+                                Icon(Icons.access_time_rounded, size: 13, color: Color(0xFF0F766E)),
                                 SizedBox(width: 4),
-                                Text('Ubah Jam', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF6366F1))),
+                                Text('Ubah Jam', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF0F766E))),
                               ],
                             ),
                           ),
@@ -5219,34 +5334,42 @@ class _P5MFormPageState extends State<P5MFormPage> {
                   const SizedBox(height: 8),
                   InkWell(
                     onTap: () => _pickTimeFor(false),
-                    borderRadius: BorderRadius.circular(10),
+                    borderRadius: BorderRadius.circular(12),
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
                       decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: const Color(0xFFCBD5E1)),
+                        color: const Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
                       ),
                       child: Row(
                         children: [
-                          const Icon(Icons.wb_sunny_rounded, size: 18, color: Color(0xFFF59E0B)),
+                          Container(
+                            padding: const EdgeInsets.all(7),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFD97706).withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Icon(Icons.wb_sunny_rounded, size: 16, color: Color(0xFFD97706)),
+                          ),
                           const SizedBox(width: 10),
                           Text(
                             '${_jamBangun.hour.toString().padLeft(2, '0')}:${_jamBangun.minute.toString().padLeft(2, '0')} WITA',
-                            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                            style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
                           ),
                           const Spacer(),
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                             decoration: BoxDecoration(
-                              color: const Color(0xFFF59E0B).withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(6),
+                              color: const Color(0xFF0F766E).withValues(alpha: 0.08),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: const Color(0xFF0F766E).withValues(alpha: 0.2)),
                             ),
                             child: const Row(
                               children: [
-                                Icon(Icons.access_time_rounded, size: 13, color: Color(0xFFD97706)),
+                                Icon(Icons.access_time_rounded, size: 13, color: Color(0xFF0F766E)),
                                 SizedBox(width: 4),
-                                Text('Ubah Jam', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFFD97706))),
+                                Text('Ubah Jam', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF0F766E))),
                               ],
                             ),
                           ),
@@ -5254,92 +5377,126 @@ class _P5MFormPageState extends State<P5MFormPage> {
                       ),
                     ),
                   ),
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 16),
 
-                  // Q3: Total Durasi Tidur 24 Jam Terakhir (Tombol Chips 4 Jam s/d 10 Jam)
+                  // Q3: Total Durasi Tidur 24 Jam Terakhir (3x3 Grid Rapi, Senada & Profesional)
                   _buildFatigueQuestionHeader(
                     '3',
                     'Berapa total durasi tidur Anda dalam 24 jam terakhir?',
                     subtitle: 'Pilih tombol durasi (Otomatis menyesuaikan checklist Fit to Work #3)',
                   ),
                   const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      '< 4 Jam',
-                      '4 Jam',
-                      '5 Jam',
-                      '6 Jam',
-                      '7 Jam',
-                      '8 Jam',
-                      '9 Jam',
-                      '10 Jam',
-                      '> 10 Jam',
-                    ].map((opt) {
-                      final isSel = _durasiTidur24h == opt;
-                      final isAlert = opt == '< 4 Jam' || opt == '4 Jam' || opt == '5 Jam';
-                      return _buildSelectableChip(opt, isSel, () {
-                        setState(() {
-                          _durasiTidur24h = opt;
-                          if (isAlert) {
-                            _fitQuestions[2]['answer'] = 'No';
-                          } else {
-                            _fitQuestions[2]['answer'] = 'Yes';
-                          }
-                        });
-                      }, isAlert: isAlert && isSel);
-                    }).toList(),
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      final itemWidth = (constraints.maxWidth - 16) / 3;
+                      final options = [
+                        {'val': '< 4 Jam', 'hint': 'Defisit Kritis', 'alert': true},
+                        {'val': '4 Jam', 'hint': 'Defisit Tinggi', 'alert': true},
+                        {'val': '5 Jam', 'hint': 'Kurang Tidur', 'alert': true},
+                        {'val': '6 Jam', 'hint': 'Standar Minimal', 'alert': false},
+                        {'val': '7 Jam', 'hint': 'Optimal Sehat', 'alert': false},
+                        {'val': '8 Jam', 'hint': 'Optimal Sehat', 'alert': false},
+                        {'val': '9 Jam', 'hint': 'Cukup & Segar', 'alert': false},
+                        {'val': '10 Jam', 'hint': 'Istirahat Panjang', 'alert': false},
+                        {'val': '> 10 Jam', 'hint': 'Ekstra Panjang', 'alert': false},
+                      ];
+                      return Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: options.map((opt) {
+                          final val = opt['val'] as String;
+                          final hint = opt['hint'] as String;
+                          final isAlert = opt['alert'] as bool;
+                          final isSel = _durasiTidur24h == val;
+                          return SizedBox(
+                            width: itemWidth,
+                            child: _buildDurationGridItem(
+                              label: val,
+                              statusHint: hint,
+                              isSelected: isSel,
+                              isDeficit: isAlert,
+                              onTap: () {
+                                setState(() {
+                                  _durasiTidur24h = val;
+                                  if (isAlert) {
+                                    _fitQuestions[2]['answer'] = 'No';
+                                  } else {
+                                    _fitQuestions[2]['answer'] = 'Yes';
+                                  }
+                                });
+                              },
+                            ),
+                          );
+                        }).toList(),
+                      );
+                    },
                   ),
                   if (_durasiTidur24h == '< 4 Jam' || _durasiTidur24h == '4 Jam' || _durasiTidur24h == '5 Jam') ...[
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 8),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                       decoration: BoxDecoration(
                         color: const Color(0xFFFEF2F2),
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(10),
                         border: Border.all(color: const Color(0xFFFECACA)),
                       ),
                       child: const Row(
                         children: [
-                          Icon(Icons.warning_amber_rounded, size: 14, color: Color(0xFFDC2626)),
-                          SizedBox(width: 6),
+                          Icon(Icons.warning_amber_rounded, size: 16, color: Color(0xFFDC2626)),
+                          SizedBox(width: 8),
                           Expanded(
                             child: Text(
-                              'Peringatan: Tidur kurang dari 6 jam berisiko kelelahan tinggi (UNFIT).',
-                              style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFFDC2626)),
+                              'Peringatan K3: Tidur kurang dari 6 jam berisiko fatigue tinggi (UNFIT). Alert deviasi otomatis diteruskan ke PJA.',
+                              style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFFDC2626), height: 1.3),
                             ),
                           ),
                         ],
                       ),
                     ),
                   ],
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 16),
 
-                  // Q4: Total Durasi Tidur 48 Jam Terakhir
+                  // Q4: Total Durasi Tidur 48 Jam Terakhir (3x2 Grid Rapi)
                   _buildFatigueQuestionHeader('4', 'Berapa total durasi tidur Anda dalam 48 jam terakhir?'),
                   const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      '< 8 Jam',
-                      '8 - 10 Jam',
-                      '11 - 12 Jam',
-                      '13 - 14 Jam',
-                      '15 - 16 Jam',
-                      '> 16 Jam',
-                    ].map((opt) {
-                      final isSel = _durasiTidur48h == opt;
-                      final isAlert = opt == '< 8 Jam';
-                      return _buildSelectableChip(opt, isSel, () {
-                        setState(() => _durasiTidur48h = opt);
-                      }, isAlert: isAlert && isSel);
-                    }).toList(),
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      final itemWidth = (constraints.maxWidth - 16) / 3;
+                      final options48 = [
+                        {'val': '< 8 Jam', 'hint': 'Defisit Tinggi', 'alert': true},
+                        {'val': '8 - 10 Jam', 'hint': 'Kurang Cukup', 'alert': false},
+                        {'val': '11 - 12 Jam', 'hint': 'Cukup Standar', 'alert': false},
+                        {'val': '13 - 14 Jam', 'hint': 'Optimal Sehat', 'alert': false},
+                        {'val': '15 - 16 Jam', 'hint': 'Istirahat Baik', 'alert': false},
+                        {'val': '> 16 Jam', 'hint': 'Ekstra Panjang', 'alert': false},
+                      ];
+                      return Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: options48.map((opt) {
+                          final val = opt['val'] as String;
+                          final hint = opt['hint'] as String;
+                          final isAlert = opt['alert'] as bool;
+                          final isSel = _durasiTidur48h == val;
+                          return SizedBox(
+                            width: itemWidth,
+                            child: _buildDurationGridItem(
+                              label: val,
+                              statusHint: hint,
+                              isSelected: isSel,
+                              isDeficit: isAlert,
+                              onTap: () {
+                                setState(() => _durasiTidur48h = val);
+                              },
+                            ),
+                          );
+                        }).toList(),
+                      );
+                    },
                   ),
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 16),
 
-                  // Q5: Tidur Siang 24 Jam Terakhir (Ya/Tidak)
+                  // Q5: Tidur Siang 24 Jam Terakhir (Ya/Tidak) - Desain Senada & Elegan
                   _buildFatigueQuestionHeader('5', 'Apakah Anda tidur siang dalam 24 jam terakhir?'),
                   const SizedBox(height: 8),
                   Row(
@@ -5347,28 +5504,33 @@ class _P5MFormPageState extends State<P5MFormPage> {
                       Expanded(
                         child: InkWell(
                           onTap: () => setState(() => _tidurSiang = true),
-                          borderRadius: BorderRadius.circular(10),
+                          borderRadius: BorderRadius.circular(12),
                           child: AnimatedContainer(
                             duration: const Duration(milliseconds: 180),
-                            padding: const EdgeInsets.symmetric(vertical: 10),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
                             decoration: BoxDecoration(
-                              color: _tidurSiang ? const Color(0xFF0D9488) : const Color(0xFFF8FAFC),
-                              borderRadius: BorderRadius.circular(10),
+                              color: _tidurSiang ? const Color(0xFFECFDF5) : const Color(0xFFF8FAFC),
+                              borderRadius: BorderRadius.circular(12),
                               border: Border.all(
-                                color: _tidurSiang ? const Color(0xFF0F766E) : const Color(0xFFE2E8F0),
+                                color: _tidurSiang ? const Color(0xFF059669) : const Color(0xFFE2E8F0),
+                                width: _tidurSiang ? 1.5 : 1,
                               ),
                             ),
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                Icon(Icons.check_circle_rounded, size: 16, color: _tidurSiang ? Colors.white : const Color(0xFF64748B)),
-                                const SizedBox(width: 6),
+                                Icon(
+                                  _tidurSiang ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded,
+                                  size: 16,
+                                  color: _tidurSiang ? const Color(0xFF059669) : const Color(0xFF94A3B8),
+                                ),
+                                const SizedBox(width: 8),
                                 Text(
-                                  'Ya',
+                                  'Ya (Ada Tidur Siang)',
                                   style: TextStyle(
                                     fontSize: 12.5,
-                                    fontWeight: FontWeight.bold,
-                                    color: _tidurSiang ? Colors.white : const Color(0xFF334155),
+                                    fontWeight: _tidurSiang ? FontWeight.bold : FontWeight.w600,
+                                    color: _tidurSiang ? const Color(0xFF047857) : const Color(0xFF334155),
                                   ),
                                 ),
                               ],
@@ -5380,28 +5542,33 @@ class _P5MFormPageState extends State<P5MFormPage> {
                       Expanded(
                         child: InkWell(
                           onTap: () => setState(() => _tidurSiang = false),
-                          borderRadius: BorderRadius.circular(10),
+                          borderRadius: BorderRadius.circular(12),
                           child: AnimatedContainer(
                             duration: const Duration(milliseconds: 180),
-                            padding: const EdgeInsets.symmetric(vertical: 10),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
                             decoration: BoxDecoration(
-                              color: !_tidurSiang ? const Color(0xFF64748B) : const Color(0xFFF8FAFC),
-                              borderRadius: BorderRadius.circular(10),
+                              color: !_tidurSiang ? const Color(0xFFF1F5F9) : const Color(0xFFF8FAFC),
+                              borderRadius: BorderRadius.circular(12),
                               border: Border.all(
-                                color: !_tidurSiang ? const Color(0xFF475569) : const Color(0xFFE2E8F0),
+                                color: !_tidurSiang ? const Color(0xFF94A3B8) : const Color(0xFFE2E8F0),
+                                width: !_tidurSiang ? 1.5 : 1,
                               ),
                             ),
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                Icon(Icons.cancel_rounded, size: 16, color: !_tidurSiang ? Colors.white : const Color(0xFF64748B)),
-                                const SizedBox(width: 6),
+                                Icon(
+                                  !_tidurSiang ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded,
+                                  size: 16,
+                                  color: !_tidurSiang ? const Color(0xFF475569) : const Color(0xFF94A3B8),
+                                ),
+                                const SizedBox(width: 8),
                                 Text(
                                   'Tidak',
                                   style: TextStyle(
                                     fontSize: 12.5,
-                                    fontWeight: FontWeight.bold,
-                                    color: !_tidurSiang ? Colors.white : const Color(0xFF334155),
+                                    fontWeight: !_tidurSiang ? FontWeight.bold : FontWeight.w600,
+                                    color: !_tidurSiang ? const Color(0xFF1E293B) : const Color(0xFF64748B),
                                   ),
                                 ),
                               ],
@@ -5433,10 +5600,10 @@ class _P5MFormPageState extends State<P5MFormPage> {
                         });
                       }).toList(),
                     ),
-                    const SizedBox(height: 14),
+                    const SizedBox(height: 16),
                   ],
 
-                  // Q7: Sering Terbangun di Malam Hari? (Ya/Tidak)
+                  // Q7: Sering Terbangun di Malam Hari? (Desain Senada, Lembut & Informatif)
                   _buildFatigueQuestionHeader('7', 'Apakah tidur Anda sering terbangun di malam hari?'),
                   const SizedBox(height: 8),
                   Row(
@@ -5444,28 +5611,33 @@ class _P5MFormPageState extends State<P5MFormPage> {
                       Expanded(
                         child: InkWell(
                           onTap: () => setState(() => _seringTerbangun = true),
-                          borderRadius: BorderRadius.circular(10),
+                          borderRadius: BorderRadius.circular(12),
                           child: AnimatedContainer(
                             duration: const Duration(milliseconds: 180),
-                            padding: const EdgeInsets.symmetric(vertical: 10),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
                             decoration: BoxDecoration(
-                              color: _seringTerbangun ? const Color(0xFFEF4444) : const Color(0xFFF8FAFC),
-                              borderRadius: BorderRadius.circular(10),
+                              color: _seringTerbangun ? const Color(0xFFFFFBEB) : const Color(0xFFF8FAFC),
+                              borderRadius: BorderRadius.circular(12),
                               border: Border.all(
-                                color: _seringTerbangun ? const Color(0xFFDC2626) : const Color(0xFFE2E8F0),
+                                color: _seringTerbangun ? const Color(0xFFF59E0B) : const Color(0xFFE2E8F0),
+                                width: _seringTerbangun ? 1.5 : 1,
                               ),
                             ),
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                Icon(Icons.warning_amber_rounded, size: 16, color: _seringTerbangun ? Colors.white : const Color(0xFF64748B)),
+                                Icon(
+                                  Icons.warning_amber_rounded,
+                                  size: 16,
+                                  color: _seringTerbangun ? const Color(0xFFD97706) : const Color(0xFF94A3B8),
+                                ),
                                 const SizedBox(width: 6),
                                 Text(
                                   'Ya (Sering Terganggu)',
                                   style: TextStyle(
                                     fontSize: 12,
-                                    fontWeight: FontWeight.bold,
-                                    color: _seringTerbangun ? Colors.white : const Color(0xFF334155),
+                                    fontWeight: _seringTerbangun ? FontWeight.bold : FontWeight.w600,
+                                    color: _seringTerbangun ? const Color(0xFFB45309) : const Color(0xFF334155),
                                   ),
                                 ),
                               ],
@@ -5477,28 +5649,33 @@ class _P5MFormPageState extends State<P5MFormPage> {
                       Expanded(
                         child: InkWell(
                           onTap: () => setState(() => _seringTerbangun = false),
-                          borderRadius: BorderRadius.circular(10),
+                          borderRadius: BorderRadius.circular(12),
                           child: AnimatedContainer(
                             duration: const Duration(milliseconds: 180),
-                            padding: const EdgeInsets.symmetric(vertical: 10),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
                             decoration: BoxDecoration(
-                              color: !_seringTerbangun ? const Color(0xFF10B981) : const Color(0xFFF8FAFC),
-                              borderRadius: BorderRadius.circular(10),
+                              color: !_seringTerbangun ? const Color(0xFFECFDF5) : const Color(0xFFF8FAFC),
+                              borderRadius: BorderRadius.circular(12),
                               border: Border.all(
                                 color: !_seringTerbangun ? const Color(0xFF059669) : const Color(0xFFE2E8F0),
+                                width: !_seringTerbangun ? 1.5 : 1,
                               ),
                             ),
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                Icon(Icons.check_circle_rounded, size: 16, color: !_seringTerbangun ? Colors.white : const Color(0xFF64748B)),
+                                Icon(
+                                  Icons.check_circle_rounded,
+                                  size: 16,
+                                  color: !_seringTerbangun ? const Color(0xFF059669) : const Color(0xFF94A3B8),
+                                ),
                                 const SizedBox(width: 6),
                                 Text(
                                   'Tidak (Tidur Nyenyak)',
                                   style: TextStyle(
                                     fontSize: 12,
-                                    fontWeight: FontWeight.bold,
-                                    color: !_seringTerbangun ? Colors.white : const Color(0xFF334155),
+                                    fontWeight: !_seringTerbangun ? FontWeight.bold : FontWeight.w600,
+                                    color: !_seringTerbangun ? const Color(0xFF047857) : const Color(0xFF334155),
                                   ),
                                 ),
                               ],

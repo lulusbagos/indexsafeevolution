@@ -718,374 +718,472 @@ class _HistoryPageState extends State<HistoryPage> {
   }
 
   Future<dynamic> _showBottomSheet(int index) {
-    var sync = (_rawData[index]['sync_id'] == null) ? false : true;
+    final rawItem = _rawData[index] as Map<String, dynamic>;
+    final bool isSynced = rawItem['sync_id'] != null;
+    final accent = moduleAccentColor(widget.module);
+
+    final title = (rawItem['title'] ?? rawItem['nama'] ?? rawItem['topik'] ?? 'Laporan').toString();
+    final dateStr = (rawItem['date'] ?? rawItem['tanggal'] ?? '').toString().split('T').first;
+    final timeStr = (rawItem['time'] ?? rawItem['waktu'] ?? '').toString();
+    final areaStr = (rawItem['area'] ?? '').toString();
+
     return showModalBottomSheet(
       context: context,
-      useSafeArea: true,
-      showDragHandle: true,
-      constraints: const BoxConstraints(
-        maxHeight: 560,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      builder: (_) {
-        return Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-              ListTile(
-                title: const Text(
-                  'Tampilkan',
-                  style: TextStyle(
-                    color: Colors.black87,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                trailing: Icon(
-                  Icons.remove_red_eye,
-                  color: Colors.indigo.shade400,
-                ),
-                contentPadding: const EdgeInsets.fromLTRB(0, 10, 0, 10),
-                shape:
-                    Border(bottom: BorderSide(color: Colors.indigo.shade100)),
-                onTap: () {
-                  Navigator.pop(context);
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => HistoryDetailPage(
-                        widget.module,
-                        widget.history,
-                        _rawData[index] as Map<String, dynamic>,
+      builder: (ctx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(18, 12, 18, 20),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Drag Handle
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      margin: const EdgeInsets.only(bottom: 16),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFCBD5E1),
+                        borderRadius: BorderRadius.circular(2),
                       ),
                     ),
-                  );
-                },
-              ),
-              if (widget.module == Module.simama)
-                ListTile(
-                  title: const Text(
-                    'Edit Laporan',
-                    style: TextStyle(
-                      color: Colors.black87,
-                      fontWeight: FontWeight.bold,
+                  ),
+
+                  // Header Card Informasi Ringkas
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 16),
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: accent.withValues(alpha: 0.06),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: accent.withValues(alpha: 0.2)),
                     ),
-                  ),
-                  trailing: const Icon(
-                    Icons.edit_note_rounded,
-                    color: Color(0xFF7C3AED),
-                  ),
-                  contentPadding: const EdgeInsets.fromLTRB(0, 10, 0, 10),
-                  shape: Border(bottom: BorderSide(color: Colors.indigo.shade100)),
-                  onTap: () {
-                    Navigator.pop(context);
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => SimamaFormPage(
-                          widget.module,
-                          editData: _rawData[index] as Map<String, dynamic>,
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 42,
+                          height: 42,
+                          decoration: BoxDecoration(
+                            color: accent.withValues(alpha: 0.14),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Icon(Icons.assignment_outlined, color: accent, size: 22),
                         ),
-                      ),
-                    ).then((_) => _getData());
-                  },
-                ),
-              if (widget.module == Module.p2h)
-                ListTile(
-                  title: const Text(
-                    'Bagikan Laporan (Share PDF / WA)',
-                    style: TextStyle(
-                      color: Colors.black87,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  trailing: const Icon(
-                    Icons.share_rounded,
-                    color: Color(0xFF0284C7),
-                  ),
-                  contentPadding: const EdgeInsets.fromLTRB(0, 10, 0, 10),
-                  shape: Border(bottom: BorderSide(color: Colors.indigo.shade100)),
-                  onTap: () {
-                    Navigator.pop(context);
-                    P2hShareService.showShareModal(context, _rawData[index] as Map<String, dynamic>);
-                  },
-                ),
-              if (widget.module == Module.p5m)
-                ListTile(
-                  title: const Text(
-                    'Lihat Rincian Semua Asesmen',
-                    style: TextStyle(
-                      color: Color(0xFF0F766E),
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  subtitle: const Text(
-                    'Checklist Fit to Work & Kuesioner Fatigue Lengkap',
-                    style: TextStyle(fontSize: 11, color: Color(0xFF64748B)),
-                  ),
-                  trailing: const Icon(
-                    Icons.assignment_turned_in_rounded,
-                    color: Color(0xFF0F766E),
-                  ),
-                  contentPadding: const EdgeInsets.fromLTRB(0, 10, 0, 10),
-                  shape: Border(bottom: BorderSide(color: Colors.indigo.shade100)),
-                  onTap: () {
-                    Navigator.pop(context);
-                    P5mShareService.showAllAssessmentsModal(context, _rawData[index] as Map<String, dynamic>);
-                  },
-                ),
-              if (widget.module == Module.p5m)
-                ListTile(
-                  title: const Text(
-                    'Edit Laporan P5M',
-                    style: TextStyle(
-                      color: Colors.black87,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  trailing: const Icon(
-                    Icons.edit_note_rounded,
-                    color: Color(0xFF0D9488),
-                  ),
-                  contentPadding: const EdgeInsets.fromLTRB(0, 10, 0, 10),
-                  shape: Border(bottom: BorderSide(color: Colors.indigo.shade100)),
-                  onTap: () {
-                    Navigator.pop(context);
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => P5MFormPage(
-                          editData: _rawData[index] as Map<String, dynamic>,
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                title,
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF0F172A),
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                [
+                                  if (dateStr.isNotEmpty) dateStr,
+                                  if (timeStr.isNotEmpty) timeStr,
+                                  if (areaStr.isNotEmpty) areaStr,
+                                ].join(' • '),
+                                style: const TextStyle(
+                                  fontSize: 11.5,
+                                  color: Color(0xFF64748B),
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
-                    ).then((_) => _getData());
-                  },
-                ),
-              if (widget.module == Module.p5m)
-                ListTile(
-                  title: const Text(
-                    'Bagikan Laporan Fit to Work (PDF / WA)',
-                    style: TextStyle(
-                      color: Colors.black87,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  trailing: const Icon(
-                    Icons.share_rounded,
-                    color: Color(0xFF0D9488),
-                  ),
-                  contentPadding: const EdgeInsets.fromLTRB(0, 10, 0, 10),
-                  shape: Border(bottom: BorderSide(color: Colors.indigo.shade100)),
-                  onTap: () {
-                    Navigator.pop(context);
-                    P5mShareService.showShareModal(context, _rawData[index] as Map<String, dynamic>);
-                  },
-                ),
-              if (widget.module == Module.hazard)
-                ListTile(
-                  title: const Text(
-                    'Edit Laporan Hazard',
-                    style: TextStyle(
-                      color: Colors.black87,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  trailing: const Icon(
-                    Icons.edit_note_rounded,
-                    color: Color(0xFFEA580C),
-                  ),
-                  contentPadding: const EdgeInsets.fromLTRB(0, 10, 0, 10),
-                  shape: Border(bottom: BorderSide(color: Colors.indigo.shade100)),
-                  onTap: () {
-                    Navigator.pop(context);
-                    final raw = _rawData[index] as Map<String, dynamic>;
-                    final hazardItem = HazardReportItem.fromJson(raw);
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => HazardCreatePage(
-                          editItem: hazardItem,
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: isSynced ? const Color(0xFFECFDF5) : const Color(0xFFFFFBEB),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(
+                              color: isSynced ? const Color(0xFFA7F3D0) : const Color(0xFFFDE68A),
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                isSynced ? Icons.cloud_done_rounded : Icons.cloud_off_rounded,
+                                size: 12,
+                                color: isSynced ? const Color(0xFF059669) : const Color(0xFFD97706),
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                isSynced ? 'Sinkron' : 'Draft',
+                                style: TextStyle(
+                                  fontSize: 10.5,
+                                  fontWeight: FontWeight.bold,
+                                  color: isSynced ? const Color(0xFF059669) : const Color(0xFFD97706),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
-                    ).then((_) => _getData());
-                  },
-                ),
-              if (widget.module == Module.hazard)
-                ListTile(
-                  title: const Text(
-                    'Bagikan Laporan (Share PDF / WA)',
-                    style: TextStyle(
-                      color: Colors.black87,
-                      fontWeight: FontWeight.bold,
+                      ],
                     ),
                   ),
-                  trailing: const Icon(
-                    Icons.share_rounded,
-                    color: Color(0xFFEA580C),
-                  ),
-                  contentPadding: const EdgeInsets.fromLTRB(0, 10, 0, 10),
-                  shape: Border(bottom: BorderSide(color: Colors.indigo.shade100)),
-                  onTap: () {
-                    Navigator.pop(context);
-                    HazardPdfService.showShareModalFromMap(context, _rawData[index] as Map<String, dynamic>);
-                  },
-                ),
-              if (widget.module == Module.hazard)
-                ListTile(
-                  title: const Text(
-                    'Cetak PDF',
-                    style: TextStyle(
-                      color: Colors.black87,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  trailing: const Icon(
-                    Icons.picture_as_pdf_rounded,
-                    color: Color(0xFFEA580C),
-                  ),
-                  contentPadding: const EdgeInsets.fromLTRB(0, 10, 0, 10),
-                  shape: Border(bottom: BorderSide(color: Colors.indigo.shade100)),
-                  onTap: () {
-                    Navigator.pop(context);
-                    HazardPdfService.printHazardPdfFromMap(_rawData[index] as Map<String, dynamic>);
-                  },
-                ),
-              ListTile(
-                title: Text(
-                  'Sinkron',
-                  style: TextStyle(
-                    color: (sync) ? Colors.black45 : Colors.black87,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                trailing: Icon(
-                  Icons.cloud_sync,
-                  color: (sync) ? Colors.indigo.shade200 : Colors.indigo,
-                ),
-                contentPadding: const EdgeInsets.fromLTRB(0, 10, 0, 10),
-                shape:
-                    Border(bottom: BorderSide(color: Colors.indigo.shade100)),
-                onTap: (sync)
-                    ? null
-                    : () {
-                        switch (widget.module) {
-                          case Module.simama:
-                            syncTran(_db, _api, 'simama',
-                                    _rawData[index]['id'] as int)
-                                .then((val) => _feedBack(val));
-                            break;
-                          case Module.inspection:
-                          case Module.inspectionDaily:
-                          case Module.inspectionWeekly:
-                            syncTran(_db, _api, 'inspection',
-                                    _rawData[index]['id'] as int)
-                                .then((val) => _feedBack(val));
-                            break;
-                          default:
-                            syncTran(_db, _api, widget.module.name,
-                                    _rawData[index]['id'] as int)
-                                .then((val) => _feedBack(val));
-                            break;
-                        }
-                        Navigator.pop(context);
-                      },
-              ),
-                if (widget.module == Module.observation && sync)
-                  ListTile(
-                    title: const Text('Edit Observasi',
-                        style: TextStyle(fontWeight: FontWeight.bold)),
-                    trailing: const Icon(Icons.edit_outlined),
-                    contentPadding: const EdgeInsets.fromLTRB(0, 10, 0, 10),
-                    shape: Border(
-                        bottom: BorderSide(color: Colors.indigo.shade100)),
+
+                  // Opsi 1: Tampilkan Detail
+                  _buildModernActionTile(
+                    icon: Icons.visibility_outlined,
+                    iconColor: accent,
+                    iconBg: accent.withValues(alpha: 0.1),
+                    title: 'Tampilkan Detail',
+                    subtitle: 'Lihat formulir & kelengkapan data',
                     onTap: () {
                       Navigator.pop(context);
-                      _editObservation(_rawData[index] as Map<String, dynamic>);
-                    },
-                  ),
-              ListTile(
-                title: Text(
-                  'Hapus Data',
-                  style: TextStyle(
-                    color: (sync) ? Colors.black45 : Colors.black87,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                trailing: Icon(
-                  Icons.delete_forever,
-                  color: (sync) ? Colors.indigo.shade200 : Colors.indigo,
-                ),
-                contentPadding: const EdgeInsets.fromLTRB(0, 10, 0, 10),
-                onTap: () {
-                  Navigator.pop(context);
-                  showDialog(
-                    context: context,
-                    builder: (BuildContext context) {
-                      return AlertDialog(
-                        title: const Text('Delete Data'),
-                        content: const Text(
-                          'Apakah anda akan menghapus data ini?',
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => HistoryDetailPage(
+                            widget.module,
+                            widget.history,
+                            rawItem,
+                          ),
                         ),
-                        actions: [
-                          TextButton(
-                            style: TextButton.styleFrom(
-                              textStyle: Theme.of(context).textTheme.labelLarge,
-                            ),
-                            child: const Text('Cancel'),
-                            onPressed: () => Navigator.pop(context),
-                          ),
-                          TextButton(
-                            style: TextButton.styleFrom(
-                              textStyle: Theme.of(context).textTheme.labelLarge,
-                            ),
-                            child: const Text('Ok'),
-                            onPressed: () {
-                              Navigator.pop(context);
-                              final rowItem = _rawData[index];
-                              final id = rowItem['id'] as int;
-                              final syncId = rowItem['sync_id'];
-                              () async {
-                                var canDelete = true;
-                                if (widget.module == Module.observation && sync && syncId != null) {
-                                    canDelete = await _api.deleteObservation(syncId as int);
-                                  } else if (widget.module == Module.hazard && sync && syncId != null) {
-                                    final res = await _api.deleteHazardDirect(syncId as int);
-                                    canDelete = res.isRight();
-                                  }
-                                if (!canDelete) {
-                                  if (mounted) SnackBarMsg.danger(this.context, 'Gagal menghapus laporan server.');
-                                  return;
-                                }
-                                final val = await _db.delete(_table, id);
-                                if (!mounted) return;
-                                if (val > 0) {
-                                  _db.execute(
-                                      '''delete from ${_table.replaceAll('_trans', '')}_details 
-                                      where tran_id=$id''');
-                                  setState(() => _rawData.removeAt(index));
-                                  SnackBarMsg.success(this.context, 'Data berhasil dihapus!');
-                                  OfflineSyncService.instance.refresh();
-                                  if (syncId != null && widget.module != Module.observation) {
-                                    final modName = (widget.module == Module.simama) ? 'simama' : widget.module.name;
-                                    _api.dio.delete('/tran/$modName/$syncId').then((_) {}, onError: (_) {});
-                                  }
-                                } else {
-                                  SnackBarMsg.danger(this.context, 'Data gagal dihapus!');
-                                }
-                              }();
-                            },
-                          ),
-                        ],
                       );
                     },
-                  );
-                },
+                  ),
+
+                  // Opsi Khusus P5M: Rincian Semua Asesmen
+                  if (widget.module == Module.p5m)
+                    _buildModernActionTile(
+                      icon: Icons.assignment_turned_in_rounded,
+                      iconColor: const Color(0xFF0F766E),
+                      iconBg: const Color(0xFF0F766E).withValues(alpha: 0.12),
+                      title: 'Lihat Rincian Semua Asesmen',
+                      subtitle: 'Checklist Fit to Work & Evaluasi Fatigue Lengkap',
+                      onTap: () {
+                        Navigator.pop(context);
+                        P5mShareService.showAllAssessmentsModal(context, rawItem);
+                      },
+                    ),
+
+                  // Opsi Edit (Sesuai modul)
+                  if (widget.module == Module.p5m)
+                    _buildModernActionTile(
+                      icon: Icons.edit_note_rounded,
+                      iconColor: const Color(0xFF2563EB),
+                      iconBg: const Color(0xFF2563EB).withValues(alpha: 0.1),
+                      title: 'Edit Laporan P5M',
+                      subtitle: 'Perbarui data pertemuan & kesiapan kerja',
+                      onTap: () {
+                        Navigator.pop(context);
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => P5MFormPage(editData: rawItem),
+                          ),
+                        ).then((_) => _getData());
+                      },
+                    ),
+
+                  if (widget.module == Module.simama)
+                    _buildModernActionTile(
+                      icon: Icons.edit_note_rounded,
+                      iconColor: const Color(0xFF7C3AED),
+                      iconBg: const Color(0xFF7C3AED).withValues(alpha: 0.1),
+                      title: 'Edit Laporan SiMaMa',
+                      subtitle: 'Perbarui hasil sidak malam',
+                      onTap: () {
+                        Navigator.pop(context);
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => SimamaFormPage(
+                              widget.module,
+                              editData: rawItem,
+                            ),
+                          ),
+                        ).then((_) => _getData());
+                      },
+                    ),
+
+                  if (widget.module == Module.hazard)
+                    _buildModernActionTile(
+                      icon: Icons.edit_note_rounded,
+                      iconColor: const Color(0xFFEA580C),
+                      iconBg: const Color(0xFFEA580C).withValues(alpha: 0.1),
+                      title: 'Edit Laporan Hazard',
+                      subtitle: 'Ubah data temuan bahaya K3',
+                      onTap: () {
+                        Navigator.pop(context);
+                        final hazardItem = HazardReportItem.fromJson(rawItem);
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => HazardCreatePage(editItem: hazardItem),
+                          ),
+                        ).then((_) => _getData());
+                      },
+                    ),
+
+                  if (widget.module == Module.observation && isSynced)
+                    _buildModernActionTile(
+                      icon: Icons.edit_outlined,
+                      iconColor: const Color(0xFF0D9488),
+                      iconBg: const Color(0xFF0D9488).withValues(alpha: 0.1),
+                      title: 'Edit Observasi',
+                      subtitle: 'Perbarui checklist observasi',
+                      onTap: () {
+                        Navigator.pop(context);
+                        _editObservation(rawItem);
+                      },
+                    ),
+
+                  // Opsi Bagikan (PDF / WA)
+                  if (widget.module == Module.p5m)
+                    _buildModernActionTile(
+                      icon: Icons.share_rounded,
+                      iconColor: const Color(0xFF059669),
+                      iconBg: const Color(0xFF059669).withValues(alpha: 0.1),
+                      title: 'Bagikan Laporan Fit to Work',
+                      subtitle: 'Kirim ringkasan WhatsApp atau cetak PDF resmi',
+                      onTap: () {
+                        Navigator.pop(context);
+                        P5mShareService.showShareModal(context, rawItem);
+                      },
+                    ),
+
+                  if (widget.module == Module.p2h)
+                    _buildModernActionTile(
+                      icon: Icons.share_rounded,
+                      iconColor: const Color(0xFF0284C7),
+                      iconBg: const Color(0xFF0284C7).withValues(alpha: 0.1),
+                      title: 'Bagikan Laporan P2H',
+                      subtitle: 'Kirim ringkasan WhatsApp atau cetak PDF',
+                      onTap: () {
+                        Navigator.pop(context);
+                        P2hShareService.showShareModal(context, rawItem);
+                      },
+                    ),
+
+                  if (widget.module == Module.hazard) ...[
+                    _buildModernActionTile(
+                      icon: Icons.share_rounded,
+                      iconColor: const Color(0xFFEA580C),
+                      iconBg: const Color(0xFFEA580C).withValues(alpha: 0.1),
+                      title: 'Bagikan Laporan Hazard',
+                      subtitle: 'Kirim ringkasan WhatsApp atau export PDF',
+                      onTap: () {
+                        Navigator.pop(context);
+                        HazardPdfService.showShareModalFromMap(context, rawItem);
+                      },
+                    ),
+                    _buildModernActionTile(
+                      icon: Icons.picture_as_pdf_rounded,
+                      iconColor: const Color(0xFFEA580C),
+                      iconBg: const Color(0xFFEA580C).withValues(alpha: 0.1),
+                      title: 'Cetak PDF',
+                      subtitle: 'Download atau cetak dokumen PDF',
+                      onTap: () {
+                        Navigator.pop(context);
+                        HazardPdfService.printHazardPdfFromMap(rawItem);
+                      },
+                    ),
+                  ],
+
+                  // Opsi Sinkron
+                  _buildModernActionTile(
+                    icon: Icons.cloud_sync_rounded,
+                    iconColor: isSynced ? const Color(0xFF94A3B8) : const Color(0xFF4F46E5),
+                    iconBg: isSynced ? const Color(0xFFF1F5F9) : const Color(0xFF4F46E5).withValues(alpha: 0.1),
+                    title: isSynced ? 'Sudah Tersinkron' : 'Sinkronkan ke Server',
+                    subtitle: isSynced ? 'Data telah tersimpan di server MBS' : 'Unggah data offline ini ke server sekarang',
+                    onTap: isSynced
+                        ? null
+                        : () {
+                            switch (widget.module) {
+                              case Module.simama:
+                                syncTran(_db, _api, 'simama', rawItem['id'] as int).then((val) => _feedBack(val));
+                                break;
+                              case Module.inspection:
+                              case Module.inspectionDaily:
+                              case Module.inspectionWeekly:
+                                syncTran(_db, _api, 'inspection', rawItem['id'] as int).then((val) => _feedBack(val));
+                                break;
+                              default:
+                                syncTran(_db, _api, widget.module.name, rawItem['id'] as int).then((val) => _feedBack(val));
+                                break;
+                            }
+                            Navigator.pop(context);
+                          },
+                  ),
+
+                  // Opsi Hapus Data
+                  _buildModernActionTile(
+                    icon: Icons.delete_outline_rounded,
+                    iconColor: const Color(0xFFDC2626),
+                    iconBg: const Color(0xFFFEF2F2),
+                    title: 'Hapus Laporan',
+                    subtitle: 'Hapus laporan dari perangkat lokal',
+                    isDanger: true,
+                    onTap: () {
+                      Navigator.pop(context);
+                      showDialog(
+                        context: context,
+                        builder: (BuildContext context) {
+                          return AlertDialog(
+                            title: const Text('Hapus Data'),
+                            content: const Text('Apakah Anda yakin akan menghapus data ini?'),
+                            actions: [
+                              TextButton(
+                                child: const Text('Batal'),
+                                onPressed: () => Navigator.pop(context),
+                              ),
+                              FilledButton(
+                                style: FilledButton.styleFrom(backgroundColor: const Color(0xFFDC2626)),
+                                child: const Text('Hapus'),
+                                onPressed: () {
+                                  Navigator.pop(context);
+                                  final id = rawItem['id'] as int;
+                                  final syncId = rawItem['sync_id'];
+                                  () async {
+                                    var canDelete = true;
+                                    if (widget.module == Module.observation && isSynced && syncId != null) {
+                                      canDelete = await _api.deleteObservation(syncId as int);
+                                    } else if (widget.module == Module.hazard && isSynced && syncId != null) {
+                                      final res = await _api.deleteHazardDirect(syncId as int);
+                                      canDelete = res.isRight();
+                                    }
+                                    if (!canDelete) {
+                                      if (mounted) SnackBarMsg.danger(this.context, 'Gagal menghapus laporan server.');
+                                      return;
+                                    }
+                                    final val = await _db.delete(_table, id);
+                                    if (!mounted) return;
+                                    if (val > 0) {
+                                      _db.execute('delete from ${_table.replaceAll('_trans', '')}_details where tran_id=$id');
+                                      setState(() => _rawData.removeAt(index));
+                                      SnackBarMsg.success(this.context, 'Data berhasil dihapus!');
+                                      OfflineSyncService.instance.refresh();
+                                      if (syncId != null && widget.module != Module.observation) {
+                                        final modName = (widget.module == Module.simama) ? 'simama' : widget.module.name;
+                                        _api.dio.delete('/tran/$modName/$syncId').then((_) {}, onError: (_) {});
+                                      }
+                                    } else {
+                                      SnackBarMsg.danger(this.context, 'Data gagal dihapus!');
+                                    }
+                                  }();
+                                },
+                              ),
+                            ],
+                          );
+                        },
+                      );
+                    },
+                  ),
+                ],
               ),
-            ],
-          ),
+            ),
           ),
         );
       },
+    );
+  }
+
+  Widget _buildModernActionTile({
+    required IconData icon,
+    required Color iconColor,
+    required Color iconBg,
+    required String title,
+    required String subtitle,
+    required VoidCallback? onTap,
+    bool isDanger = false,
+  }) {
+    final bool isEnabled = onTap != null;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(14),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: isDanger
+                  ? const Color(0xFFFEF2F2).withValues(alpha: 0.6)
+                  : (isEnabled ? const Color(0xFFF8FAFC) : const Color(0xFFF1F5F9)),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: isDanger
+                    ? const Color(0xFFFECACA)
+                    : (isEnabled ? const Color(0xFFE2E8F0) : const Color(0xFFE2E8F0).withValues(alpha: 0.5)),
+                width: 1,
+              ),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    color: iconBg,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(icon, color: iconColor, size: 20),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        title,
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                          color: isDanger
+                              ? const Color(0xFFDC2626)
+                              : (isEnabled ? const Color(0xFF0F172A) : const Color(0xFF94A3B8)),
+                        ),
+                      ),
+                      const SizedBox(height: 1),
+                      Text(
+                        subtitle,
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: isDanger
+                              ? const Color(0xFFEF4444)
+                              : (isEnabled ? const Color(0xFF64748B) : const Color(0xFF94A3B8)),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(
+                  Icons.arrow_forward_ios_rounded,
+                  size: 13,
+                  color: isDanger
+                      ? const Color(0xFFFCA5A5)
+                      : (isEnabled ? const Color(0xFF94A3B8) : const Color(0xFFCBD5E1)),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 
