@@ -61,6 +61,21 @@ namespace Indexsafe.Api.Models
         [Column("fatigue_json")]
         public string? FatigueJson { get; set; }
 
+        [Column("pja_nik")]
+        [MaxLength(50)]
+        public string? PjaNik { get; set; }
+
+        [Column("pja_nama")]
+        [MaxLength(150)]
+        public string? PjaNama { get; set; }
+
+        [Column("pja_id")]
+        public int? PjaId { get; set; }
+
+        [Column("pja_departemen")]
+        [MaxLength(100)]
+        public string? PjaDepartemen { get; set; }
+
         [Column("is_deleted")]
         public bool IsDeleted { get; set; } = false;
 

@@ -201,6 +201,14 @@ class _P5MFormPageState extends State<P5MFormPage> {
   String _durasiTidurSiang = '30 Menit';
   bool _seringTerbangun = false;
 
+  // PJA Departemen (Penerima Alert Deviasi)
+  String? _selectedPjaNik;
+  String? _selectedPjaNama;
+  int? _selectedPjaId;
+  String? _selectedPjaDept;
+  String? _selectedPjaJabatan;
+  List<Map<String, dynamic>> _deptPjaCandidates = [];
+
   void _autoCalculateSleepDuration() {
     int startMinutes = _jamMulaiTidur.hour * 60 + _jamMulaiTidur.minute;
     int endMinutes = _jamBangun.hour * 60 + _jamBangun.minute;
@@ -328,6 +336,13 @@ class _P5MFormPageState extends State<P5MFormPage> {
         }
       }
 
+      if (d['pja_nik'] != null && d['pja_nik'].toString().isNotEmpty) {
+        _selectedPjaNik = d['pja_nik'].toString();
+        _selectedPjaNama = d['pja_nama']?.toString();
+        _selectedPjaId = int.tryParse(d['pja_id']?.toString() ?? '');
+        _selectedPjaDept = d['pja_departemen']?.toString();
+      }
+
     }
 
 
@@ -335,6 +350,8 @@ class _P5MFormPageState extends State<P5MFormPage> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
 
       _loadMasterAreas();
+
+      _loadDepartmentPjas();
 
       if (_area.isNotEmpty) {
 
@@ -2725,6 +2742,14 @@ class _P5MFormPageState extends State<P5MFormPage> {
 
         'fatigue_json': _isPekerjaLapangan ? jsonEncode(fatigueMap) : null,
 
+        'pja_nik': _isPekerjaLapangan ? _selectedPjaNik : null,
+
+        'pja_nama': _isPekerjaLapangan ? _selectedPjaNama : null,
+
+        'pja_id': _isPekerjaLapangan ? _selectedPjaId : null,
+
+        'pja_departemen': _isPekerjaLapangan ? _selectedPjaDept : null,
+
         'company_id': _companyId ?? _profile?.companyId ?? 1,
 
         'employee_id': _profile?.id ?? 0,
@@ -2784,6 +2809,14 @@ class _P5MFormPageState extends State<P5MFormPage> {
           'is_pekerja_lapangan',
 
           'fatigue_json',
+
+          'pja_nik',
+
+          'pja_nama',
+
+          'pja_id',
+
+          'pja_departemen',
 
           'fit_status',
 
@@ -3094,13 +3127,12 @@ class _P5MFormPageState extends State<P5MFormPage> {
                   label: const Text('Bagikan', style: TextStyle(fontWeight: FontWeight.bold)),
 
                   onPressed: () {
-
                     Navigator.pop(dlgCtx);
-
-                    Navigator.pop(context);
-
-                    P5mShareService.showShareModal(context, data);
-
+                    P5mShareService.showShareModal(context, data).then((_) {
+                      if (mounted) {
+                        Navigator.pop(context, true);
+                      }
+                    });
                   },
 
                 ),
@@ -5016,6 +5048,130 @@ class _P5MFormPageState extends State<P5MFormPage> {
                     ),
                   ),
 
+                  // PJA Selector (Departemen yang sama)
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 16),
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: _selectedPjaNik != null ? const Color(0xFF0D9488).withValues(alpha: 0.4) : const Color(0xFFF59E0B),
+                        width: 1.2,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.02),
+                          blurRadius: 6,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(6),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF0D9488).withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Icon(Icons.supervisor_account_rounded, size: 18, color: Color(0xFF0D9488)),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    'PJA / PENGAWAS DEPARTEMEN',
+                                    style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: Color(0xFF0D9488), letterSpacing: 0.5),
+                                  ),
+                                  Text(
+                                    'Dept: ${_profile?.depart ?? _selectedPjaDept ?? "Departemen Anda"} • Menerima alert deviasi',
+                                    style: const TextStyle(fontSize: 10, color: Color(0xFF64748B)),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            TextButton.icon(
+                              onPressed: _showPjaPickerBottomSheet,
+                              icon: const Icon(Icons.swap_horiz_rounded, size: 16, color: Color(0xFF0D9488)),
+                              label: Text(
+                                _selectedPjaNik == null ? 'PILIH' : 'GANTI',
+                                style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: Color(0xFF0D9488)),
+                              ),
+                              style: TextButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                minimumSize: Size.zero,
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                        InkWell(
+                          onTap: _showPjaPickerBottomSheet,
+                          borderRadius: BorderRadius.circular(10),
+                          child: Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF8FAFC),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: const Color(0xFFE2E8F0)),
+                            ),
+                            child: Row(
+                              children: [
+                                CircleAvatar(
+                                  radius: 18,
+                                  backgroundColor: const Color(0xFF0D9488).withValues(alpha: 0.15),
+                                  child: const Icon(Icons.person_rounded, size: 20, color: Color(0xFF0D9488)),
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        _selectedPjaNama ?? 'Pilih PJA Departemen',
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.bold,
+                                          color: _selectedPjaNama != null ? const Color(0xFF0F172A) : const Color(0xFF94A3B8),
+                                        ),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        _selectedPjaNik != null
+                                            ? 'NIK: $_selectedPjaNik • ${_selectedPjaJabatan ?? "PJA/Pengawas"}'
+                                            : 'Wajib dipilih: Karyawan satu departemen sebagai PJA penerima notifikasi',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          color: _selectedPjaNik != null ? const Color(0xFF64748B) : const Color(0xFFD97706),
+                                          fontWeight: _selectedPjaNik != null ? FontWeight.normal : FontWeight.w600,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Color(0xFF94A3B8)),
+                              ],
+                            ),
+                          ),
+                        ),
+                        if (_selectedPjaNik == null) ...[
+                          const SizedBox(height: 6),
+                          const Text(
+                            '* Bila terjadi deviasi tidak siap bekerja / tidur < 5 jam, alert langsung dikirim ke notifikasi PJA ini.',
+                            style: TextStyle(fontSize: 10, color: Color(0xFFD97706), fontStyle: FontStyle.italic),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+
                   // Q1: Jam Mulai Tidur Terakhir (Time)
                   _buildFatigueQuestionHeader('1', 'Jam berapa Anda mulai tidur terakhir?'),
                   const SizedBox(height: 8),
@@ -5358,6 +5514,237 @@ class _P5MFormPageState extends State<P5MFormPage> {
           ],
         ],
       ),
+    );
+  }
+
+  Future<void> _loadDepartmentPjas([String? query]) async {
+    final profile = _profile;
+    final myDept = (profile?.depart ?? '').trim();
+    final sqldb = await _db.database;
+    final safeQuery = (query ?? '').trim().replaceAll("'", "''");
+    final safeDept = myDept.replaceAll("'", "''");
+
+    String sql = '''
+      SELECT id, 
+             COALESCE(no_nik, nik, '') as no_nik, 
+             COALESCE(nama_lengkap, nama, '') as nama_lengkap, 
+             COALESCE(departemen, depart, 'UMUM') as departemen, 
+             COALESCE(posisi, jabatan, 'Pengawas/PJA') as posisi,
+             COALESCE(foto, '') as foto
+      FROM employees
+      WHERE 1=1
+    ''';
+
+    if (safeDept.isNotEmpty) {
+      sql += " AND (departemen LIKE '%$safeDept%' OR depart LIKE '%$safeDept%')";
+    }
+    if (safeQuery.isNotEmpty) {
+      sql += " AND (nama_lengkap LIKE '%$safeQuery%' OR no_nik LIKE '%$safeQuery%' OR posisi LIKE '%$safeQuery%')";
+    }
+    sql += " ORDER BY nama_lengkap ASC LIMIT 50";
+
+    try {
+      var rows = await sqldb.rawQuery(sql);
+      if (rows.isEmpty && safeDept.isNotEmpty) {
+        rows = await sqldb.rawQuery('''
+          SELECT id, 
+                 COALESCE(no_nik, nik, '') as no_nik, 
+                 COALESCE(nama_lengkap, nama, '') as nama_lengkap, 
+                 COALESCE(departemen, depart, 'UMUM') as departemen, 
+                 COALESCE(posisi, jabatan, 'Pengawas/PJA') as posisi,
+                 COALESCE(foto, '') as foto
+          FROM employees
+          ORDER BY nama_lengkap ASC LIMIT 50
+        ''');
+      }
+
+      if (mounted) {
+        setState(() {
+          _deptPjaCandidates = rows.map((r) => Map<String, dynamic>.from(r)).toList();
+        });
+        if (_selectedPjaNik == null && _deptPjaCandidates.isNotEmpty) {
+          final myNik = (profile?.noNik ?? '').trim();
+          final candidate = _deptPjaCandidates.firstWhere(
+            (c) => c['no_nik'].toString().trim() != myNik,
+            orElse: () => _deptPjaCandidates.first,
+          );
+          _selectPja(candidate);
+        }
+      }
+    } catch (_) {}
+  }
+
+  void _selectPja(Map<String, dynamic> c) {
+    setState(() {
+      _selectedPjaNik = c['no_nik']?.toString().trim();
+      _selectedPjaNama = c['nama_lengkap']?.toString().trim();
+      _selectedPjaId = (c['id'] as num?)?.toInt();
+      _selectedPjaDept = c['departemen']?.toString().trim();
+      _selectedPjaJabatan = c['posisi']?.toString().trim();
+    });
+  }
+
+  void _showPjaPickerBottomSheet() {
+    final searchCtrl = TextEditingController();
+    List<Map<String, dynamic>> filteredList = List.from(_deptPjaCandidates);
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return DraggableScrollableSheet(
+              initialChildSize: 0.75,
+              minChildSize: 0.5,
+              maxChildSize: 0.95,
+              expand: false,
+              builder: (context, scrollController) {
+                return Column(
+                  children: [
+                    Container(
+                      margin: const EdgeInsets.symmetric(vertical: 10),
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade300,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF0D9488).withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: const Icon(Icons.supervisor_account_rounded, color: Color(0xFF0D9488), size: 22),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Pilih PJA / Pengawas',
+                                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                                ),
+                                Text(
+                                  'Departemen: ${_profile?.depart ?? "Sama dengan login"}',
+                                  style: const TextStyle(fontSize: 11, color: Color(0xFF0D9488), fontWeight: FontWeight.w600),
+                                ),
+                              ],
+                            ),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.close_rounded),
+                            onPressed: () => Navigator.pop(ctx),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: TextField(
+                        controller: searchCtrl,
+                        decoration: InputDecoration(
+                          hintText: 'Cari nama atau NIK pengawas...',
+                          hintStyle: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
+                          prefixIcon: const Icon(Icons.search_rounded, color: Color(0xFF0D9488)),
+                          filled: true,
+                          fillColor: const Color(0xFFF1F5F9),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                        ),
+                        onChanged: (val) {
+                          final q = val.toLowerCase().trim();
+                          setModalState(() {
+                            filteredList = _deptPjaCandidates.where((c) {
+                              final name = (c['nama_lengkap'] ?? '').toString().toLowerCase();
+                              final nik = (c['no_nik'] ?? '').toString().toLowerCase();
+                              final pos = (c['posisi'] ?? '').toString().toLowerCase();
+                              return name.contains(q) || nik.contains(q) || pos.contains(q);
+                            }).toList();
+                          });
+                        },
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    const Divider(height: 1),
+                    Expanded(
+                      child: filteredList.isEmpty
+                          ? Center(
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.person_off_rounded, size: 40, color: Colors.grey.shade400),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    'Tidak ada data PJA di departemen ini',
+                                    style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+                                  ),
+                                ],
+                              ),
+                            )
+                          : ListView.builder(
+                              controller: scrollController,
+                              itemCount: filteredList.length,
+                              itemBuilder: (context, idx) {
+                                final c = filteredList[idx];
+                                final nik = c['no_nik']?.toString() ?? '';
+                                final nama = c['nama_lengkap']?.toString() ?? '';
+                                final pos = c['posisi']?.toString() ?? 'Pengawas';
+                                final dept = c['departemen']?.toString() ?? '';
+                                final isSelected = _selectedPjaNik == nik;
+
+                                return ListTile(
+                                  leading: CircleAvatar(
+                                    backgroundColor: isSelected
+                                        ? const Color(0xFF0D9488)
+                                        : const Color(0xFF0D9488).withValues(alpha: 0.1),
+                                    child: Icon(
+                                      Icons.person_rounded,
+                                      color: isSelected ? Colors.white : const Color(0xFF0D9488),
+                                      size: 20,
+                                    ),
+                                  ),
+                                  title: Text(
+                                    nama,
+                                    style: TextStyle(
+                                      fontSize: 13.5,
+                                      fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                                      color: isSelected ? const Color(0xFF0D9488) : const Color(0xFF0F172A),
+                                    ),
+                                  ),
+                                  subtitle: Text(
+                                    'NIK: $nik • $pos ($dept)',
+                                    style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                                  ),
+                                  trailing: isSelected
+                                      ? const Icon(Icons.check_circle_rounded, color: Color(0xFF0D9488))
+                                      : null,
+                                  onTap: () {
+                                    _selectPja(c);
+                                    Navigator.pop(ctx);
+                                  },
+                                );
+                              },
+                            ),
+                    ),
+                  ],
+                );
+              },
+            );
+          },
+        );
+      },
     );
   }
 

@@ -94,7 +94,24 @@ class P5mShareService {
     for (int i = 0; i < questions.length; i++) {
       final qText = questions[i];
       final ans = (i < answers.length) ? answers[i].trim() : 'Yes';
-      final isCoreQuestion = i < 4;
+      final qLower = qText.toLowerCase();
+
+      final isFatigueQ = qLower.contains('mulai tidur') ||
+          qLower.contains('bangun') ||
+          qLower.contains('durasi tidur') ||
+          qLower.contains('tidur siang') ||
+          qLower.contains('lama anda tidur') ||
+          qLower.contains('terbangun') ||
+          qLower.contains('24 jam') ||
+          qLower.contains('48 jam');
+      final isCoreQuestion = !isFatigueQ && (
+          qLower.contains('sehat') ||
+          qLower.contains('bebas dari masalah') ||
+          qLower.contains('beban pikiran') ||
+          qLower.contains('cukup tidur') ||
+          qLower.contains('minimal 6 jam') ||
+          qLower.contains('apd')
+      );
 
       bool isItemFit = true;
       if (isCoreQuestion) {
@@ -107,10 +124,11 @@ class P5mShareService {
           'question': qText,
           'answer': isNo ? 'NO (UNFIT)' : 'YES (SEHAT)',
           'isFit': isItemFit.toString(),
+          'type': 'core',
         });
       } else {
         // Fatigue questions
-        if (qText.contains('24 jam terakhir') && (ans == '< 4 Jam' || ans == '4 Jam' || ans == '5 Jam')) {
+        if (qLower.contains('24 jam terakhir') && (ans == '< 4 Jam' || ans == '4 Jam' || ans == '5 Jam')) {
           hasUnfit = true;
           isItemFit = false;
         }
@@ -118,6 +136,7 @@ class P5mShareService {
           'question': qText,
           'answer': ans,
           'isFit': isItemFit.toString(),
+          'type': 'fatigue',
         });
       }
     }
@@ -160,6 +179,9 @@ class P5mShareService {
     buffer.writeln('📅 *Tanggal/Jam*: $dateStr • $timeStr');
     buffer.writeln('👤 *Karyawan / Presenter*: $nama ($nik)');
     buffer.writeln('🏢 *Departemen*: ${data['departemen'] ?? 'OPERASIONAL'}');
+    if (data['pja_nama'] != null && data['pja_nama'].toString().isNotEmpty) {
+      buffer.writeln('👮 *PJA / Pengawas*: ${data['pja_nama']} (${data['pja_nik'] ?? '-'}) [Dept: ${data['pja_departemen'] ?? data['departemen'] ?? '-'}]');
+    }
     buffer.writeln('📍 *Area*: $area');
     buffer.writeln('🎯 *Lokasi/Benchmark*: $lokasi');
     buffer.writeln('📋 *Topik*: $topik');
@@ -455,10 +477,20 @@ class P5mShareService {
                   ),
                   pw.Column(
                     children: [
-                      pw.Text('Pengawas / Presenter Briefing', style: const pw.TextStyle(fontSize: 8)),
+                      pw.Text('Pengawas / PJA Departemen', style: const pw.TextStyle(fontSize: 8)),
                       pw.SizedBox(height: 32),
-                      pw.Text('____________________', style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold)),
-                      pw.Text('Tanda Tangan & Nama Terang', style: const pw.TextStyle(fontSize: 7)),
+                      pw.Text(
+                        data['pja_nama']?.toString().isNotEmpty == true
+                            ? data['pja_nama'].toString()
+                            : '____________________',
+                        style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold),
+                      ),
+                      pw.Text(
+                        data['pja_nik']?.toString().isNotEmpty == true
+                            ? 'NIK: ${data['pja_nik']} (${data['pja_departemen'] ?? "PJA"})'
+                            : 'Tanda Tangan & Nama Terang',
+                        style: const pw.TextStyle(fontSize: 7),
+                      ),
                     ],
                   ),
                 ],
@@ -507,12 +539,12 @@ class P5mShareService {
     await Printing.sharePdf(bytes: bytes, filename: filename);
   }
 
-  static void showShareModal(BuildContext context, Map<String, dynamic> data) {
+  static Future<void> showShareModal(BuildContext context, Map<String, dynamic> data) {
     final eval = evaluateFitStatus(data);
     final statusLabel = eval['statusLabel'] as String;
     final color = eval['color'] as Color;
 
-    showModalBottomSheet(
+    return showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
@@ -570,6 +602,35 @@ class P5mShareService {
                 leading: Container(
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
+                    color: const Color(0xFF0D9488).withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.assignment_turned_in_rounded, color: Color(0xFF0D9488)),
+                ),
+                title: const Text(
+                  'Lihat Rincian Semua Asesmen',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),
+                ),
+                subtitle: const Text(
+                  'Tampilkan hasil checklist fit to work & evaluasi fatigue lengkap',
+                  style: TextStyle(fontSize: 11),
+                ),
+                trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 14),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  Future.delayed(const Duration(milliseconds: 200), () {
+                    if (context.mounted) {
+                      showAllAssessmentsModal(context, data);
+                    }
+                  });
+                },
+              ),
+              const Divider(height: 20),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
                     color: const Color(0xFF22C55E).withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(10),
                   ),
@@ -619,6 +680,416 @@ class P5mShareService {
           ),
         ),
       ),
+    );
+  }
+
+  static void showAllAssessmentsModal(BuildContext context, Map<String, dynamic> data) {
+    final eval = evaluateFitStatus(data);
+    final isFit = eval['isFit'] as bool;
+    final statusLabel = eval['statusLabel'] as String;
+    final color = eval['color'] as Color;
+    final items = eval['items'] as List<Map<String, String>>;
+
+    final dateStr = data['date'] ?? data['tanggal'] ?? '-';
+    final timeStr = data['time'] ?? data['waktu'] ?? '-';
+    final nama = data['nama'] ?? data['employee_name'] ?? 'Karyawan';
+    final nik = data['nik'] ?? data['no_nik'] ?? '-';
+    final dept = data['departemen'] ?? 'Operasional';
+    final pjaNama = data['pja_nama']?.toString();
+    final pjaNik = data['pja_nik']?.toString();
+    final pjaDept = data['pja_departemen']?.toString() ?? dept;
+    final lokasi = data['lokasi'] ?? data['location_name'] ?? data['area'] ?? '-';
+    final catatan = data['catatan'] ?? data['remark'] ?? data['keterangan'] ?? '';
+
+    // Check sleep deficit
+    bool hasSleepDeficit = false;
+    for (var it in items) {
+      if (it['question']!.contains('24 jam terakhir') && (it['answer'] == '< 4 Jam' || it['answer'] == '4 Jam' || it['answer'] == '5 Jam')) {
+        hasSleepDeficit = true;
+      }
+    }
+
+    // Separate Core Fit to Work items and Fatigue items
+    final coreItems = items.where((it) => it['type'] == 'core').toList();
+    final fatigueItems = items.where((it) => it['type'] == 'fatigue').toList();
+
+    // Fallback if core questions empty
+    if (coreItems.isEmpty) {
+      for (var def in defaultFitToWorkQuestions) {
+        coreItems.add({
+          'question': def['question']!,
+          'answer': isFit ? 'YES (SEHAT)' : 'NO (UNFIT)',
+          'isFit': isFit.toString(),
+          'type': 'core',
+        });
+      }
+    }
+
+    // Decode fatigue_json if fatigueItems empty
+    if (fatigueItems.isEmpty && data['fatigue_json'] != null) {
+      try {
+        final fMap = jsonDecode(data['fatigue_json'].toString());
+        if (fMap is Map) {
+          if (fMap['jam_mulai_tidur'] != null) {
+            fatigueItems.add({'question': 'Jam berapa Anda mulai tidur terakhir?', 'answer': fMap['jam_mulai_tidur'].toString(), 'isFit': 'true', 'type': 'fatigue'});
+          }
+          if (fMap['jam_bangun'] != null) {
+            fatigueItems.add({'question': 'Jam berapa Anda bangun hari ini?', 'answer': fMap['jam_bangun'].toString(), 'isFit': 'true', 'type': 'fatigue'});
+          }
+          if (fMap['durasi_tidur_24h'] != null) {
+            final d24 = fMap['durasi_tidur_24h'].toString();
+            final isDef = d24 == '< 4 Jam' || d24 == '4 Jam' || d24 == '5 Jam';
+            fatigueItems.add({'question': 'Berapa total durasi tidur Anda dalam 24 jam terakhir?', 'answer': d24, 'isFit': (!isDef).toString(), 'type': 'fatigue'});
+          }
+          if (fMap['durasi_tidur_48h'] != null) {
+            fatigueItems.add({'question': 'Berapa total durasi tidur Anda dalam 48 jam terakhir?', 'answer': fMap['durasi_tidur_48h'].toString(), 'isFit': 'true', 'type': 'fatigue'});
+          }
+          if (fMap['tidur_siang'] != null) {
+            fatigueItems.add({'question': 'Apakah Anda tidur siang dalam 24 jam terakhir?', 'answer': fMap['tidur_siang'] == true || fMap['tidur_siang'] == 'true' || fMap['tidur_siang'] == 1 ? 'Ya' : 'Tidak', 'isFit': 'true', 'type': 'fatigue'});
+          }
+          if (fMap['durasi_tidur_siang'] != null && fMap['durasi_tidur_siang'] != '-') {
+            fatigueItems.add({'question': 'Jika ya, berapa lama Anda tidur siang?', 'answer': fMap['durasi_tidur_siang'].toString(), 'isFit': 'true', 'type': 'fatigue'});
+          }
+          if (fMap['sering_terbangun'] != null) {
+            fatigueItems.add({'question': 'Apakah tidur Anda sering terbangun di malam hari?', 'answer': fMap['sering_terbangun'] == true || fMap['sering_terbangun'] == 'true' || fMap['sering_terbangun'] == 1 ? 'Ya' : 'Tidak', 'isFit': 'true', 'type': 'fatigue'});
+          }
+        }
+      } catch (_) {}
+    }
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) {
+        return DraggableScrollableSheet(
+          initialChildSize: 0.85,
+          minChildSize: 0.5,
+          maxChildSize: 0.95,
+          expand: false,
+          builder: (context, scrollController) {
+            return Column(
+              children: [
+                // Drag handle
+                Container(
+                  margin: const EdgeInsets.symmetric(vertical: 10),
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+
+                // Header Bar
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: color.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Icon(
+                          isFit ? Icons.verified_user_rounded : Icons.warning_amber_rounded,
+                          color: color,
+                          size: 22,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Hasil Lengkap Semua Asesmen',
+                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                            ),
+                            Text(
+                              statusLabel,
+                              style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: color),
+                            ),
+                          ],
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close_rounded),
+                        onPressed: () => Navigator.pop(ctx),
+                      ),
+                    ],
+                  ),
+                ),
+                const Divider(height: 16),
+
+                // Content List
+                Expanded(
+                  child: ListView(
+                    controller: scrollController,
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                    children: [
+                      // Deviation Banner if Unfit or Sleep Deficit
+                      if (!isFit || hasSleepDeficit) ...[
+                        Container(
+                          margin: const EdgeInsets.only(bottom: 14),
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFEF2F2),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: const Color(0xFFFCA5A5)),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  const Icon(Icons.report_problem_rounded, color: Color(0xFFDC2626), size: 20),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      hasSleepDeficit
+                                          ? '⚠️ DEVIASI: JAM TIDUR KURANG DARI 5 JAM'
+                                          : '⚠️ DEVIASI: KARYAWAN TIDAK SIAP BEKERJA (UNFIT)',
+                                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFFDC2626)),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                pjaNama != null
+                                    ? 'Alert deviasi telah dikirimkan ke notifikasi PJA: $pjaNama ($pjaNik).'
+                                    : 'Perlu konfirmasi & evaluasi PJA/Pengawas sebelum pekerja memulai shift.',
+                                style: const TextStyle(fontSize: 11, color: Color(0xFF991B1B)),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+
+                      // Card Info Karyawan & PJA
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF8FAFC),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFFE2E8F0)),
+                        ),
+                        child: Column(
+                          children: [
+                            Row(
+                              children: [
+                                const Icon(Icons.badge_rounded, size: 16, color: Color(0xFF0D9488)),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: Text(
+                                    'Karyawan: $nama ($nik)',
+                                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                                  ),
+                                ),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF0D9488).withValues(alpha: 0.1),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Text(
+                                    dept,
+                                    style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF0D9488)),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            if (pjaNama != null && pjaNama.isNotEmpty) ...[
+                              const Divider(height: 14),
+                              Row(
+                                children: [
+                                  const Icon(Icons.supervisor_account_rounded, size: 16, color: Color(0xFF6366F1)),
+                                  const SizedBox(width: 6),
+                                  Expanded(
+                                    child: Text(
+                                      'PJA / Pengawas: $pjaNama (${pjaNik ?? "-"})',
+                                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                                    ),
+                                  ),
+                                  Text(
+                                    pjaDept,
+                                    style: const TextStyle(fontSize: 10, color: Color(0xFF64748B), fontStyle: FontStyle.italic),
+                                  ),
+                                ],
+                              ),
+                            ],
+                            const Divider(height: 14),
+                            Row(
+                              children: [
+                                const Icon(Icons.access_time_rounded, size: 16, color: Color(0xFF64748B)),
+                                const SizedBox(width: 6),
+                                Text(
+                                  '$dateStr • $timeStr',
+                                  style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                                ),
+                                const Spacer(),
+                                const Icon(Icons.place_rounded, size: 16, color: Color(0xFF64748B)),
+                                const SizedBox(width: 4),
+                                Text(
+                                  lokasi,
+                                  style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+
+                      // Section 1: Fit to Work Core (Items 0 to 3)
+                      const Text(
+                        'CHECKLIST KESIAPAN KERJA (FIT TO WORK)',
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF0F172A), letterSpacing: 0.5),
+                      ),
+                      const SizedBox(height: 8),
+                      ...coreItems.map((it) {
+                        final isItemFit = it['isFit'] == 'true';
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 8),
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color: isItemFit ? const Color(0xFFE2E8F0) : const Color(0xFFFCA5A5),
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                isItemFit ? Icons.check_circle_rounded : Icons.cancel_rounded,
+                                color: isItemFit ? const Color(0xFF10B981) : const Color(0xFFEF4444),
+                                size: 18,
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Text(
+                                  it['question']!,
+                                  style: const TextStyle(fontSize: 12, color: Color(0xFF0F172A)),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: isItemFit
+                                      ? const Color(0xFF10B981).withValues(alpha: 0.1)
+                                      : const Color(0xFFEF4444).withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  it['answer']!,
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                    color: isItemFit ? const Color(0xFF059669) : const Color(0xFFDC2626),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }),
+
+                      // Section 2: Fatigue Assessment Items (Items 4+)
+                      if (fatigueItems.isNotEmpty) ...[
+                        const SizedBox(height: 12),
+                        const Text(
+                          'PENILAIAN POLA TIDUR & FATIGUE (PEKERJA LAPANGAN)',
+                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF0D9488), letterSpacing: 0.5),
+                        ),
+                        const SizedBox(height: 8),
+                        ...fatigueItems.map((it) {
+                          final isDeficit = it['answer'] == '< 4 Jam' || it['answer'] == '4 Jam' || it['answer'] == '5 Jam' || it['answer'] == '< 8 Jam';
+                          return Container(
+                            margin: const EdgeInsets.only(bottom: 8),
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                            decoration: BoxDecoration(
+                              color: isDeficit ? const Color(0xFFFEF2F2) : Colors.white,
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color: isDeficit ? const Color(0xFFFCA5A5) : const Color(0xFFE2E8F0),
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  isDeficit ? Icons.warning_amber_rounded : Icons.bedtime_rounded,
+                                  color: isDeficit ? const Color(0xFFDC2626) : const Color(0xFF0D9488),
+                                  size: 18,
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Text(
+                                    it['question']!,
+                                    style: const TextStyle(fontSize: 12, color: Color(0xFF0F172A)),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: isDeficit
+                                        ? const Color(0xFFDC2626).withValues(alpha: 0.1)
+                                        : const Color(0xFF0D9488).withValues(alpha: 0.1),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Text(
+                                    it['answer']!,
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold,
+                                      color: isDeficit ? const Color(0xFFDC2626) : const Color(0xFF0F766E),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        }),
+                      ],
+
+                      // Catatan
+                      if (catatan.isNotEmpty && catatan != '-' && catatan != '.') ...[
+                        const SizedBox(height: 12),
+                        const Text(
+                          'CATATAN / TINDAKAN PENCEGAHAN',
+                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF0F172A), letterSpacing: 0.5),
+                        ),
+                        const SizedBox(height: 6),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFEF9C3).withValues(alpha: 0.4),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: const Color(0xFFFDE047)),
+                          ),
+                          child: Text(
+                            catatan,
+                            style: const TextStyle(fontSize: 12, color: Color(0xFF713F12)),
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 20),
+                    ],
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
   }
 }

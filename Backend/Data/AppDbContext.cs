@@ -480,6 +480,14 @@ namespace Indexsafe.Api.Data
 
                 entity.Property(e => e.FatigueJson).HasColumnName("fatigue_json");
 
+                entity.Property(e => e.PjaNik).HasColumnName("pja_nik");
+
+                entity.Property(e => e.PjaNama).HasColumnName("pja_nama");
+
+                entity.Property(e => e.PjaId).HasColumnName("pja_id");
+
+                entity.Property(e => e.PjaDepartemen).HasColumnName("pja_departemen");
+
                 entity.Property(e => e.IsDeleted).HasColumnName("is_deleted");
 
                 entity.Property(e => e.CreatedAt).HasColumnName("created_at");

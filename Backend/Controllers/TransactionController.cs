@@ -3931,6 +3931,11 @@ namespace Indexsafe.Api.Controllers
                     var isPekerjaLapanganStr = form["is_pekerja_lapangan"].FirstOrDefault();
                     bool isPekerjaLapangan = isPekerjaLapanganStr == "1" || isPekerjaLapanganStr?.Equals("true", StringComparison.OrdinalIgnoreCase) == true;
                     var fatigueJson = form["fatigue_json"].FirstOrDefault();
+                    var pjaNik = form["pja_nik"].FirstOrDefault()?.Trim();
+                    var pjaNama = form["pja_nama"].FirstOrDefault()?.Trim();
+                    var pjaIdStr = form["pja_id"].FirstOrDefault();
+                    int? pjaId = int.TryParse(pjaIdStr, out var pid) ? pid : null;
+                    var pjaDept = form["pja_departemen"].FirstOrDefault()?.Trim();
 
                     try
                     {
@@ -3939,6 +3944,8 @@ namespace Indexsafe.Api.Controllers
                                 ALTER TABLE [tbl_t_p5m] ADD [is_pekerja_lapangan] BIT NULL;
                             IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'tbl_t_p5m' AND COLUMN_NAME = 'fatigue_json')
                                 ALTER TABLE [tbl_t_p5m] ADD [fatigue_json] NVARCHAR(MAX) NULL;
+                            IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'tbl_t_p5m' AND COLUMN_NAME = 'pja_nik')
+                                ALTER TABLE [tbl_t_p5m] ADD [pja_nik] VARCHAR(50) NULL, [pja_nama] NVARCHAR(150) NULL, [pja_id] INT NULL, [pja_departemen] NVARCHAR(100) NULL;
                         ");
                     }
                     catch {}
@@ -3973,248 +3980,205 @@ namespace Indexsafe.Api.Controllers
 
                             if (a.Equals("No", StringComparison.OrdinalIgnoreCase) || a.Equals("Tidak", StringComparison.OrdinalIgnoreCase) || a == "0")
 
-
-
                             {
 
+                                if (i < 4 || q.Contains("cukup tidur") || q.Contains("sehat") || q.Contains("bebas dari masalah") || q.Contains("APD"))
 
+                                {
 
-                                hasUnfit = true;
+                                    hasUnfit = true;
 
-
+                                }
 
                             }
 
 
 
-
-
-
-
                             var p5mRecord = new P5m
-
-
 
                             {
 
-
-
                                 FotoKegiatan = fotoKegiatanUrl,
-
-
 
                                 Tanggal = tanggal,
 
-
-
                                 Waktu = waktu,
-
-
 
                                 Nama = userName,
 
-
-
                                 Nik = userNik,
-
-
 
                                 Departemen = dept,
 
-
-
                                 Area = area,
-
-
 
                                 Lokasi = lokasi,
 
-
-
                                 DetilLokasi = detilLokasi,
-
-
 
                                 Topik = topik,
 
-
-
                                 Judul = judul,
-
-
 
                                 Keterangan = keterangan,
 
-
-
                                 ListPertanyaan = q,
-
-
 
                                 Jawaban = a,
 
-
-
                                 Catatan = catatan,
-
-
 
                                 PerusahaanId = companyId,
 
-
-
                                 IsPekerjaLapangan = isPekerjaLapangan,
-
-
 
                                 FatigueJson = fatigueJson,
 
+                                PjaNik = pjaNik,
 
+                                PjaNama = pjaNama,
+
+                                PjaId = pjaId,
+
+                                PjaDepartemen = pjaDept,
 
                                 IsDeleted = false,
 
-
-
                                 CreatedAt = DateTime.Now
-
-
 
                             };
 
 
 
-
-
-
-
                             _context.P5ms.Add(p5mRecord);
-
-
 
                             await _context.SaveChangesAsync();
 
-
-
                             if (i == 0) primaryId = p5mRecord.Id;
-
-
 
                         }
 
-
-
                     }
-
-
 
                     else
 
-
-
                     {
-
-
 
                         var p5m = new P5m
 
-
-
                         {
-
-
 
                             Tanggal = tanggal,
 
-
-
                             Waktu = waktu,
-
-
 
                             Nama = userName,
 
-
-
                             Nik = userNik,
-
-
 
                             Departemen = dept,
 
-
-
                             Area = area,
-
-
 
                             Lokasi = lokasi,
 
-
-
                             DetilLokasi = detilLokasi,
-
-
 
                             Topik = topik,
 
-
-
                             Judul = judul,
-
-
 
                             Keterangan = keterangan,
 
-
-
                             FotoKegiatan = fotoKegiatanUrl,
-
-
 
                             ListPertanyaan = "Fit to Work",
 
-
-
                             Jawaban = "Yes",
-
-
 
                             Catatan = catatan,
 
-
-
                             PerusahaanId = companyId,
 
+                            IsPekerjaLapangan = isPekerjaLapangan,
 
+                            FatigueJson = fatigueJson,
+
+                            PjaNik = pjaNik,
+
+                            PjaNama = pjaNama,
+
+                            PjaId = pjaId,
+
+                            PjaDepartemen = pjaDept,
 
                             IsDeleted = false,
 
-
-
                             CreatedAt = DateTime.Now
-
-
 
                         };
 
 
 
-
-
-
-
                         _context.P5ms.Add(p5m);
-
-
 
                         await _context.SaveChangesAsync();
 
-
-
                         primaryId = p5m.Id;
 
+                    }
 
 
+
+                    // Kirim notifikasi deviasi kesiapan kerja / fatigue ke PJA
+                    if (isPekerjaLapangan && !string.IsNullOrWhiteSpace(pjaNik))
+                    {
+                        bool isSleepDeficit = false;
+                        string durasiTidur = "";
+                        if (!string.IsNullOrWhiteSpace(fatigueJson))
+                        {
+                            try
+                            {
+                                using var doc = System.Text.Json.JsonDocument.Parse(fatigueJson);
+                                if (doc.RootElement.TryGetProperty("durasi_tidur_24h", out var dEl))
+                                {
+                                    durasiTidur = dEl.GetString() ?? "";
+                                    if (durasiTidur.Contains("< 4") || durasiTidur.StartsWith("4 Jam"))
+                                    {
+                                        isSleepDeficit = true;
+                                    }
+                                }
+                            }
+                            catch { }
+                        }
+
+                        if (hasUnfit || isSleepDeficit)
+                        {
+                            string reason = isSleepDeficit
+                                ? $"jam tidur kurang dari 5 jam ({durasiTidur})"
+                                : "kondisi fisik/mental tidak siap bekerja (UNFIT)";
+
+                            string empName = !string.IsNullOrWhiteSpace(userName) ? userName : "Karyawan";
+                            string empNik = !string.IsNullOrWhiteSpace(userNik) ? userNik : "-";
+                            string empDept = !string.IsNullOrWhiteSpace(pjaDept) ? pjaDept : (!string.IsNullOrWhiteSpace(dept) ? dept : "Operasional");
+
+                            try
+                            {
+                                _context.Notifications.Add(new Notification
+                                {
+                                    RecipientNik = pjaNik.Trim(),
+                                    Title = $"⚠️ Deviasi Kesiapan Kerja: {empName} Tidak Siap Bekerja",
+                                    Message = $"Karyawan an. {empName} ({empNik}) dari departemen {empDept} melaporkan deviasi: {reason}. Mohon PJA segera memverifikasi kondisi pekerja sebelum memulai aktivitas kerja.",
+                                    Url = "/P5m/Index",
+                                    NotifType = "p5m_deviation",
+                                    IsRead = false,
+                                    IsActioned = false,
+                                    CreatedAt = DateTime.Now
+                                });
+                                await _context.SaveChangesAsync();
+                            }
+                            catch { }
+                        }
                     }
 
 
@@ -5805,13 +5769,21 @@ namespace Indexsafe.Api.Controllers
 
                             is_fit = !hasUnfit,
 
-
-
                             fit_status = hasUnfit ? "UNFIT" : "FIT TO WORK",
 
+                            is_pekerja_lapangan = first.IsPekerjaLapangan,
 
+                            pja_nik = first.PjaNik,
 
-                            checklist = g.Select(x => new { question = x.ListPertanyaan, answer = x.Jawaban }).ToList(),
+                            pja_nama = first.PjaNama,
+
+                            pja_id = first.PjaId,
+
+                            pja_departemen = first.PjaDepartemen,
+
+                            fatigue_json = first.FatigueJson,
+
+                            checklist = g.OrderBy(x => x.Id).Select(x => new { question = x.ListPertanyaan, answer = x.Jawaban }).ToList(),
 
 
 

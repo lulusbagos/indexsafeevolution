@@ -416,6 +416,18 @@ Future<bool> syncTran(
       if (row['fatigue_json'] != null) {
         cleanMap['fatigue_json'] = row['fatigue_json'].toString();
       }
+      if (row['pja_nik'] != null) {
+        cleanMap['pja_nik'] = row['pja_nik'].toString();
+      }
+      if (row['pja_nama'] != null) {
+        cleanMap['pja_nama'] = row['pja_nama'].toString();
+      }
+      if (row['pja_id'] != null) {
+        cleanMap['pja_id'] = row['pja_id'].toString();
+      }
+      if (row['pja_departemen'] != null) {
+        cleanMap['pja_departemen'] = row['pja_departemen'].toString();
+      }
 
       final files = <String, String>{};
       final photoPath = row['foto_kegiatan'] ?? row['image'];
