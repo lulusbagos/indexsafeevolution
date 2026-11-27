@@ -10,8 +10,8 @@ class OneEvService {
 
   final ApiService _api = ApiService();
   final Dio _dio = Dio(BaseOptions(
-    connectTimeout: const Duration(milliseconds: 3500),
-    receiveTimeout: const Duration(milliseconds: 3500),
+    connectTimeout: const Duration(milliseconds: 10000),
+    receiveTimeout: const Duration(milliseconds: 10000),
   ));
 
   Map<String, dynamic>? _cachedProfile;
@@ -94,18 +94,29 @@ class OneEvService {
     final prefProfile = PreferenceService.getProfile();
     _cachedProfile = {
       'no_nik': targetNik,
+      'no_ktp': prefProfile?.noKtp ?? '',
+      'no_kk': prefProfile?.noKk ?? '',
       'nama_lengkap': prefProfile?.namaLengkap ?? '',
+      'nama_alias': prefProfile?.namaAlias ?? '',
+      'warga_negara': prefProfile?.wn ?? 'WNI',
+      'jenis_kelamin': prefProfile?.jk ?? '',
+      'tempat_lahir': prefProfile?.tmpLahir ?? '',
+      'tanggal_lahir': prefProfile?.tglLahir ?? '',
+      'agama': prefProfile?.agama ?? '',
+      'status_nikah': prefProfile?.statNikah ?? '',
+      'nama_ibu': prefProfile?.namaIbu ?? '',
+      'nama_ayah': prefProfile?.namaAyah ?? '',
       'nama_perusahaan': prefProfile?.company ?? 'PT INDEXIM COALINDO',
       'kode_perusahaan': 'IDC',
       'nama_departemen': prefProfile?.depart ?? '',
       'nama_jabatan': prefProfile?.posisi ?? '',
       'nama_posisi': prefProfile?.jabatan ?? '',
       'hp_1': prefProfile?.hp ?? '',
-      'email_pribadi': '',
+      'email_pribadi': prefProfile?.emailPribadi ?? '',
       'email_kantor': prefProfile?.emailKantor ?? '',
       'status_aktif': true,
-      'grade': '',
-      'roster_kerja': '',
+      'grade': prefProfile?.grade ?? '',
+      'roster_kerja': prefProfile?.roster != null ? '${prefProfile!.roster}' : '',
       'golongan_tipe': '',
       'alamat': '',
       'kontak_darurat_nama': '',
@@ -114,6 +125,7 @@ class OneEvService {
       'kontak_darurat_keterangan': '',
       'permit_jenis': 'MINE_PERMIT',
       'permit_berakhir': '-',
+      'path_foto': prefProfile?.foto,
       'mcu_tanggal': null,
       'mcu_hasil': null,
       'mcu_keterangan': null,

@@ -174,7 +174,11 @@ namespace Indexsafe.Api.Controllers
                         ["lokasi_kerja"] = reader["lokasi_kerja"]?.ToString() ?? "",
                         ["tanggal_masuk"] = reader["tanggal_masuk"] != DBNull.Value ? Convert.ToDateTime(reader["tanggal_masuk"]).ToString("yyyy-MM-dd") : null,
                         ["tanggal_aktif"] = reader["tanggal_aktif"] != DBNull.Value ? Convert.ToDateTime(reader["tanggal_aktif"]).ToString("yyyy-MM-dd") : null,
-                        ["path_foto"] = reader["path_foto"]?.ToString(),
+                        ["path_foto"] = !string.IsNullOrWhiteSpace(reader["path_foto"]?.ToString())
+                            ? (reader["path_foto"]!.ToString()!.Trim().StartsWith("http", StringComparison.OrdinalIgnoreCase)
+                                ? reader["path_foto"]!.ToString()!.Trim()
+                                : "https://oneev.indexim.id" + (reader["path_foto"]!.ToString()!.Trim().StartsWith("/") ? "" : "/") + reader["path_foto"]!.ToString()!.Trim().Replace("\\", "/"))
+                            : null,
                         ["status_aktif"] = reader["status_aktif_efektif"] != DBNull.Value && Convert.ToBoolean(reader["status_aktif_efektif"]),
                         ["permit_jenis"] = reader["permit_pengajuan_terakhir"]?.ToString() ?? "",
                         ["permit_berakhir"] = reader["permit_berakhir_kerja"] != DBNull.Value ? Convert.ToDateTime(reader["permit_berakhir_kerja"]).ToString("yyyy-MM-dd") : null,

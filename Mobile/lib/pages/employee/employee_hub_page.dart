@@ -105,15 +105,52 @@ class _EmployeeHubPageState extends State<EmployeeHubPage> {
     _profile = PreferenceService.getProfile();
     if (_profile != null) {
       _nama = _profile!.namaLengkap ?? '';
+      _namaAlias = _profile!.namaAlias ?? '';
       _nik = _profile!.noNik ?? '';
-      _dept = _profile!.depart ?? '';
-      _perusahaan = _profile!.company ?? '';
-      _posisi = _profile!.jabatan ?? '';
+      _noKtp = _profile!.noKtp ?? '';
+      _noKk = _profile!.noKk ?? '';
+      _jenisKelamin = _profile!.jk ?? '';
+      _tempatLahir = _profile!.tmpLahir ?? '';
+      _tanggalLahir = _profile!.tglLahir ?? '';
+      _agama = _profile!.agama ?? '';
+      _statusNikah = _profile!.statNikah ?? '';
+      _wargaNegara = _profile!.wn ?? 'WNI';
+      _namaIbu = _profile!.namaIbu ?? '';
+      _namaAyah = _profile!.namaAyah ?? '';
+      _emailPribadi = _profile!.emailPribadi ?? '';
       _hp = _profile!.hp ?? '';
       _emailKantor = _profile!.emailKantor ?? '';
+      _noNpwp = _profile!.noNpwp ?? '';
+      _noBpjsTk = _profile!.noBpjstk ?? '';
+      _noBpjsKes = _profile!.noBpjskes ?? '';
+      _noBpjsPensiun = _profile!.noBpjspensiun ?? '';
+      _dept = _profile!.depart ?? '';
+      _perusahaan = _profile!.company ?? '';
+      _posisi = _profile!.jabatan ?? _profile!.posisi ?? '';
+      _jabatan = _profile!.posisi ?? _profile!.jabatan ?? '';
+      _grade = _profile!.grade ?? '';
+      _roster = _profile!.roster != null ? '${_profile!.roster}' : '';
       _minePermitNo = _profile!.noNik ?? '';
+      _pathFoto = _profile!.foto;
     }
     _loadLiveOneEvData();
+  }
+
+  String _resolvePhotoUrl(String? path) {
+    if (path != null && path.trim().isNotEmpty) {
+      final trimmed = path.trim();
+      if (trimmed.startsWith('http')) return trimmed;
+      final clean = trimmed.startsWith('/') ? trimmed : '/$trimmed';
+      return 'https://oneev.indexim.id$clean';
+    }
+    final prefFoto = PreferenceService.getProfile()?.foto;
+    if (prefFoto != null && prefFoto.trim().isNotEmpty) {
+      final trimmed = prefFoto.trim();
+      if (trimmed.startsWith('http')) return trimmed;
+      final clean = trimmed.startsWith('/') ? trimmed : '/$trimmed';
+      return 'https://oneev.indexim.id$clean';
+    }
+    return '';
   }
 
   @override
@@ -458,11 +495,9 @@ class _EmployeeHubPageState extends State<EmployeeHubPage> {
                   color: const Color(0xFF4F46E5),
                 ),
                 child: ClipOval(
-                  child: _pathFoto != null && _pathFoto!.isNotEmpty
+                  child: _resolvePhotoUrl(_pathFoto).isNotEmpty
                       ? Image.network(
-                          _pathFoto!.startsWith('http')
-                              ? _pathFoto!
-                              : 'https://apimbs.indexim.id$_pathFoto',
+                          _resolvePhotoUrl(_pathFoto),
                           fit: BoxFit.cover,
                           errorBuilder: (_, __, ___) => const Icon(Icons.person, color: Colors.white, size: 34),
                         )
@@ -865,21 +900,50 @@ class _EmployeeHubPageState extends State<EmployeeHubPage> {
                       ],
                     ),
                     const SizedBox(height: 12),
-                    Text(
-                      _nama,
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w900,
-                        color: Colors.white,
-                      ),
-                    ),
-                    Text(
-                      'NIK: $_nik • $_jabatan',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: Colors.white70,
-                        fontWeight: FontWeight.w600,
-                      ),
+                    Row(
+                      children: [
+                        Container(
+                          width: 48,
+                          height: 48,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Colors.white70, width: 2),
+                          ),
+                          child: ClipOval(
+                            child: _resolvePhotoUrl(_pathFoto).isNotEmpty
+                                ? Image.network(
+                                    _resolvePhotoUrl(_pathFoto),
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (_, __, ___) => const Icon(Icons.person, color: Colors.white, size: 30),
+                                  )
+                                : const Icon(Icons.person, color: Colors.white, size: 30),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                _nama,
+                                style: const TextStyle(
+                                  fontSize: 17,
+                                  fontWeight: FontWeight.w900,
+                                  color: Colors.white,
+                                ),
+                              ),
+                              Text(
+                                'NIK: $_nik • $_posisi',
+                                style: const TextStyle(
+                                  fontSize: 11.5,
+                                  color: Colors.white70,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -1017,12 +1081,21 @@ class _EmployeeHubPageState extends State<EmployeeHubPage> {
                   Row(
                     children: [
                       Container(
-                        padding: const EdgeInsets.all(10),
+                        width: 44,
+                        height: 44,
                         decoration: BoxDecoration(
-                          color: const Color(0xFFE0F2FE),
-                          borderRadius: BorderRadius.circular(12),
+                          shape: BoxShape.circle,
+                          border: Border.all(color: const Color(0xFF0284C7).withOpacity(0.3), width: 1.5),
                         ),
-                        child: const Icon(Icons.edit_document, color: Color(0xFF0284C7), size: 24),
+                        child: ClipOval(
+                          child: _resolvePhotoUrl(_pathFoto).isNotEmpty
+                              ? Image.network(
+                                  _resolvePhotoUrl(_pathFoto),
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, __, ___) => const Icon(Icons.person, color: Color(0xFF0284C7), size: 24),
+                                )
+                              : const Icon(Icons.person, color: Color(0xFF0284C7), size: 24),
+                        ),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
