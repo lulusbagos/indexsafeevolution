@@ -311,4 +311,142 @@ class OneEvService {
 
     return true;
   }
+
+  /// Mengambil daftar master Agama dari ONE_DB_MITRA
+  Future<List<Map<String, dynamic>>> fetchMasterAgama() async {
+    final candidates = _buildCandidateUrls('/api/one-ev/master/agama');
+    for (final url in candidates) {
+      try {
+        final res = await _dio.get(url, options: Options(validateStatus: (s) => s != null && s < 500));
+        if (res.statusCode == 200 && res.data != null) {
+          final listRaw = res.data is Map ? res.data['data'] : jsonDecode(res.data.toString())['data'];
+          if (listRaw is List) {
+            return listRaw.map((e) => Map<String, dynamic>.from(e)).toList();
+          }
+        }
+      } catch (e) {
+        debugPrint('[OneEvService] Gagal fetch master agama: $e');
+      }
+    }
+    return [
+      {'id': 1, 'nama': 'BUDHA'},
+      {'id': 2, 'nama': 'HINDU'},
+      {'id': 3, 'nama': 'ISLAM'},
+      {'id': 4, 'nama': 'KATHOLIK'},
+      {'id': 5, 'nama': 'KHONGHUCU'},
+      {'id': 6, 'nama': 'KRISTEN'},
+    ];
+  }
+
+  /// Mengambil daftar master Tingkat Pendidikan dari ONE_DB_MITRA
+  Future<List<Map<String, dynamic>>> fetchMasterPendidikan() async {
+    final candidates = _buildCandidateUrls('/api/one-ev/master/pendidikan');
+    for (final url in candidates) {
+      try {
+        final res = await _dio.get(url, options: Options(validateStatus: (s) => s != null && s < 500));
+        if (res.statusCode == 200 && res.data != null) {
+          final listRaw = res.data is Map ? res.data['data'] : jsonDecode(res.data.toString())['data'];
+          if (listRaw is List) {
+            return listRaw.map((e) => Map<String, dynamic>.from(e)).toList();
+          }
+        }
+      } catch (e) {
+        debugPrint('[OneEvService] Gagal fetch master pendidikan: $e');
+      }
+    }
+    return [
+      {'id': 1, 'nama': 'SD'},
+      {'id': 2, 'nama': 'SMP'},
+      {'id': 4, 'nama': 'SMA/K'},
+      {'id': 8, 'nama': 'PAKET C'},
+      {'id': 9, 'nama': 'DIPLOMA 1'},
+      {'id': 10, 'nama': 'DIPLOMA 2'},
+      {'id': 11, 'nama': 'DIPLOMA 3'},
+      {'id': 12, 'nama': 'DIPLOMA 4'},
+      {'id': 13, 'nama': 'STRATA 1'},
+      {'id': 14, 'nama': 'STRATA 2'},
+      {'id': 15, 'nama': 'STRATA 3'},
+      {'id': 16, 'nama': 'TIDAK TAMAT SD'},
+      {'id': 17, 'nama': 'PAKET B'},
+    ];
+  }
+
+  /// Mengambil daftar master Provinsi dari ONE_DB_MITRA
+  Future<List<Map<String, dynamic>>> fetchMasterProvinsi() async {
+    final candidates = _buildCandidateUrls('/api/one-ev/master/provinsi');
+    for (final url in candidates) {
+      try {
+        final res = await _dio.get(url, options: Options(validateStatus: (s) => s != null && s < 500));
+        if (res.statusCode == 200 && res.data != null) {
+          final listRaw = res.data is Map ? res.data['data'] : jsonDecode(res.data.toString())['data'];
+          if (listRaw is List) {
+            return listRaw.map((e) => Map<String, dynamic>.from(e)).toList();
+          }
+        }
+      } catch (e) {
+        debugPrint('[OneEvService] Gagal fetch master provinsi: $e');
+      }
+    }
+    return [];
+  }
+
+  /// Mengambil daftar master Kabupaten dari ONE_DB_MITRA berdasarkan provinsi
+  Future<List<Map<String, dynamic>>> fetchMasterKabupaten({String? provinsi}) async {
+    final param = provinsi != null && provinsi.trim().isNotEmpty ? '?provinsi=${Uri.encodeComponent(provinsi.trim())}' : '';
+    final candidates = _buildCandidateUrls('/api/one-ev/master/kabupaten$param');
+    for (final url in candidates) {
+      try {
+        final res = await _dio.get(url, options: Options(validateStatus: (s) => s != null && s < 500));
+        if (res.statusCode == 200 && res.data != null) {
+          final listRaw = res.data is Map ? res.data['data'] : jsonDecode(res.data.toString())['data'];
+          if (listRaw is List) {
+            return listRaw.map((e) => Map<String, dynamic>.from(e)).toList();
+          }
+        }
+      } catch (e) {
+        debugPrint('[OneEvService] Gagal fetch master kabupaten: $e');
+      }
+    }
+    return [];
+  }
+
+  /// Mengambil daftar master Kecamatan dari ONE_DB_MITRA berdasarkan kabupaten
+  Future<List<Map<String, dynamic>>> fetchMasterKecamatan({String? kabupaten}) async {
+    final param = kabupaten != null && kabupaten.trim().isNotEmpty ? '?kabupaten=${Uri.encodeComponent(kabupaten.trim())}' : '';
+    final candidates = _buildCandidateUrls('/api/one-ev/master/kecamatan$param');
+    for (final url in candidates) {
+      try {
+        final res = await _dio.get(url, options: Options(validateStatus: (s) => s != null && s < 500));
+        if (res.statusCode == 200 && res.data != null) {
+          final listRaw = res.data is Map ? res.data['data'] : jsonDecode(res.data.toString())['data'];
+          if (listRaw is List) {
+            return listRaw.map((e) => Map<String, dynamic>.from(e)).toList();
+          }
+        }
+      } catch (e) {
+        debugPrint('[OneEvService] Gagal fetch master kecamatan: $e');
+      }
+    }
+    return [];
+  }
+
+  /// Mengambil daftar master Kelurahan/Desa dari ONE_DB_MITRA berdasarkan kecamatan
+  Future<List<Map<String, dynamic>>> fetchMasterKelurahan({String? kecamatan}) async {
+    final param = kecamatan != null && kecamatan.trim().isNotEmpty ? '?kecamatan=${Uri.encodeComponent(kecamatan.trim())}' : '';
+    final candidates = _buildCandidateUrls('/api/one-ev/master/kelurahan$param');
+    for (final url in candidates) {
+      try {
+        final res = await _dio.get(url, options: Options(validateStatus: (s) => s != null && s < 500));
+        if (res.statusCode == 200 && res.data != null) {
+          final listRaw = res.data is Map ? res.data['data'] : jsonDecode(res.data.toString())['data'];
+          if (listRaw is List) {
+            return listRaw.map((e) => Map<String, dynamic>.from(e)).toList();
+          }
+        }
+      } catch (e) {
+        debugPrint('[OneEvService] Gagal fetch master kelurahan: $e');
+      }
+    }
+    return [];
+  }
 }

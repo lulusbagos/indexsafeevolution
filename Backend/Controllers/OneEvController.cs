@@ -941,6 +941,279 @@ namespace Indexsafe.Api.Controllers
             }
         }
 
+        [HttpGet("master/agama")]
+        [AllowAnonymous]
+        public async Task<IActionResult> GetMasterAgama()
+        {
+            try
+            {
+                var conn = _context.Database.GetDbConnection();
+                bool wasClosed = conn.State != ConnectionState.Open;
+                if (wasClosed) await conn.OpenAsync();
+
+                try
+                {
+                    using var cmd = conn.CreateCommand();
+                    cmd.CommandText = "SELECT id, UPPER(LTRIM(RTRIM(nama))) AS nama FROM [ONE_DB_MITRA].dbo.tbl_m_agama WHERE (status_aktif IS NULL OR status_aktif = '1') ORDER BY id ASC;";
+                    using var reader = await cmd.ExecuteReaderAsync();
+                    var list = new List<object>();
+                    while (await reader.ReadAsync())
+                    {
+                        list.Add(new
+                        {
+                            id = Convert.ToInt32(reader["id"]),
+                            nama = reader["nama"]?.ToString() ?? ""
+                        });
+                    }
+                    return Ok(new { success = true, data = list });
+                }
+                finally
+                {
+                    if (wasClosed) await conn.CloseAsync();
+                }
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { success = false, message = $"Gagal mengambil master agama: {ex.Message}" });
+            }
+        }
+
+        [HttpGet("master/pendidikan")]
+        [AllowAnonymous]
+        public async Task<IActionResult> GetMasterPendidikan()
+        {
+            try
+            {
+                var conn = _context.Database.GetDbConnection();
+                bool wasClosed = conn.State != ConnectionState.Open;
+                if (wasClosed) await conn.OpenAsync();
+
+                try
+                {
+                    using var cmd = conn.CreateCommand();
+                    cmd.CommandText = "SELECT id, UPPER(LTRIM(RTRIM(nama))) AS nama FROM [ONE_DB_MITRA].dbo.tbl_m_tingkat_pendidikan ORDER BY id ASC;";
+                    using var reader = await cmd.ExecuteReaderAsync();
+                    var list = new List<object>();
+                    while (await reader.ReadAsync())
+                    {
+                        list.Add(new
+                        {
+                            id = Convert.ToInt32(reader["id"]),
+                            nama = reader["nama"]?.ToString() ?? ""
+                        });
+                    }
+                    return Ok(new { success = true, data = list });
+                }
+                finally
+                {
+                    if (wasClosed) await conn.CloseAsync();
+                }
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { success = false, message = $"Gagal mengambil master tingkat pendidikan: {ex.Message}" });
+            }
+        }
+
+        [HttpGet("master/provinsi")]
+        [AllowAnonymous]
+        public async Task<IActionResult> GetMasterProvinsi()
+        {
+            try
+            {
+                var conn = _context.Database.GetDbConnection();
+                bool wasClosed = conn.State != ConnectionState.Open;
+                if (wasClosed) await conn.OpenAsync();
+
+                try
+                {
+                    using var cmd = conn.CreateCommand();
+                    cmd.CommandText = "SELECT kode_provinsi AS kode, UPPER(LTRIM(RTRIM(nama_provinsi))) AS nama FROM [ONE_DB_MITRA].dbo.tbl_m_provinsi ORDER BY nama ASC;";
+                    using var reader = await cmd.ExecuteReaderAsync();
+                    var list = new List<object>();
+                    while (await reader.ReadAsync())
+                    {
+                        list.Add(new
+                        {
+                            kode = reader["kode"]?.ToString() ?? "",
+                            nama = reader["nama"]?.ToString() ?? ""
+                        });
+                    }
+                    return Ok(new { success = true, data = list });
+                }
+                finally
+                {
+                    if (wasClosed) await conn.CloseAsync();
+                }
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { success = false, message = $"Gagal mengambil master provinsi: {ex.Message}" });
+            }
+        }
+
+        [HttpGet("master/kabupaten")]
+        [AllowAnonymous]
+        public async Task<IActionResult> GetMasterKabupaten([FromQuery] string? provinsi = null)
+        {
+            try
+            {
+                var conn = _context.Database.GetDbConnection();
+                bool wasClosed = conn.State != ConnectionState.Open;
+                if (wasClosed) await conn.OpenAsync();
+
+                try
+                {
+                    using var cmd = conn.CreateCommand();
+                    cmd.CommandText = @"
+                        DECLARE @provParam NVARCHAR(100) = @prov;
+                        DECLARE @provKode VARCHAR(10) = NULL;
+
+                        IF @provParam IS NOT NULL AND LTRIM(RTRIM(@provParam)) <> ''
+                        BEGIN
+                            SELECT TOP 1 @provKode = kode_provinsi 
+                            FROM [ONE_DB_MITRA].dbo.tbl_m_provinsi 
+                            WHERE UPPER(LTRIM(RTRIM(nama_provinsi))) = UPPER(LTRIM(RTRIM(@provParam))) OR kode_provinsi = @provParam;
+                        END
+
+                        SELECT MIN(kode_kabupaten) AS kode, UPPER(LTRIM(RTRIM(nama_kabupaten))) AS nama 
+                        FROM [ONE_DB_MITRA].dbo.tbl_m_kabupaten 
+                        WHERE (@provKode IS NULL OR kode_provinsi = @provKode OR LEFT(kode_kabupaten, 2) = @provKode)
+                        GROUP BY UPPER(LTRIM(RTRIM(nama_kabupaten)))
+                        ORDER BY nama ASC;
+                    ";
+                    AddParam(cmd, "@prov", string.IsNullOrWhiteSpace(provinsi) ? (object)DBNull.Value : provinsi.Trim());
+                    using var reader = await cmd.ExecuteReaderAsync();
+                    var list = new List<object>();
+                    while (await reader.ReadAsync())
+                    {
+                        list.Add(new
+                        {
+                            kode = reader["kode"]?.ToString() ?? "",
+                            nama = reader["nama"]?.ToString() ?? ""
+                        });
+                    }
+                    return Ok(new { success = true, data = list });
+                }
+                finally
+                {
+                    if (wasClosed) await conn.CloseAsync();
+                }
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { success = false, message = $"Gagal mengambil master kabupaten: {ex.Message}" });
+            }
+        }
+
+        [HttpGet("master/kecamatan")]
+        [AllowAnonymous]
+        public async Task<IActionResult> GetMasterKecamatan([FromQuery] string? kabupaten = null)
+        {
+            try
+            {
+                var conn = _context.Database.GetDbConnection();
+                bool wasClosed = conn.State != ConnectionState.Open;
+                if (wasClosed) await conn.OpenAsync();
+
+                try
+                {
+                    using var cmd = conn.CreateCommand();
+                    cmd.CommandText = @"
+                        DECLARE @kabParam NVARCHAR(100) = @kab;
+                        DECLARE @kabKode VARCHAR(10) = NULL;
+
+                        IF @kabParam IS NOT NULL AND LTRIM(RTRIM(@kabParam)) <> ''
+                        BEGIN
+                            SELECT TOP 1 @kabKode = kode_kabupaten 
+                            FROM [ONE_DB_MITRA].dbo.tbl_m_kabupaten 
+                            WHERE UPPER(LTRIM(RTRIM(nama_kabupaten))) = UPPER(LTRIM(RTRIM(@kabParam))) OR kode_kabupaten = @kabParam;
+                        END
+
+                        SELECT MIN(kode_kecamatan) AS kode, UPPER(LTRIM(RTRIM(nama_kecamatan))) AS nama 
+                        FROM [ONE_DB_MITRA].dbo.tbl_m_kecamatan 
+                        WHERE (@kabKode IS NULL OR kode_kabupaten = @kabKode OR LEFT(kode_kecamatan, LEN(@kabKode)) = @kabKode)
+                        GROUP BY UPPER(LTRIM(RTRIM(nama_kecamatan)))
+                        ORDER BY nama ASC;
+                    ";
+                    AddParam(cmd, "@kab", string.IsNullOrWhiteSpace(kabupaten) ? (object)DBNull.Value : kabupaten.Trim());
+                    using var reader = await cmd.ExecuteReaderAsync();
+                    var list = new List<object>();
+                    while (await reader.ReadAsync())
+                    {
+                        list.Add(new
+                        {
+                            kode = reader["kode"]?.ToString() ?? "",
+                            nama = reader["nama"]?.ToString() ?? ""
+                        });
+                    }
+                    return Ok(new { success = true, data = list });
+                }
+                finally
+                {
+                    if (wasClosed) await conn.CloseAsync();
+                }
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { success = false, message = $"Gagal mengambil master kecamatan: {ex.Message}" });
+            }
+        }
+
+        [HttpGet("master/kelurahan")]
+        [AllowAnonymous]
+        public async Task<IActionResult> GetMasterKelurahan([FromQuery] string? kecamatan = null)
+        {
+            try
+            {
+                var conn = _context.Database.GetDbConnection();
+                bool wasClosed = conn.State != ConnectionState.Open;
+                if (wasClosed) await conn.OpenAsync();
+
+                try
+                {
+                    using var cmd = conn.CreateCommand();
+                    cmd.CommandText = @"
+                        DECLARE @kecParam NVARCHAR(100) = @kec;
+                        DECLARE @kecKode VARCHAR(20) = NULL;
+
+                        IF @kecParam IS NOT NULL AND LTRIM(RTRIM(@kecParam)) <> ''
+                        BEGIN
+                            SELECT TOP 1 @kecKode = kode_kecamatan 
+                            FROM [ONE_DB_MITRA].dbo.tbl_m_kecamatan 
+                            WHERE UPPER(LTRIM(RTRIM(nama_kecamatan))) = UPPER(LTRIM(RTRIM(@kecParam))) OR kode_kecamatan = @kecParam;
+                        END
+
+                        SELECT MIN(kode_kelurahan) AS kode, UPPER(LTRIM(RTRIM(kelurahan))) AS nama 
+                        FROM [ONE_DB_MITRA].dbo.tbl_m_kelurahan 
+                        WHERE (@kecKode IS NULL OR kode_kecamatan = @kecKode OR LEFT(kode_kelurahan, LEN(@kecKode)) = @kecKode)
+                        GROUP BY UPPER(LTRIM(RTRIM(kelurahan)))
+                        ORDER BY nama ASC;
+                    ";
+                    AddParam(cmd, "@kec", string.IsNullOrWhiteSpace(kecamatan) ? (object)DBNull.Value : kecamatan.Trim());
+                    using var reader = await cmd.ExecuteReaderAsync();
+                    var list = new List<object>();
+                    while (await reader.ReadAsync())
+                    {
+                        list.Add(new
+                        {
+                            kode = reader["kode"]?.ToString() ?? "",
+                            nama = reader["nama"]?.ToString() ?? ""
+                        });
+                    }
+                    return Ok(new { success = true, data = list });
+                }
+                finally
+                {
+                    if (wasClosed) await conn.CloseAsync();
+                }
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { success = false, message = $"Gagal mengambil master kelurahan: {ex.Message}" });
+            }
+        }
+
         private static void AddParam(DbCommand cmd, string name, object? value)
         {
             var p = cmd.CreateParameter();

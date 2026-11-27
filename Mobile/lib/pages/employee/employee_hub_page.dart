@@ -1010,17 +1010,12 @@ class _EmployeeHubPageState extends State<EmployeeHubPage> {
     final jkCtrl = TextEditingController(text: _jenisKelamin);
     final tempatLahirCtrl = TextEditingController(text: _tempatLahir);
     final tglLahirCtrl = TextEditingController(text: _tanggalLahir);
-    final agamaCtrl = TextEditingController(text: _agama);
     final nikahCtrl = TextEditingController(text: _statusNikah);
     final darahCtrl = TextEditingController(text: _golDarah);
     final ibuCtrl = TextEditingController(text: _namaIbu);
     final ayahCtrl = TextEditingController(text: _namaAyah);
 
     // 2. Domisili
-    final provinsiCtrl = TextEditingController(text: _provinsi);
-    final kabupatenCtrl = TextEditingController(text: _kabupaten);
-    final kecamatanCtrl = TextEditingController(text: _kecamatan);
-    final desaCtrl = TextEditingController(text: _desa);
     final alamatCtrl = TextEditingController(text: _alamat);
     final rtCtrl = TextEditingController(text: _rt);
     final rwCtrl = TextEditingController(text: _rw);
@@ -1038,7 +1033,6 @@ class _EmployeeHubPageState extends State<EmployeeHubPage> {
     final kdKetCtrl = TextEditingController(text: _daruratKeterangan);
 
     // 4. Pendidikan & Jaminan
-    final jenjangCtrl = TextEditingController(text: _jenjangPendidikan);
     final sekolahCtrl = TextEditingController(text: _namaSekolah);
     final fakultasCtrl = TextEditingController(text: _fakultas);
     final jurusanCtrl = TextEditingController(text: _jurusan);
@@ -1047,8 +1041,220 @@ class _EmployeeHubPageState extends State<EmployeeHubPage> {
     final bpjsKesCtrl = TextEditingController(text: _noBpjsKes);
     final bpjsPensiunCtrl = TextEditingController(text: _noBpjsPensiun);
 
+    // Master Dropdown Options & State (Live Database ONE_DB_MITRA)
+    List<Map<String, dynamic>> agamaOptions = [];
+    List<Map<String, dynamic>> pendidikanOptions = [];
+    List<Map<String, dynamic>> provinsiOptions = [];
+    List<Map<String, dynamic>> kabupatenOptions = [];
+    List<Map<String, dynamic>> kecamatanOptions = [];
+    List<Map<String, dynamic>> desaOptions = [];
+
+    int? curAgamaId = _idAgama;
+    String curAgamaName = _agama;
+
+    int? curPendidikanId = _idPendidikan;
+    String curJenjangName = _jenjangPendidikan;
+
+    String? curProvinsi = _provinsi.trim().isNotEmpty ? _provinsi.trim() : null;
+    String? curKabupaten = _kabupaten.trim().isNotEmpty ? _kabupaten.trim() : null;
+    String? curKecamatan = _kecamatan.trim().isNotEmpty ? _kecamatan.trim() : null;
+    String? curDesa = _desa.trim().isNotEmpty ? _desa.trim() : null;
+
+    bool loadingProv = false;
+    bool loadingKab = false;
+    bool loadingKec = false;
+    bool loadingDesa = false;
+    bool masterInitialized = false;
+
     int activeTab = 0;
     bool isSaving = false;
+
+    Future<void> loadMasterData(void Function(void Function()) setModalState) async {
+      if (masterInitialized) return;
+      masterInitialized = true;
+
+      setModalState(() => loadingProv = true);
+      try {
+        final agamas = await OneEvService.instance.fetchMasterAgama();
+        final pendidikans = await OneEvService.instance.fetchMasterPendidikan();
+        final provs = await OneEvService.instance.fetchMasterProvinsi();
+
+        setModalState(() {
+          agamaOptions = agamas;
+          pendidikanOptions = pendidikans;
+          provinsiOptions = provs;
+          loadingProv = false;
+
+          // Sync Agama
+          if (curAgamaId == null && curAgamaName.isNotEmpty) {
+            final found = agamas.firstWhere(
+              (a) => (a['nama']?.toString().toUpperCase() ?? '') == curAgamaName.toUpperCase(),
+              orElse: () => {},
+            );
+            if (found.isNotEmpty) curAgamaId = found['id'] as int;
+          }
+          if (curAgamaId != null && !agamaOptions.any((a) => a['id'] == curAgamaId)) {
+            agamaOptions.insert(0, {'id': curAgamaId, 'nama': curAgamaName.isNotEmpty ? curAgamaName : 'Agama $curAgamaId'});
+          }
+
+          // Sync Pendidikan
+          if (curPendidikanId == null && curJenjangName.isNotEmpty) {
+            final found = pendidikans.firstWhere(
+              (p) => (p['nama']?.toString().toUpperCase() ?? '') == curJenjangName.toUpperCase(),
+              orElse: () => {},
+            );
+            if (found.isNotEmpty) curPendidikanId = found['id'] as int;
+          }
+          if (curPendidikanId != null && !pendidikanOptions.any((p) => p['id'] == curPendidikanId)) {
+            pendidikanOptions.insert(0, {'id': curPendidikanId, 'nama': curJenjangName.isNotEmpty ? curJenjangName : 'Pendidikan $curPendidikanId'});
+          }
+
+          // Sync Provinsi
+          if (curProvinsi != null && curProvinsi!.isNotEmpty) {
+            final foundP = provs.firstWhere(
+              (p) => (p['nama']?.toString().toUpperCase() ?? '') == curProvinsi!.toUpperCase(),
+              orElse: () => {},
+            );
+            if (foundP.isNotEmpty) {
+              curProvinsi = foundP['nama']?.toString();
+            } else {
+              provinsiOptions.insert(0, {'kode': '', 'nama': curProvinsi!});
+            }
+          }
+        });
+
+        // Pre-load Kabupaten if existing
+        if (curProvinsi != null && curProvinsi!.isNotEmpty) {
+          setModalState(() => loadingKab = true);
+          final kabs = await OneEvService.instance.fetchMasterKabupaten(provinsi: curProvinsi);
+          setModalState(() {
+            kabupatenOptions = kabs;
+            loadingKab = false;
+            if (curKabupaten != null && curKabupaten!.isNotEmpty) {
+              final foundK = kabs.firstWhere(
+                (k) => (k['nama']?.toString().toUpperCase() ?? '') == curKabupaten!.toUpperCase(),
+                orElse: () => {},
+              );
+              if (foundK.isNotEmpty) {
+                curKabupaten = foundK['nama']?.toString();
+              } else {
+                kabupatenOptions.insert(0, {'kode': '', 'nama': curKabupaten!});
+              }
+            }
+          });
+
+          // Pre-load Kecamatan if existing
+          if (curKabupaten != null && curKabupaten!.isNotEmpty) {
+            setModalState(() => loadingKec = true);
+            final kecs = await OneEvService.instance.fetchMasterKecamatan(kabupaten: curKabupaten);
+            setModalState(() {
+              kecamatanOptions = kecs;
+              loadingKec = false;
+              if (curKecamatan != null && curKecamatan!.isNotEmpty) {
+                final foundKc = kecs.firstWhere(
+                  (kc) => (kc['nama']?.toString().toUpperCase() ?? '') == curKecamatan!.toUpperCase(),
+                  orElse: () => {},
+                );
+                if (foundKc.isNotEmpty) {
+                  curKecamatan = foundKc['nama']?.toString();
+                } else {
+                  kecamatanOptions.insert(0, {'kode': '', 'nama': curKecamatan!});
+                }
+              }
+            });
+
+            // Pre-load Desa if existing
+            if (curKecamatan != null && curKecamatan!.isNotEmpty) {
+              setModalState(() => loadingDesa = true);
+              final desas = await OneEvService.instance.fetchMasterKelurahan(kecamatan: curKecamatan);
+              setModalState(() {
+                desaOptions = desas;
+                loadingDesa = false;
+                if (curDesa != null && curDesa!.isNotEmpty) {
+                  final foundD = desas.firstWhere(
+                    (d) => (d['nama']?.toString().toUpperCase() ?? '') == curDesa!.toUpperCase(),
+                    orElse: () => {},
+                  );
+                  if (foundD.isNotEmpty) {
+                    curDesa = foundD['nama']?.toString();
+                  } else {
+                    desaOptions.insert(0, {'kode': '', 'nama': curDesa!});
+                  }
+                }
+              });
+            }
+          }
+        }
+      } catch (e) {
+        debugPrint('[OneEv] Error loading master data: $e');
+        setModalState(() {
+          loadingProv = false;
+          loadingKab = false;
+          loadingKec = false;
+          loadingDesa = false;
+        });
+      }
+    }
+
+    void onSelectProvinsi(String? newProv, void Function(void Function()) setModalState) async {
+      setModalState(() {
+        curProvinsi = newProv;
+        curKabupaten = null;
+        curKecamatan = null;
+        curDesa = null;
+        kabupatenOptions = [];
+        kecamatanOptions = [];
+        desaOptions = [];
+        loadingKab = true;
+      });
+      if (newProv == null || newProv.isEmpty) {
+        setModalState(() => loadingKab = false);
+        return;
+      }
+      final kabs = await OneEvService.instance.fetchMasterKabupaten(provinsi: newProv);
+      setModalState(() {
+        kabupatenOptions = kabs;
+        loadingKab = false;
+      });
+    }
+
+    void onSelectKabupaten(String? newKab, void Function(void Function()) setModalState) async {
+      setModalState(() {
+        curKabupaten = newKab;
+        curKecamatan = null;
+        curDesa = null;
+        kecamatanOptions = [];
+        desaOptions = [];
+        loadingKec = true;
+      });
+      if (newKab == null || newKab.isEmpty) {
+        setModalState(() => loadingKec = false);
+        return;
+      }
+      final kecs = await OneEvService.instance.fetchMasterKecamatan(kabupaten: newKab);
+      setModalState(() {
+        kecamatanOptions = kecs;
+        loadingKec = false;
+      });
+    }
+
+    void onSelectKecamatan(String? newKec, void Function(void Function()) setModalState) async {
+      setModalState(() {
+        curKecamatan = newKec;
+        curDesa = null;
+        desaOptions = [];
+        loadingDesa = true;
+      });
+      if (newKec == null || newKec.isEmpty) {
+        setModalState(() => loadingDesa = false);
+        return;
+      }
+      final desas = await OneEvService.instance.fetchMasterKelurahan(kecamatan: newKec);
+      setModalState(() {
+        desaOptions = desas;
+        loadingDesa = false;
+      });
+    }
 
     showModalBottomSheet(
       context: context,
@@ -1057,6 +1263,10 @@ class _EmployeeHubPageState extends State<EmployeeHubPage> {
       builder: (ctx) {
         return StatefulBuilder(
           builder: (context, setModalState) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              loadMasterData(setModalState);
+            });
+
             return Container(
               height: MediaQuery.of(context).size.height * 0.92,
               padding: EdgeInsets.fromLTRB(20, 12, 20, MediaQuery.of(context).viewInsets.bottom + 20),
@@ -1174,7 +1384,39 @@ class _EmployeeHubPageState extends State<EmployeeHubPage> {
                           const SizedBox(height: 12),
                           Row(
                             children: [
-                              Expanded(child: _buildInputField('Agama', agamaCtrl, Icons.mosque_rounded)),
+                              Expanded(
+                                child: _buildDropdownField<int>(
+                                  label: 'Agama',
+                                  value: curAgamaId,
+                                  icon: Icons.mosque_rounded,
+                                  hint: '-- Pilih Agama --',
+                                  items: agamaOptions.map((a) {
+                                    return DropdownMenuItem<int>(
+                                      value: a['id'] as int,
+                                      child: Row(
+                                        children: [
+                                          const Icon(Icons.mosque_rounded, size: 16, color: Color(0xFF6366F1)),
+                                          const SizedBox(width: 8),
+                                          Expanded(
+                                            child: Text(
+                                              a['nama']?.toString() ?? '',
+                                              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                  }).toList(),
+                                  onChanged: (val) {
+                                    setModalState(() {
+                                      curAgamaId = val;
+                                      final matched = agamaOptions.firstWhere((a) => a['id'] == val, orElse: () => {});
+                                      curAgamaName = matched['nama']?.toString() ?? '';
+                                    });
+                                  },
+                                ),
+                              ),
                               const SizedBox(width: 10),
                               Expanded(child: _buildInputField('Status Nikah', nikahCtrl, Icons.favorite_rounded)),
                             ],
@@ -1187,13 +1429,119 @@ class _EmployeeHubPageState extends State<EmployeeHubPage> {
                           _buildInputField('Nama Ayah Kandung', ayahCtrl, Icons.person_outline_rounded),
                         ] else if (activeTab == 1) ...[
                           // TAB 2: DOMISILI & ALAMAT
-                          _buildInputField('Provinsi', provinsiCtrl, Icons.map_rounded),
+                          _buildDropdownField<String>(
+                            label: 'Provinsi',
+                            value: curProvinsi,
+                            isLoading: loadingProv,
+                            icon: Icons.map_rounded,
+                            hint: '-- Pilih Provinsi (Database One EV) --',
+                            items: provinsiOptions.map((p) {
+                              final name = p['nama']?.toString() ?? '';
+                              return DropdownMenuItem<String>(
+                                value: name,
+                                child: Row(
+                                  children: [
+                                    const Icon(Icons.map_rounded, size: 16, color: Color(0xFF6366F1)),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        name,
+                                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            }).toList(),
+                            onChanged: (val) => onSelectProvinsi(val, setModalState),
+                          ),
                           const SizedBox(height: 12),
-                          _buildInputField('Kabupaten / Kota', kabupatenCtrl, Icons.location_city_rounded),
+                          _buildDropdownField<String>(
+                            label: 'Kabupaten / Kota',
+                            value: curKabupaten,
+                            isLoading: loadingKab,
+                            icon: Icons.location_city_rounded,
+                            hint: curProvinsi == null ? '-- Pilih Provinsi Terlebih Dahulu --' : '-- Pilih Kabupaten / Kota --',
+                            items: kabupatenOptions.map((k) {
+                              final name = k['nama']?.toString() ?? '';
+                              return DropdownMenuItem<String>(
+                                value: name,
+                                child: Row(
+                                  children: [
+                                    const Icon(Icons.location_city_rounded, size: 16, color: Color(0xFF6366F1)),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        name,
+                                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            }).toList(),
+                            onChanged: (val) => onSelectKabupaten(val, setModalState),
+                          ),
                           const SizedBox(height: 12),
-                          _buildInputField('Kecamatan', kecamatanCtrl, Icons.signpost_rounded),
+                          _buildDropdownField<String>(
+                            label: 'Kecamatan',
+                            value: curKecamatan,
+                            isLoading: loadingKec,
+                            icon: Icons.signpost_rounded,
+                            hint: curKabupaten == null ? '-- Pilih Kabupaten Terlebih Dahulu --' : '-- Pilih Kecamatan --',
+                            items: kecamatanOptions.map((kc) {
+                              final name = kc['nama']?.toString() ?? '';
+                              return DropdownMenuItem<String>(
+                                value: name,
+                                child: Row(
+                                  children: [
+                                    const Icon(Icons.signpost_rounded, size: 16, color: Color(0xFF6366F1)),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        name,
+                                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            }).toList(),
+                            onChanged: (val) => onSelectKecamatan(val, setModalState),
+                          ),
                           const SizedBox(height: 12),
-                          _buildInputField('Kelurahan / Desa', desaCtrl, Icons.home_work_rounded),
+                          _buildDropdownField<String>(
+                            label: 'Kelurahan / Desa',
+                            value: curDesa,
+                            isLoading: loadingDesa,
+                            icon: Icons.home_work_rounded,
+                            hint: curKecamatan == null ? '-- Pilih Kecamatan Terlebih Dahulu --' : '-- Pilih Kelurahan / Desa --',
+                            items: desaOptions.map((d) {
+                              final name = d['nama']?.toString() ?? '';
+                              return DropdownMenuItem<String>(
+                                value: name,
+                                child: Row(
+                                  children: [
+                                    const Icon(Icons.home_work_rounded, size: 16, color: Color(0xFF6366F1)),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        name,
+                                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            }).toList(),
+                            onChanged: (val) {
+                              setModalState(() => curDesa = val);
+                            },
+                          ),
                           const SizedBox(height: 12),
                           _buildInputField('Alamat Domisili / Tempat Tinggal', alamatCtrl, Icons.location_on_rounded, maxLines: 2),
                           const SizedBox(height: 12),
@@ -1232,13 +1580,44 @@ class _EmployeeHubPageState extends State<EmployeeHubPage> {
                           _buildInputField('Keterangan / Catatan Tambahan', kdKetCtrl, Icons.note_rounded, maxLines: 2),
                         ] else if (activeTab == 3) ...[
                           // TAB 4: PENDIDIKAN & JAMINAN
-                          _buildInputField('Jenjang Pendidikan (SMA/SMK, D3, S1, S2)', jenjangCtrl, Icons.school_rounded),
+                          _buildDropdownField<int>(
+                            label: 'Jenjang Pendidikan',
+                            value: curPendidikanId,
+                            icon: Icons.school_rounded,
+                            hint: '-- Pilih Tingkat Pendidikan (Database One EV) --',
+                            items: pendidikanOptions.map((p) {
+                              final name = p['nama']?.toString() ?? '';
+                              return DropdownMenuItem<int>(
+                                value: p['id'] as int,
+                                child: Row(
+                                  children: [
+                                    const Icon(Icons.school_rounded, size: 16, color: Color(0xFF6366F1)),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        name,
+                                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            }).toList(),
+                            onChanged: (val) {
+                              setModalState(() {
+                                curPendidikanId = val;
+                                final matched = pendidikanOptions.firstWhere((p) => p['id'] == val, orElse: () => {});
+                                curJenjangName = matched['nama']?.toString() ?? '';
+                              });
+                            },
+                          ),
                           const SizedBox(height: 12),
                           _buildInputField('Nama Sekolah / Universitas', sekolahCtrl, Icons.account_balance_rounded),
                           const SizedBox(height: 12),
                           _buildInputField('Fakultas', fakultasCtrl, Icons.apartment_rounded),
                           const SizedBox(height: 12),
-                          _buildInputField('Jurusan', jurusanCtrl, Icons.menu_book_rounded),
+                          _buildInputField('Jurusan / Program Studi', jurusanCtrl, Icons.menu_book_rounded),
                           const SizedBox(height: 16),
                           const Text(
                             'Jaminan Sosial & Pajak',
@@ -1311,15 +1690,16 @@ class _EmployeeHubPageState extends State<EmployeeHubPage> {
                                 'jenis_kelamin': jkCtrl.text.trim(),
                                 'tempat_lahir': tempatLahirCtrl.text.trim(),
                                 'tanggal_lahir': tglLahirCtrl.text.trim(),
-                                'agama': agamaCtrl.text.trim(),
+                                'id_agama': curAgamaId,
+                                'agama': curAgamaName,
                                 'status_nikah': nikahCtrl.text.trim(),
                                 'golongan_darah': darahCtrl.text.trim(),
                                 'nama_ibu': ibuCtrl.text.trim(),
                                 'nama_ayah': ayahCtrl.text.trim(),
-                                'provinsi': provinsiCtrl.text.trim(),
-                                'kabupaten': kabupatenCtrl.text.trim(),
-                                'kecamatan': kecamatanCtrl.text.trim(),
-                                'desa': desaCtrl.text.trim(),
+                                'provinsi': curProvinsi ?? '',
+                                'kabupaten': curKabupaten ?? '',
+                                'kecamatan': curKecamatan ?? '',
+                                'desa': curDesa ?? '',
                                 'alamat': alamatCtrl.text.trim(),
                                 'rt': rtCtrl.text.trim(),
                                 'rw': rwCtrl.text.trim(),
@@ -1337,7 +1717,8 @@ class _EmployeeHubPageState extends State<EmployeeHubPage> {
                                 'no_bpjs_tk': bpjsTkCtrl.text.trim(),
                                 'no_bpjs_kes': bpjsKesCtrl.text.trim(),
                                 'no_bpjs_pensiun': bpjsPensiunCtrl.text.trim(),
-                                'jenjang_pendidikan': jenjangCtrl.text.trim(),
+                                'id_pendidikan': curPendidikanId,
+                                'jenjang_pendidikan': curJenjangName,
                                 'nama_sekolah': sekolahCtrl.text.trim(),
                                 'fakultas': fakultasCtrl.text.trim(),
                                 'jurusan': jurusanCtrl.text.trim(),
@@ -1353,15 +1734,16 @@ class _EmployeeHubPageState extends State<EmployeeHubPage> {
                                   _jenisKelamin = jkCtrl.text.trim();
                                   _tempatLahir = tempatLahirCtrl.text.trim();
                                   _tanggalLahir = tglLahirCtrl.text.trim();
-                                  _agama = agamaCtrl.text.trim();
+                                  _idAgama = curAgamaId;
+                                  _agama = curAgamaName;
                                   _statusNikah = nikahCtrl.text.trim();
                                   _golDarah = darahCtrl.text.trim();
                                   _namaIbu = ibuCtrl.text.trim();
                                   _namaAyah = ayahCtrl.text.trim();
-                                  _provinsi = provinsiCtrl.text.trim();
-                                  _kabupaten = kabupatenCtrl.text.trim();
-                                  _kecamatan = kecamatanCtrl.text.trim();
-                                  _desa = desaCtrl.text.trim();
+                                  _provinsi = curProvinsi ?? '';
+                                  _kabupaten = curKabupaten ?? '';
+                                  _kecamatan = curKecamatan ?? '';
+                                  _desa = curDesa ?? '';
                                   _alamat = alamatCtrl.text.trim();
                                   _rt = rtCtrl.text.trim();
                                   _rw = rwCtrl.text.trim();
@@ -1379,7 +1761,8 @@ class _EmployeeHubPageState extends State<EmployeeHubPage> {
                                   _noBpjsTk = bpjsTkCtrl.text.trim();
                                   _noBpjsKes = bpjsKesCtrl.text.trim();
                                   _noBpjsPensiun = bpjsPensiunCtrl.text.trim();
-                                  _jenjangPendidikan = jenjangCtrl.text.trim();
+                                  _idPendidikan = curPendidikanId;
+                                  _jenjangPendidikan = curJenjangName;
                                   _namaSekolah = sekolahCtrl.text.trim();
                                   _fakultas = fakultasCtrl.text.trim();
                                   _jurusan = jurusanCtrl.text.trim();
@@ -2150,6 +2533,70 @@ class _EmployeeHubPageState extends State<EmployeeHubPage> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildDropdownField<T>({
+    required String label,
+    required T? value,
+    required List<DropdownMenuItem<T>> items,
+    required void Function(T?) onChanged,
+    required IconData icon,
+    bool isLoading = false,
+    String? hint,
+  }) {
+    final safeValue = items.any((i) => i.value == value) ? value : null;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              label,
+              style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: Color(0xFF475569)),
+            ),
+            if (isLoading)
+              const SizedBox(
+                width: 12,
+                height: 12,
+                child: CircularProgressIndicator(strokeWidth: 1.8, color: Color(0xFF6366F1)),
+              ),
+          ],
+        ),
+        const SizedBox(height: 5),
+        Container(
+          height: 48,
+          decoration: BoxDecoration(
+            color: const Color(0xFFF8FAFC),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: const Color(0xFFE2E8F0)),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<T>(
+              value: safeValue,
+              isExpanded: true,
+              hint: Row(
+                children: [
+                  Icon(icon, size: 18, color: const Color(0xFF6366F1)),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      hint ?? '-- Pilih $label --',
+                      style: const TextStyle(fontSize: 12.5, color: Color(0xFF94A3B8), fontWeight: FontWeight.w500),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+              icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Color(0xFF64748B), size: 20),
+              items: items,
+              onChanged: onChanged,
+            ),
+          ),
+        ),
+      ],
     );
   }
 
