@@ -55,6 +55,12 @@ namespace Indexsafe.Api.Models
 
         public int? PerusahaanId { get; set; }
 
+        [Column("is_pekerja_lapangan")]
+        public bool? IsPekerjaLapangan { get; set; }
+
+        [Column("fatigue_json")]
+        public string? FatigueJson { get; set; }
+
         [Column("is_deleted")]
         public bool IsDeleted { get; set; } = false;
 

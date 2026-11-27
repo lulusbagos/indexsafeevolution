@@ -94,14 +94,32 @@ class P5mShareService {
     for (int i = 0; i < questions.length; i++) {
       final qText = questions[i];
       final ans = (i < answers.length) ? answers[i].trim() : 'Yes';
-      final isNo = ans.toLowerCase() == 'no' || ans.toLowerCase() == 'tidak' || ans == '0';
-      if (isNo) hasUnfit = true;
+      final isCoreQuestion = i < 4;
 
-      parsedItems.add({
-        'question': qText,
-        'answer': isNo ? 'NO' : 'YES',
-        'isFit': (!isNo).toString(),
-      });
+      bool isItemFit = true;
+      if (isCoreQuestion) {
+        final isNo = ans.toLowerCase() == 'no' || ans.toLowerCase() == 'tidak' || ans == '0';
+        if (isNo) {
+          hasUnfit = true;
+          isItemFit = false;
+        }
+        parsedItems.add({
+          'question': qText,
+          'answer': isNo ? 'NO (UNFIT)' : 'YES (SEHAT)',
+          'isFit': isItemFit.toString(),
+        });
+      } else {
+        // Fatigue questions
+        if (qText.contains('24 jam terakhir') && (ans == '< 4 Jam' || ans == '4 Jam' || ans == '5 Jam')) {
+          hasUnfit = true;
+          isItemFit = false;
+        }
+        parsedItems.add({
+          'question': qText,
+          'answer': ans,
+          'isFit': isItemFit.toString(),
+        });
+      }
     }
 
     // Direct status flag check if present

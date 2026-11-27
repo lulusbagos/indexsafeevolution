@@ -476,6 +476,10 @@ namespace Indexsafe.Api.Data
 
                 entity.Property(e => e.PerusahaanId).HasColumnName("perusahaan_id");
 
+                entity.Property(e => e.IsPekerjaLapangan).HasColumnName("is_pekerja_lapangan");
+
+                entity.Property(e => e.FatigueJson).HasColumnName("fatigue_json");
+
                 entity.Property(e => e.IsDeleted).HasColumnName("is_deleted");
 
                 entity.Property(e => e.CreatedAt).HasColumnName("created_at");

@@ -3928,6 +3928,21 @@ namespace Indexsafe.Api.Controllers
 
 
 
+                    var isPekerjaLapanganStr = form["is_pekerja_lapangan"].FirstOrDefault();
+                    bool isPekerjaLapangan = isPekerjaLapanganStr == "1" || isPekerjaLapanganStr?.Equals("true", StringComparison.OrdinalIgnoreCase) == true;
+                    var fatigueJson = form["fatigue_json"].FirstOrDefault();
+
+                    try
+                    {
+                        await _context.Database.ExecuteSqlRawAsync(@"
+                            IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'tbl_t_p5m' AND COLUMN_NAME = 'is_pekerja_lapangan')
+                                ALTER TABLE [tbl_t_p5m] ADD [is_pekerja_lapangan] BIT NULL;
+                            IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'tbl_t_p5m' AND COLUMN_NAME = 'fatigue_json')
+                                ALTER TABLE [tbl_t_p5m] ADD [fatigue_json] NVARCHAR(MAX) NULL;
+                        ");
+                    }
+                    catch {}
+
                     if (questionsList != null && questionsList.Count > 0)
 
 
@@ -4045,6 +4060,14 @@ namespace Indexsafe.Api.Controllers
 
 
                                 PerusahaanId = companyId,
+
+
+
+                                IsPekerjaLapangan = isPekerjaLapangan,
+
+
+
+                                FatigueJson = fatigueJson,
 
 
 

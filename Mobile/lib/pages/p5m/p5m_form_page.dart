@@ -191,7 +191,40 @@ class _P5MFormPageState extends State<P5MFormPage> {
 
   ];
 
+  // Pekerja Lapangan / Operasional Fatigue Assessment
+  bool _isPekerjaLapangan = false;
+  TimeOfDay _jamMulaiTidur = const TimeOfDay(hour: 22, minute: 0);
+  TimeOfDay _jamBangun = const TimeOfDay(hour: 5, minute: 0);
+  String _durasiTidur24h = '7 Jam';
+  String _durasiTidur48h = '13 - 14 Jam';
+  bool _tidurSiang = false;
+  String _durasiTidurSiang = '30 Menit';
+  bool _seringTerbangun = false;
 
+  void _autoCalculateSleepDuration() {
+    int startMinutes = _jamMulaiTidur.hour * 60 + _jamMulaiTidur.minute;
+    int endMinutes = _jamBangun.hour * 60 + _jamBangun.minute;
+    if (endMinutes <= startMinutes) {
+      endMinutes += 24 * 60;
+    }
+    final diffMinutes = endMinutes - startMinutes;
+    final hours = (diffMinutes / 60).round();
+    setState(() {
+      if (hours < 4) {
+        _durasiTidur24h = '< 4 Jam';
+      } else if (hours > 10) {
+        _durasiTidur24h = '> 10 Jam';
+      } else {
+        _durasiTidur24h = '$hours Jam';
+      }
+
+      if (hours < 6) {
+        _fitQuestions[2]['answer'] = 'No';
+      } else {
+        _fitQuestions[2]['answer'] = 'Yes';
+      }
+    });
+  }
 
   @override
 
@@ -271,6 +304,28 @@ class _P5MFormPageState extends State<P5MFormPage> {
 
         } catch (_) {}
 
+      }
+
+      if (d['is_pekerja_lapangan'] == 1 || d['is_pekerja_lapangan'] == true || d['is_pekerja_lapangan'] == '1') {
+        _isPekerjaLapangan = true;
+        if (d['fatigue_json'] != null && d['fatigue_json'].toString().isNotEmpty) {
+          try {
+            final fData = jsonDecode(d['fatigue_json'].toString()) as Map;
+            if (fData['durasi_tidur_24h'] != null) _durasiTidur24h = fData['durasi_tidur_24h'].toString();
+            if (fData['durasi_tidur_48h'] != null) _durasiTidur48h = fData['durasi_tidur_48h'].toString();
+            if (fData['tidur_siang'] != null) _tidurSiang = fData['tidur_siang'] == true || fData['tidur_siang'] == 1;
+            if (fData['durasi_tidur_siang'] != null) _durasiTidurSiang = fData['durasi_tidur_siang'].toString();
+            if (fData['sering_terbangun'] != null) _seringTerbangun = fData['sering_terbangun'] == true || fData['sering_terbangun'] == 1;
+            if (fData['jam_mulai_tidur'] != null) {
+              final p = fData['jam_mulai_tidur'].toString().split(':');
+              _jamMulaiTidur = TimeOfDay(hour: int.tryParse(p[0]) ?? 22, minute: int.tryParse(p[1]) ?? 0);
+            }
+            if (fData['jam_bangun'] != null) {
+              final p = fData['jam_bangun'].toString().split(':');
+              _jamBangun = TimeOfDay(hour: int.tryParse(p[0]) ?? 5, minute: int.tryParse(p[1]) ?? 0);
+            }
+          } catch (_) {}
+        }
       }
 
     }
@@ -2599,7 +2654,36 @@ class _P5MFormPageState extends State<P5MFormPage> {
 
       final answersList = _fitQuestions.map((e) => e['answer'].toString()).toList();
 
+      final Map<String, dynamic> fatigueMap = {
+        'jam_mulai_tidur': '${_jamMulaiTidur.hour.toString().padLeft(2, '0')}:${_jamMulaiTidur.minute.toString().padLeft(2, '0')}',
+        'jam_bangun': '${_jamBangun.hour.toString().padLeft(2, '0')}:${_jamBangun.minute.toString().padLeft(2, '0')}',
+        'durasi_tidur_24h': _durasiTidur24h,
+        'durasi_tidur_48h': _durasiTidur48h,
+        'tidur_siang': _tidurSiang,
+        'durasi_tidur_siang': _tidurSiang ? _durasiTidurSiang : '-',
+        'sering_terbangun': _seringTerbangun,
+      };
 
+      if (_isPekerjaLapangan) {
+        questionsList.addAll([
+          'Jam berapa Anda mulai tidur terakhir?',
+          'Jam berapa Anda bangun hari ini?',
+          'Berapa total durasi tidur Anda dalam 24 jam terakhir?',
+          'Berapa total durasi tidur Anda dalam 48 jam terakhir?',
+          'Apakah Anda tidur siang dalam 24 jam terakhir?',
+          'Jika ya, berapa lama Anda tidur siang?',
+          'Apakah tidur Anda sering terbangun di malam hari?',
+        ]);
+        answersList.addAll([
+          '${_jamMulaiTidur.hour.toString().padLeft(2, '0')}:${_jamMulaiTidur.minute.toString().padLeft(2, '0')}',
+          '${_jamBangun.hour.toString().padLeft(2, '0')}:${_jamBangun.minute.toString().padLeft(2, '0')}',
+          _durasiTidur24h,
+          _durasiTidur48h,
+          _tidurSiang ? 'Ya' : 'Tidak',
+          _tidurSiang ? _durasiTidurSiang : '-',
+          _seringTerbangun ? 'Ya' : 'Tidak',
+        ]);
+      }
 
       final p5mMap = <String, dynamic>{
 
@@ -2636,6 +2720,10 @@ class _P5MFormPageState extends State<P5MFormPage> {
         'questions_json': jsonEncode(questionsList),
 
         'answers_json': jsonEncode(answersList),
+
+        'is_pekerja_lapangan': _isPekerjaLapangan ? 1 : 0,
+
+        'fatigue_json': _isPekerjaLapangan ? jsonEncode(fatigueMap) : null,
 
         'company_id': _companyId ?? _profile?.companyId ?? 1,
 
@@ -2692,6 +2780,10 @@ class _P5MFormPageState extends State<P5MFormPage> {
           'questions_json',
 
           'answers_json',
+
+          'is_pekerja_lapangan',
+
+          'fatigue_json',
 
           'fit_status',
 
@@ -2769,6 +2861,30 @@ class _P5MFormPageState extends State<P5MFormPage> {
 
           });
 
+        }
+
+        if (_isPekerjaLapangan) {
+          final fatigueItems = [
+            {'name': 'Jam berapa Anda mulai tidur terakhir?', 'val': '${_jamMulaiTidur.hour.toString().padLeft(2, '0')}:${_jamMulaiTidur.minute.toString().padLeft(2, '0')}', 'st': 1},
+            {'name': 'Jam berapa Anda bangun hari ini?', 'val': '${_jamBangun.hour.toString().padLeft(2, '0')}:${_jamBangun.minute.toString().padLeft(2, '0')}', 'st': 1},
+            {'name': 'Berapa total durasi tidur Anda dalam 24 jam terakhir?', 'val': _durasiTidur24h, 'st': (_durasiTidur24h == '< 4 Jam' || _durasiTidur24h == '4 Jam' || _durasiTidur24h == '5 Jam') ? 0 : 1},
+            {'name': 'Berapa total durasi tidur Anda dalam 48 jam terakhir?', 'val': _durasiTidur48h, 'st': 1},
+            {'name': 'Apakah Anda tidur siang dalam 24 jam terakhir?', 'val': _tidurSiang ? 'Ya' : 'Tidak', 'st': 1},
+            if (_tidurSiang) {'name': 'Berapa lama Anda tidur siang?', 'val': _durasiTidurSiang, 'st': 1},
+            {'name': 'Apakah tidur Anda sering terbangun di malam hari?', 'val': _seringTerbangun ? 'Ya' : 'Tidak', 'st': _seringTerbangun ? 0 : 1},
+          ];
+          for (var f in fatigueItems) {
+            await _db.insert('p5m_details', {
+              'tran_id': tranId,
+              'name': f['name'],
+              'type': 'fatigue',
+              'status': f['st'],
+              'yesno': f['st'],
+              'remark': f['val'],
+              'created_at': now.toString(),
+              'updated_at': now.toString(),
+            });
+          }
         }
 
 
@@ -4235,11 +4351,12 @@ class _P5MFormPageState extends State<P5MFormPage> {
 
               }),
 
-
-
               const SizedBox(height: 12),
 
+              // PEKERJA LAPANGAN & FATIGUE ASSESSMENT
+              _buildPekerjaLapanganSection(),
 
+              const SizedBox(height: 12),
 
               // SECTION 5: CATATAN & FOTO
 
@@ -4655,6 +4772,593 @@ class _P5MFormPageState extends State<P5MFormPage> {
 
     );
 
+  }
+
+  Future<void> _pickTimeFor(bool isSleepStart) async {
+    final initial = isSleepStart ? _jamMulaiTidur : _jamBangun;
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: initial,
+      builder: (context, child) {
+        return MediaQuery(
+          data: MediaQuery.of(context).copyWith(alwaysUse24HourFormat: true),
+          child: Theme(
+            data: Theme.of(context).copyWith(
+              colorScheme: const ColorScheme.light(
+                primary: Color(0xFF0D9488),
+                onPrimary: Colors.white,
+                surface: Colors.white,
+                onSurface: Color(0xFF0F172A),
+              ),
+            ),
+            child: child!,
+          ),
+        );
+      },
+    );
+    if (picked != null) {
+      setState(() {
+        if (isSleepStart) {
+          _jamMulaiTidur = picked;
+        } else {
+          _jamBangun = picked;
+        }
+      });
+      _autoCalculateSleepDuration();
+    }
+  }
+
+  Widget _buildSelectableChip(String label, bool isSelected, VoidCallback onSelected, {bool isAlert = false}) {
+    return InkWell(
+      onTap: onSelected,
+      borderRadius: BorderRadius.circular(10),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? (isAlert ? const Color(0xFFEF4444) : const Color(0xFF0D9488))
+              : const Color(0xFFF8FAFC),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: isSelected
+                ? (isAlert ? const Color(0xFFDC2626) : const Color(0xFF0F766E))
+                : const Color(0xFFE2E8F0),
+            width: isSelected ? 1.5 : 1,
+          ),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: (isAlert ? Colors.red : const Color(0xFF0D9488)).withValues(alpha: 0.25),
+                    blurRadius: 4,
+                    offset: const Offset(0, 2),
+                  )
+                ]
+              : null,
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (isSelected) ...[
+              const Icon(Icons.check_circle_rounded, size: 14, color: Colors.white),
+              const SizedBox(width: 5),
+            ],
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                color: isSelected ? Colors.white : const Color(0xFF334155),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFatigueQuestionHeader(String number, String question, {String? subtitle}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 22,
+              height: 22,
+              decoration: BoxDecoration(
+                color: const Color(0xFF0D9488).withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Center(
+                child: Text(
+                  number,
+                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF0D9488)),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                question,
+                style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: Color(0xFF0F172A), height: 1.3),
+              ),
+            ),
+          ],
+        ),
+        if (subtitle != null) ...[
+          const SizedBox(height: 3),
+          Padding(
+            padding: const EdgeInsets.only(left: 30),
+            child: Text(
+              subtitle,
+              style: const TextStyle(fontSize: 11, color: Color(0xFF64748B), fontStyle: FontStyle.italic),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildPekerjaLapanganSection() {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: _isPekerjaLapangan ? const Color(0xFF0D9488).withValues(alpha: 0.5) : const Color(0xFFE2E8F0),
+          width: _isPekerjaLapangan ? 1.5 : 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Toggle Header
+          InkWell(
+            onTap: () => setState(() => _isPekerjaLapangan = !_isPekerjaLapangan),
+            borderRadius: BorderRadius.circular(16),
+            child: Padding(
+              padding: const EdgeInsets.all(14),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: _isPekerjaLapangan
+                          ? const Color(0xFF0D9488).withValues(alpha: 0.12)
+                          : const Color(0xFFF1F5F9),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(
+                      Icons.engineering_rounded,
+                      size: 24,
+                      color: _isPekerjaLapangan ? const Color(0xFF0D9488) : const Color(0xFF64748B),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Pekerja Lapangan / Operasional',
+                          style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          _isPekerjaLapangan
+                              ? 'Kuesioner evaluasi fatigue (pola tidur) aktif'
+                              : 'Ketuk untuk mengaktifkan evaluasi tidur / fatigue',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: _isPekerjaLapangan ? const Color(0xFF0D9488) : const Color(0xFF64748B),
+                            fontWeight: _isPekerjaLapangan ? FontWeight.w600 : FontWeight.normal,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Switch.adaptive(
+                    value: _isPekerjaLapangan,
+                    activeColor: const Color(0xFF0D9488),
+                    activeTrackColor: const Color(0xFF0D9488).withValues(alpha: 0.5),
+                    onChanged: (val) => setState(() => _isPekerjaLapangan = val),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          // Fatigue Assessment Body if active
+          if (_isPekerjaLapangan) ...[
+            const Divider(height: 1, thickness: 1, color: Color(0xFFF1F5F9)),
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: const Color(0xFF0D9488).withValues(alpha: 0.03),
+                borderRadius: const BorderRadius.only(
+                  bottomLeft: Radius.circular(16),
+                  bottomRight: Radius.circular(16),
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Banner Info
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 14),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF0D9488).withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: const Color(0xFF0D9488).withValues(alpha: 0.2)),
+                    ),
+                    child: const Row(
+                      children: [
+                        Icon(Icons.bedtime_rounded, size: 16, color: Color(0xFF0D9488)),
+                        SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Penilaian Waktu & Kualitas Tidur (Fatigue Assessment)',
+                            style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: Color(0xFF0F766E)),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // Q1: Jam Mulai Tidur Terakhir (Time)
+                  _buildFatigueQuestionHeader('1', 'Jam berapa Anda mulai tidur terakhir?'),
+                  const SizedBox(height: 8),
+                  InkWell(
+                    onTap: () => _pickTimeFor(true),
+                    borderRadius: BorderRadius.circular(10),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: const Color(0xFFCBD5E1)),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.nightlight_round, size: 18, color: Color(0xFF6366F1)),
+                          const SizedBox(width: 10),
+                          Text(
+                            '${_jamMulaiTidur.hour.toString().padLeft(2, '0')}:${_jamMulaiTidur.minute.toString().padLeft(2, '0')} WITA',
+                            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                          ),
+                          const Spacer(),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF6366F1).withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: const Row(
+                              children: [
+                                Icon(Icons.access_time_rounded, size: 13, color: Color(0xFF6366F1)),
+                                SizedBox(width: 4),
+                                Text('Ubah Jam', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF6366F1))),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+
+                  // Q2: Jam Bangun Hari Ini (Time)
+                  _buildFatigueQuestionHeader('2', 'Jam berapa Anda bangun hari ini?'),
+                  const SizedBox(height: 8),
+                  InkWell(
+                    onTap: () => _pickTimeFor(false),
+                    borderRadius: BorderRadius.circular(10),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: const Color(0xFFCBD5E1)),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.wb_sunny_rounded, size: 18, color: Color(0xFFF59E0B)),
+                          const SizedBox(width: 10),
+                          Text(
+                            '${_jamBangun.hour.toString().padLeft(2, '0')}:${_jamBangun.minute.toString().padLeft(2, '0')} WITA',
+                            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                          ),
+                          const Spacer(),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF59E0B).withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: const Row(
+                              children: [
+                                Icon(Icons.access_time_rounded, size: 13, color: Color(0xFFD97706)),
+                                SizedBox(width: 4),
+                                Text('Ubah Jam', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFFD97706))),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+
+                  // Q3: Total Durasi Tidur 24 Jam Terakhir (Tombol Chips 4 Jam s/d 10 Jam)
+                  _buildFatigueQuestionHeader(
+                    '3',
+                    'Berapa total durasi tidur Anda dalam 24 jam terakhir?',
+                    subtitle: 'Pilih tombol durasi (Otomatis menyesuaikan checklist Fit to Work #3)',
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      '< 4 Jam',
+                      '4 Jam',
+                      '5 Jam',
+                      '6 Jam',
+                      '7 Jam',
+                      '8 Jam',
+                      '9 Jam',
+                      '10 Jam',
+                      '> 10 Jam',
+                    ].map((opt) {
+                      final isSel = _durasiTidur24h == opt;
+                      final isAlert = opt == '< 4 Jam' || opt == '4 Jam' || opt == '5 Jam';
+                      return _buildSelectableChip(opt, isSel, () {
+                        setState(() {
+                          _durasiTidur24h = opt;
+                          if (isAlert) {
+                            _fitQuestions[2]['answer'] = 'No';
+                          } else {
+                            _fitQuestions[2]['answer'] = 'Yes';
+                          }
+                        });
+                      }, isAlert: isAlert && isSel);
+                    }).toList(),
+                  ),
+                  if (_durasiTidur24h == '< 4 Jam' || _durasiTidur24h == '4 Jam' || _durasiTidur24h == '5 Jam') ...[
+                    const SizedBox(height: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFEF2F2),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: const Color(0xFFFECACA)),
+                      ),
+                      child: const Row(
+                        children: [
+                          Icon(Icons.warning_amber_rounded, size: 14, color: Color(0xFFDC2626)),
+                          SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              'Peringatan: Tidur kurang dari 6 jam berisiko kelelahan tinggi (UNFIT).',
+                              style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFFDC2626)),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 14),
+
+                  // Q4: Total Durasi Tidur 48 Jam Terakhir
+                  _buildFatigueQuestionHeader('4', 'Berapa total durasi tidur Anda dalam 48 jam terakhir?'),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      '< 8 Jam',
+                      '8 - 10 Jam',
+                      '11 - 12 Jam',
+                      '13 - 14 Jam',
+                      '15 - 16 Jam',
+                      '> 16 Jam',
+                    ].map((opt) {
+                      final isSel = _durasiTidur48h == opt;
+                      final isAlert = opt == '< 8 Jam';
+                      return _buildSelectableChip(opt, isSel, () {
+                        setState(() => _durasiTidur48h = opt);
+                      }, isAlert: isAlert && isSel);
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 14),
+
+                  // Q5: Tidur Siang 24 Jam Terakhir (Ya/Tidak)
+                  _buildFatigueQuestionHeader('5', 'Apakah Anda tidur siang dalam 24 jam terakhir?'),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: InkWell(
+                          onTap: () => setState(() => _tidurSiang = true),
+                          borderRadius: BorderRadius.circular(10),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 180),
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                            decoration: BoxDecoration(
+                              color: _tidurSiang ? const Color(0xFF0D9488) : const Color(0xFFF8FAFC),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color: _tidurSiang ? const Color(0xFF0F766E) : const Color(0xFFE2E8F0),
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.check_circle_rounded, size: 16, color: _tidurSiang ? Colors.white : const Color(0xFF64748B)),
+                                const SizedBox(width: 6),
+                                Text(
+                                  'Ya',
+                                  style: TextStyle(
+                                    fontSize: 12.5,
+                                    fontWeight: FontWeight.bold,
+                                    color: _tidurSiang ? Colors.white : const Color(0xFF334155),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: InkWell(
+                          onTap: () => setState(() => _tidurSiang = false),
+                          borderRadius: BorderRadius.circular(10),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 180),
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                            decoration: BoxDecoration(
+                              color: !_tidurSiang ? const Color(0xFF64748B) : const Color(0xFFF8FAFC),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color: !_tidurSiang ? const Color(0xFF475569) : const Color(0xFFE2E8F0),
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.cancel_rounded, size: 16, color: !_tidurSiang ? Colors.white : const Color(0xFF64748B)),
+                                const SizedBox(width: 6),
+                                Text(
+                                  'Tidak',
+                                  style: TextStyle(
+                                    fontSize: 12.5,
+                                    fontWeight: FontWeight.bold,
+                                    color: !_tidurSiang ? Colors.white : const Color(0xFF334155),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+
+                  // Q6: Durasi Tidur Siang (jika ya)
+                  if (_tidurSiang) ...[
+                    _buildFatigueQuestionHeader('6', 'Berapa lama Anda tidur siang?'),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        '15 Menit',
+                        '30 Menit',
+                        '45 Menit',
+                        '60 Menit',
+                        '> 60 Menit',
+                      ].map((opt) {
+                        final isSel = _durasiTidurSiang == opt;
+                        return _buildSelectableChip(opt, isSel, () {
+                          setState(() => _durasiTidurSiang = opt);
+                        });
+                      }).toList(),
+                    ),
+                    const SizedBox(height: 14),
+                  ],
+
+                  // Q7: Sering Terbangun di Malam Hari? (Ya/Tidak)
+                  _buildFatigueQuestionHeader('7', 'Apakah tidur Anda sering terbangun di malam hari?'),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: InkWell(
+                          onTap: () => setState(() => _seringTerbangun = true),
+                          borderRadius: BorderRadius.circular(10),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 180),
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                            decoration: BoxDecoration(
+                              color: _seringTerbangun ? const Color(0xFFEF4444) : const Color(0xFFF8FAFC),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color: _seringTerbangun ? const Color(0xFFDC2626) : const Color(0xFFE2E8F0),
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.warning_amber_rounded, size: 16, color: _seringTerbangun ? Colors.white : const Color(0xFF64748B)),
+                                const SizedBox(width: 6),
+                                Text(
+                                  'Ya (Sering Terganggu)',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                    color: _seringTerbangun ? Colors.white : const Color(0xFF334155),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: InkWell(
+                          onTap: () => setState(() => _seringTerbangun = false),
+                          borderRadius: BorderRadius.circular(10),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 180),
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                            decoration: BoxDecoration(
+                              color: !_seringTerbangun ? const Color(0xFF10B981) : const Color(0xFFF8FAFC),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color: !_seringTerbangun ? const Color(0xFF059669) : const Color(0xFFE2E8F0),
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.check_circle_rounded, size: 16, color: !_seringTerbangun ? Colors.white : const Color(0xFF64748B)),
+                                const SizedBox(width: 6),
+                                Text(
+                                  'Tidak (Tidur Nyenyak)',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                    color: !_seringTerbangun ? Colors.white : const Color(0xFF334155),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
   }
 
 }

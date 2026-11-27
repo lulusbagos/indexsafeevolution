@@ -397,12 +397,24 @@ Future<bool> syncTran(
       final details = await sqldb.rawQuery('SELECT * FROM p5m_details WHERE tran_id = ? ORDER BY id ASC', [id]);
       if (details.isNotEmpty) {
         final questions = details.map((d) => d['name']?.toString() ?? '').toList();
-        final answers = details.map((d) => (d['yesno'] == 1 || d['status'] == 1) ? 'Yes' : 'No').toList();
+        final answers = details.map((d) {
+          if (d['type'] == 'fatigue' && d['remark'] != null && d['remark'].toString().isNotEmpty) {
+            return d['remark'].toString();
+          }
+          return (d['yesno'] == 1 || d['status'] == 1) ? 'Yes' : 'No';
+        }).toList();
         cleanMap['questions_json'] = jsonEncode(questions);
         cleanMap['answers_json'] = jsonEncode(answers);
       } else if (row['questions_json'] != null) {
         cleanMap['questions_json'] = row['questions_json'].toString();
         cleanMap['answers_json'] = row['answers_json']?.toString() ?? '[]';
+      }
+
+      if (row['is_pekerja_lapangan'] != null) {
+        cleanMap['is_pekerja_lapangan'] = row['is_pekerja_lapangan'].toString();
+      }
+      if (row['fatigue_json'] != null) {
+        cleanMap['fatigue_json'] = row['fatigue_json'].toString();
       }
 
       final files = <String, String>{};
