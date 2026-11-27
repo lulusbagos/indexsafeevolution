@@ -692,5 +692,222 @@ namespace Indexsafe.Api.Controllers
 
             return Ok(new { id = area.Id, namaArea = area.NamaArea });
         }
+
+        #region Master Inspection Questions (Dynamic Checkpoints K3)
+
+        private static readonly List<MasterInspectionQuestion> _defaultInspectionQuestions = new()
+        {
+            // Modul 1: Kepatuhan & Sistem
+            new MasterInspectionQuestion { Id = 1, Key = "1_1", ModuleTitle = "Modul 1: Kepatuhan & Sistem", Question = "Apakah pekerjaan yang diamati dilakukan sesuai prosedur yang berlaku?", OrderIndex = 1, IsActive = true, IsCustom = false },
+            new MasterInspectionQuestion { Id = 2, Key = "1_2", ModuleTitle = "Modul 1: Kepatuhan & Sistem", Question = "Apakah dokumen/izin yang diperlukan tersedia dan masih berlaku?", OrderIndex = 2, IsActive = true, IsCustom = false },
+            new MasterInspectionQuestion { Id = 3, Key = "1_3", ModuleTitle = "Modul 1: Kepatuhan & Sistem", Question = "Apakah temuan inspeksi sebelumnya sudah ditindaklanjuti?", OrderIndex = 3, IsActive = true, IsCustom = false },
+
+            // Modul 2: Risiko & Keselamatan
+            new MasterInspectionQuestion { Id = 4, Key = "2_1", ModuleTitle = "Modul 2: Risiko & Keselamatan", Question = "Apakah risiko utama pekerjaan telah diidentifikasi sebelum pekerjaan dilakukan?", OrderIndex = 4, IsActive = true, IsCustom = false },
+            new MasterInspectionQuestion { Id = 5, Key = "2_2", ModuleTitle = "Modul 2: Risiko & Keselamatan", Question = "Apakah pengendali risiko kritis telah diterapkan secara efektif?", OrderIndex = 5, IsActive = true, IsCustom = false },
+            new MasterInspectionQuestion { Id = 6, Key = "2_3", ModuleTitle = "Modul 2: Risiko & Keselamatan", Question = "Apakah pekerja memahami risiko dan langkah mitigasi saat terjadi bahaya?", OrderIndex = 6, IsActive = true, IsCustom = false },
+
+            // Modul 3: Lingkungan Kerja & Housekeeping
+            new MasterInspectionQuestion { Id = 7, Key = "3_1", ModuleTitle = "Modul 3: Lingkungan Kerja & Housekeeping", Question = "Apakah area kerja bersih, rapi, dan bebas dari bahaya tersandung atau terpeleset?", OrderIndex = 7, IsActive = true, IsCustom = false },
+            new MasterInspectionQuestion { Id = 8, Key = "3_2", ModuleTitle = "Modul 3: Lingkungan Kerja & Housekeeping", Question = "Apakah pencahayaan dan ventilasi di area kerja memadai untuk aktivitas yang dilakukan?", OrderIndex = 8, IsActive = true, IsCustom = false },
+            new MasterInspectionQuestion { Id = 9, Key = "3_3", ModuleTitle = "Modul 3: Lingkungan Kerja & Housekeeping", Question = "Apakah limbah B3 dan sampah operasional dikelola dan dipisahkan dengan benar?", OrderIndex = 9, IsActive = true, IsCustom = false },
+
+            // Modul 4: Peralatan & APD
+            new MasterInspectionQuestion { Id = 10, Key = "4_1", ModuleTitle = "Modul 4: Peralatan & APD", Question = "Apakah alat pelindung diri (APD) yang dipersyaratkan digunakan secara lengkap dan benar?", OrderIndex = 10, IsActive = true, IsCustom = false },
+            new MasterInspectionQuestion { Id = 11, Key = "4_2", ModuleTitle = "Modul 4: Peralatan & APD", Question = "Apakah peralatan kerja dan unit telah diinspeksi (P2H) sebelum dioperasikan?", OrderIndex = 11, IsActive = true, IsCustom = false },
+            new MasterInspectionQuestion { Id = 12, Key = "4_3", ModuleTitle = "Modul 4: Peralatan & APD", Question = "Apakah pengaman mesin / safety device berfungsi dengan baik tanpa modifikasi terlarang?", OrderIndex = 12, IsActive = true, IsCustom = false },
+
+            // Modul 5: Monitoring & Perbaikan
+            new MasterInspectionQuestion { Id = 13, Key = "5_1", ModuleTitle = "Modul 5: Monitoring & Perbaikan", Question = "Apakah pengawas melakukan interaksi keselamatan / observasi secara berkala?", OrderIndex = 13, IsActive = true, IsCustom = false },
+            new MasterInspectionQuestion { Id = 14, Key = "5_2", ModuleTitle = "Modul 5: Monitoring & Perbaikan", Question = "Apakah temuan K3 dicatat dan ditindaklanjuti rencana perbaikannya?", OrderIndex = 14, IsActive = true, IsCustom = false },
+            new MasterInspectionQuestion { Id = 15, Key = "5_3", ModuleTitle = "Modul 5: Monitoring & Perbaikan", Question = "Apakah tersedia bukti bahwa tindakan perbaikan telah dilakukan dan efektif?", OrderIndex = 15, IsActive = true, IsCustom = false },
+        };
+
+        private async Task EnsureInspectionQuestionTableAsync()
+        {
+            try
+            {
+                await _context.Database.ExecuteSqlRawAsync(@"
+                    IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'tbl_m_inspection_question')
+                    BEGIN
+                        CREATE TABLE [dbo].[tbl_m_inspection_question] (
+                            [id] INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+                            [key] NVARCHAR(50) NOT NULL,
+                            [module_title] NVARCHAR(150) NOT NULL,
+                            [question] NVARCHAR(500) NOT NULL,
+                            [guidance] NVARCHAR(500) NULL,
+                            [order_index] INT NOT NULL DEFAULT 0,
+                            [is_active] BIT NOT NULL DEFAULT 1,
+                            [is_custom] BIT NOT NULL DEFAULT 0,
+                            [created_by_nik] NVARCHAR(50) NULL,
+                            [created_by_name] NVARCHAR(150) NULL,
+                            [created_at] DATETIME NOT NULL DEFAULT GETDATE(),
+                            [updated_at] DATETIME NULL
+                        );
+                    END
+                ");
+
+                var count = await _context.InspectionQuestions.CountAsync();
+                if (count == 0)
+                {
+                    foreach (var q in _defaultInspectionQuestions)
+                    {
+                        _context.InspectionQuestions.Add(new MasterInspectionQuestion
+                        {
+                            Key = q.Key,
+                            ModuleTitle = q.ModuleTitle,
+                            Question = q.Question,
+                            Guidance = q.Guidance,
+                            OrderIndex = q.OrderIndex,
+                            IsActive = true,
+                            IsCustom = false,
+                            CreatedAt = DateTime.Now
+                        });
+                    }
+                    await _context.SaveChangesAsync();
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[EnsureInspectionQuestionTableAsync] Warning: {ex.Message}");
+            }
+        }
+
+        [HttpGet("master/inspection/questions", Order = -1)]
+        public async Task<IActionResult> GetInspectionQuestions([FromQuery] bool includeInactive = false)
+        {
+            try
+            {
+                await EnsureInspectionQuestionTableAsync();
+
+                var query = _context.InspectionQuestions.AsNoTracking();
+                if (!includeInactive)
+                {
+                    query = query.Where(q => q.IsActive);
+                }
+
+                var list = await query.OrderBy(q => q.OrderIndex).ThenBy(q => q.Id).ToListAsync();
+                if (list.Count > 0)
+                {
+                    return Ok(list);
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[GetInspectionQuestions] Fallback to default questions: {ex.Message}");
+            }
+
+            return Ok(_defaultInspectionQuestions);
+        }
+
+        public class CreateInspectionQuestionRequest
+        {
+            public string? Key { get; set; }
+            public string? ModuleTitle { get; set; }
+            public string? Question { get; set; }
+            public string? Guidance { get; set; }
+            public int? OrderIndex { get; set; }
+            public bool? IsCustom { get; set; }
+            public string? CreatedByNik { get; set; }
+            public string? CreatedByName { get; set; }
+        }
+
+        [HttpPost("master/inspection/questions", Order = -1)]
+        public async Task<IActionResult> CreateInspectionQuestion([FromBody] CreateInspectionQuestionRequest request)
+        {
+            if (string.IsNullOrWhiteSpace(request?.Question))
+            {
+                return BadRequest(new { message = "Pertanyaan wajib diisi." });
+            }
+
+            await EnsureInspectionQuestionTableAsync();
+
+            var cleanQuestion = request.Question.Trim();
+            var cleanModule = string.IsNullOrWhiteSpace(request.ModuleTitle) ? "Pertanyaan Kustom" : request.ModuleTitle.Trim();
+            var isCustom = request.IsCustom ?? true;
+
+            var maxIndex = 15;
+            try
+            {
+                maxIndex = await _context.InspectionQuestions.MaxAsync(q => (int?)q.OrderIndex) ?? 15;
+            }
+            catch {}
+
+            var cleanKey = string.IsNullOrWhiteSpace(request.Key)
+                ? (isCustom ? $"c_{Guid.NewGuid().ToString("N")[..6]}" : $"{maxIndex + 1}_1")
+                : request.Key.Trim();
+
+            var nik = User.FindFirst("Nik")?.Value ?? request.CreatedByNik ?? "USER";
+            var nama = User.FindFirst("Nama")?.Value ?? request.CreatedByName ?? "User Mobile";
+
+            var item = new MasterInspectionQuestion
+            {
+                Key = cleanKey,
+                ModuleTitle = cleanModule,
+                Question = cleanQuestion,
+                Guidance = request.Guidance?.Trim(),
+                OrderIndex = request.OrderIndex ?? (maxIndex + 1),
+                IsActive = true,
+                IsCustom = isCustom,
+                CreatedByNik = nik,
+                CreatedByName = nama,
+                CreatedAt = DateTime.Now
+            };
+
+            _context.InspectionQuestions.Add(item);
+            await _context.SaveChangesAsync();
+
+            return Ok(item);
+        }
+
+        [HttpPut("master/inspection/questions/{id}", Order = -1)]
+        public async Task<IActionResult> UpdateInspectionQuestion(int id, [FromBody] CreateInspectionQuestionRequest request)
+        {
+            await EnsureInspectionQuestionTableAsync();
+
+            var item = await _context.InspectionQuestions.FindAsync(id);
+            if (item == null)
+            {
+                return NotFound(new { message = "Pertanyaan inspeksi tidak ditemukan." });
+            }
+
+            if (!string.IsNullOrWhiteSpace(request.Question)) item.Question = request.Question.Trim();
+            if (!string.IsNullOrWhiteSpace(request.ModuleTitle)) item.ModuleTitle = request.ModuleTitle.Trim();
+            if (!string.IsNullOrWhiteSpace(request.Key)) item.Key = request.Key.Trim();
+            if (request.Guidance != null) item.Guidance = request.Guidance.Trim();
+            if (request.OrderIndex.HasValue) item.OrderIndex = request.OrderIndex.Value;
+            if (request.IsCustom.HasValue) item.IsCustom = request.IsCustom.Value;
+            item.UpdatedAt = DateTime.Now;
+
+            await _context.SaveChangesAsync();
+            return Ok(item);
+        }
+
+        [HttpDelete("master/inspection/questions/{id}", Order = -1)]
+        public async Task<IActionResult> DeleteInspectionQuestion(int id, [FromQuery] bool hardDelete = false)
+        {
+            await EnsureInspectionQuestionTableAsync();
+
+            var item = await _context.InspectionQuestions.FindAsync(id);
+            if (item == null)
+            {
+                return NotFound(new { message = "Pertanyaan inspeksi tidak ditemukan." });
+            }
+
+            if (hardDelete)
+            {
+                _context.InspectionQuestions.Remove(item);
+            }
+            else
+            {
+                item.IsActive = false;
+                item.UpdatedAt = DateTime.Now;
+            }
+
+            await _context.SaveChangesAsync();
+            return Ok(new { message = "Pertanyaan inspeksi berhasil dihapus / dinonaktifkan.", id });
+        }
+
+        #endregion
     }
 }

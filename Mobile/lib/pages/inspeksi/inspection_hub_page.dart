@@ -1,4 +1,4 @@
-﻿import 'dart:convert';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import '../../models/inspection_hub_model.dart';
 import '../../services/api.dart';
 import '../../services/database.dart';
+import '../../services/inspection_question_service.dart';
 import '../../services/offline_sync_service.dart';
 import '../../services/preference.dart';
 import '../../utils/enums.dart';
@@ -47,6 +48,7 @@ class _InspectionHubPageState extends State<InspectionHubPage> {
   void initState() {
     super.initState();
     _currentTab = widget.initialTab;
+    InspectionQuestionService.instance.loadQuestions();
     _loadData();
   }
 
@@ -80,8 +82,6 @@ class _InspectionHubPageState extends State<InspectionHubPage> {
                   if (sId is int) {
                     final itemNik = (map['nik'] ?? '').toString().trim();
                     final itemPjaNik = (map['nik_pja'] ?? '').toString().trim();
-                    final isReporter = (userNik.isNotEmpty && itemNik == userNik);
-                    final isPja = (userNik.isNotEmpty && itemPjaNik == userNik);
 
                     final itemNikVal = itemNik.isNotEmpty ? itemNik : userNik;
                     final itemPjaVal = itemPjaNik;
@@ -1254,42 +1254,26 @@ class _InspectionHubPageState extends State<InspectionHubPage> {
                   if (item.catatan != null && item.catatan!.isNotEmpty) _buildDetailRow('Catatan', item.catatan!),
 
                   const SizedBox(height: 16),
-                  const Text('Evaluasi Checkpoint K3', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF0F172A))),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('Evaluasi Checkpoint K3', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF0F172A))),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF1F5F9),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          '${item.totalCheckpoints} Butir Pemeriksaan',
+                          style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w600, color: Color(0xFF475569)),
+                        ),
+                      ),
+                    ],
+                  ),
                   const SizedBox(height: 8),
 
-                  ...item.scores.entries.map((e) {
-                    final isYes = e.value == 2;
-                    final isNa = e.value == 1;
-                    return Container(
-                      margin: const EdgeInsets.only(bottom: 6),
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF8FAFC),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: const Color(0xFFE2E8F0)),
-                      ),
-                      child: Row(
-                        children: [
-                          Expanded(child: Text('Pertanyaan Checkpoint ${e.key}', style: const TextStyle(fontSize: 11.5, color: Color(0xFF334155)))),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: isYes ? const Color(0xFFECFDF5) : (isNa ? const Color(0xFFF1F5F9) : const Color(0xFFFEF2F2)),
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: Text(
-                              isYes ? 'YA' : (isNa ? 'N/A' : 'TIDAK'),
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                                color: isYes ? const Color(0xFF059669) : (isNa ? const Color(0xFF64748B) : const Color(0xFFDC2626)),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  }),
+                  ..._buildInspectionEvaluationList(item),
 
                   if (item.image != null && item.image!.isNotEmpty) ...[
                     const SizedBox(height: 14),
@@ -1367,5 +1351,213 @@ class _InspectionHubPageState extends State<InspectionHubPage> {
         ],
       ),
     );
+  }
+
+  Widget _buildScoreBadge(int score) {
+    final isYes = score == 2;
+    final isNa = score == 1;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: isYes
+            ? const Color(0xFFECFDF5)
+            : (isNa ? const Color(0xFFF1F5F9) : const Color(0xFFFEF2F2)),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(
+          color: isYes
+              ? const Color(0xFFA7F3D0)
+              : (isNa ? const Color(0xFFCBD5E1) : const Color(0xFFFECACA)),
+        ),
+      ),
+      child: Text(
+        isYes ? 'YA' : (isNa ? 'N/A' : 'TIDAK'),
+        style: TextStyle(
+          fontSize: 10,
+          fontWeight: FontWeight.bold,
+          color: isYes
+              ? const Color(0xFF059669)
+              : (isNa ? const Color(0xFF64748B) : const Color(0xFFDC2626)),
+        ),
+      ),
+    );
+  }
+
+  List<Widget> _buildInspectionEvaluationList(InspectionReportItem item) {
+    final List<Widget> widgets = [];
+
+    // Grouping scores by module
+    final Map<String, List<MapEntry<String, int>>> grouped = {};
+    for (var entry in item.scores.entries) {
+      final module = InspectionQuestionService.getModuleTitle(entry.key);
+      grouped.putIfAbsent(module, () => []).add(entry);
+    }
+
+    if (grouped.isEmpty && item.customQuestions.isEmpty) {
+      widgets.add(
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF8FAFC),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: const Color(0xFFE2E8F0)),
+          ),
+          child: const Text(
+            'Tidak ada butir evaluasi checkpoint tercatat.',
+            style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+            textAlign: TextAlign.center,
+          ),
+        ),
+      );
+      return widgets;
+    }
+
+    grouped.forEach((moduleTitle, entries) {
+      widgets.add(
+        Padding(
+          padding: const EdgeInsets.only(top: 10, bottom: 6),
+          child: Row(
+            children: [
+              Container(
+                width: 3.5,
+                height: 14,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF0F766E),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  moduleTitle,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF1E293B),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+
+      for (var e in entries) {
+        final qText = InspectionQuestionService.getQuestionText(e.key);
+        widgets.add(
+          Container(
+            margin: const EdgeInsets.only(bottom: 6),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Text(
+                    qText,
+                    style: const TextStyle(
+                      fontSize: 11.5,
+                      color: Color(0xFF334155),
+                      height: 1.35,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                _buildScoreBadge(e.value),
+              ],
+            ),
+          ),
+        );
+      }
+    });
+
+    // Custom questions jika ada
+    if (item.customQuestions.isNotEmpty) {
+      widgets.add(
+        Padding(
+          padding: const EdgeInsets.only(top: 12, bottom: 6),
+          child: Row(
+            children: [
+              Container(
+                width: 3.5,
+                height: 14,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF7C3AED),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(width: 8),
+              const Expanded(
+                child: Text(
+                  'Pertanyaan Kustom / Tambahan Lapangan',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF5B21B6),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+
+      for (var cq in item.customQuestions) {
+        final qText = cq['question']?.toString() ?? 'Pertanyaan Kustom';
+        final score = int.tryParse(cq['score']?.toString() ?? '1') ?? 1;
+        final photoPath = cq['photo_path']?.toString();
+
+        widgets.add(
+          Container(
+            margin: const EdgeInsets.only(bottom: 6),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFAF5FF),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: const Color(0xFFE9D5FF)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        qText,
+                        style: const TextStyle(
+                          fontSize: 11.5,
+                          color: Color(0xFF4C1D95),
+                          height: 1.35,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    _buildScoreBadge(score),
+                  ],
+                ),
+                if (photoPath != null && photoPath.isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(6),
+                    child: photoPath.startsWith('http')
+                        ? Image.network(photoPath, height: 90, width: 140, fit: BoxFit.cover)
+                        : (File(photoPath).existsSync()
+                            ? Image.file(File(photoPath), height: 90, width: 140, fit: BoxFit.cover)
+                            : const SizedBox.shrink()),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        );
+      }
+    }
+
+    return widgets;
   }
 }

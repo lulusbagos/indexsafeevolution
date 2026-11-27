@@ -26,6 +26,7 @@ namespace Indexsafe.Api.Data
     public DbSet<HazardReport> HazardReports { get; set; } = null!;
 
         public DbSet<Inspection> Inspections { get; set; } = null!;
+        public DbSet<MasterInspectionQuestion> InspectionQuestions { get; set; } = null!;
 
         public DbSet<ActionPlan> ActionPlans { get; set; } = null!;
 
@@ -292,6 +293,23 @@ namespace Indexsafe.Api.Data
             });
 
 
+
+            modelBuilder.Entity<MasterInspectionQuestion>(entity =>
+            {
+                entity.ToTable("tbl_m_inspection_question", tb => tb.UseSqlOutputClause(false));
+                entity.Property(e => e.Id).HasColumnName("id");
+                entity.Property(e => e.Key).HasColumnName("key");
+                entity.Property(e => e.ModuleTitle).HasColumnName("module_title");
+                entity.Property(e => e.Question).HasColumnName("question");
+                entity.Property(e => e.Guidance).HasColumnName("guidance");
+                entity.Property(e => e.OrderIndex).HasColumnName("order_index");
+                entity.Property(e => e.IsActive).HasColumnName("is_active");
+                entity.Property(e => e.IsCustom).HasColumnName("is_custom");
+                entity.Property(e => e.CreatedByNik).HasColumnName("created_by_nik");
+                entity.Property(e => e.CreatedByName).HasColumnName("created_by_name");
+                entity.Property(e => e.CreatedAt).HasColumnName("created_at");
+                entity.Property(e => e.UpdatedAt).HasColumnName("updated_at");
+            });
 
             // ActionPlan column mappings
 

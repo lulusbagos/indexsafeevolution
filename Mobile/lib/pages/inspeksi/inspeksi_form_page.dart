@@ -8,6 +8,7 @@ import 'package:intl/intl.dart';
 
 import '../../services/api.dart';
 import '../../services/database.dart';
+import '../../services/inspection_question_service.dart';
 import '../../services/offline_sync_service.dart';
 import '../../services/preference.dart';
 import '../../utils/enums.dart';
@@ -119,7 +120,7 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
   bool _isLoadingAreaPjas = false;
 
   // 15 Standard Checkpoints dari Web /Inspection/Index
-  late final List<_CheckpointItem> _checkpoints;
+  List<_CheckpointItem> _checkpoints = [];
 
   // Dynamic Custom Questions (Standardisasi Form)
   final List<_CustomQuestion> _customQuestions = [];
@@ -165,106 +166,50 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
   }
 
   void _initCheckpoints() {
-    _checkpoints = [
-      // Modul 1. Kepatuhan & Sistem
-      _CheckpointItem(
-        key: '1_1',
-        moduleTitle: 'Modul 1: Kepatuhan & Sistem',
-        question:
-            'Apakah pekerjaan yang diamati dilakukan sesuai prosedur yang berlaku?',
-      ),
-      _CheckpointItem(
-        key: '1_2',
-        moduleTitle: 'Modul 1: Kepatuhan & Sistem',
-        question:
-            'Apakah dokumen/izin yang diperlukan tersedia dan masih berlaku?',
-      ),
-      _CheckpointItem(
-        key: '1_3',
-        moduleTitle: 'Modul 1: Kepatuhan & Sistem',
-        question: 'Apakah temuan inspeksi sebelumnya sudah ditindaklanjuti?',
-      ),
+    _checkpoints = InspectionQuestionService.defaultQuestions
+        .map((q) => _CheckpointItem(
+              key: q.key,
+              moduleTitle: q.moduleTitle,
+              question: q.question,
+            ))
+        .toList();
+    _loadDynamicCheckpoints();
+  }
 
-      // Modul 2. Risiko & Keselamatan
-      _CheckpointItem(
-        key: '2_1',
-        moduleTitle: 'Modul 2: Risiko & Keselamatan',
-        question:
-            'Apakah risiko utama pekerjaan telah diidentifikasi sebelum pekerjaan dilakukan?',
-      ),
-      _CheckpointItem(
-        key: '2_2',
-        moduleTitle: 'Modul 2: Risiko & Keselamatan',
-        question:
-            'Apakah pengendali risiko kritis telah diterapkan secara efektif?',
-      ),
-      _CheckpointItem(
-        key: '2_3',
-        moduleTitle: 'Modul 2: Risiko & Keselamatan',
-        question:
-            'Apakah pekerja memahami risiko dan langkah mitigasi saat terjadi bahaya?',
-      ),
+  Future<void> _loadDynamicCheckpoints() async {
+    try {
+      final dynamicQuestions =
+          await InspectionQuestionService.instance.loadQuestions();
+      if (!mounted) return;
 
-      // Modul 3. Lingkungan Kerja & Housekeeping
-      _CheckpointItem(
-        key: '3_1',
-        moduleTitle: 'Modul 3: Lingkungan Kerja & Housekeeping',
-        question:
-            'Apakah area kerja bersih, rapi, dan bebas dari bahaya tersandung atau terpeleset?',
-      ),
-      _CheckpointItem(
-        key: '3_2',
-        moduleTitle: 'Modul 3: Lingkungan Kerja & Housekeeping',
-        question:
-            'Apakah pencahayaan dan ventilasi di area kerja memadai untuk aktivitas yang dilakukan?',
-      ),
-      _CheckpointItem(
-        key: '3_3',
-        moduleTitle: 'Modul 3: Lingkungan Kerja & Housekeeping',
-        question:
-            'Apakah limbah B3 dan sampah operasional dikelola dan dipisahkan dengan benar?',
-      ),
+      final existingScores = <String, int>{
+        for (var c in _checkpoints) c.key: c.score
+      };
+      final existingPhotos = <String, File?>{
+        for (var c in _checkpoints) c.key: c.photo
+      };
+      final existingRemarks = <String, String?>{
+        for (var c in _checkpoints) c.key: c.remark
+      };
 
-      // Modul 4. Peralatan & APD
-      _CheckpointItem(
-        key: '4_1',
-        moduleTitle: 'Modul 4: Peralatan & APD',
-        question:
-            'Apakah alat pelindung diri (APD) yang dipersyaratkan digunakan secara lengkap dan benar?',
-      ),
-      _CheckpointItem(
-        key: '4_2',
-        moduleTitle: 'Modul 4: Peralatan & APD',
-        question:
-            'Apakah peralatan kerja dan unit telah diinspeksi (P2H) sebelum dioperasikan?',
-      ),
-      _CheckpointItem(
-        key: '4_3',
-        moduleTitle: 'Modul 4: Peralatan & APD',
-        question:
-            'Apakah pengaman mesin / safety device berfungsi dengan baik tanpa modifikasi terlarang?',
-      ),
+      final updatedList = dynamicQuestions.where((q) => !q.isCustom).map((q) {
+        final cp = _CheckpointItem(
+          key: q.key,
+          moduleTitle: q.moduleTitle,
+          question: q.question,
+        );
+        if (existingScores.containsKey(q.key)) cp.score = existingScores[q.key]!;
+        if (existingPhotos.containsKey(q.key)) cp.photo = existingPhotos[q.key];
+        if (existingRemarks.containsKey(q.key)) cp.remark = existingRemarks[q.key];
+        return cp;
+      }).toList();
 
-      // Modul 5. Monitoring & Perbaikan
-      _CheckpointItem(
-        key: '5_1',
-        moduleTitle: 'Modul 5: Monitoring & Perbaikan',
-        question:
-            'Apakah pengawas melakukan interaksi keselamatan / observasi secara berkala?',
-      ),
-      _CheckpointItem(
-        key: '5_2',
-        moduleTitle: 'Modul 5: Monitoring & Perbaikan',
-        question:
-            'Apakah temuan K3 dicatat dan ditindaklanjuti rencana perbaikannya?',
-      ),
-      _CheckpointItem(
-        key: '5_3',
-        moduleTitle: 'Modul 5: Monitoring & Perbaikan',
-        question:
-            'Apakah tersedia bukti bahwa tindakan perbaikan telah dilakukan dan efektif?',
-      ),
-    ];
+      if (updatedList.isNotEmpty) {
+        setState(() {
+          _checkpoints = updatedList;
+        });
+      }
+    } catch (_) {}
   }
 
   Future<void> _loadAreasFromMaster({VoidCallback? onDone}) async {
@@ -1421,16 +1366,23 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
     );
 
     if (res != null) {
+      final cqId = 'custom_${DateTime.now().millisecondsSinceEpoch}';
       setState(() {
         _customQuestions.add(
           _CustomQuestion(
-            id: 'custom_${DateTime.now().millisecondsSinceEpoch}',
+            id: cqId,
             question: res.question,
             optionType: res.optionType,
             score: 2,
           ),
         );
       });
+
+      InspectionQuestionService.instance.createQuestion(
+        question: res.question,
+        moduleTitle: 'Pertanyaan Kustom Lapangan',
+        isCustom: true,
+      );
     }
   }
 
