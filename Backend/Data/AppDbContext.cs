@@ -27,6 +27,8 @@ namespace Indexsafe.Api.Data
 
         public DbSet<Inspection> Inspections { get; set; } = null!;
         public DbSet<MasterInspectionQuestion> InspectionQuestions { get; set; } = null!;
+        public DbSet<DocumentFolder> DocumentFolders { get; set; } = null!;
+        public DbSet<DocumentItem> Documents { get; set; } = null!;
 
         public DbSet<ActionPlan> ActionPlans { get; set; } = null!;
 

@@ -36,6 +36,7 @@ import 'notif_page.dart';
 import 'safety_updates_page.dart';
 import 'special_permit/special_permit_followup_page.dart';
 import 'special_permit/special_permit_list_page.dart';
+import 'document_management/document_management_page.dart';
 import '../widgets/home_weather_widget.dart';
 
 class _HomeModuleCard extends StatelessWidget {
@@ -45,6 +46,7 @@ class _HomeModuleCard extends StatelessWidget {
     required this.labelColor,
     required this.onTap,
     this.iconHeight = 68,
+    this.width,
   });
 
   final String title;
@@ -52,10 +54,11 @@ class _HomeModuleCard extends StatelessWidget {
   final Color labelColor;
   final VoidCallback onTap;
   final double iconHeight;
+  final double? width;
 
   @override
   Widget build(BuildContext context) {
-    return Material(
+    Widget cardContent = Material(
       color: Colors.white,
       borderRadius: BorderRadius.circular(18),
       child: InkWell(
@@ -63,6 +66,7 @@ class _HomeModuleCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(18),
         child: Container(
           height: 126,
+          width: width,
           padding: const EdgeInsets.fromLTRB(8, 10, 8, 8),
           decoration: BoxDecoration(
             border: Border.all(color: const Color(0xFFD9E1F2)),
@@ -113,6 +117,8 @@ class _HomeModuleCard extends StatelessWidget {
         ),
       ),
     );
+
+    return width != null ? SizedBox(width: width, child: cardContent) : cardContent;
   }
 }
 
@@ -5269,15 +5275,20 @@ class _DashboardPageState extends State<DashboardPage>
               ),
               _buildHomeBannerSection(),
               Padding(
-                padding: const EdgeInsets.fromLTRB(20, 15, 20, 10),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: _HomeModuleCard(
+                padding: const EdgeInsets.only(top: 15, bottom: 10),
+                child: SizedBox(
+                  height: 134,
+                  child: ListView(
+                    scrollDirection: Axis.horizontal,
+                    physics: const BouncingScrollPhysics(),
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    children: [
+                      _HomeModuleCard(
                         title: 'SAP',
                         imagePath: 'assets/images/home-sap.png',
                         labelColor: const Color(0xFF174B83),
                         iconHeight: 70,
+                        width: ((MediaQuery.of(context).size.width - 40 - 24) / 3.18).clamp(108.0, 130.0),
                         onTap: () {
                           Navigator.of(context).push(
                             MaterialPageRoute(
@@ -5287,14 +5298,13 @@ class _DashboardPageState extends State<DashboardPage>
                           );
                         },
                       ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: _HomeModuleCard(
+                      const SizedBox(width: 12),
+                      _HomeModuleCard(
                         title: 'OHS',
                         imagePath: 'assets/images/home-ohs.png',
                         labelColor: const Color(0xFF0F9F8F),
                         iconHeight: 72,
+                        width: ((MediaQuery.of(context).size.width - 40 - 24) / 3.18).clamp(108.0, 130.0),
                         onTap: () {
                           Navigator.of(context).push(
                             MaterialPageRoute(
@@ -5304,14 +5314,13 @@ class _DashboardPageState extends State<DashboardPage>
                           );
                         },
                       ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: _HomeModuleCard(
+                      const SizedBox(width: 12),
+                      _HomeModuleCard(
                         title: 'PERFORMANCE\nHUB',
                         imagePath: 'assets/images/home-performance-hub.png',
                         labelColor: const Color(0xFFF08A00),
                         iconHeight: 66,
+                        width: ((MediaQuery.of(context).size.width - 40 - 24) / 3.18).clamp(108.0, 130.0),
                         onTap: () {
                           Navigator.of(context).push(
                             MaterialPageRoute(
@@ -5321,8 +5330,23 @@ class _DashboardPageState extends State<DashboardPage>
                           );
                         },
                       ),
-                    ),
-                  ],
+                      const SizedBox(width: 12),
+                      _HomeModuleCard(
+                        title: 'DOKUMEN\nMANAGEMENT',
+                        imagePath: 'assets/images/home-doc-management.png',
+                        labelColor: const Color(0xFF0284C7),
+                        iconHeight: 70,
+                        width: ((MediaQuery.of(context).size.width - 40 - 24) / 3.18).clamp(108.0, 130.0),
+                        onTap: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (context) => const DocumentManagementPage(),
+                            ),
+                          );
+                        },
+                      ),
+                    ],
+                  ),
                 ),
               ),
               // Quick Action Card: Approval Center (khusus user terdaftar di Bima)
