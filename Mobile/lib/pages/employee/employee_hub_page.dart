@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../models/profile_model.dart';
 import '../../services/preference.dart';
+import '../../services/one_ev_service.dart';
 
 class EmployeeHubPage extends StatefulWidget {
   const EmployeeHubPage({super.key});
@@ -10,80 +12,46 @@ class EmployeeHubPage extends StatefulWidget {
 }
 
 class _EmployeeHubPageState extends State<EmployeeHubPage> {
+  final OneEvService _oneEvService = OneEvService.instance;
   ProfileModel? _profile;
 
-  // Profil Karyawan Aktif
+  // Profil Karyawan Aktif (Live dari ONE_DB_MITRA)
+  bool _isLoading = true;
   String _nama = 'LULUS BAGOS HERMAWAN';
   String _nik = '24051940986';
+  String _noKtp = '3504132003940003';
+  String _noKk = '3504132003940001';
   String _dept = 'SYSTEM INTEGRATIONS';
   String _perusahaan = 'PT INDEXIM COALINDO';
-  String _posisi = 'OFFICER PRODUCT & SYSTEM DEVELOPMENT';
-  String _hp = '0812-3456-7890';
-  String _email = 'lulus.hermawan@indexim.id';
-  String _darurat = '0812-9876-5432 (Keluarga Inti)';
+  String _posisi = 'Officer Product & System Development';
+  String _jabatan = 'FOREMAN/OFFICER';
+  String _hp = '0852-7496-6722';
+  String _hp2 = '';
+  String _emailPribadi = 'lulusbagoshermawan@gmail.com';
+  String _emailKantor = 'lulus.hermawan@indexim.id';
+  String _alamat = 'Jl. Imam Bonjol, Kel. Api-Api, Bontang Utara, Kalimantan Timur';
   String _daruratNama = 'Keluarga Inti';
-  String _daruratHub = 'Istri';
+  String _daruratTelp = '0812-9876-5432';
+  String _daruratRelasi = 'Keluarga';
   String _golDarah = 'O+';
-  String _lokasiKerja = 'Kaliorang Site & Pit Central';
+  String _tempatLahir = 'Tulungagung';
+  String _tanggalLahir = '1994-03-20';
+  String _grade = '6 SETARA';
+  String _roster = '6 - 2 WEEK';
+  String _tanggalMasuk = '2024-05-15';
   String _statusKerja = 'PKWTT / Karyawan Tetap';
   String _minePermitNo = 'MP-IDC-2024-00892';
-  String _simperClass = 'Kelas II (LV & Light Truck)';
+  String _minePermitExp = '2027-08-18';
+  String _simperClass = 'Kelas II (LV 4x4 & Light Truck)';
+  String? _pathFoto;
+
+  // Data List dari ONE_DB_MITRA
+  List<Map<String, dynamic>> _certificates = [];
+  List<Map<String, dynamic>> _skillMatrix = [];
 
   // Pencarian
   String _searchQuery = '';
   final TextEditingController _searchCtrl = TextEditingController();
-
-  // Daftar Mitra Kerja Tambang
-  final List<Map<String, dynamic>> _mitraList = [
-    {
-      'kode': 'IDC',
-      'nama': 'PT INDEXIM COALINDO',
-      'tipe': 'Principal / Owner',
-      'headcount': 842,
-      'color': const Color(0xFF0F766E),
-      'lokasi': 'Kaliorang Site Office',
-    },
-    {
-      'kode': 'PAMA',
-      'nama': 'PT PAMAPERSADA NUSANTARA',
-      'tipe': 'Mining Contractor (OB & Coal)',
-      'headcount': 2340,
-      'color': const Color(0xFF2563EB),
-      'lokasi': 'Pit Central & Pit West',
-    },
-    {
-      'kode': 'BUMA',
-      'nama': 'PT BUKIT MAKMUR MANDIRI UTAMA',
-      'tipe': 'Mining Contractor (OB Removal)',
-      'headcount': 1680,
-      'color': const Color(0xFFD97706),
-      'lokasi': 'Pit South & Dump East',
-    },
-    {
-      'kode': 'KPP',
-      'nama': 'PT KALIMANTAN PRIMA PERSADA',
-      'tipe': 'Hauling & Road Maintenance',
-      'headcount': 620,
-      'color': const Color(0xFF7C3AED),
-      'lokasi': 'Hauling Road KM 0 - KM 48',
-    },
-    {
-      'kode': 'SIMS',
-      'nama': 'PT SIMS JAYA KALTIM',
-      'tipe': 'Coal Hauling & Stockpile Operator',
-      'headcount': 510,
-      'color': const Color(0xFFEA580C),
-      'lokasi': 'ROM Stockpile & Port',
-    },
-    {
-      'kode': 'RPP',
-      'nama': 'PT RIZKI PATRA PRATAMA',
-      'tipe': 'Crushing & Barge Loading',
-      'headcount': 428,
-      'color': const Color(0xFF059669),
-      'lokasi': 'Port & Conveyor Jet Jetty',
-    },
-  ];
 
   @override
   void initState() {
@@ -96,14 +64,63 @@ class _EmployeeHubPageState extends State<EmployeeHubPage> {
       _perusahaan = _profile!.company ?? _perusahaan;
       _posisi = _profile!.jabatan ?? _posisi;
       _hp = _profile!.hp ?? _hp;
-      _email = _profile!.emailKantor ?? _email;
+      _emailKantor = _profile!.emailKantor ?? _emailKantor;
     }
+    _loadLiveOneEvData();
   }
 
   @override
   void dispose() {
     _searchCtrl.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadLiveOneEvData() async {
+    setState(() => _isLoading = true);
+    try {
+      final userNik = _nik;
+      final profData = await _oneEvService.fetchProfile(nik: userNik);
+      final certs = await _oneEvService.fetchCertificates(nik: userNik);
+      final skills = await _oneEvService.fetchSkillMatrix(nik: userNik);
+
+      if (mounted) {
+        setState(() {
+          _nama = profData['nama_lengkap'] ?? _nama;
+          _nik = profData['no_nik'] ?? _nik;
+          _noKtp = profData['no_ktp'] ?? _noKtp;
+          _noKk = profData['no_kk'] ?? _noKk;
+          _perusahaan = profData['nama_perusahaan'] ?? _perusahaan;
+          _dept = profData['nama_departemen'] ?? _dept;
+          _posisi = profData['nama_posisi'] ?? _posisi;
+          _jabatan = profData['nama_jabatan'] ?? _jabatan;
+          _hp = profData['hp_1'] ?? _hp;
+          _hp2 = profData['hp_2'] ?? _hp2;
+          _emailPribadi = profData['email_pribadi'] ?? _emailPribadi;
+          _emailKantor = profData['email_kantor'] ?? _emailKantor;
+          _alamat = profData['alamat'] ?? _alamat;
+          _daruratNama = profData['kontak_darurat_nama'] ?? _daruratNama;
+          _daruratTelp = profData['kontak_darurat_telp'] ?? _daruratTelp;
+          _daruratRelasi = profData['kontak_darurat_relasi'] ?? _daruratRelasi;
+          _golDarah = profData['golongan_darah'] ?? _golDarah;
+          _tempatLahir = profData['tempat_lahir'] ?? _tempatLahir;
+          _tanggalLahir = profData['tanggal_lahir'] ?? _tanggalLahir;
+          _grade = profData['grade'] ?? _grade;
+          _roster = profData['roster_kerja'] ?? _roster;
+          _tanggalMasuk = profData['tanggal_masuk'] ?? _tanggalMasuk;
+          _minePermitExp = profData['permit_berakhir'] ?? _minePermitExp;
+          _pathFoto = profData['path_foto'];
+
+          _certificates = certs;
+          _skillMatrix = skills;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('[OneEv] Error loading live data: $e');
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
   }
 
   @override
@@ -167,270 +184,174 @@ class _EmployeeHubPageState extends State<EmployeeHubPage> {
         ),
         actions: [
           IconButton(
+            tooltip: 'Refresh Data Database',
+            icon: const Icon(Icons.refresh_rounded, color: primaryColor),
+            onPressed: () {
+              HapticFeedback.lightImpact();
+              _loadLiveOneEvData();
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Memuat ulang data terbaru dari ONE Evolution...'),
+                  duration: Duration(seconds: 1),
+                  behavior: SnackBarBehavior.floating,
+                ),
+              );
+            },
+          ),
+          IconButton(
             tooltip: 'Profil Saya',
             icon: const Icon(Icons.badge_rounded, color: primaryColor),
             onPressed: _showProfileDetailModal,
           ),
-          IconButton(
-            tooltip: 'Mitra Kerja',
-            icon: const Icon(Icons.corporate_fare_rounded, color: Color(0xFF64748B)),
-            onPressed: _showMitraDirectoryModal,
-          ),
           const SizedBox(width: 4),
         ],
       ),
-      body: ListView(
-        physics: const BouncingScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(16, 14, 16, 40),
+      body: Stack(
         children: [
-          // 1. Top Enterprise Workforce Banner
-          _buildWorkforceHeroBanner(),
+          RefreshIndicator(
+            onRefresh: _loadLiveOneEvData,
+            color: primaryColor,
+            child: ListView(
+              physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+              padding: const EdgeInsets.fromLTRB(16, 14, 16, 40),
+              children: [
+                // 1. Top Enterprise Workforce Banner (Live dari ONE_DB_MITRA)
+                _buildWorkforceHeroBanner(),
 
-          const SizedBox(height: 14),
+                const SizedBox(height: 14),
 
-          // 2. Search Bar
-          _buildSearchFilterBar(),
+                // 2. Search Bar
+            _buildSearchFilterBar(),
 
-          const SizedBox(height: 16),
+            const SizedBox(height: 16),
 
-          // 3. Section 1: Manajemen Profil & Karyawan Mitra
-          _buildSectionCard(
-            title: 'Profil & Data Karyawan Multi-Mitra',
-            onTitleTap: () => _showFilterToast('Kategori: Data Karyawan Multi-Mitra'),
-            items: [
-              _MenuItem(
-                title: 'Profil Karyawan',
-                icon: Icons.account_box_rounded,
-                iconColor: const Color(0xFF6366F1),
-                bgColor: const Color(0xFFEEF2FF),
-                onTap: _showProfileDetailModal,
-              ),
-              _MenuItem(
-                title: 'Edit Data Karyawan',
-                icon: Icons.edit_note_rounded,
-                iconColor: const Color(0xFF0284C7),
-                bgColor: const Color(0xFFE0F2FE),
-                badge: 'REVISI',
-                onTap: _showEditEmployeeModal,
-              ),
-              _MenuItem(
-                title: 'Database Mitra',
-                icon: Icons.domain_rounded,
-                iconColor: const Color(0xFF0D9488),
-                bgColor: const Color(0xFFCCFBF1),
-                badge: '18 Mitra',
-                onTap: _showMitraDirectoryModal,
-              ),
-              _MenuItem(
-                title: 'Mine Permit ID',
-                icon: Icons.qr_code_2_rounded,
-                iconColor: const Color(0xFFD97706),
-                bgColor: const Color(0xFFFEF3C7),
-                onTap: _showMinePermitModal,
-              ),
-            ],
-          ),
+            // 3. Section 1: Manajemen Profil & Karyawan (Fokus Personal & Administrasi)
+            _buildSectionCard(
+              title: 'Data Karyawan & Administrasi (One Evolution)',
+              onTitleTap: () => _showFilterToast('Kategori: Data Karyawan One Evolution'),
+              items: [
+                _MenuItem(
+                  title: 'Profil Karyawan',
+                  icon: Icons.account_box_rounded,
+                  iconColor: const Color(0xFF6366F1),
+                  bgColor: const Color(0xFFEEF2FF),
+                  onTap: _showProfileDetailModal,
+                ),
+                _MenuItem(
+                  title: 'Edit Data Karyawan',
+                  icon: Icons.edit_note_rounded,
+                  iconColor: const Color(0xFF0284C7),
+                  bgColor: const Color(0xFFE0F2FE),
+                  badge: 'REVISI',
+                  onTap: _showEditEmployeeModal,
+                ),
+                _MenuItem(
+                  title: 'Mine Permit ID',
+                  icon: Icons.qr_code_2_rounded,
+                  iconColor: const Color(0xFFD97706),
+                  bgColor: const Color(0xFFFEF3C7),
+                  badge: 'AKTIF',
+                  onTap: _showMinePermitModal,
+                ),
+                _MenuItem(
+                  title: 'SIMPER Tambang',
+                  icon: Icons.drive_eta_rounded,
+                  iconColor: const Color(0xFF2563EB),
+                  bgColor: const Color(0xFFDBEAFE),
+                  onTap: _showSimperModal,
+                ),
+              ],
+            ),
 
-          const SizedBox(height: 14),
+            const SizedBox(height: 14),
 
-          // 4. Section 2: Kualifikasi, SIMPER & Sertifikasi Tambang
-          _buildSectionCard(
-            title: 'Kualifikasi, SIMPER & Sertifikasi',
-            onTitleTap: () => _showFilterToast('Kategori: SIMPER & Sertifikasi'),
-            items: [
-              _MenuItem(
-                title: 'SIMPER Tambang',
-                icon: Icons.drive_eta_rounded,
-                iconColor: const Color(0xFF2563EB),
-                bgColor: const Color(0xFFDBEAFE),
-                onTap: () => _showFeatureDetail(
-                  'SIMPER (Surat Izin Mengemudi Perusahaan)',
-                  'SIMPER aktif berlaku untuk unit LV Toyota Hilux & Light Hauler di area operasional Pit & Hauling Road PT Indexim Coalindo. Masa berlaku hingga 31 Desember 2026.',
-                  Icons.drive_eta_rounded,
-                  const Color(0xFF2563EB),
+            // 4. Section 2: Kualifikasi, Sertifikasi & Matriks Skill (Fokus Kompetensi)
+            _buildSectionCard(
+              title: 'Sertifikasi & Kebugaran Kerja (One Evolution)',
+              onTitleTap: () => _showFilterToast('Kategori: Sertifikasi & Kompetensi'),
+              items: [
+                _MenuItem(
+                  title: 'Sertifikat POP & K3',
+                  icon: Icons.military_tech_rounded,
+                  iconColor: const Color(0xFFF59E0B),
+                  bgColor: const Color(0xFFFEF3C7),
+                  badge: '${_certificates.length} Aktif',
+                  onTap: _showCertificatesModal,
                 ),
-              ),
-              _MenuItem(
-                title: 'Sertifikat POP',
-                icon: Icons.military_tech_rounded,
-                iconColor: const Color(0xFFF59E0B),
-                bgColor: const Color(0xFFFEF3C7),
-                onTap: () => _showFeatureDetail(
-                  'Sertifikasi Pengawas Operasional Pertama (POP)',
-                  'Sertifikasi kompetensi resmi Kementerian ESDM & BNSP untuk pengawasan teknis dan keselamatan operasional pertambangan mineral & batubara.',
-                  Icons.military_tech_rounded,
-                  const Color(0xFFF59E0B),
+                _MenuItem(
+                  title: 'Matriks Skill',
+                  icon: Icons.psychology_rounded,
+                  iconColor: const Color(0xFF8B5CF6),
+                  bgColor: const Color(0xFFEDE9FE),
+                  badge: '100% Fit',
+                  onTap: _showSkillMatrixModal,
                 ),
-              ),
-              _MenuItem(
-                title: 'Status Induksi',
-                icon: Icons.verified_user_rounded,
-                iconColor: const Color(0xFF10B981),
-                bgColor: const Color(0xFFD1FAE5),
-                badge: 'VALID',
-                onTap: () => _showFeatureDetail(
-                  'Kepatuhan Induksi & Re-Induksi K3LH',
-                  'Seluruh pekerja PT Indexim dan mitra kerja wajib mengikuti induksi keselamatan umum dan re-induksi periodik setiap awal bulan.',
-                  Icons.verified_user_rounded,
-                  const Color(0xFF10B981),
+                _MenuItem(
+                  title: 'Status Induksi',
+                  icon: Icons.verified_user_rounded,
+                  iconColor: const Color(0xFF10B981),
+                  bgColor: const Color(0xFFD1FAE5),
+                  badge: 'VALID',
+                  onTap: () => _showFeatureDetail(
+                    'Kepatuhan Induksi & Re-Induksi K3LH',
+                    'Karyawan $_nama telah menyelesaikan Induksi Keselamatan Tambang PT Indexim Coalindo & Re-Induksi Periodik awal bulan. Status kepatuhan 100%.',
+                    Icons.verified_user_rounded,
+                    const Color(0xFF10B981),
+                  ),
                 ),
-              ),
-              _MenuItem(
-                title: 'Matriks Skill',
-                icon: Icons.psychology_rounded,
-                iconColor: const Color(0xFF8B5CF6),
-                bgColor: const Color(0xFFEDE9FE),
-                onTap: () => _showFeatureDetail(
-                  'Matriks Kompetensi & Lisensi Operator',
-                  'Pemetaan skill operator alat berat, mekanik maintenance, surveyor, dan juru ledak (blasting) dari seluruh perusahaan mitra.',
-                  Icons.psychology_rounded,
-                  const Color(0xFF8B5CF6),
+                _MenuItem(
+                  title: 'Fit to Work & MCU',
+                  icon: Icons.medical_services_rounded,
+                  iconColor: const Color(0xFFEC4899),
+                  bgColor: const Color(0xFFFCE7F3),
+                  badge: 'FIT 1',
+                  onTap: () => _showFeatureDetail(
+                    'Medical Check Up (MCU) & Kesiapan Kerja',
+                    'Hasil MCU Berkala Tahunan: FIT TO WORK (Kategori 1 tanpa deviasi). Tekanan darah, spirometri paru, dan tes audiometri dinyatakan memenuhi standar keselamatan tambang IDC.',
+                    Icons.medical_services_rounded,
+                    const Color(0xFFEC4899),
+                  ),
                 ),
+              ],
+            ),
+          ],
+        ),
+      ),
+          if (_isLoading)
+            const Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: LinearProgressIndicator(
+                minHeight: 3,
+                backgroundColor: Colors.transparent,
+                valueColor: AlwaysStoppedAnimation<Color>(primaryColor),
               ),
-            ],
-          ),
-
-          const SizedBox(height: 14),
-
-          // 5. Section 3: Kesehatan Kerja & Fit to Work (OHS)
-          _buildSectionCard(
-            title: 'Kesehatan Kerja & Fit to Work (OHS)',
-            onTitleTap: () => _showFilterToast('Kategori: Kesehatan Kerja & OHS'),
-            items: [
-              _MenuItem(
-                title: 'MCU Berkala',
-                icon: Icons.medical_services_rounded,
-                iconColor: const Color(0xFFEC4899),
-                bgColor: const Color(0xFFFCE7F3),
-                badge: 'FIT 1',
-                onTap: () => _showFeatureDetail(
-                  'Medical Check Up (MCU) Tahunan',
-                  'Pemeriksaan kesehatan menyeluruh meliputi Spirometri (paru), Audiometri (pendengaran), Darah Lengkap, dan Rontgen Thorax dengan hasil FIT TO WORK.',
-                  Icons.medical_services_rounded,
-                  const Color(0xFFEC4899),
-                ),
-              ),
-              _MenuItem(
-                title: 'Fatigue P5M',
-                icon: Icons.bedtime_rounded,
-                iconColor: const Color(0xFF0F766E),
-                bgColor: const Color(0xFFCCFBF1),
-                onTap: () => _showFeatureDetail(
-                  'Fatigue Assessment & Jam Tidur Karyawan',
-                  'Pengecekan kesiapan kerja harian melalui form P5M. Karyawan wajib memiliki durasi tidur minimal 6 jam untuk diizinkan beroperasi di pit.',
-                  Icons.bedtime_rounded,
-                  const Color(0xFF0F766E),
-                ),
-              ),
-              _MenuItem(
-                title: 'Klinik Site',
-                icon: Icons.local_hospital_rounded,
-                iconColor: const Color(0xFFEF4444),
-                bgColor: const Color(0xFFFEE2E2),
-                onTap: () => _showFeatureDetail(
-                  'Klinik Darurat Tambang 24 Jam',
-                  'Layanan pertolongan pertama, rawat jalan darurat, dan ambulans 4x4 siaga di Central Site Office & Pit Station.',
-                  Icons.local_hospital_rounded,
-                  const Color(0xFFEF4444),
-                ),
-              ),
-              _MenuItem(
-                title: 'BPJS & Asuransi',
-                icon: Icons.health_and_safety_rounded,
-                iconColor: const Color(0xFF0284C7),
-                bgColor: const Color(0xFFE0F2FE),
-                onTap: () => _showFeatureDetail(
-                  'Jaminan Sosial & Proteksi Kerja',
-                  'Nomor BPJS Ketenagakerjaan (JKK, JKM, JHT, JP) dan BPJS Kesehatan terintegrasi untuk seluruh karyawan internal dan kontraktor.',
-                  Icons.health_and_safety_rounded,
-                  const Color(0xFF0284C7),
-                ),
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 14),
-
-          // 6. Section 4: Hubungan Industrial, Tata Tertib & Onboarding
-          _buildSectionCard(
-            title: 'Hubungan Industrial & Tata Tertib',
-            onTitleTap: () => _showFilterToast('Kategori: Hubungan Industrial & Regulasi'),
-            items: [
-              _MenuItem(
-                title: 'Mutasi & Roster',
-                icon: Icons.swap_horiz_rounded,
-                iconColor: const Color(0xFF475569),
-                bgColor: const Color(0xFFF1F5F9),
-                onTap: () => _showFeatureDetail(
-                  'Jadwal Roster & Penempatan Area Tambang',
-                  'Pengaturan jadwal kerja roster (6 minggu on : 2 minggu off / 5:2) dan rotasi area pit tambang antar mitra.',
-                  Icons.swap_horiz_rounded,
-                  const Color(0xFF475569),
-                ),
-              ),
-              _MenuItem(
-                title: 'PKB & Disiplin',
-                icon: Icons.menu_book_rounded,
-                iconColor: const Color(0xFF0369A1),
-                bgColor: const Color(0xFFE0F2FE),
-                onTap: () => _showFeatureDetail(
-                  'Perjanjian Kerja Bersama & Tata Tertib Tambang',
-                  'Buku pedoman hak dan kewajiban pekerja, standar sanksi pelanggaran keselamatan, dan kode etik pertambangan PT Indexim Coalindo.',
-                  Icons.menu_book_rounded,
-                  const Color(0xFF0369A1),
-                ),
-              ),
-              _MenuItem(
-                title: 'Onboarding Site',
-                icon: Icons.how_to_reg_rounded,
-                iconColor: const Color(0xFF059669),
-                bgColor: const Color(0xFFD1FAE5),
-                onTap: () => _showFeatureDetail(
-                  'Prosedur Onboarding Karyawan Mitra',
-                  'Alur pendaftaran personil baru mitra kerja: verifikasi KTP, MCU pra-kerja, safety induction, hingga penerbitan Mine Permit resmi.',
-                  Icons.how_to_reg_rounded,
-                  const Color(0xFF059669),
-                ),
-              ),
-              _MenuItem(
-                title: 'Whistleblower',
-                icon: Icons.campaign_rounded,
-                iconColor: const Color(0xFFDC2626),
-                bgColor: const Color(0xFFFEE2E2),
-                badge: 'RAHASIA',
-                onTap: () => _showFeatureDetail(
-                  'Saluran Whistleblowing & Konseling Karyawan',
-                  'Kanal pelaporan rahasia untuk dugaan pelanggaran integritas, diskriminasi, bullying, atau ketidaksesuaian norma keselamatan kerja tambang.',
-                  Icons.campaign_rounded,
-                  const Color(0xFFDC2626),
-                ),
-              ),
-            ],
-          ),
+            ),
         ],
       ),
     );
   }
 
-  // --------------------------------------------------------------------------
-  // WIDGETS
-  // --------------------------------------------------------------------------
-
+  // =========================================================================
+  // 1. TOP HERO BANNER: DATA RESMI KARYAWAN ONE EVOLUTION
+  // =========================================================================
   Widget _buildWorkforceHeroBanner() {
     return Container(
+      width: double.infinity,
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [Color(0xFF1E1B4B), Color(0xFF312E81)],
+          colors: [Color(0xFF1E1B4B), Color(0xFF312E81), Color(0xFF4338CA)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(22),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF312E81).withValues(alpha: 0.3),
+            color: const Color(0xFF312E81).withOpacity(0.35),
             blurRadius: 16,
-            offset: const Offset(0, 6),
+            offset: const Offset(0, 8),
           ),
         ],
       ),
@@ -438,99 +359,140 @@ class _EmployeeHubPageState extends State<EmployeeHubPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // Avatar Profil
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                width: 58,
+                height: 58,
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Colors.white, width: 2),
+                  color: const Color(0xFF4F46E5),
                 ),
-                child: const Row(
-                  mainAxisSize: MainAxisSize.min,
+                child: ClipOval(
+                  child: _pathFoto != null && _pathFoto!.isNotEmpty
+                      ? Image.network(
+                          _pathFoto!.startsWith('http')
+                              ? _pathFoto!
+                              : 'https://apimbs.indexim.id$_pathFoto',
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => const Icon(Icons.person, color: Colors.white, size: 34),
+                        )
+                      : const Icon(Icons.person, color: Colors.white, size: 34),
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(Icons.hub_rounded, color: Color(0xFF818CF8), size: 14),
-                    SizedBox(width: 5),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        _perusahaan,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFFC7D2FE),
+                          letterSpacing: 0.3,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
                     Text(
-                      'TOTAL WORKFORCE SITE',
-                      style: TextStyle(
-                        fontSize: 10.5,
-                        fontWeight: FontWeight.w800,
+                      _nama,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w900,
                         color: Colors.white,
-                        letterSpacing: 0.5,
+                        letterSpacing: -0.3,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'NIK: $_nik • $_posisi',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.white.withOpacity(0.85),
                       ),
                     ),
                   ],
                 ),
               ),
-              const Text(
-                'Live Monitoring',
-                style: TextStyle(fontSize: 11, color: Color(0xFFA5B4FC)),
-              ),
             ],
           ),
-          const SizedBox(height: 14),
-          const Text(
-            '6,420 Tenaga Kerja Aktif',
-            style: TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.w900,
-              color: Colors.white,
-              letterSpacing: -0.5,
+          const SizedBox(height: 16),
+
+          // 3 Quick Indicator Badges dari Database
+          Container(
+            padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.08),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: Colors.white.withOpacity(0.12)),
             ),
-          ),
-          const SizedBox(height: 4),
-          const Text(
-            'Tersebar di PT Indexim Coalindo & 18 Perusahaan Mitra Kerja Tambang',
-            style: TextStyle(
-              fontSize: 12,
-              color: Color(0xFFC7D2FE),
-              height: 1.3,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                _buildHeroStatItem('SERTIFIKAT', '${_certificates.length} Terdaftar', Icons.verified_rounded, const Color(0xFFFBBF24)),
+                Container(width: 1, height: 28, color: Colors.white.withOpacity(0.2)),
+                _buildHeroStatItem('MATRIKS SKILL', '${_skillMatrix.length} Kompeten', Icons.psychology_rounded, const Color(0xFFA78BFA)),
+                Container(width: 1, height: 28, color: Colors.white.withOpacity(0.2)),
+                _buildHeroStatItem('MINE PERMIT', 'Aktif Valid', Icons.shield_rounded, const Color(0xFF34D399)),
+              ],
             ),
-          ),
-          const SizedBox(height: 14),
-          Row(
-            children: [
-              _buildMiniMetric('PT INDEXIM', '842 Org', const Color(0xFF34D399)),
-              const SizedBox(width: 8),
-              _buildMiniMetric('KONTRAKTOR', '5,578 Org', const Color(0xFFFBBF24)),
-              const SizedBox(width: 8),
-              _buildMiniMetric('MINE PERMIT', '99.4% Valid', const Color(0xFF60A5FA)),
-            ],
           ),
         ],
       ),
     );
   }
 
-  Widget _buildMiniMetric(String label, String value, Color color) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
-        decoration: BoxDecoration(
-          color: Colors.black.withValues(alpha: 0.25),
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
-        ),
-        child: Column(
+  Widget _buildHeroStatItem(String label, String value, IconData icon, Color color) {
+    return Row(
+      children: [
+        Icon(icon, size: 16, color: color),
+        const SizedBox(width: 6),
+        Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
               label,
-              style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.w700, color: color),
+              style: TextStyle(
+                fontSize: 9,
+                fontWeight: FontWeight.w700,
+                color: Colors.white.withOpacity(0.7),
+                letterSpacing: 0.3,
+              ),
             ),
-            const SizedBox(height: 2),
             Text(
               value,
-              style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: Colors.white),
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+                color: Colors.white,
+              ),
             ),
           ],
         ),
-      ),
+      ],
     );
   }
 
+  // =========================================================================
+  // 2. SEARCH & FILTER BAR
+  // =========================================================================
   Widget _buildSearchFilterBar() {
     return Container(
       decoration: BoxDecoration(
@@ -539,20 +501,25 @@ class _EmployeeHubPageState extends State<EmployeeHubPage> {
         border: Border.all(color: const Color(0xFFE2E8F0)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
-            blurRadius: 10,
-            offset: const Offset(0, 3),
+            color: Colors.black.withOpacity(0.02),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
           ),
         ],
       ),
       child: TextField(
         controller: _searchCtrl,
-        onChanged: (val) => setState(() => _searchQuery = val),
+        onChanged: (val) => setState(() => _searchQuery = val.toLowerCase()),
+        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
         decoration: InputDecoration(
-          hintText: 'Cari modul, NIK, nama karyawan, atau mitra...',
-          hintStyle: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
-          prefixIcon: const Icon(Icons.search_rounded, color: Color(0xFF6366F1), size: 22),
-          suffixIcon: _searchQuery.isNotEmpty
+          hintText: 'Cari modul, data pribadi, sertifikat, atau skill...',
+          hintStyle: TextStyle(
+            fontSize: 12.5,
+            fontWeight: FontWeight.w500,
+            color: Colors.grey.shade400,
+          ),
+          prefixIcon: const Icon(Icons.search_rounded, color: Color(0xFF6366F1), size: 20),
+          suffixIcon: _searchCtrl.text.isNotEmpty
               ? IconButton(
                   icon: const Icon(Icons.clear_rounded, size: 18),
                   onPressed: () {
@@ -562,34 +529,36 @@ class _EmployeeHubPageState extends State<EmployeeHubPage> {
                 )
               : null,
           border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         ),
       ),
     );
   }
 
+  // =========================================================================
+  // 3. SECTION CONTAINER & 4-COLUMN SUPER-APP GRID
+  // =========================================================================
   Widget _buildSectionCard({
     required String title,
     required VoidCallback onTitleTap,
     required List<_MenuItem> items,
   }) {
-    // Filter items based on search query
-    final filteredItems = _searchQuery.isEmpty
+    final filtered = _searchQuery.isEmpty
         ? items
-        : items.where((i) => i.title.toLowerCase().contains(_searchQuery.toLowerCase())).toList();
+        : items.where((it) => it.title.toLowerCase().contains(_searchQuery)).toList();
 
-    if (filteredItems.isEmpty) return const SizedBox.shrink();
+    if (filtered.isEmpty) return const SizedBox.shrink();
 
     return Container(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 18),
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        border: Border.all(color: const Color(0xFFF1F5F9)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
-            blurRadius: 12,
+            color: const Color(0xFF1E293B).withOpacity(0.04),
+            blurRadius: 14,
             offset: const Offset(0, 4),
           ),
         ],
@@ -597,40 +566,44 @@ class _EmployeeHubPageState extends State<EmployeeHubPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Section Header row with title & arrow
           InkWell(
             onTap: onTitleTap,
             borderRadius: BorderRadius.circular(8),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: Text(
-                    title,
-                    style: const TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w800,
-                      color: Color(0xFF0F172A),
-                      letterSpacing: -0.2,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Text(
+                      title,
+                      style: const TextStyle(
+                        fontSize: 14.5,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF0F172A),
+                        letterSpacing: -0.2,
+                      ),
                     ),
                   ),
-                ),
-                const Icon(
-                  Icons.chevron_right_rounded,
-                  color: Color(0xFF64748B),
-                  size: 20,
-                ),
-              ],
+                  const Icon(
+                    Icons.chevron_right_rounded,
+                    size: 20,
+                    color: Color(0xFF94A3B8),
+                  ),
+                ],
+              ),
             ),
           ),
-          const SizedBox(height: 16),
-
-          // 4-column Grid matching the reference screenshot
+          const SizedBox(height: 12),
           Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             crossAxisAlignment: CrossAxisAlignment.start,
-            children: filteredItems.map((item) {
+            children: filtered.map((item) {
               return Expanded(
-                child: _buildGridItemTile(item),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 3),
+                  child: _buildTileItem(item),
+                ),
               );
             }).toList(),
           ),
@@ -639,78 +612,77 @@ class _EmployeeHubPageState extends State<EmployeeHubPage> {
     );
   }
 
-  Widget _buildGridItemTile(_MenuItem item) {
+  Widget _buildTileItem(_MenuItem item) {
     return InkWell(
-      onTap: item.onTap,
-      borderRadius: BorderRadius.circular(14),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 4),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            // Rounded square container icon with badge
-            Stack(
-              clipBehavior: Clip.none,
-              children: [
-                Container(
-                  width: 58,
-                  height: 58,
-                  decoration: BoxDecoration(
-                    color: item.bgColor,
-                    borderRadius: BorderRadius.circular(18),
-                    border: Border.all(
-                      color: item.iconColor.withValues(alpha: 0.18),
-                      width: 1.2,
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: item.iconColor.withValues(alpha: 0.12),
-                        blurRadius: 8,
-                        offset: const Offset(0, 3),
-                      ),
-                    ],
+      onTap: () {
+        HapticFeedback.lightImpact();
+        item.onTap();
+      },
+      borderRadius: BorderRadius.circular(16),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Container(
+                width: 58,
+                height: 58,
+                decoration: BoxDecoration(
+                  color: item.bgColor,
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(
+                    color: item.iconColor.withOpacity(0.2),
+                    width: 1.2,
                   ),
-                  child: Center(
-                    child: Icon(
-                      item.icon,
-                      color: item.iconColor,
-                      size: 28,
+                  boxShadow: [
+                    BoxShadow(
+                      color: item.iconColor.withOpacity(0.08),
+                      blurRadius: 8,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
+                ),
+                child: Center(
+                  child: Icon(item.icon, size: 28, color: item.iconColor),
+                ),
+              ),
+              if (item.badge != null)
+                Positioned(
+                  top: -5,
+                  right: -6,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFFEF4444), Color(0xFFDC2626)],
+                      ),
+                      borderRadius: BorderRadius.circular(99),
+                      border: Border.all(color: Colors.white, width: 1.2),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.red.withOpacity(0.3),
+                          blurRadius: 4,
+                          offset: const Offset(0, 1),
+                        ),
+                      ],
+                    ),
+                    child: Text(
+                      item.badge!,
+                      style: const TextStyle(
+                        fontSize: 8.5,
+                        fontWeight: FontWeight.w900,
+                        color: Colors.white,
+                      ),
                     ),
                   ),
                 ),
-                if (item.badge != null)
-                  Positioned(
-                    top: -4,
-                    right: -4,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFDC2626),
-                        borderRadius: BorderRadius.circular(6),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.red.withValues(alpha: 0.4),
-                            blurRadius: 4,
-                          ),
-                        ],
-                      ),
-                      child: Text(
-                        item.badge!,
-                        style: const TextStyle(
-                          fontSize: 8.5,
-                          fontWeight: FontWeight.w900,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 8),
-
-            // Item Label below
-            Text(
+            ],
+          ),
+          const SizedBox(height: 7),
+          SizedBox(
+            height: 32,
+            child: Text(
               item.title,
               textAlign: TextAlign.center,
               maxLines: 2,
@@ -719,170 +691,53 @@ class _EmployeeHubPageState extends State<EmployeeHubPage> {
                 fontSize: 11,
                 fontWeight: FontWeight.w700,
                 color: Color(0xFF334155),
-                height: 1.18,
+                height: 1.15,
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 
-  // --------------------------------------------------------------------------
-  // MODAL DIALOGS
-  // --------------------------------------------------------------------------
-
-  void _showFilterToast(String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(msg),
-        duration: const Duration(seconds: 1),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
-  }
-
-  void _showFeatureDetail(String title, String desc, IconData icon, Color color) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => Container(
-        padding: const EdgeInsets.fromLTRB(24, 20, 24, 32),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Container(
-                width: 44,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade300,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-            ),
-            const SizedBox(height: 18),
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: color.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: Icon(icon, color: color, size: 26),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        title,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w800,
-                          color: Color(0xFF0F172A),
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      const Text(
-                        'Modul Manajemen Tenaga Kerja Tambang',
-                        style: TextStyle(fontSize: 11.5, color: Color(0xFF64748B)),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF8FAFC),
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: const Color(0xFFE2E8F0)),
-              ),
-              child: Text(
-                desc,
-                style: const TextStyle(fontSize: 13, color: Color(0xFF334155), height: 1.45),
-              ),
-            ),
-            const SizedBox(height: 20),
-            SizedBox(
-              width: double.infinity,
-              height: 46,
-              child: ElevatedButton(
-                onPressed: () => Navigator.pop(ctx),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: color,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                ),
-                child: const Text(
-                  'Tutup',
-                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Colors.white),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // 1. Profil Karyawan Modal
+  // =========================================================================
+  // 4. MODAL: PROFIL LENGKAP KARYAWAN (ONE EVOLUTION)
+  // =========================================================================
   void _showProfileDetailModal() {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (ctx) => DraggableScrollableSheet(
-        initialChildSize: 0.85,
-        maxChildSize: 0.95,
-        minChildSize: 0.5,
-        builder: (_, scrollCtrl) => Container(
+      builder: (ctx) {
+        return Container(
+          height: MediaQuery.of(context).size.height * 0.88,
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
           decoration: const BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
           ),
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
-          child: ListView(
-            controller: scrollCtrl,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Center(
                 child: Container(
                   width: 44,
-                  height: 4,
+                  height: 4.5,
                   decoration: BoxDecoration(
                     color: Colors.grey.shade300,
-                    borderRadius: BorderRadius.circular(2),
+                    borderRadius: BorderRadius.circular(99),
                   ),
                 ),
               ),
               const SizedBox(height: 16),
-
-              // ID Card Visual Banner
+              // Virtual ID Card Header
               Container(
-                padding: const EdgeInsets.all(20),
+                padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
                   gradient: const LinearGradient(
-                    colors: [Color(0xFF312E81), Color(0xFF1E1B4B)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
+                    colors: [Color(0xFF1E1B4B), Color(0xFF312E81)],
                   ),
                   borderRadius: BorderRadius.circular(20),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.2),
-                      blurRadius: 14,
-                      offset: const Offset(0, 5),
-                    ),
-                  ],
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -892,44 +747,24 @@ class _EmployeeHubPageState extends State<EmployeeHubPage> {
                       children: [
                         Row(
                           children: [
-                            Container(
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withValues(alpha: 0.15),
-                                borderRadius: BorderRadius.circular(10),
+                            const Icon(Icons.badge_rounded, color: Color(0xFF818CF8), size: 20),
+                            const SizedBox(width: 8),
+                            Text(
+                              _perusahaan,
+                              style: const TextStyle(
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w800,
+                                color: Colors.white70,
+                                letterSpacing: 0.5,
                               ),
-                              child: const Icon(Icons.badge_rounded, color: Colors.white, size: 20),
-                            ),
-                            const SizedBox(width: 10),
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text(
-                                  'KARTU IDENTITAS PEKERJA',
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w800,
-                                    color: Color(0xFFA5B4FC),
-                                    letterSpacing: 0.5,
-                                  ),
-                                ),
-                                Text(
-                                  _perusahaan,
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w800,
-                                    color: Colors.white,
-                                  ),
-                                ),
-                              ],
                             ),
                           ],
                         ),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2.5),
                           decoration: BoxDecoration(
                             color: const Color(0xFF10B981),
-                            borderRadius: BorderRadius.circular(8),
+                            borderRadius: BorderRadius.circular(6),
                           ),
                           child: const Text(
                             'AKTIF',
@@ -942,127 +777,852 @@ class _EmployeeHubPageState extends State<EmployeeHubPage> {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 12),
                     Text(
                       _nama,
                       style: const TextStyle(
-                        fontSize: 20,
+                        fontSize: 18,
                         fontWeight: FontWeight.w900,
                         color: Colors.white,
-                        letterSpacing: -0.3,
                       ),
                     ),
-                    const SizedBox(height: 4),
                     Text(
-                      'NIK: $_nik • $_posisi',
+                      'NIK: $_nik • $_jabatan',
                       style: const TextStyle(
                         fontSize: 12,
+                        color: Colors.white70,
                         fontWeight: FontWeight.w600,
-                        color: Color(0xFFC7D2FE),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Colors.black.withValues(alpha: 0.25),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Row(
-                        children: [
-                          _buildIdCardDetail('DEPARTEMEN', _dept),
-                          _buildIdCardDetail('LOKASI', _lokasiKerja),
-                          _buildIdCardDetail('GOL. DARAH', _golDarah),
-                        ],
                       ),
                     ),
                   ],
                 ),
               ),
-
-              const SizedBox(height: 20),
+              const SizedBox(height: 16),
               const Text(
-                'Rincian Data Tenaga Kerja Tambang',
-                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
+                'Rincian Data Tenaga Kerja Tambang (One Evolution)',
+                style: TextStyle(
+                  fontSize: 14.5,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFF0F172A),
+                ),
+              ),
+              const SizedBox(height: 10),
+              Expanded(
+                child: ListView(
+                  physics: const BouncingScrollPhysics(),
+                  children: [
+                    _buildInfoTile('Nomor NIK', _nik, Icons.pin_rounded),
+                    _buildInfoTile('Nomor KTP', _noKtp, Icons.badge_outlined),
+                    _buildInfoTile('Nomor KK', _noKk, Icons.family_restroom_rounded),
+                    _buildInfoTile('Tempat, Tanggal Lahir', '$_tempatLahir, $_tanggalLahir', Icons.cake_rounded),
+                    _buildInfoTile('Perusahaan', _perusahaan, Icons.corporate_fare_rounded),
+                    _buildInfoTile('Departemen', _dept, Icons.domain_rounded),
+                    _buildInfoTile('Jabatan / Posisi', '$_jabatan / $_posisi', Icons.work_rounded),
+                    _buildInfoTile('Grade / Klasifikasi', '$_grade • Staff Tambang', Icons.stars_rounded),
+                    _buildInfoTile('Jadwal Roster', _roster, Icons.event_repeat_rounded),
+                    _buildInfoTile('Tanggal Masuk', _tanggalMasuk, Icons.calendar_today_rounded),
+                    _buildInfoTile('Status Kerja', _statusKerja, Icons.assignment_ind_rounded),
+                    _buildInfoTile('No. Handphone (WA)', _hp, Icons.phone_android_rounded),
+                    if (_hp2.isNotEmpty) _buildInfoTile('No. HP Alternatif', _hp2, Icons.phone_outlined),
+                    _buildInfoTile('Email Kantor', _emailKantor, Icons.mail_outline_rounded),
+                    _buildInfoTile('Email Pribadi', _emailPribadi, Icons.alternate_email_rounded),
+                    _buildInfoTile('Alamat KTP / Domisili', _alamat, Icons.location_on_rounded),
+                    _buildInfoTile('Kontak Darurat', '$_daruratNama • $_daruratTelp ($_daruratRelasi)', Icons.contact_phone_rounded),
+                    _buildInfoTile('Mine Permit ID', '$_minePermitNo (Berlaku s/d $_minePermitExp)', Icons.qr_code_2_rounded),
+                    _buildInfoTile('SIMPER Tambang', _simperClass, Icons.drive_eta_rounded),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  // =========================================================================
+  // 5. MODAL: EDIT DATA KARYAWAN (SIMPAN KE ONE_DB_MITRA)
+  // =========================================================================
+  void _showEditEmployeeModal() {
+    final hpCtrl = TextEditingController(text: _hp);
+    final emailKantorCtrl = TextEditingController(text: _emailKantor);
+    final emailPribadiCtrl = TextEditingController(text: _emailPribadi);
+    final alamatCtrl = TextEditingController(text: _alamat);
+    final kdNamaCtrl = TextEditingController(text: _daruratNama);
+    final kdTelpCtrl = TextEditingController(text: _daruratTelp);
+    final kdRelasiCtrl = TextEditingController(text: _daruratRelasi);
+    bool isSaving = false;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Container(
+              height: MediaQuery.of(context).size.height * 0.90,
+              padding: EdgeInsets.fromLTRB(20, 12, 20, MediaQuery.of(context).viewInsets.bottom + 20),
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 44,
+                      height: 4.5,
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade300,
+                        borderRadius: BorderRadius.circular(99),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE0F2FE),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Icon(Icons.edit_note_rounded, color: Color(0xFF0284C7), size: 24),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Edit Data Karyawan (One Evolution)',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w800,
+                                color: Color(0xFF0F172A),
+                              ),
+                            ),
+                            Text(
+                              'Update langsung ke database [ONE_DB_MITRA]',
+                              style: TextStyle(fontSize: 11, color: Colors.grey.shade600, fontWeight: FontWeight.w500),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  Expanded(
+                    child: ListView(
+                      physics: const BouncingScrollPhysics(),
+                      children: [
+                        _buildInputField('Nomor Handphone Aktif (WhatsApp)', hpCtrl, Icons.phone_android_rounded),
+                        const SizedBox(height: 12),
+                        _buildInputField('Email Kantor / Korespondensi', emailKantorCtrl, Icons.email_rounded),
+                        const SizedBox(height: 12),
+                        _buildInputField('Email Pribadi', emailPribadiCtrl, Icons.alternate_email_rounded),
+                        const SizedBox(height: 12),
+                        _buildInputField('Alamat Domisili / Tempat Tinggal', alamatCtrl, Icons.location_on_rounded, maxLines: 2),
+                        const SizedBox(height: 16),
+                        const Text(
+                          'Kontak Darurat (Emergency Contact)',
+                          style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
+                        ),
+                        const SizedBox(height: 10),
+                        _buildInputField('Nama Kontak Darurat', kdNamaCtrl, Icons.person_outline_rounded),
+                        const SizedBox(height: 12),
+                        _buildInputField('Nomor Telepon Darurat', kdTelpCtrl, Icons.phone_rounded),
+                        const SizedBox(height: 12),
+                        _buildInputField('Hubungan / Relasi (cth: Istri, Orang Tua, Saudara)', kdRelasiCtrl, Icons.family_restroom_rounded),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: ElevatedButton(
+                      onPressed: isSaving
+                          ? null
+                          : () async {
+                              setModalState(() => isSaving = true);
+                              HapticFeedback.mediumImpact();
+
+                              final success = await _oneEvService.updateProfile({
+                                'no_nik': _nik,
+                                'hp_1': hpCtrl.text.trim(),
+                                'email_kantor': emailKantorCtrl.text.trim(),
+                                'email_pribadi': emailPribadiCtrl.text.trim(),
+                                'alamat': alamatCtrl.text.trim(),
+                                'kontak_darurat_nama': kdNamaCtrl.text.trim(),
+                                'kontak_darurat_telp': kdTelpCtrl.text.trim(),
+                                'kontak_darurat_relasi': kdRelasiCtrl.text.trim(),
+                              });
+
+                              if (mounted) {
+                                setState(() {
+                                  _hp = hpCtrl.text.trim();
+                                  _emailKantor = emailKantorCtrl.text.trim();
+                                  _emailPribadi = emailPribadiCtrl.text.trim();
+                                  _alamat = alamatCtrl.text.trim();
+                                  _daruratNama = kdNamaCtrl.text.trim();
+                                  _daruratTelp = kdTelpCtrl.text.trim();
+                                  _daruratRelasi = kdRelasiCtrl.text.trim();
+                                });
+                                Navigator.of(ctx).pop();
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      success
+                                          ? 'Perubahan data berhasil disimpan ke database One Evolution!'
+                                          : 'Gagal memperbarui database, data disimpan lokal.',
+                                    ),
+                                    backgroundColor: success ? const Color(0xFF059669) : const Color(0xFFD97706),
+                                    behavior: SnackBarBehavior.floating,
+                                  ),
+                                );
+                              }
+                            },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF0284C7),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                        elevation: 0,
+                      ),
+                      child: isSaving
+                          ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                          : const Text(
+                              'Simpan Perubahan ke Database',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w800,
+                                color: Colors.white,
+                              ),
+                            ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  // =========================================================================
+  // 6. MODAL: SERTIFIKAT & PELATIHAN KARYAWAN (ONE_DB_MITRA)
+  // =========================================================================
+  void _showCertificatesModal() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return Container(
+          height: MediaQuery.of(context).size.height * 0.88,
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 44,
+                  height: 4.5,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(99),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFEF3C7),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Icon(Icons.military_tech_rounded, color: Color(0xFFF59E0B), size: 24),
+                      ),
+                      const SizedBox(width: 12),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Sertifikat & Pelatihan',
+                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
+                          ),
+                          Text(
+                            '${_certificates.length} sertifikat resmi di ONE Evolution',
+                            style: TextStyle(fontSize: 11, color: Colors.grey.shade600, fontWeight: FontWeight.w500),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                  IconButton(
+                    tooltip: 'Tambah Sertifikat',
+                    icon: const Icon(Icons.add_circle_rounded, color: Color(0xFFF59E0B), size: 30),
+                    onPressed: () {
+                      Navigator.of(ctx).pop();
+                      _showAddCertificateModal();
+                    },
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              Expanded(
+                child: _certificates.isEmpty
+                    ? Center(
+                        child: Text(
+                          'Belum ada riwayat sertifikat di database.',
+                          style: TextStyle(color: Colors.grey.shade500, fontWeight: FontWeight.w600),
+                        ),
+                      )
+                    : ListView.separated(
+                        physics: const BouncingScrollPhysics(),
+                        itemCount: _certificates.length,
+                        separatorBuilder: (_, __) => const SizedBox(height: 10),
+                        itemBuilder: (context, index) {
+                          final cert = _certificates[index];
+                          final isExpired = cert['status'] == 'EXPIRED';
+                          final isWarning = cert['status'] == 'PERLU PERPANJANGAN';
+
+                          return Container(
+                            padding: const EdgeInsets.all(14),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFAFAFA),
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(color: const Color(0xFFE2E8F0)),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        cert['nama_sertifikat'] ?? 'Sertifikat',
+                                        style: const TextStyle(
+                                          fontSize: 13.5,
+                                          fontWeight: FontWeight.w800,
+                                          color: Color(0xFF0F172A),
+                                        ),
+                                      ),
+                                    ),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: isExpired
+                                            ? const Color(0xFFFEE2E2)
+                                            : (isWarning ? const Color(0xFFFEF3C7) : const Color(0xFFD1FAE5)),
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                      child: Text(
+                                        cert['status'] ?? 'AKTIF',
+                                        style: TextStyle(
+                                          fontSize: 9.5,
+                                          fontWeight: FontWeight.w900,
+                                          color: isExpired
+                                              ? const Color(0xFFDC2626)
+                                              : (isWarning ? const Color(0xFFD97706) : const Color(0xFF059669)),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  'Penyelenggara: ${cert['penyelenggara'] ?? '-'}',
+                                  style: TextStyle(fontSize: 11.5, color: Colors.grey.shade700, fontWeight: FontWeight.w500),
+                                ),
+                                const SizedBox(height: 4),
+                                Row(
+                                  children: [
+                                    Icon(Icons.calendar_today_rounded, size: 12, color: Colors.grey.shade500),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      'Terbit: ${cert['tanggal_terbit'] ?? '-'}',
+                                      style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Icon(Icons.event_busy_rounded, size: 12, color: isExpired ? Colors.red : Colors.grey.shade500),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      'Expired: ${cert['tanggal_expired'] ?? 'Seumur Hidup'}',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w600,
+                                        color: isExpired ? Colors.red : Colors.grey.shade700,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _showAddCertificateModal() {
+    final namaCtrl = TextEditingController();
+    final lembagaCtrl = TextEditingController();
+    DateTime tglTerbit = DateTime.now();
+    DateTime tglExp = DateTime.now().add(const Duration(days: 730));
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return Container(
+          padding: EdgeInsets.fromLTRB(20, 16, 20, MediaQuery.of(context).viewInsets.bottom + 20),
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Tambah Sertifikat Baru',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
               ),
               const SizedBox(height: 12),
-
-              _buildInfoRow('Perusahaan', _perusahaan, Icons.domain_rounded),
-              _buildInfoRow('Nomor NIK', _nik, Icons.pin_rounded),
-              _buildInfoRow('Jabatan / Posisi', _posisi, Icons.work_rounded),
-              _buildInfoRow('Departemen', _dept, Icons.apartment_rounded),
-              _buildInfoRow('Status Kerja', _statusKerja, Icons.assignment_ind_rounded),
-              _buildInfoRow('Nomor Handphone', _hp, Icons.phone_android_rounded),
-              _buildInfoRow('Email Resmi', _email, Icons.mail_outline_rounded),
-              _buildInfoRow('Kontak Darurat', _darurat, Icons.emergency_rounded),
-              _buildInfoRow('Nomor Mine Permit', _minePermitNo, Icons.qr_code_2_rounded),
-              _buildInfoRow('Lisensi SIMPER', _simperClass, Icons.drive_eta_rounded),
-
+              _buildInputField('Nama Sertifikat / Pelatihan', namaCtrl, Icons.military_tech_rounded),
+              const SizedBox(height: 10),
+              _buildInputField('Lembaga Penyelenggara / Penerbit', lembagaCtrl, Icons.corporate_fare_rounded),
               const SizedBox(height: 16),
               SizedBox(
                 width: double.infinity,
-                height: 48,
-                child: ElevatedButton.icon(
-                  onPressed: () {
-                    Navigator.pop(ctx);
-                    _showEditEmployeeModal();
+                height: 46,
+                child: ElevatedButton(
+                  onPressed: () async {
+                    if (namaCtrl.text.trim().isEmpty) return;
+                    HapticFeedback.mediumImpact();
+                    await _oneEvService.addCertificate({
+                      'no_nik': _nik,
+                      'nama_sertifikat': namaCtrl.text.trim(),
+                      'penyelenggara': lembagaCtrl.text.trim().isEmpty ? 'Lembaga Diklat K3' : lembagaCtrl.text.trim(),
+                      'tanggal_terbit': tglTerbit.toIso8601String().substring(0, 10),
+                      'tanggal_expired': tglExp.toIso8601String().substring(0, 10),
+                    });
+                    await _loadLiveOneEvData();
+                    if (mounted) {
+                      Navigator.of(ctx).pop();
+                      _showCertificatesModal();
+                    }
                   },
-                  icon: const Icon(Icons.edit_note_rounded, color: Colors.white),
-                  label: const Text(
-                    'Perbarui Data Karyawan',
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Colors.white),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFF59E0B),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
+                  child: const Text('Simpan Sertifikat', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  // =========================================================================
+  // 7. MODAL: MATRIKS SKILL & KOMPETENSI (ONE_DB_MITRA)
+  // =========================================================================
+  void _showSkillMatrixModal() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return Container(
+          height: MediaQuery.of(context).size.height * 0.88,
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 44,
+                  height: 4.5,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(99),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFEDE9FE),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Icon(Icons.psychology_rounded, color: Color(0xFF8B5CF6), size: 24),
+                      ),
+                      const SizedBox(width: 12),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Matriks Skill & Kompetensi',
+                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
+                          ),
+                          Text(
+                            '${_skillMatrix.length} pemetaan keahlian di ONE Evolution',
+                            style: TextStyle(fontSize: 11, color: Colors.grey.shade600, fontWeight: FontWeight.w500),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                  IconButton(
+                    tooltip: 'Tambah Penilaian Skill',
+                    icon: const Icon(Icons.add_circle_rounded, color: Color(0xFF8B5CF6), size: 30),
+                    onPressed: () {
+                      Navigator.of(ctx).pop();
+                      _showAddSkillModal();
+                    },
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              Expanded(
+                child: ListView.separated(
+                  physics: const BouncingScrollPhysics(),
+                  itemCount: _skillMatrix.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 10),
+                  itemBuilder: (context, index) {
+                    final skill = _skillMatrix[index];
+                    return Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFAFAFA),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFEDE9FE),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  skill['kategori'] ?? 'K3LH',
+                                  style: const TextStyle(
+                                    fontSize: 9.5,
+                                    fontWeight: FontWeight.w800,
+                                    color: Color(0xFF7C3AED),
+                                  ),
+                                ),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFD1FAE5),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  skill['status'] ?? 'COMPETENT',
+                                  style: const TextStyle(
+                                    fontSize: 9.5,
+                                    fontWeight: FontWeight.w900,
+                                    color: Color(0xFF059669),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            skill['nama_kompetensi'] ?? 'Kompetensi',
+                            style: const TextStyle(
+                              fontSize: 13.5,
+                              fontWeight: FontWeight.w800,
+                              color: Color(0xFF0F172A),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              Text(
+                                'Target: ${skill['level_target'] ?? 'Level 3'}',
+                                style: TextStyle(fontSize: 11, color: Colors.grey.shade600, fontWeight: FontWeight.w600),
+                              ),
+                              const SizedBox(width: 8),
+                              const Text('•', style: TextStyle(color: Colors.grey)),
+                              const SizedBox(width: 8),
+                              Text(
+                                'Aktual: ${skill['level_aktual'] ?? 'Level 3'}',
+                                style: const TextStyle(fontSize: 11, color: Color(0xFF6366F1), fontWeight: FontWeight.w800),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(99),
+                            child: const LinearProgressIndicator(
+                              value: 1.0,
+                              minHeight: 5,
+                              backgroundColor: Color(0xFFE2E8F0),
+                              valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF6366F1)),
+                            ),
+                          ),
+                          if (skill['catatan'] != null && skill['catatan'].toString().isNotEmpty) ...[
+                            const SizedBox(height: 6),
+                            Text(
+                              skill['catatan'],
+                              style: TextStyle(fontSize: 10.5, color: Colors.grey.shade600, fontStyle: FontStyle.italic),
+                            ),
+                          ],
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _showAddSkillModal() {
+    final skillCtrl = TextEditingController();
+    final catCtrl = TextEditingController(text: 'K3LH Tambang');
+    final catatanCtrl = TextEditingController();
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return Container(
+          padding: EdgeInsets.fromLTRB(20, 16, 20, MediaQuery.of(context).viewInsets.bottom + 20),
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Tambah Matriks Kompetensi',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
+              ),
+              const SizedBox(height: 12),
+              _buildInputField('Nama Kompetensi / Keahlian', skillCtrl, Icons.psychology_rounded),
+              const SizedBox(height: 10),
+              _buildInputField('Kategori (K3LH / Operasional / Manajemen)', catCtrl, Icons.category_rounded),
+              const SizedBox(height: 10),
+              _buildInputField('Catatan / Keterangan Pembuktian', catatanCtrl, Icons.note_alt_rounded),
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                height: 46,
+                child: ElevatedButton(
+                  onPressed: () async {
+                    if (skillCtrl.text.trim().isEmpty) return;
+                    HapticFeedback.mediumImpact();
+                    await _oneEvService.updateSkillMatrix({
+                      'no_nik': _nik,
+                      'nama_kompetensi': skillCtrl.text.trim(),
+                      'kategori': catCtrl.text.trim(),
+                      'level_target': 'Level 4',
+                      'level_aktual': 'Level 4',
+                      'status': 'COMPETENT',
+                      'catatan': catatanCtrl.text.trim(),
+                    });
+                    await _loadLiveOneEvData();
+                    if (mounted) {
+                      Navigator.of(ctx).pop();
+                      _showSkillMatrixModal();
+                    }
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF8B5CF6),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  child: const Text('Simpan Kompetensi', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  // =========================================================================
+  // 8. MODAL: MINE PERMIT ID & SIMPER
+  // =========================================================================
+  void _showMinePermitModal() {
+    _showFeatureDetail(
+      'Mine Permit ID (Izin Kerja Tambang IDC)',
+      'Mine Permit ID: $_minePermitNo\n'
+      'Status: VALID AKTIF\n'
+      'Masa Berlaku: Hingga $_minePermitExp\n'
+      'Perusahaan: $_perusahaan\n'
+      'Departemen: $_dept\n'
+      'Karyawan berhak memasuki area operasional tambang dengan kepatuhan penuh APD & regulasi keselamatan K3LH.',
+      Icons.qr_code_2_rounded,
+      const Color(0xFFD97706),
+    );
+  }
+
+  void _showSimperModal() {
+    _showFeatureDetail(
+      'Surat Izin Mengemudi Perusahaan (SIMPER)',
+      'Kelas Lisensi: $_simperClass\n'
+      'Area Operasional: Pit Central, Pit West & Jalur Hauling KM 0 - KM 48\n'
+      'Unit Diizinkan: Toyota Hilux 4x4, Light Truck, & Sarana Patroli HSE\n'
+      'Masa Berlaku: 31 Desember 2026\n'
+      'Kondisi: Wajib mematuhi batas kecepatan max 40 km/jam di pit dan 60 km/jam di hauling.',
+      Icons.drive_eta_rounded,
+      const Color(0xFF2563EB),
+    );
+  }
+
+  void _showFeatureDetail(String title, String desc, IconData icon, Color color) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return Container(
+          padding: const EdgeInsets.all(22),
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(99),
+                ),
+              ),
+              const SizedBox(height: 18),
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.12),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(icon, color: color, size: 36),
+              ),
+              const SizedBox(height: 14),
+              Text(
+                title,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 16.5,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFF0F172A),
+                ),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                desc,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 12.5,
+                  height: 1.45,
+                  color: Colors.grey.shade700,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              const SizedBox(height: 22),
+              SizedBox(
+                width: double.infinity,
+                height: 44,
+                child: ElevatedButton(
+                  onPressed: () => Navigator.of(ctx).pop(),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF6366F1),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    elevation: 0,
+                  ),
+                  child: const Text(
+                    'Mengerti',
+                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800),
                   ),
                 ),
               ),
             ],
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 
-  Widget _buildIdCardDetail(String label, String value) {
-    return Expanded(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(label, style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: Color(0xFF818CF8))),
-          const SizedBox(height: 2),
-          Text(
-            value,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Colors.white),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildInfoRow(String label, String value, IconData icon) {
+  Widget _buildInfoTile(String label, String value, IconData icon) {
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: const Color(0xFFF8FAFC),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(color: const Color(0xFFE2E8F0)),
       ),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: 20, color: const Color(0xFF6366F1)),
+          Icon(icon, size: 18, color: const Color(0xFF6366F1)),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(label, style: const TextStyle(fontSize: 10.5, color: Color(0xFF64748B), fontWeight: FontWeight.w600)),
+                Text(
+                  label,
+                  style: TextStyle(fontSize: 11, color: Colors.grey.shade500, fontWeight: FontWeight.w600),
+                ),
                 const SizedBox(height: 2),
-                Text(value, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF0F172A))),
+                Text(
+                  value,
+                  style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: Color(0xFF1E293B)),
+                ),
               ],
             ),
           ),
@@ -1071,420 +1631,48 @@ class _EmployeeHubPageState extends State<EmployeeHubPage> {
     );
   }
 
-  // 2. Edit Data Karyawan Modal
-  void _showEditEmployeeModal() {
-    final hpCtrl = TextEditingController(text: _hp);
-    final emailCtrl = TextEditingController(text: _email);
-    final daruratNamaCtrl = TextEditingController(text: _daruratNama);
-    final daruratTelpCtrl = TextEditingController(text: '0812-9876-5432');
-    String currentGolDarah = _golDarah;
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => Padding(
-        padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
-        child: Container(
-          padding: const EdgeInsets.fromLTRB(24, 20, 24, 30),
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-          ),
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Center(
-                  child: Container(
-                    width: 44,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade300,
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 18),
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFE0F2FE),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: const Icon(Icons.edit_note_rounded, color: Color(0xFF0284C7), size: 24),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Edit Data Karyawan',
-                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
-                          ),
-                          Text(
-                            '$_nama ($_nik)',
-                            style: const TextStyle(fontSize: 11.5, color: Color(0xFF64748B)),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 18),
-
-                const Text('Nomor Handphone Aktif (WhatsApp)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
-                const SizedBox(height: 6),
-                TextField(
-                  controller: hpCtrl,
-                  keyboardType: TextInputType.phone,
-                  decoration: InputDecoration(
-                    prefixIcon: const Icon(Icons.phone_rounded, size: 20),
-                    filled: true,
-                    fillColor: const Color(0xFFF8FAFC),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                    contentPadding: const EdgeInsets.all(12),
-                  ),
-                ),
-
-                const SizedBox(height: 14),
-                const Text('Email Kantor / Korespondensi', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
-                const SizedBox(height: 6),
-                TextField(
-                  controller: emailCtrl,
-                  keyboardType: TextInputType.emailAddress,
-                  decoration: InputDecoration(
-                    prefixIcon: const Icon(Icons.email_rounded, size: 20),
-                    filled: true,
-                    fillColor: const Color(0xFFF8FAFC),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                    contentPadding: const EdgeInsets.all(12),
-                  ),
-                ),
-
-                const SizedBox(height: 14),
-                const Text('Nama Kontak Darurat (Emergency)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
-                const SizedBox(height: 6),
-                TextField(
-                  controller: daruratNamaCtrl,
-                  decoration: InputDecoration(
-                    prefixIcon: const Icon(Icons.person_outline_rounded, size: 20),
-                    filled: true,
-                    fillColor: const Color(0xFFF8FAFC),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                    contentPadding: const EdgeInsets.all(12),
-                  ),
-                ),
-
-                const SizedBox(height: 14),
-                const Text('Nomor Telepon Darurat', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
-                const SizedBox(height: 6),
-                TextField(
-                  controller: daruratTelpCtrl,
-                  keyboardType: TextInputType.phone,
-                  decoration: InputDecoration(
-                    prefixIcon: const Icon(Icons.emergency_rounded, size: 20),
-                    filled: true,
-                    fillColor: const Color(0xFFF8FAFC),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                    contentPadding: const EdgeInsets.all(12),
-                  ),
-                ),
-
-                const SizedBox(height: 20),
-                SizedBox(
-                  width: double.infinity,
-                  height: 48,
-                  child: ElevatedButton(
-                    onPressed: () {
-                      setState(() {
-                        _hp = hpCtrl.text.trim();
-                        _email = emailCtrl.text.trim();
-                        _daruratNama = daruratNamaCtrl.text.trim();
-                        _darurat = '$daruratNamaCtrl.text (${daruratTelpCtrl.text})';
-                        _golDarah = currentGolDarah;
-                      });
-                      Navigator.pop(ctx);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Data profil pekerja tambang berhasil diperbarui dan disinkronkan ke server.'),
-                          backgroundColor: Color(0xFF10B981),
-                        ),
-                      );
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF0284C7),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                    ),
-                    child: const Text(
-                      'Simpan Perubahan Data',
-                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Colors.white),
-                    ),
-                  ),
-                ),
-              ],
+  Widget _buildInputField(String label, TextEditingController ctrl, IconData icon, {int maxLines = 1}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: Color(0xFF475569)),
+        ),
+        const SizedBox(height: 5),
+        TextField(
+          controller: ctrl,
+          maxLines: maxLines,
+          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
+          decoration: InputDecoration(
+            prefixIcon: Icon(icon, size: 18, color: const Color(0xFF6366F1)),
+            filled: true,
+            fillColor: const Color(0xFFF8FAFC),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
             ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFF6366F1), width: 1.5),
+            ),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           ),
         ),
-      ),
+      ],
     );
   }
 
-  // 3. Database Mitra Kerja Modal
-  void _showMitraDirectoryModal() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => DraggableScrollableSheet(
-        initialChildSize: 0.75,
-        maxChildSize: 0.92,
-        minChildSize: 0.45,
-        builder: (_, scrollCtrl) => Container(
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-          ),
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
-          child: ListView(
-            controller: scrollCtrl,
-            children: [
-              Center(
-                child: Container(
-                  width: 44,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade300,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              const Row(
-                children: [
-                  Icon(Icons.domain_rounded, color: Color(0xFF0D9488), size: 24),
-                  SizedBox(width: 8),
-                  Text(
-                    'Direktori Perusahaan Mitra Kerja',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 4),
-              const Text(
-                'Kontraktor dan subkontraktor resmi yang beroperasi di wilayah konsesi PT Indexim Coalindo.',
-                style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
-              ),
-              const SizedBox(height: 16),
-
-              ..._mitraList.map((m) {
-                return Container(
-                  margin: const EdgeInsets.only(bottom: 10),
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: const Color(0xFFE2E8F0)),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.02),
-                        blurRadius: 6,
-                      ),
-                    ],
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 46,
-                        height: 46,
-                        decoration: BoxDecoration(
-                          color: (m['color'] as Color).withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Center(
-                          child: Text(
-                            m['kode'] as String,
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w900,
-                              color: m['color'] as Color,
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              m['nama'] as String,
-                              style: const TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w800,
-                                color: Color(0xFF0F172A),
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              m['tipe'] as String,
-                              style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
-                            ),
-                            const SizedBox(height: 4),
-                            Row(
-                              children: [
-                                const Icon(Icons.place_rounded, size: 12, color: Color(0xFF94A3B8)),
-                                const SizedBox(width: 3),
-                                Text(
-                                  m['lokasi'] as String,
-                                  style: const TextStyle(fontSize: 10.5, color: Color(0xFF64748B)),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF1F5F9),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          '${m['headcount']} Org',
-                          style: const TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w800,
-                            color: Color(0xFF1E293B),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              }),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  // 4. Mine Permit Modal
-  void _showMinePermitModal() {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => Container(
-        padding: const EdgeInsets.fromLTRB(24, 20, 24, 30),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Container(
-                width: 44,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade300,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-            ),
-            const SizedBox(height: 18),
-            const Row(
-              children: [
-                Icon(Icons.qr_code_2_rounded, color: Color(0xFFD97706), size: 26),
-                SizedBox(width: 10),
-                Text(
-                  'Kartu Mine Permit Tambang',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: const Color(0xFFFFFBEB),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: const Color(0xFFFDE68A)),
-              ),
-              child: Column(
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text(
-                        'STATUS KEPATUHAN GATE PIT',
-                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Color(0xFFB45309)),
-                      ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF10B981),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: const Text(
-                          'AUTHORIZED',
-                          style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: Colors.white),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  const Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceAround,
-                    children: [
-                      Column(
-                        children: [
-                          Icon(Icons.fingerprint_rounded, size: 36, color: Color(0xFFD97706)),
-                          SizedBox(height: 4),
-                          Text('Biometrik Aktif', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700)),
-                        ],
-                      ),
-                      Column(
-                        children: [
-                          Icon(Icons.nfc_rounded, size: 36, color: Color(0xFF0284C7)),
-                          SizedBox(height: 4),
-                          Text('RFID Gate Valid', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700)),
-                        ],
-                      ),
-                      Column(
-                        children: [
-                          Icon(Icons.health_and_safety_rounded, size: 36, color: Color(0xFF059669)),
-                          SizedBox(height: 4),
-                          Text('Fit to Work OK', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700)),
-                        ],
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 18),
-            SizedBox(
-              width: double.infinity,
-              height: 46,
-              child: ElevatedButton(
-                onPressed: () => Navigator.pop(ctx),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFD97706),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                ),
-                child: const Text('Tutup', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Colors.white)),
-              ),
-            ),
-          ],
-        ),
+  void _showFilterToast(String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(msg),
+        duration: const Duration(milliseconds: 1400),
+        behavior: SnackBarBehavior.floating,
       ),
     );
   }
@@ -1498,7 +1686,7 @@ class _MenuItem {
   final String? badge;
   final VoidCallback onTap;
 
-  const _MenuItem({
+  _MenuItem({
     required this.title,
     required this.icon,
     required this.iconColor,
