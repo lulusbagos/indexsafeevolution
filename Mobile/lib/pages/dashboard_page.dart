@@ -5349,7 +5349,7 @@ class _DashboardPageState extends State<DashboardPage>
                       ),
                       const SizedBox(width: 12),
                       _HomeModuleCard(
-                        title: 'MINING\nOPS',
+                        title: 'X MINE',
                         imagePath: 'assets/images/home-mining-ops.png',
                         labelColor: const Color(0xFFD97706),
                         iconHeight: 70,
@@ -5364,7 +5364,7 @@ class _DashboardPageState extends State<DashboardPage>
                       ),
                       const SizedBox(width: 12),
                       _HomeModuleCard(
-                        title: 'EMPLOYEE\nHUB',
+                        title: 'ONE EV',
                         imagePath: 'assets/images/home-employee-hub.png',
                         labelColor: const Color(0xFF6366F1),
                         iconHeight: 70,
