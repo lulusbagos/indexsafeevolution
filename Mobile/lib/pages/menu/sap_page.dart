@@ -58,7 +58,7 @@ class SapPage extends StatelessWidget {
 
 class _Style { const _Style(this.title, this.desc, this.color, this.icon, this.path); final String title, desc, path; final Color color; final IconData icon; }
 const _styles = [
-  _Style('Inspection\n& Weekly', 'Lakukan inspeksi rutin lapangan.', Color(0xFF2378F5), Icons.find_in_page_rounded, 'assets/images/sap-inspection.png'),
+  _Style('Inspeksi', 'Lakukan inspeksi rutin lapangan.', Color(0xFF2378F5), Icons.find_in_page_rounded, 'assets/images/sap-inspection.png'),
   _Style('Hazard\nReport', 'Laporkan potensi bahaya di area kerja.', Color(0xFFFF9D00), Icons.warning_amber_rounded, 'assets/images/sap-hazard.png'),
   _Style('Observation', 'Catat perilaku aman dan tidak aman.', Color(0xFF00BCA8), Icons.fact_check_rounded, 'assets/images/sap-observation.png'),
   _Style('Safety Talk', 'Laksanakan dan dokumentasikan safety talk.', Color(0xFF8239ED), Icons.forum_rounded, 'assets/images/sap-talk.png'),

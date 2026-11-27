@@ -33,7 +33,7 @@ List<LinkNewsModel> listNews() {
 
 List<LinkMenuModel> listMenuSap = <LinkMenuModel>[
   LinkMenuModel(
-    title: 'Inspection\n& Weekly',
+    title: 'Inspeksi',
     icon: Icons.manage_search_sharp,
     image: 'assets/icons/sap-02.png',
     route: '/inspection',
