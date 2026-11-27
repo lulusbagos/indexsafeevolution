@@ -1,16 +1,16 @@
 using System;
 using System.Collections.Generic;
+using System.Data;
 using System.IO;
-using System.Linq;
-using System.Security.Claims;
+using System.Net.Http;
 using System.Threading.Tasks;
 using Indexsafe.Api.Data;
-using Indexsafe.Api.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 
 namespace Indexsafe.Api.Controllers
 {
@@ -20,89 +20,125 @@ namespace Indexsafe.Api.Controllers
     {
         private readonly AppDbContext _context;
         private readonly IWebHostEnvironment _env;
+        private readonly IConfiguration _config;
+        private static readonly HttpClient _httpClient = new HttpClient();
 
-        public DocumentManagementController(AppDbContext context, IWebHostEnvironment env)
+        private const string BaseStorageUrl = "https://oneev.indexim.id/uploads/document_management/company_1";
+        private const string LocalStorageRoot = @"C:\MinePermitFiles\ONEDBEV\uploads\document_management\company_1";
+
+        public DocumentManagementController(AppDbContext context, IWebHostEnvironment env, IConfiguration config)
         {
             _context = context;
             _env = env;
+            _config = config;
         }
 
-        private string GetCallerNik(string? fallback = null)
-        {
-            var header = Request?.Headers["X-User-Nik"].ToString();
-            if (!string.IsNullOrWhiteSpace(header)) return header.Trim();
-            if (!string.IsNullOrWhiteSpace(fallback)) return fallback.Trim();
-            return User?.FindFirst(ClaimTypes.NameIdentifier)?.Value
-                   ?? User?.FindFirst("nrp")?.Value
-                   ?? User?.FindFirst("nik")?.Value
-                   ?? string.Empty;
-        }
-
-        private string GetCallerName(string? fallback = null)
-        {
-            var header = Request?.Headers["X-User-Name"].ToString();
-            if (!string.IsNullOrWhiteSpace(header)) return header.Trim();
-            if (!string.IsNullOrWhiteSpace(fallback)) return fallback.Trim();
-            return User?.FindFirst(ClaimTypes.Name)?.Value
-                   ?? User?.FindFirst("nama")?.Value
-                   ?? User?.FindFirst("name")?.Value
-                   ?? string.Empty;
-        }
-
+        /// <summary>
+        /// Ringkasan statistik dokumen tambang dari ONE_DB_MITRA
+        /// </summary>
         [HttpGet("summary")]
         [AllowAnonymous]
         public async Task<IActionResult> GetSummary([FromQuery] string? department = null)
         {
             try
             {
-                var docQuery = _context.Documents.Where(d => !d.IsDeleted);
-                if (!string.IsNullOrWhiteSpace(department))
+                var conn = _context.Database.GetDbConnection();
+                bool wasClosed = conn.State != ConnectionState.Open;
+                if (wasClosed) await conn.OpenAsync();
+
+                try
                 {
-                    docQuery = docQuery.Where(d => d.Department == department || d.Department == "MANAGEMENT" || d.Department == "HSE & OHS");
-                }
+                    using var cmd = conn.CreateCommand();
+                    cmd.CommandText = @"
+                        SELECT 
+                            (SELECT COUNT(*) FROM [ONE_DB_MITRA].dbo.tbl_t_dokumen_file WHERE is_deleted = 0) AS total_files,
+                            (SELECT COUNT(*) FROM [ONE_DB_MITRA].dbo.tbl_m_dokumen_folder WHERE perusahaan_id = 1 AND is_deleted = 0) AS total_folders,
+                            (SELECT ISNULL(SUM(CAST(size_bytes AS BIGINT)), 0) FROM [ONE_DB_MITRA].dbo.tbl_t_dokumen_file WHERE is_deleted = 0) AS total_storage,
+                            (SELECT COUNT(*) FROM [ONE_DB_MITRA].dbo.tbl_t_dokumen_file WHERE is_deleted = 0 AND file_path LIKE '%04 SOP%') AS sop_count,
+                            (SELECT COUNT(*) FROM [ONE_DB_MITRA].dbo.tbl_t_dokumen_file WHERE is_deleted = 0 AND file_path LIKE '%06 JSA%') AS jsa_count,
+                            (SELECT COUNT(*) FROM [ONE_DB_MITRA].dbo.tbl_t_dokumen_file WHERE is_deleted = 0 AND file_path LIKE '%07 Form%') AS form_count,
+                            (SELECT COUNT(*) FROM [ONE_DB_MITRA].dbo.tbl_t_dokumen_file WHERE is_deleted = 0 AND file_path LIKE '%01 Kebijakan%') AS policy_count;
 
-                var totalDocs = await docQuery.CountAsync();
-                var totalFolders = await _context.DocumentFolders.CountAsync(f => !f.IsDeleted);
-                var pendingApprovals = await docQuery.CountAsync(d => d.ApprovalStatus == "Submitted" || d.ApprovalStatus == "UnderReview");
-                var activeSop = await docQuery.CountAsync(d => d.Category == "SOP" && d.ApprovalStatus == "Approved");
-                var totalStorage = await docQuery.SumAsync(d => (long?)d.FileSize) ?? 0;
+                        SELECT TOP 8 
+                            file_id, folder_id, nama_dokumen, nama_file_stored, file_path, content_type, size_bytes,
+                            is_read_only, is_bold, created_at, created_by
+                        FROM [ONE_DB_MITRA].dbo.tbl_t_dokumen_file
+                        WHERE is_deleted = 0
+                        ORDER BY file_id DESC;
+                    ";
 
-                var recentDocs = await docQuery
-                    .OrderByDescending(d => d.UpdatedAt)
-                    .Take(6)
-                    .Select(d => new
+                    long totalFiles = 0;
+                    long totalFolders = 0;
+                    long totalStorage = 0;
+                    int sopCount = 0;
+                    int jsaCount = 0;
+                    int formCount = 0;
+                    int policyCount = 0;
+
+                    using var reader = await cmd.ExecuteReaderAsync();
+                    if (await reader.ReadAsync())
                     {
-                        d.Id,
-                        d.FolderId,
-                        d.DocNumber,
-                        d.Title,
-                        d.Category,
-                        d.FileType,
-                        d.FileName,
-                        d.FileSize,
-                        d.Version,
-                        d.Department,
-                        d.UploaderName,
-                        d.ApprovalStatus,
-                        d.UpdatedAt
-                    })
-                    .ToListAsync();
-
-                return Ok(new
-                {
-                    status = 200,
-                    success = true,
-                    data = new
-                    {
-                        totalDocuments = totalDocs,
-                        totalFolders,
-                        pendingApprovals,
-                        activeSopCount = activeSop,
-                        totalStorageBytes = totalStorage,
-                        storageFormatted = FormatStorage(totalStorage),
-                        recentDocuments = recentDocs
+                        totalFiles = reader["total_files"] != DBNull.Value ? Convert.ToInt64(reader["total_files"]) : 0;
+                        totalFolders = reader["total_folders"] != DBNull.Value ? Convert.ToInt64(reader["total_folders"]) : 0;
+                        totalStorage = reader["total_storage"] != DBNull.Value ? Convert.ToInt64(reader["total_storage"]) : 0;
+                        sopCount = reader["sop_count"] != DBNull.Value ? Convert.ToInt32(reader["sop_count"]) : 0;
+                        jsaCount = reader["jsa_count"] != DBNull.Value ? Convert.ToInt32(reader["jsa_count"]) : 0;
+                        formCount = reader["form_count"] != DBNull.Value ? Convert.ToInt32(reader["form_count"]) : 0;
+                        policyCount = reader["policy_count"] != DBNull.Value ? Convert.ToInt32(reader["policy_count"]) : 0;
                     }
-                });
+
+                    var recentDocs = new List<object>();
+                    if (await reader.NextResultAsync())
+                    {
+                        while (await reader.ReadAsync())
+                        {
+                            var filePath = reader["file_path"]?.ToString() ?? "";
+                            var docName = reader["nama_dokumen"]?.ToString() ?? "";
+                            var size = reader["size_bytes"] != DBNull.Value ? Convert.ToInt64(reader["size_bytes"]) : 0;
+                            var ext = Path.GetExtension(docName).TrimStart('.').ToLower();
+                            if (string.IsNullOrEmpty(ext)) ext = Path.GetExtension(filePath).TrimStart('.').ToLower();
+                            if (string.IsNullOrEmpty(ext)) ext = "pdf";
+
+                            recentDocs.Add(new
+                            {
+                                id = Convert.ToInt32(reader["file_id"]),
+                                folderId = reader["folder_id"] != DBNull.Value ? Convert.ToInt32(reader["folder_id"]) : (int?)null,
+                                title = docName,
+                                fileName = reader["nama_file_stored"]?.ToString() ?? docName,
+                                filePath = filePath,
+                                fileUrl = BuildDownloadUrl(filePath),
+                                fileType = ext,
+                                fileSize = size,
+                                formattedSize = FormatStorage(size),
+                                isReadOnly = reader["is_read_only"] != DBNull.Value && Convert.ToBoolean(reader["is_read_only"]),
+                                createdAt = reader["created_at"] != DBNull.Value ? Convert.ToDateTime(reader["created_at"]).ToString("yyyy-MM-dd HH:mm") : null,
+                                createdBy = reader["created_by"]?.ToString() ?? "-"
+                            });
+                        }
+                    }
+
+                    return Ok(new
+                    {
+                        status = 200,
+                        success = true,
+                        data = new
+                        {
+                            totalDocuments = totalFiles,
+                            totalFolders = totalFolders,
+                            totalStorageBytes = totalStorage,
+                            storageFormatted = FormatStorage(totalStorage),
+                            activeSopCount = sopCount,
+                            jsaCount = jsaCount,
+                            formCount = formCount,
+                            policyCount = policyCount,
+                            recentDocuments = recentDocs
+                        }
+                    });
+                }
+                finally
+                {
+                    if (wasClosed) await conn.CloseAsync();
+                }
             }
             catch (Exception ex)
             {
@@ -110,57 +146,87 @@ namespace Indexsafe.Api.Controllers
             }
         }
 
+        /// <summary>
+        /// Mengambil daftar folder (hierarkis berjenjang) dari ONE_DB_MITRA.
+        /// Jika parentId null/0, default menampilkan folder utama PT Indexim Coalindo (folder_id = 9).
+        /// </summary>
         [HttpGet("folders")]
         [AllowAnonymous]
-        public async Task<IActionResult> GetFolders(
-            [FromQuery] int? parentId = null,
-            [FromQuery] string? category = null,
-            [FromQuery] string? department = null)
+        public async Task<IActionResult> GetFolders([FromQuery] int? parentId = null)
         {
             try
             {
-                var query = _context.DocumentFolders.Where(f => !f.IsDeleted);
+                var conn = _context.Database.GetDbConnection();
+                bool wasClosed = conn.State != ConnectionState.Open;
+                if (wasClosed) await conn.OpenAsync();
 
-                if (parentId.HasValue)
+                try
                 {
-                    query = query.Where(f => f.ParentId == parentId.Value);
+                    // Menentukan target parent_id
+                    // Folder ID 9 = "PT Indexim Coalindo" (induk seluruh kategori dokumen site)
+                    int targetParent = parentId.HasValue && parentId.Value > 0 ? parentId.Value : 9;
+
+                    using var cmd = conn.CreateCommand();
+                    cmd.CommandText = @"
+                        SELECT 
+                            f.folder_id,
+                            f.parent_folder_id,
+                            f.nama_folder,
+                            f.path_key,
+                            f.folder_color,
+                            f.is_bold,
+                            f.created_at,
+                            f.created_by,
+                            (SELECT COUNT(*) FROM [ONE_DB_MITRA].dbo.tbl_m_dokumen_folder c WHERE c.parent_folder_id = f.folder_id AND c.is_deleted = 0) AS subfolder_count,
+                            (SELECT COUNT(*) FROM [ONE_DB_MITRA].dbo.tbl_t_dokumen_file fl WHERE fl.folder_id = f.folder_id AND fl.is_deleted = 0) AS file_count
+                        FROM [ONE_DB_MITRA].dbo.tbl_m_dokumen_folder f
+                        WHERE f.perusahaan_id = 1 
+                          AND f.is_deleted = 0 
+                          AND f.parent_folder_id = @parentId
+                        ORDER BY f.nama_folder ASC;
+                    ";
+
+                    var p = cmd.CreateParameter();
+                    p.ParameterName = "@parentId";
+                    p.Value = targetParent;
+                    cmd.Parameters.Add(p);
+
+                    var folders = new List<object>();
+                    using var reader = await cmd.ExecuteReaderAsync();
+                    while (await reader.ReadAsync())
+                    {
+                        var folderId = Convert.ToInt32(reader["folder_id"]);
+                        var color = reader["folder_color"]?.ToString();
+                        if (string.IsNullOrWhiteSpace(color)) color = "#0284C7";
+
+                        folders.Add(new
+                        {
+                            id = folderId,
+                            parentId = reader["parent_folder_id"] != DBNull.Value ? Convert.ToInt32(reader["parent_folder_id"]) : (int?)null,
+                            name = reader["nama_folder"]?.ToString() ?? "Folder",
+                            path = reader["path_key"]?.ToString() ?? "",
+                            color = color,
+                            isBold = reader["is_bold"] != DBNull.Value && Convert.ToBoolean(reader["is_bold"]),
+                            subfolderCount = Convert.ToInt32(reader["subfolder_count"]),
+                            fileCount = Convert.ToInt32(reader["file_count"]),
+                            filesCount = Convert.ToInt32(reader["file_count"]),
+                            createdAt = reader["created_at"] != DBNull.Value ? Convert.ToDateTime(reader["created_at"]).ToString("yyyy-MM-dd") : null,
+                            createdBy = reader["created_by"]?.ToString() ?? "-"
+                        });
+                    }
+
+                    return Ok(new
+                    {
+                        status = 200,
+                        success = true,
+                        parentFolderId = targetParent,
+                        data = folders
+                    });
                 }
-                else
+                finally
                 {
-                    query = query.Where(f => f.ParentId == null);
+                    if (wasClosed) await conn.CloseAsync();
                 }
-
-                if (!string.IsNullOrWhiteSpace(category) && !category.Equals("all", StringComparison.OrdinalIgnoreCase))
-                {
-                    query = query.Where(f => f.Category == category);
-                }
-
-                var folders = await query.OrderBy(f => f.Name).ToListAsync();
-
-                // Compute file counts per folder
-                var folderIds = folders.Select(f => f.Id).ToList();
-                var counts = await _context.Documents
-                    .Where(d => !d.IsDeleted && d.FolderId.HasValue && folderIds.Contains(d.FolderId.Value))
-                    .GroupBy(d => d.FolderId!.Value)
-                    .Select(g => new { FolderId = g.Key, Count = g.Count() })
-                    .ToDictionaryAsync(x => x.FolderId, x => x.Count);
-
-                var result = folders.Select(f => new
-                {
-                    f.Id,
-                    f.ParentId,
-                    f.Name,
-                    f.Category,
-                    f.Department,
-                    f.Company,
-                    f.Color,
-                    f.Icon,
-                    f.CreatedByName,
-                    f.CreatedAt,
-                    FilesCount = counts.TryGetValue(f.Id, out var c) ? c : 0
-                });
-
-                return Ok(new { status = 200, success = true, data = result });
             }
             catch (Exception ex)
             {
@@ -168,103 +234,115 @@ namespace Indexsafe.Api.Controllers
             }
         }
 
-        [HttpPost("folders")]
-        [AllowAnonymous]
-        public async Task<IActionResult> CreateFolder([FromBody] CreateFolderRequest req)
-        {
-            try
-            {
-                if (string.IsNullOrWhiteSpace(req.Name))
-                {
-                    return BadRequest(new { status = 400, success = false, message = "Nama folder wajib diisi" });
-                }
-
-                var folder = new DocumentFolder
-                {
-                    ParentId = req.ParentId,
-                    Name = req.Name.Trim(),
-                    Category = string.IsNullOrWhiteSpace(req.Category) ? "Drive" : req.Category.Trim(),
-                    Department = req.Department?.Trim(),
-                    Company = req.Company?.Trim(),
-                    Color = string.IsNullOrWhiteSpace(req.Color) ? "#3B82F6" : req.Color.Trim(),
-                    Icon = string.IsNullOrWhiteSpace(req.Icon) ? "folder" : req.Icon.Trim(),
-                    CreatedByNik = GetCallerNik(req.Nik),
-                    CreatedByName = GetCallerName(req.Nama),
-                    CreatedAt = DateTime.Now
-                };
-
-                _context.DocumentFolders.Add(folder);
-                await _context.SaveChangesAsync();
-
-                return Ok(new { status = 200, success = true, message = "Folder berhasil dibuat", data = folder });
-            }
-            catch (Exception ex)
-            {
-                return StatusCode(500, new { status = 500, success = false, message = ex.Message });
-            }
-        }
-
+        /// <summary>
+        /// Mengambil daftar file dokumen dalam satu folder secara on-demand.
+        /// </summary>
         [HttpGet("files")]
         [AllowAnonymous]
         public async Task<IActionResult> GetFiles(
-            [FromQuery] int? folderId = null,
-            [FromQuery] string? category = null,
-            [FromQuery] string? search = null,
-            [FromQuery] string? approvalStatus = null,
-            [FromQuery] string? department = null,
+            [FromQuery] int folderId,
             [FromQuery] int page = 1,
-            [FromQuery] int pageSize = 50)
+            [FromQuery] int pageSize = 100)
         {
             try
             {
-                var query = _context.Documents.Where(d => !d.IsDeleted);
-
-                if (folderId.HasValue && folderId.Value > 0)
+                if (folderId <= 0)
                 {
-                    query = query.Where(d => d.FolderId == folderId.Value);
+                    return BadRequest(new { status = 400, success = false, message = "folderId wajib diisi" });
                 }
 
-                if (!string.IsNullOrWhiteSpace(category) && !category.Equals("all", StringComparison.OrdinalIgnoreCase))
+                var conn = _context.Database.GetDbConnection();
+                bool wasClosed = conn.State != ConnectionState.Open;
+                if (wasClosed) await conn.OpenAsync();
+
+                try
                 {
-                    query = query.Where(d => d.Category == category);
+                    using var cmd = conn.CreateCommand();
+                    cmd.CommandText = @"
+                        SELECT COUNT(*) 
+                        FROM [ONE_DB_MITRA].dbo.tbl_t_dokumen_file 
+                        WHERE folder_id = @folderId AND is_deleted = 0;
+
+                        SELECT 
+                            file_id, folder_id, nama_dokumen, nama_file_stored, file_path, content_type, size_bytes,
+                            is_read_only, is_bold, expired_at, created_at, created_by
+                        FROM [ONE_DB_MITRA].dbo.tbl_t_dokumen_file
+                        WHERE folder_id = @folderId AND is_deleted = 0
+                        ORDER BY nama_dokumen ASC
+                        OFFSET @offset ROWS FETCH NEXT @pageSize ROWS ONLY;
+                    ";
+
+                    var pFolder = cmd.CreateParameter();
+                    pFolder.ParameterName = "@folderId";
+                    pFolder.Value = folderId;
+                    cmd.Parameters.Add(pFolder);
+
+                    int offset = Math.Max(0, (page - 1) * pageSize);
+                    var pOffset = cmd.CreateParameter();
+                    pOffset.ParameterName = "@offset";
+                    pOffset.Value = offset;
+                    cmd.Parameters.Add(pOffset);
+
+                    var pSize = cmd.CreateParameter();
+                    pSize.ParameterName = "@pageSize";
+                    pSize.Value = pageSize;
+                    cmd.Parameters.Add(pSize);
+
+                    int total = 0;
+                    var files = new List<object>();
+
+                    using var reader = await cmd.ExecuteReaderAsync();
+                    if (await reader.ReadAsync())
+                    {
+                        total = Convert.ToInt32(reader[0]);
+                    }
+
+                    if (await reader.NextResultAsync())
+                    {
+                        while (await reader.ReadAsync())
+                        {
+                            var filePath = reader["file_path"]?.ToString() ?? "";
+                            var docName = reader["nama_dokumen"]?.ToString() ?? "";
+                            var size = reader["size_bytes"] != DBNull.Value ? Convert.ToInt64(reader["size_bytes"]) : 0;
+                            var ext = Path.GetExtension(docName).TrimStart('.').ToLower();
+                            if (string.IsNullOrEmpty(ext)) ext = Path.GetExtension(filePath).TrimStart('.').ToLower();
+                            if (string.IsNullOrEmpty(ext)) ext = "pdf";
+
+                            files.Add(new
+                            {
+                                id = Convert.ToInt32(reader["file_id"]),
+                                folderId = Convert.ToInt32(reader["folder_id"]),
+                                title = docName,
+                                fileName = reader["nama_file_stored"]?.ToString() ?? docName,
+                                filePath = filePath,
+                                fileUrl = BuildDownloadUrl(filePath),
+                                fileType = ext,
+                                fileSize = size,
+                                formattedSize = FormatStorage(size),
+                                isReadOnly = reader["is_read_only"] != DBNull.Value && Convert.ToBoolean(reader["is_read_only"]),
+                                isBold = reader["is_bold"] != DBNull.Value && Convert.ToBoolean(reader["is_bold"]),
+                                expiredAt = reader["expired_at"] != DBNull.Value ? Convert.ToDateTime(reader["expired_at"]).ToString("yyyy-MM-dd") : null,
+                                createdAt = reader["created_at"] != DBNull.Value ? Convert.ToDateTime(reader["created_at"]).ToString("yyyy-MM-dd HH:mm") : null,
+                                createdBy = reader["created_by"]?.ToString() ?? "-"
+                            });
+                        }
+                    }
+
+                    return Ok(new
+                    {
+                        status = 200,
+                        success = true,
+                        folderId = folderId,
+                        total = total,
+                        page = page,
+                        pageSize = pageSize,
+                        data = files
+                    });
                 }
-
-                if (!string.IsNullOrWhiteSpace(approvalStatus) && !approvalStatus.Equals("all", StringComparison.OrdinalIgnoreCase))
+                finally
                 {
-                    query = query.Where(d => d.ApprovalStatus == approvalStatus);
+                    if (wasClosed) await conn.CloseAsync();
                 }
-
-                if (!string.IsNullOrWhiteSpace(department))
-                {
-                    query = query.Where(d => d.Department == department || d.Department == "MANAGEMENT" || d.Department == "HSE & OHS");
-                }
-
-                if (!string.IsNullOrWhiteSpace(search))
-                {
-                    var term = search.Trim().ToLower();
-                    query = query.Where(d =>
-                        d.Title.ToLower().Contains(term) ||
-                        (d.DocNumber != null && d.DocNumber.ToLower().Contains(term)) ||
-                        (d.FileName != null && d.FileName.ToLower().Contains(term)) ||
-                        (d.Description != null && d.Description.ToLower().Contains(term)));
-                }
-
-                var totalCount = await query.CountAsync();
-                var files = await query
-                    .OrderByDescending(d => d.UpdatedAt)
-                    .Skip((page - 1) * pageSize)
-                    .Take(pageSize)
-                    .ToListAsync();
-
-                return Ok(new
-                {
-                    status = 200,
-                    success = true,
-                    data = files,
-                    total = totalCount,
-                    page,
-                    pageSize
-                });
             }
             catch (Exception ex)
             {
@@ -272,19 +350,92 @@ namespace Indexsafe.Api.Controllers
             }
         }
 
-        [HttpGet("files/{id}")]
+        /// <summary>
+        /// Pencarian cepat (instant search) pada seluruh koleksi 4.100+ dokumen ONE_DB_MITRA.
+        /// </summary>
+        [HttpGet("search")]
         [AllowAnonymous]
-        public async Task<IActionResult> GetFileById(int id)
+        public async Task<IActionResult> SearchDocuments([FromQuery] string q, [FromQuery] int limit = 40)
         {
             try
             {
-                var doc = await _context.Documents.FirstOrDefaultAsync(d => d.Id == id && !d.IsDeleted);
-                if (doc == null)
+                if (string.IsNullOrWhiteSpace(q) || q.Trim().Length < 2)
                 {
-                    return NotFound(new { status = 404, success = false, message = "Dokumen tidak ditemukan" });
+                    return Ok(new { status = 200, success = true, data = new List<object>() });
                 }
 
-                return Ok(new { status = 200, success = true, data = doc });
+                var conn = _context.Database.GetDbConnection();
+                bool wasClosed = conn.State != ConnectionState.Open;
+                if (wasClosed) await conn.OpenAsync();
+
+                try
+                {
+                    using var cmd = conn.CreateCommand();
+                    cmd.CommandText = @"
+                        SELECT TOP (@limit) 
+                            f.file_id, f.folder_id, f.nama_dokumen, f.nama_file_stored, f.file_path, 
+                            f.content_type, f.size_bytes, f.is_read_only, f.is_bold, f.created_at, f.created_by,
+                            fo.nama_folder, fo.path_key
+                        FROM [ONE_DB_MITRA].dbo.tbl_t_dokumen_file f
+                        LEFT JOIN [ONE_DB_MITRA].dbo.tbl_m_dokumen_folder fo ON f.folder_id = fo.folder_id
+                        WHERE f.is_deleted = 0 
+                          AND (f.nama_dokumen LIKE @term OR f.file_path LIKE @term)
+                        ORDER BY f.file_id DESC;
+                    ";
+
+                    var pTerm = cmd.CreateParameter();
+                    pTerm.ParameterName = "@term";
+                    pTerm.Value = $"%{q.Trim()}%";
+                    cmd.Parameters.Add(pTerm);
+
+                    var pLimit = cmd.CreateParameter();
+                    pLimit.ParameterName = "@limit";
+                    pLimit.Value = Math.Clamp(limit, 1, 100);
+                    cmd.Parameters.Add(pLimit);
+
+                    var results = new List<object>();
+                    using var reader = await cmd.ExecuteReaderAsync();
+                    while (await reader.ReadAsync())
+                    {
+                        var filePath = reader["file_path"]?.ToString() ?? "";
+                        var docName = reader["nama_dokumen"]?.ToString() ?? "";
+                        var size = reader["size_bytes"] != DBNull.Value ? Convert.ToInt64(reader["size_bytes"]) : 0;
+                        var ext = Path.GetExtension(docName).TrimStart('.').ToLower();
+                        if (string.IsNullOrEmpty(ext)) ext = Path.GetExtension(filePath).TrimStart('.').ToLower();
+                        if (string.IsNullOrEmpty(ext)) ext = "pdf";
+
+                        results.Add(new
+                        {
+                            id = Convert.ToInt32(reader["file_id"]),
+                            folderId = reader["folder_id"] != DBNull.Value ? Convert.ToInt32(reader["folder_id"]) : (int?)null,
+                            folderName = reader["nama_folder"]?.ToString() ?? "",
+                            folderPath = reader["path_key"]?.ToString() ?? "",
+                            title = docName,
+                            fileName = reader["nama_file_stored"]?.ToString() ?? docName,
+                            filePath = filePath,
+                            fileUrl = BuildDownloadUrl(filePath),
+                            fileType = ext,
+                            fileSize = size,
+                            formattedSize = FormatStorage(size),
+                            isReadOnly = reader["is_read_only"] != DBNull.Value && Convert.ToBoolean(reader["is_read_only"]),
+                            createdAt = reader["created_at"] != DBNull.Value ? Convert.ToDateTime(reader["created_at"]).ToString("yyyy-MM-dd HH:mm") : null,
+                            createdBy = reader["created_by"]?.ToString() ?? "-"
+                        });
+                    }
+
+                    return Ok(new
+                    {
+                        status = 200,
+                        success = true,
+                        query = q.Trim(),
+                        count = results.Count,
+                        data = results
+                    });
+                }
+                finally
+                {
+                    if (wasClosed) await conn.CloseAsync();
+                }
             }
             catch (Exception ex)
             {
@@ -292,50 +443,74 @@ namespace Indexsafe.Api.Controllers
             }
         }
 
-        [HttpPost("submit-pengajuan")]
+        /// <summary>
+        /// Mengambil breadcrumb hierarki folder (jalur dari root hingga folder ini).
+        /// </summary>
+        [HttpGet("breadcrumbs")]
         [AllowAnonymous]
-        public async Task<IActionResult> SubmitPengajuan([FromBody] SubmitPengajuanRequest req)
+        public async Task<IActionResult> GetBreadcrumbs([FromQuery] int folderId)
         {
             try
             {
-                if (string.IsNullOrWhiteSpace(req.Title))
+                if (folderId <= 0)
                 {
-                    return BadRequest(new { status = 400, success = false, message = "Judul pengajuan dokumen wajib diisi" });
+                    return Ok(new { status = 200, success = true, data = new List<object>() });
                 }
 
-                var doc = new DocumentItem
-                {
-                    FolderId = req.FolderId,
-                    DocNumber = string.IsNullOrWhiteSpace(req.DocNumber)
-                        ? $"DOC-REQ-{DateTime.Now:yyyyMMdd}-{new Random().Next(100, 999)}"
-                        : req.DocNumber.Trim(),
-                    Title = req.Title.Trim(),
-                    Description = req.Description?.Trim(),
-                    Category = string.IsNullOrWhiteSpace(req.Category) ? "Pengajuan" : req.Category.Trim(),
-                    FileType = string.IsNullOrWhiteSpace(req.FileType) ? "pdf" : req.FileType.Trim(),
-                    FileName = req.FileName?.Trim() ?? $"{req.Title.Trim()}.pdf",
-                    FileSize = req.FileSize > 0 ? req.FileSize : 1024000,
-                    FileUrl = req.FileUrl?.Trim(),
-                    Version = string.IsNullOrWhiteSpace(req.Version) ? "v1.0" : req.Version.Trim(),
-                    Department = req.Department?.Trim(),
-                    Company = req.Company?.Trim(),
-                    UploaderNik = GetCallerNik(req.UploaderNik),
-                    UploaderName = GetCallerName(req.UploaderName),
-                    ApprovalStatus = "Submitted",
-                    CreatedAt = DateTime.Now,
-                    UpdatedAt = DateTime.Now
-                };
+                var conn = _context.Database.GetDbConnection();
+                bool wasClosed = conn.State != ConnectionState.Open;
+                if (wasClosed) await conn.OpenAsync();
 
-                _context.Documents.Add(doc);
-                await _context.SaveChangesAsync();
-
-                return Ok(new
+                try
                 {
-                    status = 200,
-                    success = true,
-                    message = "Dokumen pengajuan berhasil diajukan dan sedang menunggu verifikasi/persetujuan",
-                    data = doc
-                });
+                    using var cmd = conn.CreateCommand();
+                    cmd.CommandText = @"
+                        WITH FolderHierarchy AS (
+                            SELECT folder_id, parent_folder_id, nama_folder, path_key, 0 AS level
+                            FROM [ONE_DB_MITRA].dbo.tbl_m_dokumen_folder
+                            WHERE folder_id = @folderId AND is_deleted = 0
+                            
+                            UNION ALL
+                            
+                            SELECT p.folder_id, p.parent_folder_id, p.nama_folder, p.path_key, fh.level + 1
+                            FROM [ONE_DB_MITRA].dbo.tbl_m_dokumen_folder p
+                            INNER JOIN FolderHierarchy fh ON fh.parent_folder_id = p.folder_id
+                            WHERE p.is_deleted = 0
+                        )
+                        SELECT folder_id, parent_folder_id, nama_folder, path_key
+                        FROM FolderHierarchy
+                        ORDER BY level DESC;
+                    ";
+
+                    var p = cmd.CreateParameter();
+                    p.ParameterName = "@folderId";
+                    p.Value = folderId;
+                    cmd.Parameters.Add(p);
+
+                    var breadcrumbs = new List<object>();
+                    using var reader = await cmd.ExecuteReaderAsync();
+                    while (await reader.ReadAsync())
+                    {
+                        breadcrumbs.Add(new
+                        {
+                            id = Convert.ToInt32(reader["folder_id"]),
+                            parentId = reader["parent_folder_id"] != DBNull.Value ? Convert.ToInt32(reader["parent_folder_id"]) : (int?)null,
+                            name = reader["nama_folder"]?.ToString() ?? "",
+                            path = reader["path_key"]?.ToString() ?? ""
+                        });
+                    }
+
+                    return Ok(new
+                    {
+                        status = 200,
+                        success = true,
+                        data = breadcrumbs
+                    });
+                }
+                finally
+                {
+                    if (wasClosed) await conn.CloseAsync();
+                }
             }
             catch (Exception ex)
             {
@@ -343,34 +518,88 @@ namespace Indexsafe.Api.Controllers
             }
         }
 
-        [HttpPost("approve")]
+        /// <summary>
+        /// Download / streaming file dokumen on-demand.
+        /// </summary>
+        [HttpGet("download/{fileId}")]
         [AllowAnonymous]
-        public async Task<IActionResult> ApproveDocument([FromBody] ApprovalActionRequest req)
+        public async Task<IActionResult> DownloadFile(int fileId)
         {
             try
             {
-                var doc = await _context.Documents.FirstOrDefaultAsync(d => d.Id == req.DocumentId && !d.IsDeleted);
-                if (doc == null)
+                var conn = _context.Database.GetDbConnection();
+                bool wasClosed = conn.State != ConnectionState.Open;
+                if (wasClosed) await conn.OpenAsync();
+
+                string filePath = "";
+                string docName = "";
+                string contentType = "application/pdf";
+
+                try
                 {
-                    return NotFound(new { status = 404, success = false, message = "Dokumen tidak ditemukan" });
+                    using var cmd = conn.CreateCommand();
+                    cmd.CommandText = @"
+                        SELECT file_id, nama_dokumen, file_path, content_type 
+                        FROM [ONE_DB_MITRA].dbo.tbl_t_dokumen_file 
+                        WHERE file_id = @id AND is_deleted = 0;
+                    ";
+                    var p = cmd.CreateParameter();
+                    p.ParameterName = "@id";
+                    p.Value = fileId;
+                    cmd.Parameters.Add(p);
+
+                    using var reader = await cmd.ExecuteReaderAsync();
+                    if (await reader.ReadAsync())
+                    {
+                        docName = reader["nama_dokumen"]?.ToString() ?? "dokumen.pdf";
+                        filePath = reader["file_path"]?.ToString() ?? "";
+                        contentType = reader["content_type"]?.ToString() ?? "application/pdf";
+                    }
+                    else
+                    {
+                        return NotFound(new { status = 404, success = false, message = "File tidak ditemukan" });
+                    }
+                }
+                finally
+                {
+                    if (wasClosed) await conn.CloseAsync();
                 }
 
-                doc.ApprovalStatus = "Approved";
-                doc.ApproverNik = GetCallerNik(req.ApproverNik);
-                doc.ApproverName = GetCallerName(req.ApproverName);
-                doc.ApprovalNotes = req.Notes?.Trim();
-                doc.ApprovedAt = DateTime.Now;
-                doc.UpdatedAt = DateTime.Now;
-
-                await _context.SaveChangesAsync();
-
-                return Ok(new
+                // 1. Cek apakah file ada di storage disk lokal
+                var localPath = Path.Combine(LocalStorageRoot, filePath.Replace('/', Path.DirectorySeparatorChar));
+                if (System.IO.File.Exists(localPath))
                 {
-                    status = 200,
-                    success = true,
-                    message = $"Dokumen '{doc.Title}' berhasil disetujui",
-                    data = doc
-                });
+                    return PhysicalFile(localPath, contentType, docName);
+                }
+
+                // 2. Jika tidak ada di lokal, streaming dari remoteUrl dan simpan ke disk lokal untuk caching
+                var remoteUrl = BuildDownloadUrl(filePath);
+                try
+                {
+                    var response = await _httpClient.GetAsync(remoteUrl, HttpCompletionOption.ResponseHeadersRead);
+                    if (response.IsSuccessStatusCode)
+                    {
+                        var dir = Path.GetDirectoryName(localPath);
+                        if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
+
+                        await using (var fileStream = new FileStream(localPath, FileMode.Create, FileAccess.Write, FileShare.None))
+                        {
+                            await response.Content.CopyToAsync(fileStream);
+                        }
+
+                        if (System.IO.File.Exists(localPath))
+                        {
+                            return PhysicalFile(localPath, contentType, docName);
+                        }
+                    }
+                }
+                catch (Exception downloadEx)
+                {
+                    // Fallback redirect jika download gagal
+                    return Redirect(remoteUrl);
+                }
+
+                return Redirect(remoteUrl);
             }
             catch (Exception ex)
             {
@@ -378,63 +607,17 @@ namespace Indexsafe.Api.Controllers
             }
         }
 
-        [HttpPost("reject")]
-        [AllowAnonymous]
-        public async Task<IActionResult> RejectDocument([FromBody] ApprovalActionRequest req)
+        private static string BuildDownloadUrl(string filePath)
         {
-            try
+            if (string.IsNullOrWhiteSpace(filePath)) return "";
+            var normalized = filePath.Trim().Replace('\\', '/');
+            var segments = normalized.Split('/', StringSplitOptions.RemoveEmptyEntries);
+            var encodedSegments = new List<string>();
+            foreach (var seg in segments)
             {
-                var doc = await _context.Documents.FirstOrDefaultAsync(d => d.Id == req.DocumentId && !d.IsDeleted);
-                if (doc == null)
-                {
-                    return NotFound(new { status = 404, success = false, message = "Dokumen tidak ditemukan" });
-                }
-
-                doc.ApprovalStatus = "Rejected";
-                doc.ApproverNik = GetCallerNik(req.ApproverNik);
-                doc.ApproverName = GetCallerName(req.ApproverName);
-                doc.ApprovalNotes = req.Notes?.Trim() ?? "Ditolak / Perlu Revisi";
-                doc.ApprovedAt = DateTime.Now;
-                doc.UpdatedAt = DateTime.Now;
-
-                await _context.SaveChangesAsync();
-
-                return Ok(new
-                {
-                    status = 200,
-                    success = true,
-                    message = $"Dokumen '{doc.Title}' telah ditolak dengan catatan",
-                    data = doc
-                });
+                encodedSegments.Add(Uri.EscapeDataString(seg));
             }
-            catch (Exception ex)
-            {
-                return StatusCode(500, new { status = 500, success = false, message = ex.Message });
-            }
-        }
-
-        [HttpDelete("files/{id}")]
-        [AllowAnonymous]
-        public async Task<IActionResult> DeleteFile(int id)
-        {
-            try
-            {
-                var doc = await _context.Documents.FirstOrDefaultAsync(d => d.Id == id && !d.IsDeleted);
-                if (doc == null)
-                {
-                    return NotFound(new { status = 404, success = false, message = "Dokumen tidak ditemukan" });
-                }
-
-                doc.IsDeleted = true;
-                doc.UpdatedAt = DateTime.Now;
-                await _context.SaveChangesAsync();
-
-                return Ok(new { status = 200, success = true, message = "Dokumen berhasil dihapus" });
-            }
-            catch (Exception ex)
-            {
-                return StatusCode(500, new { status = 500, success = false, message = ex.Message });
-            }
+            return $"{BaseStorageUrl}/{string.Join("/", encodedSegments)}";
         }
 
         private static string FormatStorage(long bytes)
@@ -444,44 +627,5 @@ namespace Indexsafe.Api.Controllers
             if (bytes < 1024L * 1024 * 1024) return $"{bytes / (1024.0 * 1024):F1} MB";
             return $"{bytes / (1024.0 * 1024 * 1024):F2} GB";
         }
-    }
-
-    public class CreateFolderRequest
-    {
-        public int? ParentId { get; set; }
-        public string Name { get; set; } = string.Empty;
-        public string? Category { get; set; }
-        public string? Department { get; set; }
-        public string? Company { get; set; }
-        public string? Color { get; set; }
-        public string? Icon { get; set; }
-        public string? Nik { get; set; }
-        public string? Nama { get; set; }
-    }
-
-    public class SubmitPengajuanRequest
-    {
-        public int? FolderId { get; set; }
-        public string? DocNumber { get; set; }
-        public string Title { get; set; } = string.Empty;
-        public string? Description { get; set; }
-        public string? Category { get; set; }
-        public string? FileType { get; set; }
-        public string? FileName { get; set; }
-        public long FileSize { get; set; }
-        public string? FileUrl { get; set; }
-        public string? Version { get; set; }
-        public string? Department { get; set; }
-        public string? Company { get; set; }
-        public string? UploaderNik { get; set; }
-        public string? UploaderName { get; set; }
-    }
-
-    public class ApprovalActionRequest
-    {
-        public int DocumentId { get; set; }
-        public string? Notes { get; set; }
-        public string? ApproverNik { get; set; }
-        public string? ApproverName { get; set; }
     }
 }
