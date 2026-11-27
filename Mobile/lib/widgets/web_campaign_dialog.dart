@@ -8,6 +8,8 @@ import '../services/api.dart';
 
 class WebCampaignDialog extends StatefulWidget {
   static bool _isShowing = false;
+  static bool get isShowing => _isShowing;
+
   final int campaignId;
   final String title;
   final String url;
@@ -29,14 +31,15 @@ class WebCampaignDialog extends StatefulWidget {
 
   /// Helper static untuk mengecek ke server apakah ada kampanye aktif yang ditargetkan untuk NIK ini,
   /// serta memvalidasi aturan frekuensi tampilan (misal: 1x sehari).
-  static Future<void> checkAndShow(
+  static Future<bool> checkAndShow(
     BuildContext context, {
     required String nik,
     required String nama,
     required String depart,
   }) async {
-    if (nik.isEmpty || _isShowing) return;
+    if (nik.isEmpty || _isShowing) return false;
 
+    bool wasShown = false;
     try {
       final api = ApiService();
       final res = await api.getActiveWebCampaign(nik);
@@ -75,6 +78,7 @@ class WebCampaignDialog extends StatefulWidget {
         if (targetUrl.isEmpty) return;
 
         _isShowing = true;
+        wasShown = true;
         try {
           await showDialog(
             context: context,
@@ -101,7 +105,10 @@ class WebCampaignDialog extends StatefulWidget {
           _isShowing = false;
         }
       });
-    } catch (_) {}
+      return wasShown;
+    } catch (_) {
+      return false;
+    }
   }
 
   @override

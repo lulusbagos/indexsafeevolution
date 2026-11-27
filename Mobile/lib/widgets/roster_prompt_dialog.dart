@@ -5,11 +5,19 @@ import '../pages/reinduction_form_page.dart';
 import '../services/api.dart';
 import '../services/preference.dart';
 
+enum ReinductionPromptResult {
+  none,
+  dismissed,
+  formOpened,
+}
+
 class ReinductionPromptDialog extends StatelessWidget {
   const ReinductionPromptDialog({super.key});
 
   static bool _isChecking = false;
   static bool _isShowing = false;
+
+  static bool get isShowing => _isShowing;
 
   static String _getMonthName(int month) {
     const months = [
@@ -23,8 +31,8 @@ class ReinductionPromptDialog extends StatelessWidget {
   /// Memeriksa status re-induksi bulanan karyawan saat aplikasi dibuka di awal bulan.
   /// Jika sudah mengisi di bulan berjalan, pop up tidak akan muncul lagi di bulan tersebut.
   /// Jika belum mengisi, pop up akan muncul mengingatkan pengisian.
-  static Future<void> checkAndPrompt(BuildContext context) async {
-    if (_isChecking || _isShowing) return;
+  static Future<ReinductionPromptResult> checkAndPrompt(BuildContext context) async {
+    if (_isChecking || _isShowing) return ReinductionPromptResult.none;
     _isChecking = true;
 
     try {
@@ -35,7 +43,7 @@ class ReinductionPromptDialog extends StatelessWidget {
       // 1. Cek cache lokal: jika sudah tercatat selesai bulan ini, lewati
       if (prefs.getBool(monthKey) == true) {
         _isChecking = false;
-        return;
+        return ReinductionPromptResult.none;
       }
 
       // 2. Cek status ke server
@@ -44,8 +52,10 @@ class ReinductionPromptDialog extends StatelessWidget {
 
       if (!context.mounted) {
         _isChecking = false;
-        return;
+        return ReinductionPromptResult.none;
       }
+
+      ReinductionPromptResult promptResult = ReinductionPromptResult.none;
 
       await res.fold(
         (err) async {
@@ -64,7 +74,7 @@ class ReinductionPromptDialog extends StatelessWidget {
           // Belum mengisi di bulan ini -> Munculkan pop up Re-Induksi
           if (context.mounted) {
             _isShowing = true;
-            await showGeneralDialog(
+            final result = await showGeneralDialog<String>(
               context: context,
               barrierDismissible: true,
               barrierLabel: 'Tutup',
@@ -86,18 +96,26 @@ class ReinductionPromptDialog extends StatelessWidget {
               },
             );
             _isShowing = false;
+            if (result == 'form') {
+              promptResult = ReinductionPromptResult.formOpened;
+            } else {
+              promptResult = ReinductionPromptResult.dismissed;
+            }
           }
         },
       );
+      return promptResult;
     } catch (e) {
       debugPrint('[ReinductionPromptDialog] Exception: $e');
+      return ReinductionPromptResult.none;
     } finally {
       _isChecking = false;
+      _isShowing = false;
     }
   }
 
   /// Backward-compatible alias
-  static Future<void> checkAndPromptRoster(BuildContext context) => checkAndPrompt(context);
+  static Future<ReinductionPromptResult> checkAndPromptRoster(BuildContext context) => checkAndPrompt(context);
 
   @override
   Widget build(BuildContext context) {
@@ -223,7 +241,7 @@ class ReinductionPromptDialog extends StatelessWidget {
                         child: ElevatedButton.icon(
                           onPressed: () async {
                             HapticFeedback.mediumImpact();
-                            Navigator.of(context).pop();
+                            Navigator.of(context).pop('form');
                             final profile = PreferenceService.getProfile();
                             final filled = await Navigator.of(context).push<bool>(
                               MaterialPageRoute(
@@ -262,7 +280,7 @@ class ReinductionPromptDialog extends StatelessWidget {
                         width: double.infinity,
                         height: 38,
                         child: TextButton(
-                          onPressed: () => Navigator.of(context).pop(),
+                          onPressed: () => Navigator.of(context).pop('later'),
                           child: const Text(
                             'Nanti Saja',
                             style: TextStyle(

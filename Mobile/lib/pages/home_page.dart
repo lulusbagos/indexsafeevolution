@@ -9,11 +9,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../services/api.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
-import '../services/popup_ad_service.dart';
 import '../services/security_check_service.dart';
-import '../widgets/roster_prompt_dialog.dart';
-import '../widgets/web_campaign_dialog.dart';
 import '../services/preference.dart';
+import '../services/startup_popup_coordinator.dart';
 import '../utils/globals.dart' as globals;
 import 'dashboard_page.dart';
 import 'hazard/hazard_create_page.dart';
@@ -119,35 +117,9 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin, Widg
       await prefs.setInt('bgProfile', (_profile?.id ?? 0));
       await prefs.setString('bgNik', (_profile?.noNik ?? ''));
 
-      // Tampilkan iklan popup jika ada dari backend (1 hari sekali)
+      // Tampilkan pop up startup secara bergantian & profesional (tidak pernah bertumpuk)
       if (mounted) {
-        Future.delayed(const Duration(milliseconds: 700), () async {
-          if (!mounted) return;
-          try {
-            await PopupAdService.checkAndShowPopupAd(context);
-          } catch (_) {}
-
-          // Cek dan tampilkan pop up Re-Induksi bulanan di awal bulan jika belum diisi
-          if (!mounted) return;
-          try {
-            await ReinductionPromptDialog.checkAndPrompt(context);
-          } catch (_) {}
-
-          if (!mounted) return;
-          try {
-            String userNik = _profile?.noNik?.trim() ?? '';
-            if (userNik.isEmpty) {
-              userNik = PreferenceService.getOfflineNik() ?? '';
-            }
-            debugPrint('[HomePage] Checking WebCampaign for NIK: $userNik');
-            await WebCampaignDialog.checkAndShow(
-              context,
-              nik: userNik,
-              nama: _profile?.namaLengkap ?? '',
-              depart: _profile?.depart ?? '',
-            );
-          } catch (_) {}
-        });
+        StartupPopupCoordinator.runSequentialPopups(context);
       }
     });
   }

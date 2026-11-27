@@ -1,4 +1,3 @@
-import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
 
 import '../widgets/popup_ad_dialog.dart';
@@ -8,14 +7,17 @@ import 'preference.dart';
 class PopupAdService {
   static bool _isShowing = false;
 
+  static bool get isShowing => _isShowing;
+
   /// Memeriksa dan menampilkan iklan popup jika tersedia dari backend.
   /// Otomatis muncul 1 hari sekali setiap aplikasi dibuka.
   /// Jika ada gambar baru (fileName berubah), akan langsung muncul hari itu juga.
-  static Future<void> checkAndShowPopupAd(
+  /// Mengembalikan true jika dialog iklan berhasil ditampilkan dan ditutup user.
+  static Future<bool> checkAndShowPopupAd(
     BuildContext context, {
     bool force = false,
   }) async {
-    if (_isShowing) return;
+    if (_isShowing) return false;
 
     try {
       final api = ApiService();
@@ -24,12 +26,12 @@ class PopupAdService {
       final adRes = await api.getActivePopupAd();
       debugPrint('[PopupAdService] Fetch result: hasAd=${adRes?.hasAd}, data=${adRes?.data?.fileName}');
       if (adRes == null || !adRes.hasAd || adRes.data == null) {
-        return;
+        return false;
       }
 
       final adData = adRes.data!;
       if (adData.fileName.isEmpty || adData.imageUrl.isEmpty) {
-        return;
+        return false;
       }
 
       // 3. Cek pembatasan 1 hari sekali
@@ -49,12 +51,12 @@ class PopupAdService {
 
       if (!shouldShow) {
         debugPrint('[PopupAdService] Ad already displayed today. Skipping.');
-        return;
+        return false;
       }
 
       if (!context.mounted) {
         debugPrint('[PopupAdService] Context not mounted. Skipping.');
-        return;
+        return false;
       }
 
       _isShowing = true;
@@ -75,8 +77,10 @@ class PopupAdService {
         dateStr: todayStr,
         fileName: adData.fileName,
       );
+      return true;
     } catch (e) {
       debugPrint('[PopupAdService] Error in checkAndShowPopupAd: $e');
+      return false;
     } finally {
       _isShowing = false;
     }
