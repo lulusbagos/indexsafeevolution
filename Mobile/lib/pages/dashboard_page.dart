@@ -41,7 +41,7 @@ import 'mining/mining_hub_page.dart';
 import 'employee/employee_hub_page.dart';
 import '../widgets/home_weather_widget.dart';
 
-class _HomeModuleCard extends StatelessWidget {
+class _HomeModuleCard extends StatefulWidget {
   const _HomeModuleCard({
     required this.title,
     required this.imagePath,
@@ -59,68 +59,100 @@ class _HomeModuleCard extends StatelessWidget {
   final double? width;
 
   @override
+  State<_HomeModuleCard> createState() => _HomeModuleCardState();
+}
+
+class _HomeModuleCardState extends State<_HomeModuleCard> {
+  bool _isPressed = false;
+
+  @override
   Widget build(BuildContext context) {
-    Widget cardContent = Material(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(18),
-      child: InkWell(
-        onTap: onTap,
+    Widget cardContent = AnimatedScale(
+      scale: _isPressed ? 0.94 : 1.0,
+      duration: const Duration(milliseconds: 140),
+      curve: Curves.easeOutCubic,
+      child: Material(
+        color: Colors.white,
         borderRadius: BorderRadius.circular(18),
-        child: Container(
-          height: 126,
-          width: width,
-          padding: const EdgeInsets.fromLTRB(8, 10, 8, 8),
-          decoration: BoxDecoration(
-            border: Border.all(color: const Color(0xFFD9E1F2)),
-            borderRadius: BorderRadius.circular(18),
-            boxShadow: [
-              BoxShadow(
-                color: const Color(0xFF1E3A8A).withValues(alpha: .06),
-                blurRadius: 10,
-                offset: const Offset(0, 5),
+        child: InkWell(
+          onTap: () {
+            HapticFeedback.lightImpact();
+            widget.onTap();
+          },
+          onHighlightChanged: (highlighted) {
+            if (_isPressed != highlighted) {
+              setState(() => _isPressed = highlighted);
+            }
+          },
+          borderRadius: BorderRadius.circular(18),
+          child: Container(
+            height: 126,
+            width: widget.width,
+            padding: const EdgeInsets.fromLTRB(6, 10, 6, 8),
+            decoration: BoxDecoration(
+              border: Border.all(
+                color: _isPressed
+                    ? widget.labelColor.withOpacity(0.5)
+                    : const Color(0xFFD9E1F2),
+                width: _isPressed ? 1.4 : 1.0,
               ),
-            ],
-          ),
-          child: Column(
-            children: [
-              Expanded(
-                child: Center(
-                  child: Image.asset(
-                    imagePath,
-                    height: iconHeight,
-                    width: 82,
-                    fit: BoxFit.contain,
-                    filterQuality: FilterQuality.high,
+              borderRadius: BorderRadius.circular(18),
+              boxShadow: [
+                BoxShadow(
+                  color: widget.labelColor.withOpacity(_isPressed ? 0.14 : 0.06),
+                  blurRadius: _isPressed ? 6 : 10,
+                  offset: Offset(0, _isPressed ? 2 : 4),
+                ),
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.03),
+                  blurRadius: 4,
+                  offset: const Offset(0, 1),
+                ),
+              ],
+            ),
+            child: Column(
+              children: [
+                Expanded(
+                  child: Center(
+                    child: Image.asset(
+                      widget.imagePath,
+                      height: widget.iconHeight,
+                      width: 82,
+                      fit: BoxFit.contain,
+                      filterQuality: FilterQuality.high,
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 5),
-              SizedBox(
-                height: 32,
-                child: Center(
-                  child: FittedBox(
-                    fit: BoxFit.scaleDown,
-                    child: Text(
-                      title,
-                      maxLines: 2,
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 13,
-                        height: 1.05,
-                        fontWeight: FontWeight.w800,
-                        color: labelColor,
+                const SizedBox(height: 4),
+                SizedBox(
+                  height: 32,
+                  child: Center(
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        widget.title,
+                        maxLines: 2,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          height: 1.05,
+                          fontWeight: FontWeight.w800,
+                          color: widget.labelColor,
+                        ),
                       ),
                     ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
     );
 
-    return width != null ? SizedBox(width: width, child: cardContent) : cardContent;
+    return widget.width != null
+        ? SizedBox(width: widget.width, child: cardContent)
+        : cardContent;
   }
 }
 
@@ -2714,6 +2746,10 @@ class _DashboardPageState extends State<DashboardPage>
   final PageController _bannerController = PageController();
   Timer? _bannerTimer;
 
+  // Module Carousel State (Page 0: 3 Main Modules, Page 1: Extended Modules)
+  int _currentModulePage = 0;
+  final PageController _modulePageController = PageController();
+
   // Notification State
   int _notifCount = PreferenceService.getNotif();
 
@@ -3348,6 +3384,7 @@ class _DashboardPageState extends State<DashboardPage>
     _positionStreamSub?.cancel();
     _bannerTimer?.cancel();
     _bannerController.dispose();
+    _modulePageController.dispose();
     super.dispose();
   }
 
@@ -5277,108 +5314,201 @@ class _DashboardPageState extends State<DashboardPage>
               ),
               _buildHomeBannerSection(),
               Padding(
-                padding: const EdgeInsets.only(top: 15, bottom: 10),
-                child: SizedBox(
-                  height: 134,
-                  child: ListView(
-                    scrollDirection: Axis.horizontal,
-                    physics: const BouncingScrollPhysics(),
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    children: [
-                      _HomeModuleCard(
-                        title: 'SAP',
-                        imagePath: 'assets/images/home-sap.png',
-                        labelColor: const Color(0xFF174B83),
-                        iconHeight: 70,
-                        width: ((MediaQuery.of(context).size.width - 40 - 24) / 3.18).clamp(108.0, 130.0),
-                        onTap: () {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              fullscreenDialog: true,
-                              builder: (context) => const SapPage(),
-                            ),
+                padding: const EdgeInsets.only(top: 14, bottom: 8),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    SizedBox(
+                      height: 136,
+                      child: PageView.builder(
+                        controller: _modulePageController,
+                        itemCount: 2,
+                        physics: const BouncingScrollPhysics(),
+                        onPageChanged: (page) {
+                          if (_currentModulePage != page) {
+                            setState(() => _currentModulePage = page);
+                          }
+                        },
+                        itemBuilder: (context, pageIndex) {
+                          return AnimatedBuilder(
+                            animation: _modulePageController,
+                            builder: (context, child) {
+                              double page = 0.0;
+                              if (_modulePageController.position.haveDimensions &&
+                                  _modulePageController.page != null) {
+                                page = _modulePageController.page!;
+                              } else {
+                                page = _currentModulePage.toDouble();
+                              }
+                              final diff = pageIndex - page;
+                              final scale = (1.0 - (diff.abs() * 0.08)).clamp(0.92, 1.0);
+                              final opacity = (1.0 - (diff.abs() * 0.35)).clamp(0.65, 1.0);
+
+                              return Transform.scale(
+                                scale: scale,
+                                child: Opacity(
+                                  opacity: opacity,
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                                    child: Row(
+                                      children: [
+                                        Expanded(
+                                          child: Transform.translate(
+                                            offset: Offset(diff * 20.0, 0),
+                                            child: pageIndex == 0
+                                                ? _HomeModuleCard(
+                                                    title: 'SAP',
+                                                    imagePath: 'assets/images/home-sap.png',
+                                                    labelColor: const Color(0xFF174B83),
+                                                    iconHeight: 70,
+                                                    onTap: () {
+                                                      Navigator.of(context).push(
+                                                        MaterialPageRoute(
+                                                          fullscreenDialog: true,
+                                                          builder: (context) => const SapPage(),
+                                                        ),
+                                                      );
+                                                    },
+                                                  )
+                                                : _HomeModuleCard(
+                                                    title: 'DOKUMEN\nMANAGEMENT',
+                                                    imagePath: 'assets/images/home-doc-management.png',
+                                                    labelColor: const Color(0xFF0284C7),
+                                                    iconHeight: 70,
+                                                    onTap: () {
+                                                      Navigator.of(context).push(
+                                                        MaterialPageRoute(
+                                                          builder: (context) => const DocumentManagementPage(),
+                                                        ),
+                                                      );
+                                                    },
+                                                  ),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 12),
+                                        Expanded(
+                                          child: Transform.translate(
+                                            offset: Offset(0, 0),
+                                            child: pageIndex == 0
+                                                ? _HomeModuleCard(
+                                                    title: 'OHS',
+                                                    imagePath: 'assets/images/home-ohs.png',
+                                                    labelColor: const Color(0xFF0F9F8F),
+                                                    iconHeight: 72,
+                                                    onTap: () {
+                                                      Navigator.of(context).push(
+                                                        MaterialPageRoute(
+                                                          fullscreenDialog: true,
+                                                          builder: (context) => const OhsPage(),
+                                                        ),
+                                                      );
+                                                    },
+                                                  )
+                                                : _HomeModuleCard(
+                                                    title: 'X MINE',
+                                                    imagePath: 'assets/images/home-mining-ops.png',
+                                                    labelColor: const Color(0xFFD97706),
+                                                    iconHeight: 70,
+                                                    onTap: () {
+                                                      Navigator.of(context).push(
+                                                        MaterialPageRoute(
+                                                          builder: (context) => const MiningHubPage(),
+                                                        ),
+                                                      );
+                                                    },
+                                                  ),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 12),
+                                        Expanded(
+                                          child: Transform.translate(
+                                            offset: Offset(-diff * 20.0, 0),
+                                            child: pageIndex == 0
+                                                ? _HomeModuleCard(
+                                                    title: 'PERFORMANCE\nHUB',
+                                                    imagePath: 'assets/images/home-performance-hub.png',
+                                                    labelColor: const Color(0xFFF08A00),
+                                                    iconHeight: 66,
+                                                    onTap: () {
+                                                      Navigator.of(context).push(
+                                                        MaterialPageRoute(
+                                                          fullscreenDialog: true,
+                                                          builder: (context) => const ExtraPage(),
+                                                        ),
+                                                      );
+                                                    },
+                                                  )
+                                                : _HomeModuleCard(
+                                                    title: 'ONE EV',
+                                                    imagePath: 'assets/images/home-employee-hub.png',
+                                                    labelColor: const Color(0xFF6366F1),
+                                                    iconHeight: 70,
+                                                    onTap: () {
+                                                      Navigator.of(context).push(
+                                                        MaterialPageRoute(
+                                                          builder: (context) => const EmployeeHubPage(),
+                                                        ),
+                                                      );
+                                                    },
+                                                  ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              );
+                            },
                           );
                         },
                       ),
-                      const SizedBox(width: 12),
-                      _HomeModuleCard(
-                        title: 'OHS',
-                        imagePath: 'assets/images/home-ohs.png',
-                        labelColor: const Color(0xFF0F9F8F),
-                        iconHeight: 72,
-                        width: ((MediaQuery.of(context).size.width - 40 - 24) / 3.18).clamp(108.0, 130.0),
-                        onTap: () {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              fullscreenDialog: true,
-                              builder: (context) => const OhsPage(),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: List.generate(2, (idx) {
+                        final isCurrent = idx == _currentModulePage;
+                        return GestureDetector(
+                          onTap: () {
+                            HapticFeedback.selectionClick();
+                            _modulePageController.animateToPage(
+                              idx,
+                              duration: const Duration(milliseconds: 400),
+                              curve: Curves.easeOutCubic,
+                            );
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                vertical: 4, horizontal: 2),
+                            color: Colors.transparent,
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 280),
+                              curve: Curves.easeOutCubic,
+                              margin: const EdgeInsets.symmetric(horizontal: 3),
+                              width: isCurrent ? 22 : 6,
+                              height: 4.5,
+                              decoration: BoxDecoration(
+                                color: isCurrent
+                                    ? const Color(0xFF1D4ED8)
+                                    : const Color(0xFFCBD5E1),
+                                borderRadius: BorderRadius.circular(99),
+                                boxShadow: isCurrent
+                                    ? [
+                                        BoxShadow(
+                                          color: const Color(0xFF1D4ED8)
+                                              .withOpacity(0.35),
+                                          blurRadius: 5,
+                                          offset: const Offset(0, 1.5),
+                                        ),
+                                      ]
+                                    : null,
+                              ),
                             ),
-                          );
-                        },
-                      ),
-                      const SizedBox(width: 12),
-                      _HomeModuleCard(
-                        title: 'PERFORMANCE\nHUB',
-                        imagePath: 'assets/images/home-performance-hub.png',
-                        labelColor: const Color(0xFFF08A00),
-                        iconHeight: 66,
-                        width: ((MediaQuery.of(context).size.width - 40 - 24) / 3.18).clamp(108.0, 130.0),
-                        onTap: () {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              fullscreenDialog: true,
-                              builder: (context) => const ExtraPage(),
-                            ),
-                          );
-                        },
-                      ),
-                      const SizedBox(width: 12),
-                      _HomeModuleCard(
-                        title: 'DOKUMEN\nMANAGEMENT',
-                        imagePath: 'assets/images/home-doc-management.png',
-                        labelColor: const Color(0xFF0284C7),
-                        iconHeight: 70,
-                        width: ((MediaQuery.of(context).size.width - 40 - 24) / 3.18).clamp(108.0, 130.0),
-                        onTap: () {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (context) => const DocumentManagementPage(),
-                            ),
-                          );
-                        },
-                      ),
-                      const SizedBox(width: 12),
-                      _HomeModuleCard(
-                        title: 'X MINE',
-                        imagePath: 'assets/images/home-mining-ops.png',
-                        labelColor: const Color(0xFFD97706),
-                        iconHeight: 70,
-                        width: ((MediaQuery.of(context).size.width - 40 - 24) / 3.18).clamp(108.0, 130.0),
-                        onTap: () {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (context) => const MiningHubPage(),
-                            ),
-                          );
-                        },
-                      ),
-                      const SizedBox(width: 12),
-                      _HomeModuleCard(
-                        title: 'ONE EV',
-                        imagePath: 'assets/images/home-employee-hub.png',
-                        labelColor: const Color(0xFF6366F1),
-                        iconHeight: 70,
-                        width: ((MediaQuery.of(context).size.width - 40 - 24) / 3.18).clamp(108.0, 130.0),
-                        onTap: () {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (context) => const EmployeeHubPage(),
-                            ),
-                          );
-                        },
-                      ),
-                    ],
-                  ),
+                          ),
+                        );
+                      }),
+                    ),
+                  ],
                 ),
               ),
               // Quick Action Card: Approval Center (khusus user terdaftar di Bima)
