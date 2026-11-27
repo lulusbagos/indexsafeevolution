@@ -10,8 +10,8 @@ class OneEvService {
 
   final ApiService _api = ApiService();
   final Dio _dio = Dio(BaseOptions(
-    connectTimeout: const Duration(milliseconds: 3000),
-    receiveTimeout: const Duration(milliseconds: 3000),
+    connectTimeout: const Duration(milliseconds: 3500),
+    receiveTimeout: const Duration(milliseconds: 3500),
   ));
 
   Map<String, dynamic>? _cachedProfile;
@@ -27,15 +27,19 @@ class OneEvService {
     final activeBase = _api.baseUrl;
     final List<String> list = [];
 
-    // Prioritaskan domain resmi
-    list.add('https://apimbs.indexim.id$cleanPath');
+    // 1. Port reverse adb localhost (Samsung Galaxy S10+ via USB adb reverse tcp:7302 tcp:7302)
+    list.add('http://127.0.0.1:7302$cleanPath');
 
+    // 2. Active Base URL jika berbeda
     if (activeBase.isNotEmpty && !list.contains('$activeBase$cleanPath')) {
       list.add('$activeBase$cleanPath');
     }
 
+    // 3. Android Emulator loopback
     list.add('http://10.0.2.2:7302$cleanPath');
-    list.add('http://127.0.0.1:7302$cleanPath');
+
+    // 4. Remote Production Domain
+    list.add('https://apimbs.indexim.id$cleanPath');
 
     return list;
   }
@@ -84,33 +88,38 @@ class OneEvService {
       }
     }
 
-    // Fallback: gunakan cachedProfile atau PreferenceService
+    // Fallback murni tanpa data palsu/dummy
     if (_cachedProfile != null) return _cachedProfile!;
 
     final prefProfile = PreferenceService.getProfile();
     _cachedProfile = {
       'no_nik': targetNik,
-      'nama_lengkap': prefProfile?.namaLengkap ?? 'LULUS BAGOS HERMAWAN',
+      'nama_lengkap': prefProfile?.namaLengkap ?? '',
       'nama_perusahaan': prefProfile?.company ?? 'PT INDEXIM COALINDO',
       'kode_perusahaan': 'IDC',
-      'nama_departemen': prefProfile?.depart ?? 'SYSTEM INTEGRATIONS',
-      'nama_jabatan': prefProfile?.posisi ?? 'FOREMAN/OFFICER',
-      'nama_posisi': prefProfile?.jabatan ?? 'Officer Product & System Development',
-      'hp_1': prefProfile?.hp ?? '0852-7496-6722',
-      'email_pribadi': 'lulusbagoshermawan@gmail.com',
-      'email_kantor': prefProfile?.emailKantor ?? 'lulus.hermawan@indexim.id',
+      'nama_departemen': prefProfile?.depart ?? '',
+      'nama_jabatan': prefProfile?.posisi ?? '',
+      'nama_posisi': prefProfile?.jabatan ?? '',
+      'hp_1': prefProfile?.hp ?? '',
+      'email_pribadi': '',
+      'email_kantor': prefProfile?.emailKantor ?? '',
       'status_aktif': true,
-      'grade': '6 SETARA',
-      'roster_kerja': '6 - 2 WEEK',
-      'golongan_tipe': 'STAFF',
-      'alamat': 'Jl. Imam Bonjol, Kel. Api-Api, Bontang Utara, Kalimantan Timur',
-      'kontak_darurat_nama': 'Keluarga Inti',
-      'kontak_darurat_telp': '0812-9876-5432',
-      'kontak_darurat_relasi': 'Keluarga',
+      'grade': '',
+      'roster_kerja': '',
+      'golongan_tipe': '',
+      'alamat': '',
+      'kontak_darurat_nama': '',
+      'kontak_darurat_telp': '',
+      'kontak_darurat_relasi': '',
+      'kontak_darurat_keterangan': '',
       'permit_jenis': 'MINE_PERMIT',
-      'permit_berakhir': '2027-08-18',
-      'total_sertifikat': 4,
-      'total_kompetensi': 6,
+      'permit_berakhir': '-',
+      'mcu_tanggal': null,
+      'mcu_hasil': null,
+      'mcu_keterangan': null,
+      'mcu_file': null,
+      'total_sertifikat': 0,
+      'total_kompetensi': 0,
     };
     return _cachedProfile!;
   }
@@ -134,13 +143,9 @@ class OneEvService {
         if (res.statusCode == 200 || res.statusCode == 204) {
           // Update cache lokal
           if (_cachedProfile != null) {
-            if (updateData['hp_1'] != null) _cachedProfile!['hp_1'] = updateData['hp_1'];
-            if (updateData['email_kantor'] != null) _cachedProfile!['email_kantor'] = updateData['email_kantor'];
-            if (updateData['email_pribadi'] != null) _cachedProfile!['email_pribadi'] = updateData['email_pribadi'];
-            if (updateData['alamat'] != null) _cachedProfile!['alamat'] = updateData['alamat'];
-            if (updateData['kontak_darurat_nama'] != null) _cachedProfile!['kontak_darurat_nama'] = updateData['kontak_darurat_nama'];
-            if (updateData['kontak_darurat_telp'] != null) _cachedProfile!['kontak_darurat_telp'] = updateData['kontak_darurat_telp'];
-            if (updateData['kontak_darurat_relasi'] != null) _cachedProfile!['kontak_darurat_relasi'] = updateData['kontak_darurat_relasi'];
+            updateData.forEach((key, val) {
+              if (val != null) _cachedProfile![key] = val;
+            });
           }
           return true;
         }
@@ -149,20 +154,16 @@ class OneEvService {
       }
     }
 
-    // Jika offline tapi data sudah disiapkan, simpan di cache lokal
+    // Jika network sementara gagal, simpan field yang diubah di cache lokal tanpa dummy
     if (_cachedProfile != null) {
-      if (updateData['hp_1'] != null) _cachedProfile!['hp_1'] = updateData['hp_1'];
-      if (updateData['email_kantor'] != null) _cachedProfile!['email_kantor'] = updateData['email_kantor'];
-      if (updateData['email_pribadi'] != null) _cachedProfile!['email_pribadi'] = updateData['email_pribadi'];
-      if (updateData['alamat'] != null) _cachedProfile!['alamat'] = updateData['alamat'];
-      if (updateData['kontak_darurat_nama'] != null) _cachedProfile!['kontak_darurat_nama'] = updateData['kontak_darurat_nama'];
-      if (updateData['kontak_darurat_telp'] != null) _cachedProfile!['kontak_darurat_telp'] = updateData['kontak_darurat_telp'];
-      if (updateData['kontak_darurat_relasi'] != null) _cachedProfile!['kontak_darurat_relasi'] = updateData['kontak_darurat_relasi'];
+      updateData.forEach((key, val) {
+        if (val != null) _cachedProfile![key] = val;
+      });
     }
     return true;
   }
 
-  /// Mengambil daftar sertifikat dari ONE_DB_MITRA
+  /// Mengambil daftar sertifikat asli dari ONE_DB_MITRA (tidak ada dummy)
   Future<List<Map<String, dynamic>>> fetchCertificates({String? nik}) async {
     final targetNik = nik ?? PreferenceService.getProfile()?.noNik ?? '24051940986';
     final candidates = _buildCandidateUrls('/api/one-ev/certificates?nik=$targetNik');
@@ -200,42 +201,7 @@ class OneEvService {
       }
     }
 
-    if (_cachedCertificates.isNotEmpty) return _cachedCertificates;
-
-    _cachedCertificates = [
-      {
-        'id': 1,
-        'nama_sertifikat': 'Pengawas Operasional Pertama (POP) Pertambangan',
-        'penyelenggara': 'Kementerian ESDM & BNSP',
-        'tanggal_terbit': '2023-08-15',
-        'tanggal_expired': '2028-08-15',
-        'status': 'AKTIF',
-      },
-      {
-        'id': 2,
-        'nama_sertifikat': 'Induksi Keselamatan Tambang Umum K3LH',
-        'penyelenggara': 'HSE PT Indexim Coalindo',
-        'tanggal_terbit': '2024-05-15',
-        'tanggal_expired': '2027-05-15',
-        'status': 'AKTIF',
-      },
-      {
-        'id': 3,
-        'nama_sertifikat': 'Defensive Driving Training (DDT) Kendaraan 4x4',
-        'penyelenggara': 'IDC Safety Driving Academy',
-        'tanggal_terbit': '2024-07-20',
-        'tanggal_expired': '2026-12-31',
-        'status': 'AKTIF',
-      },
-      {
-        'id': 4,
-        'nama_sertifikat': 'Pertolongan Pertama Pada Kecelakaan (First Aid Level 2)',
-        'penyelenggara': 'Medical Emergency Response IDC',
-        'tanggal_terbit': '2024-06-10',
-        'tanggal_expired': '2026-06-10',
-        'status': 'PERLU PERPANJANGAN',
-      },
-    ];
+    // Kembalikan cache atau list kosong - TIDAK ADA DUMMY
     return _cachedCertificates;
   }
 
@@ -266,8 +232,8 @@ class OneEvService {
 
     _cachedCertificates.insert(0, {
       'id': DateTime.now().millisecondsSinceEpoch,
-      'nama_sertifikat': data['nama_sertifikat'] ?? 'Sertifikat K3 Tambang',
-      'penyelenggara': data['penyelenggara'] ?? 'Lembaga Diklat Resmi',
+      'nama_sertifikat': data['nama_sertifikat'] ?? 'Sertifikat K3',
+      'penyelenggara': data['penyelenggara'] ?? '',
       'tanggal_terbit': data['tanggal_terbit'] ?? DateTime.now().toIso8601String().substring(0, 10),
       'tanggal_expired': data['tanggal_expired'] ?? DateTime.now().add(const Duration(days: 730)).toIso8601String().substring(0, 10),
       'status': 'AKTIF',
@@ -275,7 +241,7 @@ class OneEvService {
     return true;
   }
 
-  /// Mengambil matriks skill & kompetensi dari ONE_DB_MITRA
+  /// Mengambil matriks skill & kompetensi asli dari ONE_DB_MITRA (tidak ada dummy)
   Future<List<Map<String, dynamic>>> fetchSkillMatrix({String? nik}) async {
     final targetNik = nik ?? PreferenceService.getProfile()?.noNik ?? '24051940986';
     final candidates = _buildCandidateUrls('/api/one-ev/skill-matrix?nik=$targetNik');
@@ -302,70 +268,7 @@ class OneEvService {
       }
     }
 
-    if (_cachedSkillMatrix.isNotEmpty) return _cachedSkillMatrix;
-
-    _cachedSkillMatrix = [
-      {
-        'id': 1,
-        'nama_kompetensi': 'Identifikasi Bahaya & Pengendalian Risiko (IBPR/HIRA)',
-        'kategori': 'K3LH Tambang',
-        'level_target': 'Level 4',
-        'level_aktual': 'Level 4',
-        'status': 'COMPETENT',
-        'assessor': 'Superintendent HSE',
-        'catatan': 'Memenuhi kriteria evaluasi risiko mandiri di front pit.',
-      },
-      {
-        'id': 2,
-        'nama_kompetensi': 'SOP Golden Rules & Isolasi Energi (LOTO)',
-        'kategori': 'K3LH Tambang',
-        'level_target': 'Level 4',
-        'level_aktual': 'Level 4',
-        'status': 'COMPETENT',
-        'assessor': 'Safety Inspector',
-        'catatan': 'Kepatuhan penuh pada protokol 10 Golden Safety Rules.',
-      },
-      {
-        'id': 3,
-        'nama_kompetensi': 'Pengoperasian Kendaraan Ringan (LV 4x4) Tambang',
-        'kategori': 'Operasional Tambang',
-        'level_target': 'Level 3',
-        'level_aktual': 'Level 3',
-        'status': 'COMPETENT',
-        'assessor': 'Driver Assessor',
-        'catatan': 'SIMPER aktif LV Hilux & Light Hauler jalur hauling.',
-      },
-      {
-        'id': 4,
-        'nama_kompetensi': 'Investigasi Insiden & Safety Accountability (SAP)',
-        'kategori': 'Manajemen K3',
-        'level_target': 'Level 4',
-        'level_aktual': 'Level 4',
-        'status': 'COMPETENT',
-        'assessor': 'Lead HSE Officer',
-        'catatan': 'Pelaporan dan root-cause analysis berbasis digital.',
-      },
-      {
-        'id': 5,
-        'nama_kompetensi': 'Inspeksi K3 Terencana & Observasi Tugas',
-        'kategori': 'Operasional Tambang',
-        'level_target': 'Level 3',
-        'level_aktual': 'Level 3',
-        'status': 'COMPETENT',
-        'assessor': 'Mine Safety Foreman',
-        'catatan': 'Rutin melaksanakan inspeksi area pit dan stockpile.',
-      },
-      {
-        'id': 6,
-        'nama_kompetensi': 'Tanggap Darurat, Pemadam Api & Evakuasi Site',
-        'kategori': 'Emergency Response',
-        'level_target': 'Level 3',
-        'level_aktual': 'Level 3',
-        'status': 'COMPETENT',
-        'assessor': 'Emergency Response Team',
-        'catatan': 'Sertifikasi First Aider & tim mitigasi kebakaran.',
-      },
-    ];
+    // Kembalikan cache atau list kosong - TIDAK ADA DUMMY
     return _cachedSkillMatrix;
   }
 

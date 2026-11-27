@@ -17,72 +17,79 @@ class _EmployeeHubPageState extends State<EmployeeHubPage> {
 
   // Profil Karyawan Aktif (Live dari ONE_DB_MITRA)
   bool _isLoading = true;
-  String _nama = 'LULUS BAGOS HERMAWAN';
+  String _nama = '';
   String _namaAlias = '';
-  String _wargaNegara = 'WNI';
-  String _nik = '24051940986';
-  String _noKtp = '3504132003940003';
-  String _noKk = '3504133005240016';
-  String _jenisKelamin = 'LK';
-  String _tempatLahir = 'Tulungagung';
-  String _tanggalLahir = '1994-03-20';
-  String _agama = 'ISLAM';
-  int? _idAgama = 3;
-  String _statusNikah = 'KAWIN';
-  int? _idStatusNikah = 2;
-  String _golDarah = 'O+';
-  String _namaIbu = 'WIYATI,S.Pd';
-  String _namaAyah = 'Sugiarto, M.M.Pd';
+  String _wargaNegara = '';
+  String _nik = '';
+  String _noKtp = '';
+  String _noKk = '';
+  String _jenisKelamin = '';
+  String _tempatLahir = '';
+  String _tanggalLahir = '';
+  String _agama = '';
+  int? _idAgama;
+  String _statusNikah = '';
+  int? _idStatusNikah;
+  String? _golDarah;
+  String _namaIbu = '';
+  String _namaAyah = '';
 
   // Domisili
-  String _provinsi = 'Jawa Timur';
-  String _kabupaten = 'Kabupaten Tulungagung';
-  String _kecamatan = 'Rejotangan';
-  String _desa = 'Panjerejo';
-  String _rt = '004';
-  String _rw = '000';
-  String _kodePos = '-';
-  String _alamat = 'Jl. Imam Bonjol . RT 004/RW 000. Kel. Api-Api. Kec. Bontang Utara. Kota. Bontang. Prop. Kalimantan Timur';
+  String _provinsi = '';
+  String _kabupaten = '';
+  String _kecamatan = '';
+  String _desa = '';
+  String _rt = '';
+  String _rw = '';
+  String _kodePos = '';
+  String _alamat = '';
 
   // Kontak Utama
-  String _hp = '0852-7496-6722';
+  String _hp = '';
   String _hp2 = '';
-  String _emailPribadi = 'lulusbagoshermawan@gmail.com';
-  String _emailKantor = 'lulus.hermawan@indexim.id';
+  String _emailPribadi = '';
+  String _emailKantor = '';
 
   // Kontak Darurat
-  String _daruratNama = 'Keluarga Inti';
-  String _daruratTelp = '0812-9876-5432';
+  String _daruratNama = '';
+  String _daruratTelp = '';
   String _daruratTelpLain = '';
-  String _daruratRelasi = 'Keluarga';
-  String _daruratKeterangan = 'Hubungi jika keadaan darurat operasional';
+  String _daruratRelasi = '';
+  String _daruratKeterangan = '';
 
   // Jaminan & Pajak
-  String _noNpwp = '20.499.856.1-629.000';
-  String _noBpjsTk = '22127924722';
-  String _noBpjsKes = '0000107063774';
+  String _noNpwp = '';
+  String _noBpjsTk = '';
+  String _noBpjsKes = '';
   String _noBpjsPensiun = '';
 
   // Pendidikan
-  int? _idPendidikan = 13;
-  String _jenjangPendidikan = 'STRATA 1';
-  String _namaSekolah = 'Universitas Brawijaya';
-  String _fakultas = 'Ilmu Komputer';
-  String _jurusan = 'Teknik Informatika';
+  int? _idPendidikan;
+  String _jenjangPendidikan = '';
+  String _namaSekolah = '';
+  String _fakultas = '';
+  String _jurusan = '';
 
   // Kepegawaian (Terkunci HR - Read Only)
-  String _dept = 'SYSTEM INTEGRATIONS';
-  String _perusahaan = 'PT INDEXIM COALINDO';
-  String _posisi = 'Officer Product & System Development';
-  String _jabatan = 'FOREMAN/OFFICER';
-  String _grade = '6 SETARA';
-  String _roster = '6 - 2 WEEK';
-  String _tanggalMasuk = '2024-05-15';
-  String _statusKerja = 'PKWTT / Karyawan Tetap';
-  String _minePermitNo = 'MP-IDC-2024-00892';
-  String _minePermitExp = '2027-08-18';
-  String _simperClass = 'Kelas II (LV 4x4 & Light Truck)';
+  String _dept = '';
+  String _seksi = '';
+  String _perusahaan = '';
+  String _posisi = '';
+  String _jabatan = '';
+  String _grade = '';
+  String _roster = '';
+  String _tanggalMasuk = '';
+  String _statusKerja = '';
+  String _minePermitNo = '';
+  String _minePermitExp = '';
+  String _simperClass = 'Tidak Ada / Belum Terdaftar';
   String? _pathFoto;
+
+  // MCU dari tbl_t_karyawan_mcu
+  String? _mcuTanggal;
+  String? _mcuHasil;
+  String? _mcuKeterangan;
+  String? _mcuFile;
 
   // Data List dari ONE_DB_MITRA
   List<Map<String, dynamic>> _certificates = [];
@@ -97,13 +104,14 @@ class _EmployeeHubPageState extends State<EmployeeHubPage> {
     super.initState();
     _profile = PreferenceService.getProfile();
     if (_profile != null) {
-      _nama = _profile!.namaLengkap ?? _nama;
-      _nik = _profile!.noNik ?? _nik;
-      _dept = _profile!.depart ?? _dept;
-      _perusahaan = _profile!.company ?? _perusahaan;
-      _posisi = _profile!.jabatan ?? _posisi;
-      _hp = _profile!.hp ?? _hp;
-      _emailKantor = _profile!.emailKantor ?? _emailKantor;
+      _nama = _profile!.namaLengkap ?? '';
+      _nik = _profile!.noNik ?? '';
+      _dept = _profile!.depart ?? '';
+      _perusahaan = _profile!.company ?? '';
+      _posisi = _profile!.jabatan ?? '';
+      _hp = _profile!.hp ?? '';
+      _emailKantor = _profile!.emailKantor ?? '';
+      _minePermitNo = _profile!.noNik ?? '';
     }
     _loadLiveOneEvData();
   }
@@ -117,7 +125,7 @@ class _EmployeeHubPageState extends State<EmployeeHubPage> {
   Future<void> _loadLiveOneEvData() async {
     setState(() => _isLoading = true);
     try {
-      final userNik = _nik;
+      final userNik = _nik.isNotEmpty ? _nik : PreferenceService.getProfile()?.noNik ?? '';
       final profData = await _oneEvService.fetchProfile(nik: userNik);
       final certs = await _oneEvService.fetchCertificates(nik: userNik);
       final skills = await _oneEvService.fetchSkillMatrix(nik: userNik);
@@ -125,62 +133,69 @@ class _EmployeeHubPageState extends State<EmployeeHubPage> {
       if (mounted) {
         setState(() {
           _nama = profData['nama_lengkap'] ?? _nama;
-          _namaAlias = profData['nama_alias'] ?? _namaAlias;
-          _wargaNegara = profData['warga_negara'] ?? _wargaNegara;
+          _namaAlias = profData['nama_alias'] ?? '';
+          _wargaNegara = profData['warga_negara'] ?? '';
           _nik = profData['no_nik'] ?? _nik;
-          _noKtp = profData['no_ktp'] ?? _noKtp;
-          _noKk = profData['no_kk'] ?? _noKk;
-          _jenisKelamin = profData['jenis_kelamin'] ?? _jenisKelamin;
-          _tempatLahir = profData['tempat_lahir'] ?? _tempatLahir;
-          _tanggalLahir = profData['tanggal_lahir'] ?? _tanggalLahir;
-          _agama = profData['agama'] ?? _agama;
-          if (profData['id_agama'] != null) _idAgama = profData['id_agama'];
-          _statusNikah = profData['status_nikah'] ?? _statusNikah;
-          if (profData['id_status_nikah'] != null) _idStatusNikah = profData['id_status_nikah'];
-          _golDarah = profData['golongan_darah'] ?? _golDarah;
-          _namaIbu = profData['nama_ibu'] ?? _namaIbu;
-          _namaAyah = profData['nama_ayah'] ?? _namaAyah;
+          _noKtp = profData['no_ktp'] ?? '';
+          _noKk = profData['no_kk'] ?? '';
+          _jenisKelamin = profData['jenis_kelamin'] ?? '';
+          _tempatLahir = profData['tempat_lahir'] ?? '';
+          _tanggalLahir = profData['tanggal_lahir'] ?? '';
+          _agama = profData['agama'] ?? '';
+          _idAgama = profData['id_agama'];
+          _statusNikah = profData['status_nikah'] ?? '';
+          _idStatusNikah = profData['id_status_nikah'];
+          _golDarah = profData['golongan_darah'];
+          _namaIbu = profData['nama_ibu'] ?? '';
+          _namaAyah = profData['nama_ayah'] ?? '';
 
-          _provinsi = profData['provinsi'] ?? _provinsi;
-          _kabupaten = profData['kabupaten'] ?? _kabupaten;
-          _kecamatan = profData['kecamatan'] ?? _kecamatan;
-          _desa = profData['desa'] ?? _desa;
-          _rt = profData['rt'] ?? _rt;
-          _rw = profData['rw'] ?? _rw;
-          _kodePos = profData['kode_pos'] ?? _kodePos;
-          _alamat = profData['alamat'] ?? _alamat;
+          _provinsi = profData['provinsi'] ?? '';
+          _kabupaten = profData['kabupaten'] ?? '';
+          _kecamatan = profData['kecamatan'] ?? '';
+          _desa = profData['desa'] ?? '';
+          _rt = profData['rt'] ?? '';
+          _rw = profData['rw'] ?? '';
+          _kodePos = profData['kode_pos'] ?? '';
+          _alamat = profData['alamat'] ?? '';
 
           _hp = profData['hp_1'] ?? _hp;
-          _hp2 = profData['hp_2'] ?? _hp2;
-          _emailPribadi = profData['email_pribadi'] ?? _emailPribadi;
+          _hp2 = profData['hp_2'] ?? '';
+          _emailPribadi = profData['email_pribadi'] ?? '';
           _emailKantor = profData['email_kantor'] ?? _emailKantor;
 
-          _daruratNama = profData['kontak_darurat_nama'] ?? _daruratNama;
-          _daruratTelp = profData['kontak_darurat_telp'] ?? _daruratTelp;
-          _daruratTelpLain = profData['kontak_darurat_telp_lain'] ?? _daruratTelpLain;
-          _daruratRelasi = profData['kontak_darurat_relasi'] ?? _daruratRelasi;
-          _daruratKeterangan = profData['kontak_darurat_keterangan'] ?? _daruratKeterangan;
+          _daruratNama = profData['kontak_darurat_nama'] ?? '';
+          _daruratTelp = profData['kontak_darurat_telp'] ?? '';
+          _daruratTelpLain = profData['kontak_darurat_telp_lain'] ?? '';
+          _daruratRelasi = profData['kontak_darurat_relasi'] ?? '';
+          _daruratKeterangan = profData['kontak_darurat_keterangan'] ?? '';
 
-          _noNpwp = profData['no_npwp'] ?? _noNpwp;
-          _noBpjsTk = profData['no_bpjs_tk'] ?? _noBpjsTk;
-          _noBpjsKes = profData['no_bpjs_kes'] ?? _noBpjsKes;
-          _noBpjsPensiun = profData['no_bpjs_pensiun'] ?? _noBpjsPensiun;
+          _noNpwp = profData['no_npwp'] ?? '';
+          _noBpjsTk = profData['no_bpjs_tk'] ?? '';
+          _noBpjsKes = profData['no_bpjs_kes'] ?? '';
+          _noBpjsPensiun = profData['no_bpjs_pensiun'] ?? '';
 
-          if (profData['id_pendidikan'] != null) _idPendidikan = profData['id_pendidikan'];
-          _jenjangPendidikan = profData['jenjang_pendidikan'] ?? _jenjangPendidikan;
-          _namaSekolah = profData['nama_sekolah'] ?? _namaSekolah;
-          _fakultas = profData['fakultas'] ?? _fakultas;
-          _jurusan = profData['jurusan'] ?? _jurusan;
+          _idPendidikan = profData['id_pendidikan'];
+          _jenjangPendidikan = profData['jenjang_pendidikan'] ?? '';
+          _namaSekolah = profData['nama_sekolah'] ?? '';
+          _fakultas = profData['fakultas'] ?? '';
+          _jurusan = profData['jurusan'] ?? '';
 
           _perusahaan = profData['nama_perusahaan'] ?? _perusahaan;
           _dept = profData['nama_departemen'] ?? _dept;
+          _seksi = profData['nama_seksi'] ?? '';
           _posisi = profData['nama_posisi'] ?? _posisi;
           _jabatan = profData['nama_jabatan'] ?? _jabatan;
-          _grade = profData['grade'] ?? _grade;
-          _roster = profData['roster_kerja'] ?? _roster;
-          _tanggalMasuk = profData['tanggal_masuk'] ?? _tanggalMasuk;
-          _minePermitExp = profData['permit_berakhir'] ?? _minePermitExp;
+          _grade = profData['grade'] ?? '';
+          _roster = profData['roster_kerja'] ?? '';
+          _tanggalMasuk = profData['tanggal_masuk'] ?? '';
+          _minePermitNo = profData['no_nik'] ?? _nik;
+          _minePermitExp = profData['permit_berakhir'] ?? '-';
           _pathFoto = profData['path_foto'];
+
+          _mcuTanggal = profData['mcu_tanggal']?.toString();
+          _mcuHasil = profData['mcu_hasil']?.toString();
+          _mcuKeterangan = profData['mcu_keterangan']?.toString();
+          _mcuFile = profData['mcu_file']?.toString();
 
           _certificates = certs;
           _skillMatrix = skills;
@@ -355,7 +370,7 @@ class _EmployeeHubPageState extends State<EmployeeHubPage> {
                   icon: Icons.psychology_rounded,
                   iconColor: const Color(0xFF8B5CF6),
                   bgColor: const Color(0xFFEDE9FE),
-                  badge: '100% Fit',
+                  badge: '${_skillMatrix.length} Skill',
                   onTap: _showSkillMatrixModal,
                 ),
                 _MenuItem(
@@ -366,7 +381,8 @@ class _EmployeeHubPageState extends State<EmployeeHubPage> {
                   badge: 'VALID',
                   onTap: () => _showFeatureDetail(
                     'Kepatuhan Induksi & Re-Induksi K3LH',
-                    'Karyawan $_nama telah menyelesaikan Induksi Keselamatan Tambang PT Indexim Coalindo & Re-Induksi Periodik awal bulan. Status kepatuhan 100%.',
+                    'Karyawan $_nama telah menyelesaikan Induksi Keselamatan Tambang PT Indexim Coalindo.\n'
+                    'Status kepatuhan aktif sejak tanggal masuk $_tanggalMasuk pada departemen $_dept.',
                     Icons.verified_user_rounded,
                     const Color(0xFF10B981),
                   ),
@@ -374,15 +390,14 @@ class _EmployeeHubPageState extends State<EmployeeHubPage> {
                 _MenuItem(
                   title: 'Fit to Work & MCU',
                   icon: Icons.medical_services_rounded,
-                  iconColor: const Color(0xFFEC4899),
-                  bgColor: const Color(0xFFFCE7F3),
-                  badge: 'FIT 1',
-                  onTap: () => _showFeatureDetail(
-                    'Medical Check Up (MCU) & Kesiapan Kerja',
-                    'Hasil MCU Berkala Tahunan: FIT TO WORK (Kategori 1 tanpa deviasi). Tekanan darah, spirometri paru, dan tes audiometri dinyatakan memenuhi standar keselamatan tambang IDC.',
-                    Icons.medical_services_rounded,
-                    const Color(0xFFEC4899),
-                  ),
+                  iconColor: _mcuHasil == 'FIT TO WORK'
+                      ? const Color(0xFF10B981)
+                      : (_mcuHasil == 'UNFIT' ? const Color(0xFFEF4444) : const Color(0xFFEC4899)),
+                  bgColor: _mcuHasil == 'FIT TO WORK'
+                      ? const Color(0xFFD1FAE5)
+                      : (_mcuHasil == 'UNFIT' ? const Color(0xFFFEE2E2) : const Color(0xFFFCE7F3)),
+                  badge: _mcuHasil != null && _mcuHasil!.isNotEmpty ? _mcuHasil! : 'BELUM ADA',
+                  onTap: _showMcuModal,
                 ),
               ],
             ),
@@ -893,20 +908,21 @@ class _EmployeeHubPageState extends State<EmployeeHubPage> {
                     _buildInfoTile('Perusahaan', _perusahaan, Icons.corporate_fare_rounded),
                     _buildInfoTile('Departemen', _dept, Icons.domain_rounded),
                     _buildInfoTile('Jabatan / Posisi', '$_jabatan / $_posisi', Icons.work_rounded),
-                    _buildInfoTile('Grade / Klasifikasi', '$_grade • Staff Tambang', Icons.stars_rounded),
-                    _buildInfoTile('Jadwal Roster', _roster, Icons.event_repeat_rounded),
-                    _buildInfoTile('Tanggal Masuk', _tanggalMasuk, Icons.calendar_today_rounded),
-                    _buildInfoTile('Status Kerja', _statusKerja, Icons.assignment_ind_rounded),
-                    _buildInfoTile('No. Handphone (WA)', _hp, Icons.phone_android_rounded),
+                    _buildInfoTile('Grade / Klasifikasi', _grade.isNotEmpty ? _grade : '-', Icons.stars_rounded),
+                    _buildInfoTile('Jadwal Roster', _roster.isNotEmpty ? _roster : '-', Icons.event_repeat_rounded),
+                    _buildInfoTile('Tanggal Masuk', _tanggalMasuk.isNotEmpty ? _tanggalMasuk : '-', Icons.calendar_today_rounded),
+                    _buildInfoTile('Status Kerja', _statusKerja.isNotEmpty ? _statusKerja : 'Karyawan Aktif', Icons.assignment_ind_rounded),
+                    _buildInfoTile('No. Handphone (WA)', _hp.isNotEmpty ? _hp : '-', Icons.phone_android_rounded),
                     if (_hp2.isNotEmpty) _buildInfoTile('No. HP Alternatif', _hp2, Icons.phone_outlined),
-                    _buildInfoTile('Email Kantor', _emailKantor, Icons.mail_outline_rounded),
-                    _buildInfoTile('Email Pribadi', _emailPribadi, Icons.alternate_email_rounded),
-                    _buildInfoTile('Alamat KTP / Domisili', '$_alamat (RT/RW: $_rt/$_rw, Pos: $_kodePos)', Icons.location_on_rounded),
-                    _buildInfoTile('Kontak Darurat', '$_daruratNama • $_daruratTelp ($_daruratRelasi)', Icons.contact_phone_rounded),
-                    _buildInfoTile('Jaminan Sosial & Pajak', 'NPWP: $_noNpwp • BPJS TK: $_noBpjsTk • BPJS Kes: $_noBpjsKes', Icons.credit_card_rounded),
-                    _buildInfoTile('Pendidikan', '$_jenjangPendidikan • $_namaSekolah ($_jurusan)', Icons.school_rounded),
+                    _buildInfoTile('Email Kantor', _emailKantor.isNotEmpty ? _emailKantor : '-', Icons.mail_outline_rounded),
+                    _buildInfoTile('Email Pribadi', _emailPribadi.isNotEmpty ? _emailPribadi : '-', Icons.alternate_email_rounded),
+                    _buildInfoTile('Alamat KTP / Domisili', _alamat.isNotEmpty ? '$_alamat (Pos: $_kodePos)' : '-', Icons.location_on_rounded),
+                    _buildInfoTile('Kontak Darurat', _daruratNama.isNotEmpty ? '$_daruratNama • $_daruratTelp ($_daruratRelasi)' : 'Belum Diatur', Icons.contact_phone_rounded),
+                    _buildInfoTile('Jaminan Sosial & Pajak', 'NPWP: ${_noNpwp.isNotEmpty ? _noNpwp : "-"} • BPJS TK: ${_noBpjsTk.isNotEmpty ? _noBpjsTk : "-"} • BPJS Kes: ${_noBpjsKes.isNotEmpty ? _noBpjsKes : "-"}', Icons.credit_card_rounded),
+                    _buildInfoTile('Pendidikan', _namaSekolah.isNotEmpty ? '$_jenjangPendidikan • $_namaSekolah ($_jurusan)' : '-', Icons.school_rounded),
                     _buildInfoTile('Mine Permit ID', '$_minePermitNo (Berlaku s/d $_minePermitExp)', Icons.qr_code_2_rounded),
-                    _buildInfoTile('SIMPER Tambang', _simperClass, Icons.drive_eta_rounded),
+                    _buildInfoTile('SIMPER Tambang', _simperClass.isNotEmpty ? _simperClass : 'Belum Terdaftar', Icons.drive_eta_rounded),
+                    _buildInfoTile('Medical Check Up (MCU)', _mcuHasil != null && _mcuHasil!.isNotEmpty ? '$_mcuHasil (${_mcuTanggal ?? "-"})' : 'Belum Ada', Icons.medical_services_rounded),
                   ],
                 ),
               ),
@@ -1701,7 +1717,26 @@ class _EmployeeHubPageState extends State<EmployeeHubPage> {
               ),
               const SizedBox(height: 14),
               Expanded(
-                child: ListView.separated(
+                child: _skillMatrix.isEmpty
+                    ? Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.psychology_outlined, size: 52, color: Colors.grey.shade400),
+                            const SizedBox(height: 12),
+                            Text(
+                              'Belum ada catatan matriks skill di ONE Evolution',
+                              style: TextStyle(fontSize: 13, color: Colors.grey.shade600, fontWeight: FontWeight.w700),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Gunakan tombol + di kanan atas untuk menambahkan kompetensi resmi.',
+                              style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
+                            ),
+                          ],
+                        ),
+                      )
+                    : ListView.separated(
                   physics: const BouncingScrollPhysics(),
                   itemCount: _skillMatrix.length,
                   separatorBuilder: (_, __) => const SizedBox(height: 10),
@@ -1875,17 +1910,19 @@ class _EmployeeHubPageState extends State<EmployeeHubPage> {
   }
 
   // =========================================================================
-  // 8. MODAL: MINE PERMIT ID & SIMPER
+  // 8. MODAL: MINE PERMIT ID, SIMPER & MEDICAL CHECK UP (MCU)
   // =========================================================================
   void _showMinePermitModal() {
+    final isValid = _minePermitExp != '-' && _minePermitExp.isNotEmpty;
     _showFeatureDetail(
       'Mine Permit ID (Izin Kerja Tambang IDC)',
       'Mine Permit ID: $_minePermitNo\n'
-      'Status: VALID AKTIF\n'
-      'Masa Berlaku: Hingga $_minePermitExp\n'
+      'Status: ${isValid ? "VALID AKTIF" : "NON-AKTIF"}\n'
+      'Masa Berlaku Kerja: Hingga $_minePermitExp\n'
       'Perusahaan: $_perusahaan\n'
       'Departemen: $_dept\n'
-      'Karyawan berhak memasuki area operasional tambang dengan kepatuhan penuh APD & regulasi keselamatan K3LH.',
+      'Seksi: $_seksi\n\n'
+      'Karyawan berhak memasuki area operasional tambang dengan kepatuhan penuh APD & regulasi keselamatan K3LH IDC.',
       Icons.qr_code_2_rounded,
       const Color(0xFFD97706),
     );
@@ -1894,13 +1931,41 @@ class _EmployeeHubPageState extends State<EmployeeHubPage> {
   void _showSimperModal() {
     _showFeatureDetail(
       'Surat Izin Mengemudi Perusahaan (SIMPER)',
-      'Kelas Lisensi: $_simperClass\n'
-      'Area Operasional: Pit Central, Pit West & Jalur Hauling KM 0 - KM 48\n'
-      'Unit Diizinkan: Toyota Hilux 4x4, Light Truck, & Sarana Patroli HSE\n'
-      'Masa Berlaku: 31 Desember 2026\n'
-      'Kondisi: Wajib mematuhi batas kecepatan max 40 km/jam di pit dan 60 km/jam di hauling.',
+      'Status: Belum Terdaftar / Non-SIMPER\n\n'
+      'Karyawan dengan jabatan "$_jabatan" di departemen "$_dept" saat ini tidak memiliki lisensi SIMPER operasional alat/kendaraan tambang.\n\n'
+      'Bagi karyawan yang memerlukan pengoperasian unit sarana atau alat berat, silakan berkoordinasi dengan Driver Training Center (DTC) dan Occupational Health & Safety (OHS).',
       Icons.drive_eta_rounded,
-      const Color(0xFF2563EB),
+      const Color(0xFF64748B),
+    );
+  }
+
+  void _showMcuModal() {
+    if (_mcuHasil == null || _mcuHasil!.isEmpty) {
+      _showFeatureDetail(
+        'Medical Check Up (MCU) & Kesiapan Kerja',
+        'Belum ada riwayat pemeriksaan Medical Check Up (MCU) yang tercatat di database ONE Evolution untuk NIK $_nik.\n\n'
+        'Pemeriksaan MCU berkala dikoordinasikan secara terjadwal oleh Departemen OHS & Klinik Site IDC.',
+        Icons.medical_services_rounded,
+        const Color(0xFFEC4899),
+      );
+      return;
+    }
+
+    final isFit = _mcuHasil == 'FIT TO WORK';
+    final isUnfit = _mcuHasil == 'UNFIT';
+    final color = isFit
+        ? const Color(0xFF10B981)
+        : (isUnfit ? const Color(0xFFEF4444) : const Color(0xFFF59E0B));
+
+    _showFeatureDetail(
+      'Medical Check Up (MCU) & Kesiapan Kerja',
+      'Hasil MCU: $_mcuHasil\n'
+      'Tanggal Pemeriksaan: ${_mcuTanggal ?? "-"}\n\n'
+      'Anjuran & Catatan Dokter:\n${_mcuKeterangan != null && _mcuKeterangan!.isNotEmpty ? _mcuKeterangan : "-"}\n\n'
+      'Lampiran Dokumen Rekam Medis:\n${_mcuFile != null && _mcuFile!.isNotEmpty ? _mcuFile : "-"}\n\n'
+      'Status rekam medis ini tersinkronisasi langsung dari ONE Evolution.',
+      Icons.medical_services_rounded,
+      color,
     );
   }
 

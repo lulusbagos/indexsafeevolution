@@ -116,67 +116,67 @@ namespace Indexsafe.Api.Controllers
                         ["no_kk"] = reader["no_kk"]?.ToString(),
                         ["nama_lengkap"] = reader["nama_lengkap"]?.ToString(),
                         ["nama_alias"] = reader["nama_alias"]?.ToString(),
-                        ["warga_negara"] = reader["warga_negara"]?.ToString() ?? "WNI",
-                        ["jenis_kelamin"] = reader["jenis_kelamin"]?.ToString() ?? "LK",
-                        ["tempat_lahir"] = reader["tempat_lahir"]?.ToString(),
+                        ["warga_negara"] = reader["warga_negara"]?.ToString() ?? "",
+                        ["jenis_kelamin"] = reader["jenis_kelamin"]?.ToString() ?? "",
+                        ["tempat_lahir"] = reader["tempat_lahir"]?.ToString() ?? "",
                         ["tanggal_lahir"] = reader["tanggal_lahir"] != DBNull.Value ? Convert.ToDateTime(reader["tanggal_lahir"]).ToString("yyyy-MM-dd") : null,
-                        ["id_agama"] = reader["id_agama"] != DBNull.Value ? Convert.ToInt32(reader["id_agama"]) : 1,
-                        ["agama"] = reader["nama_agama"]?.ToString() ?? "Islam",
-                        ["id_status_nikah"] = reader["id_status_nikah"] != DBNull.Value ? Convert.ToInt32(reader["id_status_nikah"]) : 1,
-                        ["status_nikah"] = reader["nama_status_nikah"]?.ToString() ?? reader["status_nikah"]?.ToString() ?? "Belum Menikah",
-                        ["golongan_darah"] = "O+",
-                        ["nama_ibu"] = reader["nama_ibu"]?.ToString(),
-                        ["nama_ayah"] = reader["nama_ayah"]?.ToString(),
+                        ["id_agama"] = reader["id_agama"] != DBNull.Value ? Convert.ToInt32(reader["id_agama"]) : (int?)null,
+                        ["agama"] = reader["nama_agama"]?.ToString() ?? "",
+                        ["id_status_nikah"] = reader["id_status_nikah"] != DBNull.Value ? Convert.ToInt32(reader["id_status_nikah"]) : (int?)null,
+                        ["status_nikah"] = reader["nama_status_nikah"]?.ToString() ?? reader["status_nikah"]?.ToString() ?? "",
+                        ["golongan_darah"] = null,
+                        ["nama_ibu"] = reader["nama_ibu"]?.ToString() ?? "",
+                        ["nama_ayah"] = reader["nama_ayah"]?.ToString() ?? "",
 
                         // Kontak
-                        ["email_pribadi"] = reader["email_pribadi"]?.ToString(),
-                        ["email_kantor"] = reader["email_kantor"]?.ToString() ?? reader["email_pribadi"]?.ToString(),
-                        ["hp_1"] = reader["hp_1"]?.ToString(),
-                        ["hp_2"] = reader["hp_2"]?.ToString(),
+                        ["email_pribadi"] = reader["email_pribadi"]?.ToString() ?? "",
+                        ["email_kantor"] = reader["email_kantor"]?.ToString() ?? "",
+                        ["hp_1"] = reader["hp_1"]?.ToString() ?? "",
+                        ["hp_2"] = reader["hp_2"]?.ToString() ?? "",
 
                         // Domisili
-                        ["alamat"] = reader["alamat"]?.ToString() ?? reader["alamat_terbaru"]?.ToString(),
-                        ["provinsi"] = reader["provinsi"]?.ToString(),
-                        ["kabupaten"] = reader["kabupaten"]?.ToString(),
-                        ["kecamatan"] = reader["kecamatan"]?.ToString(),
-                        ["desa"] = reader["desa"]?.ToString(),
-                        ["rt"] = "004",
-                        ["rw"] = "000",
-                        ["kode_pos"] = reader["kode_pos"]?.ToString() ?? reader["kode_pos_alamat"]?.ToString() ?? "-",
+                        ["alamat"] = reader["alamat"]?.ToString() ?? reader["alamat_terbaru"]?.ToString() ?? "",
+                        ["provinsi"] = reader["provinsi"]?.ToString() ?? "",
+                        ["kabupaten"] = reader["kabupaten"]?.ToString() ?? "",
+                        ["kecamatan"] = reader["kecamatan"]?.ToString() ?? "",
+                        ["desa"] = reader["desa"]?.ToString() ?? "",
+                        ["rt"] = System.Text.RegularExpressions.Regex.Match(reader["alamat"]?.ToString() ?? reader["alamat_terbaru"]?.ToString() ?? "", @"RT\s*(\d+)", System.Text.RegularExpressions.RegexOptions.IgnoreCase).Groups[1].Value,
+                        ["rw"] = System.Text.RegularExpressions.Regex.Match(reader["alamat"]?.ToString() ?? reader["alamat_terbaru"]?.ToString() ?? "", @"RW\s*(\d+)", System.Text.RegularExpressions.RegexOptions.IgnoreCase).Groups[1].Value,
+                        ["kode_pos"] = reader["kode_pos"]?.ToString() ?? reader["kode_pos_alamat"]?.ToString() ?? "",
 
                         // Jaminan & Pajak
-                        ["no_npwp"] = reader["no_npwp"]?.ToString(),
-                        ["no_bpjs_tk"] = reader["no_bpjs_tk"]?.ToString(),
-                        ["no_bpjs_kes"] = reader["no_bpjs_kes"]?.ToString(),
-                        ["no_bpjs_pensiun"] = reader["no_bpjs_pensiun"]?.ToString(),
+                        ["no_npwp"] = reader["no_npwp"]?.ToString() ?? "",
+                        ["no_bpjs_tk"] = reader["no_bpjs_tk"]?.ToString() ?? "",
+                        ["no_bpjs_kes"] = reader["no_bpjs_kes"]?.ToString() ?? "",
+                        ["no_bpjs_pensiun"] = reader["no_bpjs_pensiun"]?.ToString() ?? "",
 
                         // Pendidikan
-                        ["id_pendidikan"] = reader["id_pendidikan"] != DBNull.Value ? Convert.ToInt32(reader["id_pendidikan"]) : 0,
-                        ["jenjang_pendidikan"] = reader["nama_jenjang_pendidikan"]?.ToString() ?? "S1 - Strata 1",
-                        ["nama_sekolah"] = reader["nama_sekolah"]?.ToString(),
-                        ["fakultas"] = reader["fakultas"]?.ToString(),
-                        ["jurusan"] = reader["jurusan"]?.ToString(),
+                        ["id_pendidikan"] = reader["id_pendidikan"] != DBNull.Value ? Convert.ToInt32(reader["id_pendidikan"]) : (int?)null,
+                        ["jenjang_pendidikan"] = reader["nama_jenjang_pendidikan"]?.ToString() ?? "",
+                        ["nama_sekolah"] = reader["nama_sekolah"]?.ToString() ?? "",
+                        ["fakultas"] = reader["fakultas"]?.ToString() ?? "",
+                        ["jurusan"] = reader["jurusan"]?.ToString() ?? "",
 
                         // Kepegawaian (Terkunci HR)
                         ["id_perusahaan"] = reader["id_perusahaan"] != DBNull.Value ? Convert.ToInt32(reader["id_perusahaan"]) : 0,
-                        ["nama_perusahaan"] = reader["nama_perusahaan"]?.ToString() ?? "PT INDEXIM COALINDO",
-                        ["kode_perusahaan"] = reader["kode_perusahaan"]?.ToString() ?? "IDC",
+                        ["nama_perusahaan"] = reader["nama_perusahaan"]?.ToString() ?? "",
+                        ["kode_perusahaan"] = reader["kode_perusahaan"]?.ToString() ?? "",
                         ["id_departemen"] = reader["id_departemen"] != DBNull.Value ? Convert.ToInt32(reader["id_departemen"]) : 0,
-                        ["nama_departemen"] = reader["nama_departemen"]?.ToString() ?? "General",
-                        ["nama_seksi"] = reader["nama_seksi"]?.ToString(),
+                        ["nama_departemen"] = reader["nama_departemen"]?.ToString() ?? "",
+                        ["nama_seksi"] = reader["nama_seksi"]?.ToString() ?? "",
                         ["id_jabatan"] = reader["id_jabatan"] != DBNull.Value ? Convert.ToInt32(reader["id_jabatan"]) : 0,
-                        ["nama_jabatan"] = reader["nama_jabatan"]?.ToString(),
+                        ["nama_jabatan"] = reader["nama_jabatan"]?.ToString() ?? "",
                         ["id_posisi"] = reader["id_posisi"] != DBNull.Value ? Convert.ToInt32(reader["id_posisi"]) : 0,
-                        ["nama_posisi"] = reader["nama_posisi"]?.ToString() ?? reader["nama_jabatan"]?.ToString(),
-                        ["grade"] = reader["grade"]?.ToString() ?? "6 SETARA",
-                        ["roster_kerja"] = reader["roster_kerja"]?.ToString() ?? "6 - 2 WEEK",
-                        ["golongan_tipe"] = reader["golongan_tipe"]?.ToString() ?? "STAFF",
-                        ["lokasi_kerja"] = reader["lokasi_kerja"]?.ToString() ?? "OFFICE & SITE",
+                        ["nama_posisi"] = reader["nama_posisi"]?.ToString() ?? reader["nama_jabatan"]?.ToString() ?? "",
+                        ["grade"] = reader["grade"]?.ToString() ?? "",
+                        ["roster_kerja"] = reader["roster_kerja"]?.ToString() ?? "",
+                        ["golongan_tipe"] = reader["golongan_tipe"]?.ToString() ?? "",
+                        ["lokasi_kerja"] = reader["lokasi_kerja"]?.ToString() ?? "",
                         ["tanggal_masuk"] = reader["tanggal_masuk"] != DBNull.Value ? Convert.ToDateTime(reader["tanggal_masuk"]).ToString("yyyy-MM-dd") : null,
                         ["tanggal_aktif"] = reader["tanggal_aktif"] != DBNull.Value ? Convert.ToDateTime(reader["tanggal_aktif"]).ToString("yyyy-MM-dd") : null,
                         ["path_foto"] = reader["path_foto"]?.ToString(),
                         ["status_aktif"] = reader["status_aktif_efektif"] != DBNull.Value && Convert.ToBoolean(reader["status_aktif_efektif"]),
-                        ["permit_jenis"] = reader["permit_pengajuan_terakhir"]?.ToString() ?? "MINE_PERMIT",
+                        ["permit_jenis"] = reader["permit_pengajuan_terakhir"]?.ToString() ?? "",
                         ["permit_berakhir"] = reader["permit_berakhir_kerja"] != DBNull.Value ? Convert.ToDateTime(reader["permit_berakhir_kerja"]).ToString("yyyy-MM-dd") : null,
                     };
                     reader.Close();
@@ -197,21 +197,52 @@ namespace Indexsafe.Api.Controllers
                     using var readerKd = await cmdKd.ExecuteReaderAsync();
                     if (await readerKd.ReadAsync())
                     {
-                        profileData["kontak_darurat_nama"] = readerKd["nama"]?.ToString();
-                        profileData["kontak_darurat_telp"] = readerKd["telp"]?.ToString();
-                        profileData["kontak_darurat_telp_lain"] = readerKd["telp_lain"]?.ToString();
-                        profileData["kontak_darurat_relasi"] = readerKd["relasi"]?.ToString();
-                        profileData["kontak_darurat_keterangan"] = readerKd["keterangan"]?.ToString();
+                        profileData["kontak_darurat_nama"] = readerKd["nama"]?.ToString() ?? "";
+                        profileData["kontak_darurat_telp"] = readerKd["telp"]?.ToString() ?? "";
+                        profileData["kontak_darurat_telp_lain"] = readerKd["telp_lain"]?.ToString() ?? "";
+                        profileData["kontak_darurat_relasi"] = readerKd["relasi"]?.ToString() ?? "";
+                        profileData["kontak_darurat_keterangan"] = readerKd["keterangan"]?.ToString() ?? "";
                     }
                     else
                     {
-                        profileData["kontak_darurat_nama"] = "Keluarga Inti";
-                        profileData["kontak_darurat_telp"] = "0812-9876-5432";
+                        profileData["kontak_darurat_nama"] = "";
+                        profileData["kontak_darurat_telp"] = "";
                         profileData["kontak_darurat_telp_lain"] = "";
-                        profileData["kontak_darurat_relasi"] = "Keluarga";
-                        profileData["kontak_darurat_keterangan"] = "Hubungi jika keadaan darurat operasional";
+                        profileData["kontak_darurat_relasi"] = "";
+                        profileData["kontak_darurat_keterangan"] = "";
                     }
                     readerKd.Close();
+
+                    // 2b. Medical Check Up (MCU) dari tbl_t_karyawan_mcu
+                    using var cmdMcu = conn.CreateCommand();
+                    cmdMcu.CommandText = @"
+                        SELECT TOP 1 m.id, m.tanggal_mcu, m.keterangan_mcu, j.hasil_mcu, m.file_pendukung
+                        FROM [ONE_DB_MITRA].dbo.tbl_t_karyawan_mcu m
+                        LEFT JOIN [ONE_DB_MITRA].dbo.tbl_m_mcu_jenis j ON m.id_hasil_mcu = j.id
+                        WHERE m.id_personal = @idPersonal AND (m.deleted_at IS NULL)
+                        ORDER BY m.id DESC;
+                    ";
+                    var pIdMcu = cmdMcu.CreateParameter();
+                    pIdMcu.ParameterName = "@idPersonal";
+                    pIdMcu.Value = idPersonal;
+                    cmdMcu.Parameters.Add(pIdMcu);
+
+                    using var readerMcu = await cmdMcu.ExecuteReaderAsync();
+                    if (await readerMcu.ReadAsync())
+                    {
+                        profileData["mcu_tanggal"] = readerMcu["tanggal_mcu"] != DBNull.Value ? Convert.ToDateTime(readerMcu["tanggal_mcu"]).ToString("yyyy-MM-dd") : null;
+                        profileData["mcu_hasil"] = readerMcu["hasil_mcu"]?.ToString() ?? "";
+                        profileData["mcu_keterangan"] = readerMcu["keterangan_mcu"]?.ToString() ?? "";
+                        profileData["mcu_file"] = readerMcu["file_pendukung"]?.ToString() ?? "";
+                    }
+                    else
+                    {
+                        profileData["mcu_tanggal"] = null;
+                        profileData["mcu_hasil"] = "";
+                        profileData["mcu_keterangan"] = "";
+                        profileData["mcu_file"] = "";
+                    }
+                    readerMcu.Close();
 
                     // 3. Ringkasan Sertifikat & Skill (DEDUPLICATED)
                     using var cmdCount = conn.CreateCommand();
@@ -567,55 +598,6 @@ namespace Indexsafe.Api.Controllers
                         }
                     }
 
-                    // Jika belum ada data sama sekali, auto-seed sertifikat standar site untuk user ini (hanya 1 per sertifikat)
-                    if (list.Count == 0 && idPersonal > 0)
-                    {
-                        var defaultTrainings = new[]
-                        {
-                            ("Induksi Keselamatan Pertambangan (K3LH Umum IDC)", "HSE PT Indexim Coalindo", DateTime.Today.AddMonths(-6), DateTime.Today.AddMonths(18)),
-                            ("Pengawas Operasional Pertama (POP) Pertambangan", "Kementerian ESDM & BNSP", DateTime.Today.AddYears(-1), DateTime.Today.AddYears(4)),
-                            ("Defensive Driving Training (DDT) Kendaraan Ringan 4x4", "IDC Training Center", DateTime.Today.AddMonths(-4), DateTime.Today.AddMonths(8)),
-                            ("Pertolongan Pertama Pada Kecelakaan (First Aid Level 2)", "Medical Site Emergency IDC", DateTime.Today.AddMonths(-8), DateTime.Today.AddMonths(16))
-                        };
-
-                        foreach (var dt in defaultTrainings)
-                        {
-                            using var cmdIns = conn.CreateCommand();
-                            cmdIns.CommandText = @"
-                                IF NOT EXISTS (
-                                    SELECT 1 FROM [ONE_DB_MITRA].dbo.tbl_r_karyawan_training 
-                                    WHERE (no_nik = @nik OR personal_id = @personalId) 
-                                      AND LOWER(LTRIM(RTRIM(nama_training))) = LOWER(LTRIM(RTRIM(@nama)))
-                                )
-                                BEGIN
-                                    INSERT INTO [ONE_DB_MITRA].dbo.tbl_r_karyawan_training
-                                    (karyawan_id, personal_id, no_nik, nama_training, penyelenggara, tanggal_training, tanggal_expired, created_at, created_by)
-                                    VALUES
-                                    (@karyawanId, @personalId, @nik, @nama, @penyelenggara, @tglTrain, @tglExp, GETDATE(), 'System_Seed');
-                                END
-                            ";
-                            AddParam(cmdIns, "@karyawanId", idKaryawan);
-                            AddParam(cmdIns, "@personalId", idPersonal);
-                            AddParam(cmdIns, "@nik", targetNik);
-                            AddParam(cmdIns, "@nama", dt.Item1);
-                            AddParam(cmdIns, "@penyelenggara", dt.Item2);
-                            AddParam(cmdIns, "@tglTrain", dt.Item3);
-                            AddParam(cmdIns, "@tglExp", dt.Item4);
-                            await cmdIns.ExecuteNonQueryAsync();
-
-                            list.Add(new Dictionary<string, object?>
-                            {
-                                ["id"] = 0,
-                                ["nama_sertifikat"] = dt.Item1,
-                                ["penyelenggara"] = dt.Item2,
-                                ["tanggal_terbit"] = dt.Item3.ToString("yyyy-MM-dd"),
-                                ["tanggal_expired"] = dt.Item4.ToString("yyyy-MM-dd"),
-                                ["file_path"] = null,
-                                ["status"] = "AKTIF"
-                            });
-                        }
-                    }
-
                     return Ok(new
                     {
                         success = true,
@@ -807,62 +789,6 @@ namespace Indexsafe.Api.Controllers
                                 ["assessor"] = r["assessor"]?.ToString() ?? "Assessor K3",
                                 ["tanggal_assessment"] = r["tanggal_assessment"] != DBNull.Value ? Convert.ToDateTime(r["tanggal_assessment"]).ToString("yyyy-MM-dd") : null,
                                 ["catatan"] = r["catatan"]?.ToString()
-                            });
-                        }
-                    }
-
-                    // Jika belum ada data kompetensi, auto-seed 6 matriks kompetensi standar posisi tambang
-                    if (list.Count == 0 && idPersonal > 0)
-                    {
-                        var defaultSkills = new[]
-                        {
-                            ("Identifikasi Bahaya & Penilaian Risiko (IBPR/HIRA)", "K3LH Tambang", "Level 4", "Level 4", "COMPETENT", "Superintendent HSE", "Menguasai HIRADC area operasi pit & workshop"),
-                            ("SOP Golden Rules & Kepatuhan Isolasi Energi (LOTO)", "K3LH Tambang", "Level 4", "Level 4", "COMPETENT", "Safety Inspector", "Kepatuhan penuh prosedur lock-out tag-out"),
-                            ("Pengoperasian Kendaraan Ringan (LV 4x4) Area Tambang", "Operasional & Teknis", "Level 3", "Level 3", "COMPETENT", "Driver Assessor", "SIMPER aktif LV Hilux & Light Hauler"),
-                            ("Investigasi Insiden & Safety Accountability (SAP)", "Manajemen K3", "Level 4", "Level 4", "COMPETENT", "Lead HSE Officer", "Pelaporan & evaluasi tindakan perbaikan insiden"),
-                            ("Inspeksi K3 Terencana Lapangan & Observasi Tugas", "Operasional & Teknis", "Level 3", "Level 3", "COMPETENT", "Mine Foreman", "Inspeksi rutin front pit & disposal dump"),
-                            ("Tanggap Darurat, Pemadam Api Ringan (APAR) & Evakuasi", "Emergency Response", "Level 3", "Level 3", "COMPETENT", "Emergency Response Team", "Sertifikasi First Aider & Fire Marshal Site")
-                        };
-
-                        foreach (var ds in defaultSkills)
-                        {
-                            using var cmdIns = conn.CreateCommand();
-                            cmdIns.CommandText = @"
-                                IF NOT EXISTS (
-                                    SELECT 1 FROM [ONE_DB_MITRA].dbo.tbl_r_karyawan_lms_competency 
-                                    WHERE (no_nik = @nik OR personal_id = @personalId) 
-                                      AND LOWER(LTRIM(RTRIM(nama_kompetensi))) = LOWER(LTRIM(RTRIM(@nama)))
-                                )
-                                BEGIN
-                                    INSERT INTO [ONE_DB_MITRA].dbo.tbl_r_karyawan_lms_competency
-                                    (karyawan_id, personal_id, no_nik, nama_kompetensi, kategori, level_target, level_aktual, status, assessor, tanggal_assessment, catatan, created_at, created_by)
-                                    VALUES
-                                    (@karyawanId, @personalId, @nik, @nama, @kategori, @target, @aktual, @status, @assessor, GETDATE(), @catatan, GETDATE(), 'System_Seed');
-                                END
-                            ";
-                            AddParam(cmdIns, "@karyawanId", idKaryawan);
-                            AddParam(cmdIns, "@personalId", idPersonal);
-                            AddParam(cmdIns, "@nik", targetNik);
-                            AddParam(cmdIns, "@nama", ds.Item1);
-                            AddParam(cmdIns, "@kategori", ds.Item2);
-                            AddParam(cmdIns, "@target", ds.Item3);
-                            AddParam(cmdIns, "@aktual", ds.Item4);
-                            AddParam(cmdIns, "@status", ds.Item5);
-                            AddParam(cmdIns, "@assessor", ds.Item6);
-                            AddParam(cmdIns, "@catatan", ds.Item7);
-                            await cmdIns.ExecuteNonQueryAsync();
-
-                            list.Add(new Dictionary<string, object?>
-                            {
-                                ["id"] = 0,
-                                ["nama_kompetensi"] = ds.Item1,
-                                ["kategori"] = ds.Item2,
-                                ["level_target"] = ds.Item3,
-                                ["level_aktual"] = ds.Item4,
-                                ["status"] = ds.Item5,
-                                ["assessor"] = ds.Item6,
-                                ["tanggal_assessment"] = DateTime.Today.ToString("yyyy-MM-dd"),
-                                ["catatan"] = ds.Item7
                             });
                         }
                     }
