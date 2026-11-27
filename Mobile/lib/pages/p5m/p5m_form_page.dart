@@ -2639,8 +2639,9 @@ class _P5MFormPageState extends State<P5MFormPage> {
 
 
 
-    final hasUnfit = _fitQuestions.any((q) => q['answer'] == 'No');
-
+    final hasSleepDeficit = _isPekerjaLapangan &&
+        (_durasiTidur24h == '< 4 Jam' || _durasiTidur24h == '4 Jam' || _durasiTidur24h == '5 Jam');
+    final hasUnfit = _fitQuestions.any((q) => q['answer'] == 'No') || hasSleepDeficit;
     final isFit = !hasUnfit;
 
 
@@ -2750,6 +2751,10 @@ class _P5MFormPageState extends State<P5MFormPage> {
 
         'pja_departemen': _isPekerjaLapangan ? _selectedPjaDept : null,
 
+        'atasan_nik': _selectedPjaNik,
+
+        'atasan_nama': _selectedPjaNama,
+
         'company_id': _companyId ?? _profile?.companyId ?? 1,
 
         'employee_id': _profile?.id ?? 0,
@@ -2817,6 +2822,10 @@ class _P5MFormPageState extends State<P5MFormPage> {
           'pja_id',
 
           'pja_departemen',
+
+          'atasan_nik',
+
+          'atasan_nama',
 
           'fit_status',
 
@@ -2903,7 +2912,7 @@ class _P5MFormPageState extends State<P5MFormPage> {
             {'name': 'Berapa total durasi tidur Anda dalam 24 jam terakhir?', 'val': _durasiTidur24h, 'st': (_durasiTidur24h == '< 4 Jam' || _durasiTidur24h == '4 Jam' || _durasiTidur24h == '5 Jam') ? 0 : 1},
             {'name': 'Berapa total durasi tidur Anda dalam 48 jam terakhir?', 'val': _durasiTidur48h, 'st': 1},
             {'name': 'Apakah Anda tidur siang dalam 24 jam terakhir?', 'val': _tidurSiang ? 'Ya' : 'Tidak', 'st': 1},
-            if (_tidurSiang) {'name': 'Berapa lama Anda tidur siang?', 'val': _durasiTidurSiang, 'st': 1},
+            {'name': 'Jika ya, berapa lama Anda tidur siang?', 'val': _tidurSiang ? _durasiTidurSiang : '-', 'st': 1},
             {'name': 'Apakah tidur Anda sering terbangun di malam hari?', 'val': _seringTerbangun ? 'Ya' : 'Tidak', 'st': _seringTerbangun ? 0 : 1},
           ];
           for (var f in fatigueItems) {
@@ -3163,8 +3172,9 @@ class _P5MFormPageState extends State<P5MFormPage> {
 
   Widget build(BuildContext context) {
 
-    final hasUnfit = _fitQuestions.any((q) => q['answer'] == 'No');
-
+    final hasSleepDeficit = _isPekerjaLapangan &&
+        (_durasiTidur24h == '< 4 Jam' || _durasiTidur24h == '4 Jam' || _durasiTidur24h == '5 Jam');
+    final hasUnfit = _fitQuestions.any((q) => q['answer'] == 'No') || hasSleepDeficit;
     final isFit = !hasUnfit;
 
 

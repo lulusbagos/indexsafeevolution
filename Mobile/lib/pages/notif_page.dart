@@ -19,7 +19,6 @@ import '../services/sync.dart';
 
 import '../utils/enums.dart';
 
-import '../utils/globals.dart' as globals;
 
 import '../utils/helpers.dart';
 
@@ -32,6 +31,7 @@ import 'roster_settings_page.dart';
 
 import 'hazard/hazard_hub_page.dart';
 
+import 'history/history_page.dart';
 import 'history/history_detail_page.dart';
 
 import 'inspeksi/inspection_hub_page.dart';
@@ -1693,7 +1693,245 @@ class _NotifPageState extends State<NotifPage> {
 
   }
 
+  void _showP5mDeviationDialog(Map<String, dynamic> item) {
+    Map<String, dynamic> payload = {};
+    if (item['payload'] != null) {
+      try {
+        final p = item['payload'];
+        if (p is Map<String, dynamic>) {
+          payload = p;
+        } else if (p is String && p.isNotEmpty) {
+          payload = jsonDecode(p) as Map<String, dynamic>;
+        }
+      } catch (_) {}
+    }
 
+    final title = item['title']?.toString() ?? 'Peringatan Deviasi Kesiapan Kerja (P5M)';
+    final message = item['message']?.toString() ?? 'Karyawan terdeteksi deviasi kesiapan kerja / durasi tidur.';
+    final empName = payload['nama']?.toString() ?? item['sender_name']?.toString() ?? 'Karyawan';
+    final empNik = payload['nik']?.toString() ?? '-';
+    final empDept = payload['departemen']?.toString() ?? 'Operasional';
+    final area = payload['area']?.toString() ?? '-';
+    final lokasi = payload['lokasi']?.toString() ?? '-';
+    final durasiTidur = payload['durasiTidur']?.toString() ?? '';
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 18),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFEF2F2),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(
+                      Icons.warning_amber_rounded,
+                      color: Color(0xFFDC2626),
+                      size: 26,
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          title,
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF0F172A),
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        const Text(
+                          'Pemberitahuan Resmi K3 untuk PJA & Atasan',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: Color(0xFFDC2626),
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+
+              // Detail Identitas Karyawan
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.person_pin_rounded, size: 16, color: Color(0xFF0D9488)),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            '$empName ($empNik)',
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF0F172A),
+                            ),
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFEF2F2),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(color: const Color(0xFFFCA5A5)),
+                          ),
+                          child: const Text(
+                            'UNFIT / DEVIASI',
+                            style: TextStyle(
+                              fontSize: 9,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFFDC2626),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      '🏢 Departemen : $empDept',
+                      style: const TextStyle(fontSize: 12, color: Color(0xFF475569)),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '📍 Area / Lokasi : $area • $lokasi',
+                      style: const TextStyle(fontSize: 12, color: Color(0xFF475569)),
+                    ),
+                    if (durasiTidur.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        '⏱️ Durasi Tidur 24h : $durasiTidur (Defisit K3)',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFFDC2626),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              // Kotak Pesan Arahan
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFFBEB),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFFFDE68A)),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(Icons.info_outline_rounded, size: 16, color: Color(0xFFD97706)),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        message,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFF92400E),
+                          height: 1.4,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              // Action Buttons
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.pop(ctx),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        side: const BorderSide(color: Color(0xFFCBD5E1)),
+                      ),
+                      child: const Text('Tutup', style: TextStyle(color: Color(0xFF475569))),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    flex: 2,
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        Navigator.pop(ctx);
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const HistoryPage(
+                              Module.p5m,
+                              History.summary,
+                            ),
+                          ),
+                        );
+                      },
+                      icon: const Icon(Icons.list_alt_rounded, size: 18),
+                      label: const Text('Buka Riwayat P5M'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF0D9488),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        elevation: 0,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
 
   void _openDetail(Map<String, dynamic> item) {
 
@@ -1750,6 +1988,24 @@ class _NotifPageState extends State<NotifPage> {
       final notifType = (item['notif_type'] ?? '').toString().toLowerCase();
 
       final title = (item['title'] ?? '').toString().toLowerCase();
+
+
+
+      // Notifikasi Deviasi Kesiapan Kerja / Fatigue P5M (PJA & Atasan)
+
+      if (notifType == 'p5m_deviation' ||
+
+          title.contains('deviasi kesiapan kerja') ||
+
+          (title.contains('tidak siap bekerja') && title.contains('p5m')) ||
+
+          (cat == 'urgent' && title.contains('deviasi'))) {
+
+        _showP5mDeviationDialog(item);
+
+        return;
+
+      }
 
 
 

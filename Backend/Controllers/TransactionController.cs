@@ -3936,6 +3936,45 @@ namespace Indexsafe.Api.Controllers
                     var pjaIdStr = form["pja_id"].FirstOrDefault();
                     int? pjaId = int.TryParse(pjaIdStr, out var pid) ? pid : null;
                     var pjaDept = form["pja_departemen"].FirstOrDefault()?.Trim();
+                    var atasanNik = form["atasan_nik"].FirstOrDefault()?.Trim();
+                    var atasanNama = form["atasan_nama"].FirstOrDefault()?.Trim();
+
+                    // Jika atasan_nik belum diisi, otomatis ambil dari roster user (NikPengawas)
+                    if (string.IsNullOrWhiteSpace(atasanNik) && !string.IsNullOrWhiteSpace(userNik))
+                    {
+                        try
+                        {
+                            var latestRoster = await _context.Rosters
+                                .Where(r => r.Nik == userNik)
+                                .OrderByDescending(r => r.CreatedAt)
+                                .FirstOrDefaultAsync();
+                            if (latestRoster != null && !string.IsNullOrWhiteSpace(latestRoster.NikPengawas))
+                            {
+                                atasanNik = latestRoster.NikPengawas.Trim();
+                                atasanNama = latestRoster.NamaPengawas?.Trim();
+                            }
+                        }
+                        catch {}
+                    }
+
+                    // Jika pja_nik belum diisi, otomatis lookup PJA berdasarkan Area Utama di tbl_r_area_pja
+                    if (string.IsNullOrWhiteSpace(pjaNik) && !string.IsNullOrWhiteSpace(area))
+                    {
+                        try
+                        {
+                            var areaPja = await _context.AreaPjaRelations
+                                .Where(a => a.NamaArea == area)
+                                .OrderByDescending(a => a.IsPicUtama)
+                                .FirstOrDefaultAsync();
+                            if (areaPja != null && !string.IsNullOrWhiteSpace(areaPja.NikPja))
+                            {
+                                pjaNik = areaPja.NikPja.Trim();
+                                pjaNama = areaPja.NamaPja?.Trim();
+                                pjaDept = areaPja.DepartemenPja?.Trim();
+                            }
+                        }
+                        catch {}
+                    }
 
                     try
                     {
@@ -3946,6 +3985,8 @@ namespace Indexsafe.Api.Controllers
                                 ALTER TABLE [tbl_t_p5m] ADD [fatigue_json] NVARCHAR(MAX) NULL;
                             IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'tbl_t_p5m' AND COLUMN_NAME = 'pja_nik')
                                 ALTER TABLE [tbl_t_p5m] ADD [pja_nik] VARCHAR(50) NULL, [pja_nama] NVARCHAR(150) NULL, [pja_id] INT NULL, [pja_departemen] NVARCHAR(100) NULL;
+                            IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'tbl_t_p5m' AND COLUMN_NAME = 'atasan_nik')
+                                ALTER TABLE [tbl_t_p5m] ADD [atasan_nik] VARCHAR(50) NULL, [atasan_nama] NVARCHAR(150) NULL;
                         ");
                     }
                     catch {}
@@ -4042,6 +4083,10 @@ namespace Indexsafe.Api.Controllers
 
                                 PjaDepartemen = pjaDept,
 
+                                AtasanNik = atasanNik,
+
+                                AtasanNama = atasanNama,
+
                                 IsDeleted = false,
 
                                 CreatedAt = DateTime.Now
@@ -4112,6 +4157,10 @@ namespace Indexsafe.Api.Controllers
 
                             PjaDepartemen = pjaDept,
 
+                            AtasanNik = atasanNik,
+
+                            AtasanNama = atasanNama,
+
                             IsDeleted = false,
 
                             CreatedAt = DateTime.Now
@@ -4130,55 +4179,133 @@ namespace Indexsafe.Api.Controllers
 
 
 
-                    // Kirim notifikasi deviasi kesiapan kerja / fatigue ke PJA
-                    if (isPekerjaLapangan && !string.IsNullOrWhiteSpace(pjaNik))
+                    // Evaluasi Deviasi Kesiapan Kerja & Evaluasi Fatigue untuk Notifikasi PJA / ATASAN
+                    bool isSleepDeficit = false;
+                    bool isDisturbedSleep = false;
+                    string durasiTidur = "";
+
+                    if (!string.IsNullOrWhiteSpace(fatigueJson))
                     {
-                        bool isSleepDeficit = false;
-                        string durasiTidur = "";
-                        if (!string.IsNullOrWhiteSpace(fatigueJson))
+                        try
+                        {
+                            using var doc = System.Text.Json.JsonDocument.Parse(fatigueJson);
+                            if (doc.RootElement.TryGetProperty("durasi_tidur_24h", out var dEl))
+                            {
+                                durasiTidur = dEl.GetString() ?? "";
+                                if (durasiTidur.Contains("< 4") || durasiTidur.StartsWith("4 Jam") || durasiTidur.StartsWith("5 Jam") || durasiTidur.Contains("< 5") || durasiTidur.Contains("< 6"))
+                                {
+                                    isSleepDeficit = true;
+                                }
+                            }
+                            if (doc.RootElement.TryGetProperty("sering_terbangun", out var sEl))
+                            {
+                                if (sEl.ValueKind == System.Text.Json.JsonValueKind.True ||
+                                    sEl.GetString()?.Equals("true", StringComparison.OrdinalIgnoreCase) == true ||
+                                    sEl.GetString()?.Equals("Ya", StringComparison.OrdinalIgnoreCase) == true)
+                                {
+                                    isDisturbedSleep = true;
+                                }
+                            }
+                        }
+                        catch { }
+                    }
+
+                    // Periksa juga dari answersList untuk pertanyaan fatigue
+                    if (questionsList != null && answersList != null)
+                    {
+                        for (int qi = 0; qi < questionsList.Count && qi < answersList.Count; qi++)
+                        {
+                            var qText = questionsList[qi].ToLowerInvariant();
+                            var aVal = answersList[qi].Trim();
+                            if (qText.Contains("24 jam") && (aVal.Contains("< 4") || aVal.StartsWith("4 Jam") || aVal.StartsWith("5 Jam") || aVal.Contains("< 5") || aVal.Contains("< 6")))
+                            {
+                                isSleepDeficit = true;
+                                if (string.IsNullOrWhiteSpace(durasiTidur)) durasiTidur = aVal;
+                            }
+                            if (qText.Contains("sering terbangun") && (aVal.Equals("Ya", StringComparison.OrdinalIgnoreCase) || aVal.Equals("true", StringComparison.OrdinalIgnoreCase)))
+                            {
+                                isDisturbedSleep = true;
+                            }
+                        }
+                    }
+
+                    // Kirim notifikasi deviasi kesiapan kerja / fatigue ke PJA dan ATASAN karyawan bersangkutan
+                    if (hasUnfit || isSleepDeficit || isDisturbedSleep)
+                    {
+                        var devReasons = new List<string>();
+                        if (isSleepDeficit) devReasons.Add($"durasi tidur 24 jam kurang dari standar K3 (< 6 jam: {durasiTidur})");
+                        if (hasUnfit) devReasons.Add("kondisi fisik/mental belum siap bekerja (UNFIT)");
+                        if (isDisturbedSleep) devReasons.Add("kualitas tidur terganggu (sering terbangun)");
+
+                        string reasonCombined = string.Join("; ", devReasons);
+                        string empName = !string.IsNullOrWhiteSpace(userName) ? userName : "Karyawan";
+                        string empNik = !string.IsNullOrWhiteSpace(userNik) ? userNik : "-";
+                        string empDept = !string.IsNullOrWhiteSpace(pjaDept) ? pjaDept : (!string.IsNullOrWhiteSpace(dept) ? dept : "Operasional");
+
+                        // Kumpulkan penerima: PJA dan ATASAN langsung
+                        var recipients = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                        if (!string.IsNullOrWhiteSpace(pjaNik)) recipients.Add(pjaNik.Trim());
+                        if (!string.IsNullOrWhiteSpace(atasanNik)) recipients.Add(atasanNik.Trim());
+
+                        // Jika belum ada PJA atau Atasan, cari pengawas di departemen yang sama
+                        if (recipients.Count == 0 && !string.IsNullOrWhiteSpace(empDept))
                         {
                             try
                             {
-                                using var doc = System.Text.Json.JsonDocument.Parse(fatigueJson);
-                                if (doc.RootElement.TryGetProperty("durasi_tidur_24h", out var dEl))
+                                var deptPjas = await _context.AreaPjaRelations
+                                    .Where(a => a.DepartemenPja == empDept)
+                                    .Select(a => a.NikPja)
+                                    .Distinct()
+                                    .Take(3)
+                                    .ToListAsync();
+                                foreach (var dp in deptPjas)
                                 {
-                                    durasiTidur = dEl.GetString() ?? "";
-                                    if (durasiTidur.Contains("< 4") || durasiTidur.StartsWith("4 Jam"))
-                                    {
-                                        isSleepDeficit = true;
-                                    }
+                                    if (!string.IsNullOrWhiteSpace(dp)) recipients.Add(dp.Trim());
                                 }
                             }
                             catch { }
                         }
 
-                        if (hasUnfit || isSleepDeficit)
+                        var payloadObj = new
                         {
-                            string reason = isSleepDeficit
-                                ? $"jam tidur kurang dari 5 jam ({durasiTidur})"
-                                : "kondisi fisik/mental tidak siap bekerja (UNFIT)";
+                            p5mId = primaryId,
+                            nik = empNik,
+                            nama = empName,
+                            departemen = empDept,
+                            area = area,
+                            lokasi = lokasi,
+                            durasiTidur = durasiTidur,
+                            isSleepDeficit = isSleepDeficit,
+                            isDisturbedSleep = isDisturbedSleep,
+                            hasUnfit = hasUnfit,
+                            isPekerjaLapangan = isPekerjaLapangan,
+                            fatigueJson = fatigueJson
+                        };
+                        string payloadJson = System.Text.Json.JsonSerializer.Serialize(payloadObj);
 
-                            string empName = !string.IsNullOrWhiteSpace(userName) ? userName : "Karyawan";
-                            string empNik = !string.IsNullOrWhiteSpace(userNik) ? userNik : "-";
-                            string empDept = !string.IsNullOrWhiteSpace(pjaDept) ? pjaDept : (!string.IsNullOrWhiteSpace(dept) ? dept : "Operasional");
-
+                        foreach (var recNik in recipients)
+                        {
                             try
                             {
                                 _context.Notifications.Add(new Notification
                                 {
-                                    RecipientNik = pjaNik.Trim(),
+                                    RecipientNik = recNik,
                                     Title = $"⚠️ Deviasi Kesiapan Kerja: {empName} Tidak Siap Bekerja",
-                                    Message = $"Karyawan an. {empName} ({empNik}) dari departemen {empDept} melaporkan deviasi: {reason}. Mohon PJA segera memverifikasi kondisi pekerja sebelum memulai aktivitas kerja.",
+                                    Message = $"Peringatan K3: Karyawan an. {empName} ({empNik}) dari departemen {empDept} di area {area} melaporkan deviasi: {reasonCombined}. Segera verifikasi & tindaklanjuti kondisi pekerja sebelum memulai aktivitas kerja.",
                                     Url = "/P5m/Index",
                                     NotifType = "p5m_deviation",
+                                    Category = "urgent",
+                                    Priority = "high",
+                                    SenderName = empName,
+                                    Payload = payloadJson,
                                     IsRead = false,
                                     IsActioned = false,
                                     CreatedAt = DateTime.Now
                                 });
-                                await _context.SaveChangesAsync();
                             }
                             catch { }
                         }
+                        try { await _context.SaveChangesAsync(); } catch { }
                     }
 
 

@@ -428,6 +428,12 @@ Future<bool> syncTran(
       if (row['pja_departemen'] != null) {
         cleanMap['pja_departemen'] = row['pja_departemen'].toString();
       }
+      if (row['atasan_nik'] != null) {
+        cleanMap['atasan_nik'] = row['atasan_nik'].toString();
+      }
+      if (row['atasan_nama'] != null) {
+        cleanMap['atasan_nama'] = row['atasan_nama'].toString();
+      }
 
       final files = <String, String>{};
       final photoPath = row['foto_kegiatan'] ?? row['image'];

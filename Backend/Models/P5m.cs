@@ -76,6 +76,14 @@ namespace Indexsafe.Api.Models
         [MaxLength(100)]
         public string? PjaDepartemen { get; set; }
 
+        [Column("atasan_nik")]
+        [MaxLength(50)]
+        public string? AtasanNik { get; set; }
+
+        [Column("atasan_nama")]
+        [MaxLength(150)]
+        public string? AtasanNama { get; set; }
+
         [Column("is_deleted")]
         public bool IsDeleted { get; set; } = false;
 
