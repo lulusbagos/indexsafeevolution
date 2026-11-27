@@ -96,21 +96,25 @@ class _SplashPageState extends State<SplashPage> with TickerProviderStateMixin {
         if (versionConfig != null) {
           final bool forceUpdate = versionConfig['force_update'] == true;
           final String minVer =
-              versionConfig['min_version']?.toString() ?? '1.0.1';
+              versionConfig['min_version']?.toString() ?? '1.0.5';
           final String latestVer =
-              versionConfig['latest_version']?.toString() ?? '1.0.1';
+              versionConfig['latest_version']?.toString() ?? '1.0.5';
           final int minBuild = (versionConfig['min_build'] is int)
               ? versionConfig['min_build'] as int
               : int.tryParse(versionConfig['min_build']?.toString() ?? '0') ??
                   0;
+          final int latestBuild = (versionConfig['latest_build'] is int)
+              ? versionConfig['latest_build'] as int
+              : int.tryParse(versionConfig['latest_build']?.toString() ?? '0') ??
+                  0;
           final int currentBuild = int.tryParse(globals.buildNumber) ?? 0;
           final String currentVer =
-              (globals.version.isNotEmpty) ? globals.version : '1.0.1';
+              (globals.version.isNotEmpty) ? globals.version : '1.0.5';
           final String playStoreUrl = versionConfig['playstore_url']
                   ?.toString() ??
-              'https://play.google.com/store/apps/details?id=id.indexim.mbs';
+              'https://play.google.com/store/apps/details?id=id.indexim.mbs&hl=id';
           final String dialogTitle = versionConfig['title']?.toString() ??
-              'Update Aplikasi Diperlukan';
+              'Update Aplikasi Tersedia';
           final String dialogMsg = versionConfig['message']?.toString() ??
               'Versi aplikasi Anda saat ini sudah usang. Harap perbarui ke versi terbaru di Google Play Store untuk dapat melanjutkan penggunaan MBS SAP.';
           final String releaseNotes =
@@ -118,7 +122,8 @@ class _SplashPageState extends State<SplashPage> with TickerProviderStateMixin {
 
           final bool isOutdated = _isVersionLower(currentVer, minVer) ||
               (currentBuild > 0 && minBuild > 0 && currentBuild < minBuild) ||
-              (forceUpdate && _isVersionLower(currentVer, latestVer));
+              _isVersionLower(currentVer, latestVer) ||
+              (forceUpdate && currentBuild > 0 && latestBuild > 0 && currentBuild < latestBuild);
 
           if (isOutdated && mounted) {
             await _showForceUpdateDialog(
@@ -294,6 +299,26 @@ class _SplashPageState extends State<SplashPage> with TickerProviderStateMixin {
     return false;
   }
 
+  Future<void> _openPlayStore(String playStoreUrl) async {
+    const fallback =
+        'https://play.google.com/store/apps/details?id=id.indexim.mbs&hl=id';
+    try {
+      final marketUri = Uri.parse('market://details?id=id.indexim.mbs');
+      if (await canLaunchUrl(marketUri)) {
+        await launchUrl(marketUri, mode: LaunchMode.externalApplication);
+        return;
+      }
+    } catch (_) {}
+
+    try {
+      final webUri = Uri.parse(playStoreUrl);
+      await launchUrl(webUri, mode: LaunchMode.externalApplication);
+    } catch (_) {
+      final fallbackUri = Uri.parse(fallback);
+      await launchUrl(fallbackUri, mode: LaunchMode.externalApplication);
+    }
+  }
+
   Future<void> _showForceUpdateDialog({
     required String currentVersion,
     required String latestVersion,
@@ -419,18 +444,7 @@ class _SplashPageState extends State<SplashPage> with TickerProviderStateMixin {
                     width: double.infinity,
                     height: 48,
                     child: ElevatedButton.icon(
-                      onPressed: () async {
-                        try {
-                          final uri = Uri.parse(playStoreUrl);
-                          await launchUrl(uri,
-                              mode: LaunchMode.externalApplication);
-                        } catch (_) {
-                          final fallbackUri = Uri.parse(
-                              'https://play.google.com/store/apps/details?id=id.indexim.mbs');
-                          await launchUrl(fallbackUri,
-                              mode: LaunchMode.externalApplication);
-                        }
-                      },
+                      onPressed: () => _openPlayStore(playStoreUrl),
                       icon: const Icon(Icons.shop_2_rounded,
                           color: Colors.white, size: 20),
                       label: const Text(

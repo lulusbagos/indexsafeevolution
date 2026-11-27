@@ -32,7 +32,7 @@ class _LoginPageState extends State<LoginPage>
   final _userCtrl = TextEditingController();
   final _pswdCtrl = TextEditingController();
   late AnimationController _animCtrl;
-  String _version = '';
+  String _version = '1.0.5';
   bool _remember = true;
   bool _obscureText = true;
   bool _isLoading = false;
@@ -47,7 +47,11 @@ class _LoginPageState extends State<LoginPage>
 
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       PackageInfo packageInfo = await PackageInfo.fromPlatform();
-      setState(() => _version = packageInfo.version);
+      final ver = packageInfo.version.isNotEmpty ? packageInfo.version : '1.0.5';
+      globals.version = ver;
+      if (mounted) {
+        setState(() => _version = ver);
+      }
 
       if (PreferenceService.isBackgroundSyncEnabled()) {
         BackgroundService.instance.isRunning().then((val) {

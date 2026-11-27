@@ -8,6 +8,8 @@ import 'package:image_cropper/image_cropper.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:package_info_plus/package_info_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../models/profile_model.dart';
 import '../services/api.dart';
@@ -46,6 +48,13 @@ class _ProfilePageState extends State<ProfilePage> {
     super.initState();
 
     WidgetsBinding.instance.addPostFrameCallback((_) async {
+      try {
+        if (globals.version.isEmpty) {
+          final pi = await PackageInfo.fromPlatform();
+          globals.version = pi.version;
+          globals.buildNumber = pi.buildNumber;
+        }
+      } catch (_) {}
       _loadProfileImage();
       _fetchLatestProfile();
     });
@@ -1328,6 +1337,41 @@ class _ProfilePageState extends State<ProfilePage> {
                       child: Column(
                         children: [
                           _buildSettingTile(
+                            icon: Icons.system_update_rounded,
+                            iconColor: const Color(0xFF0F766E),
+                            title: 'Pembaruan Aplikasi',
+                            subtitle:
+                                'Versi v${globals.version.isNotEmpty ? globals.version : '1.0.5'} (Build ${globals.buildNumber.isNotEmpty ? globals.buildNumber : '105'}) • Play Store',
+                            trailing: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFECFDF5),
+                                borderRadius: BorderRadius.circular(8),
+                                border:
+                                    Border.all(color: const Color(0xFFA7F3D0)),
+                              ),
+                              child: const Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.check_circle_rounded,
+                                      color: Color(0xFF059669), size: 12),
+                                  SizedBox(width: 4),
+                                  Text(
+                                    'v1.0.5',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w700,
+                                      color: Color(0xFF059669),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            onTap: _checkAppUpdate,
+                          ),
+                          _buildDivider(),
+                          _buildSettingTile(
                             icon: Icons.info_outline_rounded,
                             iconColor: const Color(0xFF4F46E5),
                             title: 'Tentang Aplikasi',
@@ -1416,19 +1460,19 @@ class _ProfilePageState extends State<ProfilePage> {
                     const SizedBox(height: 28),
 
                     // Footer Version
-                    const Center(
+                    Center(
                       child: Column(
                         children: [
                           Text(
-                            'Indexsafe Evolution • Mobile v2.0',
-                            style: TextStyle(
+                            'Indexsafe Evolution • Mobile v${globals.version.isNotEmpty ? globals.version : '1.0.5'} (Build ${globals.buildNumber.isNotEmpty ? globals.buildNumber : '105'})',
+                            style: const TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.w600,
                               color: Color(0xFF94A3B8),
                             ),
                           ),
-                          SizedBox(height: 2),
-                          Text(
+                          const SizedBox(height: 2),
+                          const Text(
                             'PT Indexim Coalindo HSE Integrated System',
                             style: TextStyle(
                               fontSize: 10,
@@ -2121,6 +2165,7 @@ class _ProfilePageState extends State<ProfilePage> {
     required String title,
     required String subtitle,
     required VoidCallback onTap,
+    Widget? trailing,
   }) {
     return InkWell(
       onTap: onTap,
@@ -2162,6 +2207,10 @@ class _ProfilePageState extends State<ProfilePage> {
                 ],
               ),
             ),
+            if (trailing != null) ...[
+              trailing,
+              const SizedBox(width: 4),
+            ],
             const Icon(
               Icons.chevron_right_rounded,
               color: Color(0xFFCBD5E1),
@@ -2171,6 +2220,289 @@ class _ProfilePageState extends State<ProfilePage> {
         ),
       ),
     );
+  }
+
+  Future<void> _checkAppUpdate() async {
+    const defaultPlayStoreUrl =
+        'https://play.google.com/store/apps/details?id=id.indexim.mbs&hl=id';
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => Center(
+        child: Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.1),
+                blurRadius: 16,
+              ),
+            ],
+          ),
+          child: const Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CircularProgressIndicator(
+                strokeWidth: 3,
+                valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF0F766E)),
+              ),
+              SizedBox(height: 16),
+              Text(
+                'Memeriksa versi di Play Store...',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF1E293B),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    Map<String, dynamic>? versionConfig;
+    try {
+      versionConfig = await _api.checkAppVersion();
+    } catch (_) {}
+
+    if (!mounted) return;
+    Navigator.of(context, rootNavigator: true).pop(); // dismiss loading
+
+    final String latestVer =
+        versionConfig?['latest_version']?.toString() ?? '1.0.5';
+    final int latestBuild = (versionConfig?['latest_build'] is int)
+        ? versionConfig!['latest_build'] as int
+        : int.tryParse(versionConfig?['latest_build']?.toString() ?? '105') ?? 105;
+    final String currentVer =
+        globals.version.isNotEmpty ? globals.version : '1.0.5';
+    final int currentBuild = int.tryParse(globals.buildNumber) ?? 105;
+    final String playStoreUrl = versionConfig?['playstore_url']?.toString() ??
+        defaultPlayStoreUrl;
+    final String releaseNotes = versionConfig?['release_notes']?.toString() ??
+        'Versi 1.0.5: Modul Dokumen Management terintegrasi, pembaruan Fit to Work & P5M fatigue checklist, antarmuka responsif profesional, dan perbaikan sinkronisasi data.';
+
+    final bool hasNewer = _isVersionLower(currentVer, latestVer) ||
+        (currentBuild < latestBuild);
+
+    if (!mounted) return;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        padding: const EdgeInsets.fromLTRB(24, 20, 24, 32),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 44,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey.shade300,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 20),
+            Container(
+              width: 68,
+              height: 68,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: LinearGradient(
+                  colors: hasNewer
+                      ? [const Color(0xFFF59E0B), const Color(0xFFD97706)]
+                      : [const Color(0xFF0D9488), const Color(0xFF059669)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: (hasNewer ? const Color(0xFFF59E0B) : const Color(0xFF0D9488))
+                        .withValues(alpha: 0.35),
+                    blurRadius: 16,
+                    offset: const Offset(0, 6),
+                  ),
+                ],
+              ),
+              child: Icon(
+                hasNewer
+                    ? Icons.system_update_alt_rounded
+                    : Icons.verified_rounded,
+                color: Colors.white,
+                size: 36,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              hasNewer
+                  ? 'Pembaruan Aplikasi Tersedia'
+                  : 'Aplikasi Menggunakan Versi Terbaru',
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+                color: Color(0xFF0F172A),
+              ),
+            ),
+            const SizedBox(height: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+              decoration: BoxDecoration(
+                color: hasNewer ? const Color(0xFFFEF3C7) : const Color(0xFFECFDF5),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: hasNewer ? const Color(0xFFFDE68A) : const Color(0xFFA7F3D0),
+                ),
+              ),
+              child: Text(
+                hasNewer
+                    ? 'Versi Terpasang: v$currentVer  ➔  Terbaru: v$latestVer'
+                    : 'Versi v$currentVer (Build $currentBuild) • Google Play Store',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: hasNewer ? const Color(0xFFB45309) : const Color(0xFF047857),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.info_outline_rounded,
+                        size: 16,
+                        color: Colors.blueGrey.shade700,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        hasNewer ? 'Catatan Pembaruan Rilis:' : 'Status Sinkronisasi Sistem:',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.blueGrey.shade800,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    hasNewer
+                        ? releaseNotes
+                        : 'Aplikasi Indexsafe Evolution Anda telah sinkron dengan versi rilis resmi Google Play Store. Semua fitur modul keselamatan, Dokumen Management, dan formulir P5M berjalan optimal.',
+                    style: TextStyle(
+                      fontSize: 12,
+                      height: 1.45,
+                      color: Colors.blueGrey.shade600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 22),
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: ElevatedButton.icon(
+                onPressed: () async {
+                  Navigator.pop(ctx);
+                  await _openPlayStore(playStoreUrl);
+                },
+                icon: const Icon(Icons.shop_2_rounded, color: Colors.white, size: 20),
+                label: Text(
+                  hasNewer
+                      ? 'Perbarui Sekarang di Play Store'
+                      : 'Buka Halaman Google Play Store',
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                  ),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: hasNewer ? const Color(0xFFD97706) : const Color(0xFF0F766E),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  elevation: 2,
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              height: 44,
+              child: TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text(
+                  'Tutup',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF64748B),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  bool _isVersionLower(String current, String target) {
+    try {
+      final cParts =
+          current.split('.').map((e) => int.tryParse(e) ?? 0).toList();
+      final tParts =
+          target.split('.').map((e) => int.tryParse(e) ?? 0).toList();
+      for (int i = 0; i < 3; i++) {
+        final c = i < cParts.length ? cParts[i] : 0;
+        final t = i < tParts.length ? tParts[i] : 0;
+        if (c < t) return true;
+        if (c > t) return false;
+      }
+    } catch (_) {}
+    return false;
+  }
+
+  Future<void> _openPlayStore(String playStoreUrl) async {
+    const fallback =
+        'https://play.google.com/store/apps/details?id=id.indexim.mbs&hl=id';
+    try {
+      final marketUri = Uri.parse('market://details?id=id.indexim.mbs');
+      if (await canLaunchUrl(marketUri)) {
+        await launchUrl(marketUri, mode: LaunchMode.externalApplication);
+        return;
+      }
+    } catch (_) {}
+
+    try {
+      final webUri = Uri.parse(playStoreUrl);
+      await launchUrl(webUri, mode: LaunchMode.externalApplication);
+    } catch (_) {
+      final fallbackUri = Uri.parse(fallback);
+      await launchUrl(fallbackUri, mode: LaunchMode.externalApplication);
+    }
   }
 
   Widget _buildDivider() {

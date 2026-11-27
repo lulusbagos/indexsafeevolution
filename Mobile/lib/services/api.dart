@@ -694,7 +694,7 @@ class ApiService {
 
 
 
-                      (globals.version.isNotEmpty) ? globals.version : '1.0.1',
+                      (globals.version.isNotEmpty) ? globals.version : '1.0.5',
 
 
 
@@ -1578,7 +1578,7 @@ class ApiService {
 
 
 
-          (globals.version.isNotEmpty) ? globals.version : '1.0.1';
+          (globals.version.isNotEmpty) ? globals.version : '1.0.5';
 
 
 
@@ -1882,7 +1882,7 @@ class ApiService {
 
 
 
-          (globals.version.isNotEmpty) ? globals.version : '1.0.1';
+          (globals.version.isNotEmpty) ? globals.version : '1.0.5';
 
 
 

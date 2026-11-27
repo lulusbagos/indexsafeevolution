@@ -238,7 +238,8 @@ namespace Indexsafe.Api.Controllers
                     IdPerusahaan = idPerusahaan,
                     Role = role,
                     KaryawanId = currentKaryawanId,
-                    LastLogin = DateTime.Now
+                    LastLogin = DateTime.Now,
+                    AppVersion = req.AppVersion
                 };
                 _context.AppUsers.Add(existingAppUser);
             }
@@ -254,6 +255,10 @@ namespace Indexsafe.Api.Controllers
                     existingAppUser.Role = role;
                 }
                 existingAppUser.LastLogin = DateTime.Now;
+                if (!string.IsNullOrWhiteSpace(req.AppVersion))
+                {
+                    existingAppUser.AppVersion = req.AppVersion;
+                }
             }
             await _context.SaveChangesAsync();
 
@@ -1252,6 +1257,17 @@ namespace Indexsafe.Api.Controllers
                     };
                     _context.PasswordOverrides.Add(overridePwd);
                 }
+
+                // Juga perbarui versi aplikasi di tbl_t_app_user jika tersedia
+                if (!string.IsNullOrWhiteSpace(req.AppVersion))
+                {
+                    var appUser = await _context.AppUsers.FindAsync(nrp);
+                    if (appUser != null)
+                    {
+                        appUser.AppVersion = req.AppVersion;
+                    }
+                }
+
                 await _context.SaveChangesAsync();
                 return Ok(new { success = true, message = "FCM token berhasil diperbarui di tbl_m_pengguna_sandi." });
             }

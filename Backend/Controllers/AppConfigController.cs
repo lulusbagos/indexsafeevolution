@@ -126,25 +126,25 @@ namespace Indexsafe.Api.Controllers
         {
             var latestVersion = _overrideLatestVersion 
                 ?? _configuration["AppVersionSettings:LatestVersion"] 
-                ?? "1.0.1";
+                ?? "1.0.5";
             var latestBuild = _overrideLatestBuild 
                 ?? _configuration.GetValue<int?>("AppVersionSettings:LatestBuild") 
-                ?? 101;
+                ?? 105;
             var minVersion = _overrideMinVersion 
                 ?? _configuration["AppVersionSettings:MinVersion"] 
-                ?? "1.0.1";
+                ?? "1.0.5";
             var minBuild = _overrideMinBuild 
                 ?? _configuration.GetValue<int?>("AppVersionSettings:MinBuild") 
-                ?? 101;
+                ?? 105;
             var forceUpdate = _overrideForceUpdate 
                 ?? _configuration.GetValue<bool?>("AppVersionSettings:ForceUpdate") 
-                ?? true;
+                ?? false;
             var playStoreUrl = _overridePlayStoreUrl 
                 ?? _configuration["AppVersionSettings:PlayStoreUrl"] 
-                ?? "https://play.google.com/store/apps/details?id=id.indexim.mbs";
-            var title = _configuration["AppVersionSettings:Title"] ?? "Update Aplikasi Diperlukan";
+                ?? "https://play.google.com/store/apps/details?id=id.indexim.mbs&hl=id";
+            var title = _configuration["AppVersionSettings:Title"] ?? "Update Aplikasi Tersedia";
             var message = _configuration["AppVersionSettings:Message"] ?? "Versi aplikasi Anda sudah usang. Harap perbarui ke versi terbaru di Google Play Store untuk dapat melanjutkan penggunaan MBS SAP.";
-            var releaseNotes = _configuration["AppVersionSettings:ReleaseNotes"] ?? "Integrasi Firebase Cloud Messaging, pembaruan performa, dan sinkronisasi real-time.";
+            var releaseNotes = _configuration["AppVersionSettings:ReleaseNotes"] ?? "Versi 1.0.5: Modul Dokumen Management, pembaruan Fit to Work & fatigue assessment P5M, antarmuka responsif profesional, dan perbaikan sinkronisasi real-time.";
 
             return Ok(new
             {

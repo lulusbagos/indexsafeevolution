@@ -37,5 +37,9 @@ namespace Indexsafe.Api.Models
         [MaxLength(50)]
         [Column("role")]
         public string? Role { get; set; }
+
+        [MaxLength(50)]
+        [Column("app_version")]
+        public string? AppVersion { get; set; }
     }
 }
