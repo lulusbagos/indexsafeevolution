@@ -34,7 +34,7 @@ class PopupAdService {
         return false;
       }
 
-      // 3. Cek pembatasan 1 hari sekali
+      // 3. Tampilkan iklan aktif dari backend pada saat startup
       final now = DateTime.now();
       final todayStr =
           "${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}";
@@ -42,15 +42,13 @@ class PopupAdService {
       final lastShownDate = PreferenceService.getLastAdShownDate();
       final lastShownFile = PreferenceService.getLastAdShownFile();
 
-      // Jika belum pernah ditampilkan hari ini, atau jika file gambar iklannya baru
-      final shouldShow = force ||
-          lastShownDate != todayStr ||
-          lastShownFile != adData.fileName;
+      // Selalu tampilkan jika force == true atau ada iklan aktif dari backend
+      final shouldShow = force || adData.fileName.isNotEmpty;
 
       debugPrint('[PopupAdService] today=$todayStr, lastDate=$lastShownDate, lastFile=$lastShownFile, shouldShow=$shouldShow');
 
       if (!shouldShow) {
-        debugPrint('[PopupAdService] Ad already displayed today. Skipping.');
+        debugPrint('[PopupAdService] No ad to display. Skipping.');
         return false;
       }
 

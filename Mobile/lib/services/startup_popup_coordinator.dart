@@ -43,10 +43,10 @@ class StartupPopupCoordinator {
       if (!context.mounted) return;
 
       // ==========================================
-      // 1. TAHAP 1: Iklan / Banner Info Harian
+      // 1. TAHAP 1: Iklan / Banner Info Harian (Gambar)
       // ==========================================
       debugPrint('[StartupPopupCoordinator] Step 1: Checking PopupAd...');
-      final adShown = await PopupAdService.checkAndShowPopupAd(context);
+      final adShown = await PopupAdService.checkAndShowPopupAd(context, force: true);
       if (adShown) {
         debugPrint('[StartupPopupCoordinator] Step 1: PopupAd closed. Waiting exit animation...');
         // Jeda halus agar dialog pertama selesai exit transition (320ms + jeda 180ms)
