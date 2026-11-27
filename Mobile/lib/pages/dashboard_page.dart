@@ -37,6 +37,8 @@ import 'safety_updates_page.dart';
 import 'special_permit/special_permit_followup_page.dart';
 import 'special_permit/special_permit_list_page.dart';
 import 'document_management/document_management_page.dart';
+import 'mining/mining_hub_page.dart';
+import 'employee/employee_hub_page.dart';
 import '../widgets/home_weather_widget.dart';
 
 class _HomeModuleCard extends StatelessWidget {
@@ -5341,6 +5343,36 @@ class _DashboardPageState extends State<DashboardPage>
                           Navigator.of(context).push(
                             MaterialPageRoute(
                               builder: (context) => const DocumentManagementPage(),
+                            ),
+                          );
+                        },
+                      ),
+                      const SizedBox(width: 12),
+                      _HomeModuleCard(
+                        title: 'MINING\nOPS',
+                        imagePath: 'assets/images/home-mining-ops.png',
+                        labelColor: const Color(0xFFD97706),
+                        iconHeight: 70,
+                        width: ((MediaQuery.of(context).size.width - 40 - 24) / 3.18).clamp(108.0, 130.0),
+                        onTap: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (context) => const MiningHubPage(),
+                            ),
+                          );
+                        },
+                      ),
+                      const SizedBox(width: 12),
+                      _HomeModuleCard(
+                        title: 'EMPLOYEE\nHUB',
+                        imagePath: 'assets/images/home-employee-hub.png',
+                        labelColor: const Color(0xFF6366F1),
+                        iconHeight: 70,
+                        width: ((MediaQuery.of(context).size.width - 40 - 24) / 3.18).clamp(108.0, 130.0),
+                        onTap: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (context) => const EmployeeHubPage(),
                             ),
                           );
                         },
