@@ -12,19 +12,21 @@ class _MiningHubPageState extends State<MiningHubPage> {
   String _myName = 'LULUS BAGOS HERMAWAN';
   String _myDept = 'SYSTEM INTEGRATIONS';
 
+  // Active Category Filter Tab
+  int _selectedTabIndex = 0;
+  final List<String> _tabs = [
+    'Semua',
+    'Pit & Geotek',
+    'Water & Sump',
+    'CPP & Plant',
+    'Hauling & Barging',
+  ];
+
   String _searchQuery = '';
   final TextEditingController _searchCtrl = TextEditingController();
 
-  // State untuk Kalkulator Blending Batubara
-  double _ratioSeamA = 60.0;
-  final double _caloriSeamA = 5850.0;
-  final double _caloriSeamB = 5050.0;
-
-  double get _blendedCalori {
-    final ratioA = _ratioSeamA / 100.0;
-    final ratioB = (100.0 - _ratioSeamA) / 100.0;
-    return (ratioA * _caloriSeamA) + (ratioB * _caloriSeamB);
-  }
+  // Set of subscribed module notifications
+  final Set<String> _subscribedModules = {};
 
   @override
   void initState() {
@@ -40,17 +42,270 @@ class _MiningHubPageState extends State<MiningHubPage> {
     super.dispose();
   }
 
+  void _showComingSoonModal(MiningMenuItem item) {
+    final isSubscribed = _subscribedModules.contains(item.title);
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            final currentSubscribed = _subscribedModules.contains(item.title);
+
+            return Container(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+              decoration: BoxDecoration(
+                color: const Color(0xFF0F172A), // Deep Slate Titanium
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+                border: Border.all(color: const Color(0xFF0284C7).withValues(alpha: 0.4), width: 1.5),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF0284C7).withValues(alpha: 0.25),
+                    blurRadius: 30,
+                    spreadRadius: 2,
+                    offset: const Offset(0, -6),
+                  ),
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Drag handle
+                  Center(
+                    child: Container(
+                      width: 44,
+                      height: 4.5,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.25),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+
+                  // Header Badge
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4.5),
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFFD97706), Color(0xFFB45309)],
+                          ),
+                          borderRadius: BorderRadius.circular(8),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFFD97706).withValues(alpha: 0.4),
+                              blurRadius: 10,
+                            ),
+                          ],
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.bolt_rounded, size: 14, color: Colors.white),
+                            SizedBox(width: 4),
+                            Text(
+                              'COMING SOON • TAHAP RANCANG BANGUN',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w900,
+                                color: Colors.white,
+                                letterSpacing: 0.6,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Spacer(),
+                      IconButton(
+                        icon: const Icon(Icons.close_rounded, color: Colors.white70),
+                        onPressed: () => Navigator.pop(ctx),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+
+                  // Module Title & Icon
+                  Row(
+                    children: [
+                      Container(
+                        width: 54,
+                        height: 54,
+                        decoration: BoxDecoration(
+                          color: item.iconColor.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: item.iconColor.withValues(alpha: 0.4)),
+                        ),
+                        child: Center(
+                          child: Icon(item.icon, color: item.iconColor, size: 28),
+                        ),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              item.title,
+                              style: const TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w900,
+                                color: Colors.white,
+                                letterSpacing: -0.3,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              item.categoryLabel,
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: const Color(0xFF38BDF8),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Full Functional Description
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.05),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+                    ),
+                    child: Text(
+                      item.description,
+                      style: TextStyle(
+                        fontSize: 13,
+                        height: 1.45,
+                        color: Colors.white.withValues(alpha: 0.9),
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+
+                  // Planned IoT & Telemetry Features
+                  Text(
+                    'Spesifikasi Telemetri & Sensor IoT Terintegrasi:',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                      color: Colors.white.withValues(alpha: 0.8),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 7,
+                    runSpacing: 7,
+                    children: item.iotFeatures.map((feat) {
+                      return Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF0284C7).withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: const Color(0xFF0284C7).withValues(alpha: 0.3)),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.sensors_rounded, size: 12, color: Color(0xFF38BDF8)),
+                            const SizedBox(width: 5),
+                            Text(
+                              feat,
+                              style: const TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFFBAE6FD),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 20),
+
+                  // CTA Button
+                  SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: currentSubscribed ? const Color(0xFF059669) : const Color(0xFF0284C7),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                        elevation: 0,
+                      ),
+                      icon: Icon(
+                        currentSubscribed ? Icons.notifications_active_rounded : Icons.notification_add_rounded,
+                        color: Colors.white,
+                        size: 20,
+                      ),
+                      label: Text(
+                        currentSubscribed ? 'Notifikasi Aktif (Akan Diberitahu Saat Rilis)' : 'Ingatkan Saya Saat Fitur Ini Rilis',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.white,
+                        ),
+                      ),
+                      onPressed: () {
+                        setState(() {
+                          if (currentSubscribed) {
+                            _subscribedModules.remove(item.title);
+                          } else {
+                            _subscribedModules.add(item.title);
+                          }
+                        });
+                        setModalState(() {});
+                        _showToast(
+                          currentSubscribed
+                              ? 'Pengingat untuk ${item.title} dinonaktifkan.'
+                              : 'Pengingat berhasil diaktifkan! Anda akan menerima notifikasi saat modul ini dirilis.',
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _showToast(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        duration: const Duration(seconds: 2),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    const primaryColor = Color(0xFFD97706); // Amber Gold Mining
+    const bgColor = Color(0xFF0B1120); // Deep High-Tech Obsidian
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: bgColor,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: const Color(0xFF0F172A),
         elevation: 0,
         centerTitle: false,
-        scrolledUnderElevation: 1,
+        scrolledUnderElevation: 2,
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -60,14 +315,20 @@ class _MiningHubPageState extends State<MiningHubPage> {
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
                     gradient: const LinearGradient(
-                      colors: [Color(0xFFD97706), Color(0xFFB45309)],
+                      colors: [Color(0xFFF59E0B), Color(0xFFD97706)],
                     ),
                     borderRadius: BorderRadius.circular(6),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFFF59E0B).withValues(alpha: 0.35),
+                        blurRadius: 8,
+                      ),
+                    ],
                   ),
                   child: const Text(
                     'X MINE',
                     style: TextStyle(
-                      fontSize: 13,
+                      fontSize: 12,
                       fontWeight: FontWeight.w900,
                       color: Colors.white,
                       letterSpacing: 0.8,
@@ -76,11 +337,11 @@ class _MiningHubPageState extends State<MiningHubPage> {
                 ),
                 const SizedBox(width: 8),
                 const Text(
-                  'Mining Operations',
+                  'Mining Operations Suite',
                   style: TextStyle(
-                    fontSize: 17,
+                    fontSize: 16.5,
                     fontWeight: FontWeight.w800,
-                    color: Color(0xFF0F172A),
+                    color: Colors.white,
                     letterSpacing: -0.3,
                   ),
                 ),
@@ -88,27 +349,24 @@ class _MiningHubPageState extends State<MiningHubPage> {
             ),
             const SizedBox(height: 2),
             Text(
-              'Mine Engineering • CCM • Fleet & Survey • $_myDept',
+              'End-to-End Hulu ke Hilir Tambang • PT Indexim Coalindo',
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                fontSize: 11,
+                fontSize: 10.5,
                 fontWeight: FontWeight.w600,
-                color: Colors.grey.shade600,
+                color: Colors.white.withValues(alpha: 0.65),
               ),
             ),
           ],
         ),
         actions: [
           IconButton(
-            tooltip: 'Simulasi Blending',
-            icon: const Icon(Icons.calculate_rounded, color: primaryColor),
-            onPressed: _showBlendingCalculatorModal,
-          ),
-          IconButton(
-            tooltip: 'Status Pit Tambang',
-            icon: const Icon(Icons.analytics_rounded, color: Color(0xFF64748B)),
-            onPressed: _showPitStatusModal,
+            tooltip: 'Status Modul',
+            icon: const Icon(Icons.info_outline_rounded, color: Color(0xFFFBBF24)),
+            onPressed: () {
+              _showToast('Seluruh modul X-Mine sedang dalam tahap rancang bangun 4.0 (Coming Soon).');
+            },
           ),
           const SizedBox(width: 4),
         ],
@@ -117,241 +375,23 @@ class _MiningHubPageState extends State<MiningHubPage> {
         physics: const BouncingScrollPhysics(),
         padding: const EdgeInsets.fromLTRB(16, 14, 16, 40),
         children: [
-          // 1. Top Realtime Pit Operations Banner
-          _buildPitHeroBanner(),
+          // 1. Futuristic 3D Hero Banner
+          _buildFuturisticHeroBanner(),
 
           const SizedBox(height: 14),
 
-          // 2. Search Bar
-          _buildSearchBar(),
+          // 2. High-Tech Search Bar
+          _buildFuturisticSearchBar(),
+
+          const SizedBox(height: 14),
+
+          // 3. Segmented Mining Chain Tabs (Hulu ke Hilir)
+          _buildSegmentedChainTabs(),
 
           const SizedBox(height: 16),
 
-          // 3. Section 1: Rekayasa Tambang & Geoteknik (Mine Engineering)
-          _buildSectionCard(
-            title: 'Rekayasa Tambang & Geoteknik',
-            onTitleTap: () => _showToast('Kategori: Rekayasa Tambang & Geoteknik'),
-            items: [
-              _MenuItem(
-                title: 'Pit Design',
-                icon: Icons.architecture_rounded,
-                iconColor: const Color(0xFFD97706),
-                bgColor: const Color(0xFFFEF3C7),
-                badge: 'RL -25m',
-                onTap: () => _showFeatureDetail(
-                  'Desain & Rencana Pit Tambang',
-                  'Desain geometri bench, ramp akses, dan boundary limit penambangan Pit Central Tahap 4 pada elevasi RL -25 m s/d +60 m.',
-                  Icons.architecture_rounded,
-                  const Color(0xFFD97706),
-                ),
-              ),
-              _MenuItem(
-                title: 'Mine Sequencing',
-                icon: Icons.calendar_month_rounded,
-                iconColor: const Color(0xFF0284C7),
-                bgColor: const Color(0xFFE0F2FE),
-                onTap: () => _showFeatureDetail(
-                  'Mine Sequencing & Schedule Bulanan',
-                  'Penjadwalan arah kemajuan tambang bulanan Pit West, stripping ratio berkala, dan alokasi fleet excavator loader.',
-                  Icons.calendar_month_rounded,
-                  const Color(0xFF0284C7),
-                ),
-              ),
-              _MenuItem(
-                title: 'Geoteknik Lereng',
-                icon: Icons.terrain_rounded,
-                iconColor: const Color(0xFF059669),
-                bgColor: const Color(0xFFD1FAE5),
-                badge: 'FoS 1.42',
-                onTap: () => _showFeatureDetail(
-                  'Kemantapan Lereng (FoS & Slope Stability)',
-                  'Monitoring kestabilan dinding tambang Highwall dan Lowwall menggunakan prism monitoring dan slope stability radar. FoS aman: 1.42.',
-                  Icons.terrain_rounded,
-                  const Color(0xFF059669),
-                ),
-              ),
-              _MenuItem(
-                title: 'Pit Dewatering',
-                icon: Icons.water_drop_rounded,
-                iconColor: const Color(0xFF0891B2),
-                bgColor: const Color(0xFFCFFAFE),
-                onTap: () => _showFeatureDetail(
-                  'Water Management & Pit Sump',
-                  'Pengelolaan pompa tambang di Central Sump RL -30m dengan debit 320 Liter/detik dialirkan menuju kolam pengendap sedimen (settling pond).',
-                  Icons.water_drop_rounded,
-                  const Color(0xFF0891B2),
-                ),
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 14),
-
-          // 4. Section 2: Clean Coal Management (CCM & Kualitas)
-          _buildSectionCard(
-            title: 'Clean Coal Management (CCM & Kualitas)',
-            onTitleTap: () => _showToast('Kategori: Clean Coal Management'),
-            items: [
-              _MenuItem(
-                title: 'Kualitas Seam',
-                icon: Icons.science_rounded,
-                iconColor: const Color(0xFFDC2626),
-                bgColor: const Color(0xFFFEE2E2),
-                onTap: _showSeamQualityModal,
-              ),
-              _MenuItem(
-                title: 'Simulasi Blending',
-                icon: Icons.calculate_rounded,
-                iconColor: const Color(0xFFD97706),
-                bgColor: const Color(0xFFFEF3C7),
-                badge: 'HITUNG',
-                onTap: _showBlendingCalculatorModal,
-              ),
-              _MenuItem(
-                title: 'ROM Stockpile',
-                icon: Icons.layers_rounded,
-                iconColor: const Color(0xFF7C3AED),
-                bgColor: const Color(0xFFEDE9FE),
-                onTap: () => _showFeatureDetail(
-                  'Manajemen ROM Stockpile Batubara',
-                  'Kapasitas aktif ROM Stockpile 185,200 MT (72% kapasitas). Pengaturan sistem FIFO dan pencegahan swa-bakar (spontaneous combustion).',
-                  Icons.layers_rounded,
-                  const Color(0xFF7C3AED),
-                ),
-              ),
-              _MenuItem(
-                title: 'Kontrol Parting',
-                icon: Icons.cleaning_services_rounded,
-                iconColor: const Color(0xFF0F766E),
-                bgColor: const Color(0xFFCCFBF1),
-                badge: 'CCM 98%',
-                onTap: () => _showFeatureDetail(
-                  'Pembersihan & Kontrol Parting Clay',
-                  'Pengawasan ketat pemisahan parting tanah liat dari lapisan batubara untuk memastikan kadar abu (ash content) tetap di bawah 6.5%.',
-                  Icons.cleaning_services_rounded,
-                  const Color(0xFF0F766E),
-                ),
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 14),
-
-          // 5. Section 3: Hauling, Fleet & Timbangan
-          _buildSectionCard(
-            title: 'Hauling, Fleet & Timbangan',
-            onTitleTap: () => _showToast('Kategori: Hauling & Fleet Operasional'),
-            items: [
-              _MenuItem(
-                title: 'Fleet Tracker',
-                icon: Icons.local_shipping_rounded,
-                iconColor: const Color(0xFF2563EB),
-                bgColor: const Color(0xFFDBEAFE),
-                badge: '89.6% PA',
-                onTap: () => _showFeatureDetail(
-                  'Fleet Availability & Monitoring Unit',
-                  'Ketersediaan fisik alat berat (Physical Availability): 89.6%. 142 Dump Truck dan 18 Excavator loader beroperasi normal.',
-                  Icons.local_shipping_rounded,
-                  const Color(0xFF2563EB),
-                ),
-              ),
-              _MenuItem(
-                title: 'Jembatan Timbang',
-                icon: Icons.scale_rounded,
-                iconColor: const Color(0xFF059669),
-                bgColor: const Color(0xFFD1FAE5),
-                onTap: () => _showFeatureDetail(
-                  'Weighbridge & Payload Batubara',
-                  'Monitoring otomatis timbangan truk batubara keluar pit menuju port. Rata-rata payload 32.4 ton per ritase dengan deviasi < 2%.',
-                  Icons.scale_rounded,
-                  const Color(0xFF059669),
-                ),
-              ),
-              _MenuItem(
-                title: 'Barging & Port',
-                icon: Icons.directions_boat_rounded,
-                iconColor: const Color(0xFF0284C7),
-                bgColor: const Color(0xFFE0F2FE),
-                onTap: () => _showFeatureDetail(
-                  'Operasional Pelabuhan & Pemuatan Tongkang',
-                  'Laju pemuatan conveyor jet jetty: 1,200 Ton/Jam. Stockpile pelabuhan siap muat untuk pengapalan tongkang 300 feet.',
-                  Icons.directions_boat_rounded,
-                  const Color(0xFF0284C7),
-                ),
-              ),
-              _MenuItem(
-                title: 'Jalur Hauling',
-                icon: Icons.alt_route_rounded,
-                iconColor: const Color(0xFFD97706),
-                bgColor: const Color(0xFFFEF3C7),
-                onTap: () => _showFeatureDetail(
-                  'Kondisi Jalan Hauling Tambang',
-                  'Jalur hauling KM 0 s/d KM 48 dalam kondisi mulus. 6 unit Water Truck aktif menyiram debu jalan secara terjadwal.',
-                  Icons.alt_route_rounded,
-                  const Color(0xFFD97706),
-                ),
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 14),
-
-          // 6. Section 4: Survey, Drone & Geologi Tambang
-          _buildSectionCard(
-            title: 'Survey, Drone & Geologi Tambang',
-            onTitleTap: () => _showToast('Kategori: Survey & Geologi'),
-            items: [
-              _MenuItem(
-                title: 'Drone LiDAR',
-                icon: Icons.flight_takeoff_rounded,
-                iconColor: const Color(0xFF7C3AED),
-                bgColor: const Color(0xFFEDE9FE),
-                badge: 'FOTO 3D',
-                onTap: () => _showFeatureDetail(
-                  'Pemetaan Udara Drone LiDAR & Fotogrametri',
-                  'Penerbangan drone mingguan menghasilkan peta orthophoto kontur topografi 3D bereferensi koordinat geospasial tambang.',
-                  Icons.flight_takeoff_rounded,
-                  const Color(0xFF7C3AED),
-                ),
-              ),
-              _MenuItem(
-                title: 'Volume Cut & Fill',
-                icon: Icons.straighten_rounded,
-                iconColor: const Color(0xFF0D9488),
-                bgColor: const Color(0xFFCCFBF1),
-                onTap: () => _showFeatureDetail(
-                  'Perhitungan Volume Overburden & Coal',
-                  'Rekonsiliasi volume hasil survey tambang bulanan: OB Removal 215,400 BCM dan Coal Mined 42,850 MT.',
-                  Icons.straighten_rounded,
-                  const Color(0xFF0D9488),
-                ),
-              ),
-              _MenuItem(
-                title: 'Eksplorasi Seam',
-                icon: Icons.biotech_rounded,
-                iconColor: const Color(0xFFE11D48),
-                bgColor: const Color(0xFFFFE4E6),
-                onTap: () => _showFeatureDetail(
-                  'Pemodelan Geologi & Titik Bor',
-                  'Data log stratigrafi 84 titik bor eksplorasi aktif untuk memetakan ketebalan dan kemiringan dip seam batubara.',
-                  Icons.biotech_rounded,
-                  const Color(0xFFE11D48),
-                ),
-              ),
-              _MenuItem(
-                title: 'Disposal Dump',
-                icon: Icons.delete_sweep_rounded,
-                iconColor: const Color(0xFF475569),
-                bgColor: const Color(0xFFF1F5F9),
-                onTap: () => _showFeatureDetail(
-                  'Rencana Penimbunan Waste Dump Timur',
-                  'Kapasitas area dumping timur terpakai 82% (1.4 Juta BCM). Penataan terasering lereng dan penanaman vegetasi reklamasi progresif.',
-                  Icons.delete_sweep_rounded,
-                  const Color(0xFF475569),
-                ),
-              ),
-            ],
-          ),
+          // 4. Mining Modules (Grouped Hulu ke Hilir)
+          ..._buildFilteredSections(),
         ],
       ),
     );
@@ -361,20 +401,21 @@ class _MiningHubPageState extends State<MiningHubPage> {
   // WIDGETS
   // --------------------------------------------------------------------------
 
-  Widget _buildPitHeroBanner() {
+  Widget _buildFuturisticHeroBanner() {
     return Container(
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [Color(0xFF1E293B), Color(0xFF0F172A)],
+          colors: [Color(0xFF0F172A), Color(0xFF1E293B), Color(0xFF172554)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: const Color(0xFF38BDF8).withValues(alpha: 0.3), width: 1.2),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.15),
-            blurRadius: 16,
+            color: const Color(0xFF0284C7).withValues(alpha: 0.2),
+            blurRadius: 20,
             offset: const Offset(0, 6),
           ),
         ],
@@ -383,91 +424,157 @@ class _MiningHubPageState extends State<MiningHubPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
+              // 3D Futuristic Logo Icon
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                width: 68,
+                height: 68,
                 decoration: BoxDecoration(
-                  color: const Color(0xFFD97706).withValues(alpha: 0.25),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: const Color(0xFFD97706)),
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF0284C7).withValues(alpha: 0.4),
+                      blurRadius: 16,
+                      spreadRadius: 2,
+                    ),
+                  ],
                 ),
-                child: const Text(
-                  'REALTIME PIT STATUS',
-                  style: TextStyle(
-                    fontSize: 10.5,
-                    fontWeight: FontWeight.w800,
-                    color: Color(0xFFFBBF24),
-                    letterSpacing: 0.5,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(16),
+                  child: Image.asset(
+                    'assets/images/home-mining-ops.png',
+                    fit: BoxFit.cover,
                   ),
                 ),
               ),
-              const Text(
-                'Live Operasional',
-                style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFD97706).withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(color: const Color(0xFFF59E0B)),
+                          ),
+                          child: const Text(
+                            'FASE 4.0 • COMING SOON',
+                            style: TextStyle(
+                              fontSize: 9.5,
+                              fontWeight: FontWeight.w900,
+                              color: Color(0xFFFDE047),
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    const Text(
+                      'X-MINE OPERATIONS',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w900,
+                        color: Colors.white,
+                        letterSpacing: -0.3,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Arsitektur Telemetri Hulu ke Hilir Tambang',
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white.withValues(alpha: 0.75),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
           const SizedBox(height: 14),
-          const Text(
-            'Produksi Batubara & Stripping Ratio',
+          Text(
+            'Seluruh rangkaian operasional terpadu: dari Pit Tambang, Geoteknik Lereng, Sump & Settling Pond, CPP Crushing, hingga Jalur Hauling dan Pengapalan Tongkang (Barging).',
             style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.w900,
-              color: Colors.white,
-              letterSpacing: -0.4,
+              fontSize: 11.5,
+              height: 1.38,
+              color: Colors.white.withValues(alpha: 0.8),
+              fontWeight: FontWeight.w500,
             ),
           ),
-          const SizedBox(height: 4),
-          const Text(
-            'Operasi Pit Central & Pit West dengan kepatuhan CCM 98.4%',
-            style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
-          ),
           const SizedBox(height: 14),
-          Row(
-            children: [
-              _buildPitMetric('COAL MINED', '42,850 MT', const Color(0xFFF59E0B)),
-              const SizedBox(width: 8),
-              _buildPitMetric('OB REMOVAL', '215.4K BCM', const Color(0xFF38BDF8)),
-              const SizedBox(width: 8),
-              _buildPitMetric('ACTUAL SR', '5.02 : 1', const Color(0xFF34D399)),
-            ],
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            decoration: BoxDecoration(
+              color: Colors.black.withValues(alpha: 0.35),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                _buildStatPill('18 Modul', 'Hulu ke Hilir', const Color(0xFF38BDF8)),
+                _buildStatDivider(),
+                _buildStatPill('5 Tahapan', 'Rantai Nilai', const Color(0xFFFBBF24)),
+                _buildStatDivider(),
+                _buildStatPill('IoT Live', 'Rancang Bangun', const Color(0xFF34D399)),
+                _buildStatDivider(),
+                _buildStatPill('Q3 2026', 'Target Rilis', const Color(0xFFA78BFA)),
+              ],
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildPitMetric(String label, String value, Color color) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
-        decoration: BoxDecoration(
-          color: Colors.black.withValues(alpha: 0.35),
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+  Widget _buildStatPill(String value, String label, Color accentColor) {
+    return Column(
+      children: [
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 12.5,
+            fontWeight: FontWeight.w900,
+            color: accentColor,
+          ),
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(label, style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.w700, color: color)),
-            const SizedBox(height: 2),
-            Text(value, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: Colors.white)),
-          ],
+        const SizedBox(height: 1),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 9.5,
+            fontWeight: FontWeight.w600,
+            color: Colors.white.withValues(alpha: 0.6),
+          ),
         ),
-      ),
+      ],
     );
   }
 
-  Widget _buildSearchBar() {
+  Widget _buildStatDivider() {
+    return Container(
+      width: 1,
+      height: 20,
+      color: Colors.white.withValues(alpha: 0.15),
+    );
+  }
+
+  Widget _buildFuturisticSearchBar() {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        color: const Color(0xFF0F172A),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFF1E293B)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
+            color: Colors.black.withValues(alpha: 0.3),
             blurRadius: 10,
             offset: const Offset(0, 3),
           ),
@@ -475,14 +582,15 @@ class _MiningHubPageState extends State<MiningHubPage> {
       ),
       child: TextField(
         controller: _searchCtrl,
-        onChanged: (val) => setState(() => _searchQuery = val),
+        onChanged: (val) => setState(() => _searchQuery = val.trim().toLowerCase()),
+        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.white),
         decoration: InputDecoration(
-          hintText: 'Cari modul rekayasa, geoteknik, seam, timbangan...',
-          hintStyle: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
-          prefixIcon: const Icon(Icons.search_rounded, color: Color(0xFFD97706), size: 22),
-          suffixIcon: _searchQuery.isNotEmpty
+          hintText: 'Cari modul (PIT, Sump, Settling Pond, CPP, Hauling, Barging)...',
+          hintStyle: TextStyle(fontSize: 11.5, color: Colors.white.withValues(alpha: 0.4), fontWeight: FontWeight.w500),
+          prefixIcon: const Icon(Icons.search_rounded, color: Color(0xFF38BDF8), size: 22),
+          suffixIcon: _searchCtrl.text.isNotEmpty
               ? IconButton(
-                  icon: const Icon(Icons.clear_rounded, size: 18),
+                  icon: const Icon(Icons.close_rounded, size: 18, color: Colors.white70),
                   onPressed: () {
                     _searchCtrl.clear();
                     setState(() => _searchQuery = '');
@@ -490,691 +598,617 @@ class _MiningHubPageState extends State<MiningHubPage> {
                 )
               : null,
           border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
         ),
       ),
     );
   }
 
-  Widget _buildSectionCard({
-    required String title,
-    required VoidCallback onTitleTap,
-    required List<_MenuItem> items,
-  }) {
-    final filteredItems = _searchQuery.isEmpty
-        ? items
-        : items.where((i) => i.title.toLowerCase().contains(_searchQuery.toLowerCase())).toList();
+  Widget _buildSegmentedChainTabs() {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      physics: const BouncingScrollPhysics(),
+      child: Row(
+        children: List.generate(_tabs.length, (index) {
+          final isSelected = _selectedTabIndex == index;
+          return Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: InkWell(
+              onTap: () => setState(() => _selectedTabIndex = index),
+              borderRadius: BorderRadius.circular(10),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                decoration: BoxDecoration(
+                  gradient: isSelected
+                      ? const LinearGradient(
+                          colors: [Color(0xFF0284C7), Color(0xFF0369A1)],
+                        )
+                      : null,
+                  color: isSelected ? null : const Color(0xFF0F172A),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: isSelected ? const Color(0xFF38BDF8) : const Color(0xFF1E293B),
+                    width: isSelected ? 1.4 : 1.0,
+                  ),
+                  boxShadow: isSelected
+                      ? [
+                          BoxShadow(
+                            color: const Color(0xFF0284C7).withValues(alpha: 0.35),
+                            blurRadius: 10,
+                          ),
+                        ]
+                      : null,
+                ),
+                child: Text(
+                  _tabs[index],
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: isSelected ? FontWeight.w900 : FontWeight.w700,
+                    color: isSelected ? Colors.white : Colors.white.withValues(alpha: 0.65),
+                  ),
+                ),
+              ),
+            ),
+          );
+        }),
+      ),
+    );
+  }
 
-    if (filteredItems.isEmpty) return const SizedBox.shrink();
+  List<Widget> _buildFilteredSections() {
+    final sections = <Widget>[];
 
+    // SECTION 1: HULU 1 • PIT TAMBANG
+    if (_matchesTab(1)) {
+      final items = [
+        MiningMenuItem(
+          title: 'Pit Geometry & 3D Design',
+          categoryLabel: 'HULU • PIT EXTRACTION',
+          icon: Icons.architecture_rounded,
+          iconColor: const Color(0xFFF59E0B),
+          badge: 'COMING SOON',
+          description:
+              'Pemodelan geometri pit 3D, elevasi bench, lebar berm, ramp grade hauling pit, dan visualisasi batas boundary penambangan.',
+          iotFeatures: ['Drone LiDAR Point-Cloud', 'GPS Geodetik RTK', 'Pit Cut/Fill Surface 3D'],
+        ),
+        MiningMenuItem(
+          title: 'Drilling & Blasting Telemetry',
+          categoryLabel: 'HULU • PIT EXTRACTION',
+          icon: Icons.flash_on_rounded,
+          iconColor: const Color(0xFFEF4444),
+          badge: 'COMING SOON',
+          description:
+              'Perhitungan pola pemboran, kedalaman lubang ledak, Powder Factor (PF), pemantauan seismik getaran peledakan, dan fragmentasi batuan.',
+          iotFeatures: ['Seismometer Vibration Live', 'Smart Drill Depth Logger', 'AI Fragmentation Scan'],
+        ),
+        MiningMenuItem(
+          title: 'Overburden (OB) Stripping',
+          categoryLabel: 'HULU • PIT EXTRACTION',
+          icon: Icons.terrain_rounded,
+          iconColor: const Color(0xFF38BDF8),
+          badge: 'COMING SOON',
+          description:
+              'Monitoring volume pengupasan lapisan tanah penutup OB harian, alokasi excavator loader PC2000, dan produktivitas fleet ritase.',
+          iotFeatures: ['Payload Weightmeter Loader', 'Fleet Telemetry CAN-Bus', 'BCM Reconciliation API'],
+        ),
+        MiningMenuItem(
+          title: 'Clean Coal Management (CCM)',
+          categoryLabel: 'HULU • PIT EXTRACTION',
+          icon: Icons.layers_rounded,
+          iconColor: const Color(0xFF10B981),
+          badge: 'COMING SOON',
+          description:
+              'Penggalian batubara bersih (Clean Coal Mining), pembersihan parting tanah liat, dan pencegahan kontaminasi ash content.',
+          iotFeatures: ['Seam Boundary Sensor', 'Roof & Floor Laser Tracker', 'Online Quality Analyzer'],
+        ),
+        MiningMenuItem(
+          title: 'Fleet Dispatch & Telemetry',
+          categoryLabel: 'HULU • PIT EXTRACTION',
+          icon: Icons.radar_rounded,
+          iconColor: const Color(0xFFA855F7),
+          badge: 'COMING SOON',
+          description:
+              'Sistem otomasi dispatch dump truck, optimasi antrean loader di pit, cycle time pemuatan, dan tracking kecepatan unit.',
+          iotFeatures: ['High-Precision GPS Dispatch', 'Automated Loader Pairing', 'Fuel Telemetry Level'],
+        ),
+      ];
+      final filtered = _filterItems(items);
+      if (filtered.isNotEmpty) {
+        sections.add(_buildSectionCard('1. Pit Tambang & Extraction (Hulu)', filtered));
+        sections.add(const SizedBox(height: 14));
+      }
+    }
+
+    // SECTION 2: HULU 2 • GEOTEKNIK LERENG
+    if (_matchesTab(1)) {
+      final items = [
+        MiningMenuItem(
+          title: 'Slope Stability Radar (SSR)',
+          categoryLabel: 'HULU • GEOTEKNIK LERENG',
+          icon: Icons.biotech_rounded,
+          iconColor: const Color(0xFF06B6D4),
+          badge: 'COMING SOON',
+          description:
+              'Pemindaian radar deformasi sub-milimeter pada dinding Highwall & Lowwall tambang secara real-time 24 jam non-stop.',
+          iotFeatures: ['SSR-XT Interferometric Radar', 'Sub-mm Velocity Vector', 'Thermal Heatmap Lereng'],
+        ),
+        MiningMenuItem(
+          title: 'Prisma Deformasi Digital',
+          categoryLabel: 'HULU • GEOTEKNIK LERENG',
+          icon: Icons.track_changes_rounded,
+          iconColor: const Color(0xFFF97316),
+          badge: 'COMING SOON',
+          description:
+              'Jaringan prisma pemantauan pergeseran koordinat lereng otomatis terhubung ke Robotic Total Station (RTS).',
+          iotFeatures: ['Automated Total Station RTS', 'Wireless Tiltmeter Sensor', 'InSAR Satellite Ingest'],
+        ),
+        MiningMenuItem(
+          title: 'Analisis FoS (Factor of Safety)',
+          categoryLabel: 'HULU • GEOTEKNIK LERENG',
+          icon: Icons.shield_rounded,
+          iconColor: const Color(0xFF10B981),
+          badge: 'COMING SOON',
+          description:
+              'Perhitungan Faktor Keamanan (FoS) lereng tunggal dan lereng keseluruhan berbasis parameter kekuatan batuan dan air pori.',
+          iotFeatures: ['VWP Piezometer Pori', 'Limit Equilibrium Solver', 'Borehole Extensometer'],
+        ),
+        MiningMenuItem(
+          title: 'Early Warning System (EWS)',
+          categoryLabel: 'HULU • GEOTEKNIK LERENG',
+          icon: Icons.warning_amber_rounded,
+          iconColor: const Color(0xFFEF4444),
+          badge: 'COMING SOON',
+          description:
+              'Alarm peringatan dini otomatis pergerakan tanah kritis, penentuan zona bahaya, dan sirene evakuasi pit darurat.',
+          iotFeatures: ['Automated Siren Broadcast', 'Push Alert Geoteknik', 'Geofence Evacuation Map'],
+        ),
+      ];
+      final filtered = _filterItems(items);
+      if (filtered.isNotEmpty) {
+        sections.add(_buildSectionCard('2. Geoteknik & Kestabilan Lereng', filtered));
+        sections.add(const SizedBox(height: 14));
+      }
+    }
+
+    // SECTION 3: WATER & ENVIRONMENT • SUMP & SETTLING POND
+    if (_matchesTab(2)) {
+      final items = [
+        MiningMenuItem(
+          title: 'Central Sump Water Level',
+          categoryLabel: 'WATER MANAGEMENT & SUMP',
+          icon: Icons.water_drop_rounded,
+          iconColor: const Color(0xFF0284C7),
+          badge: 'COMING SOON',
+          description:
+              'Pemantauan ketinggian muka air sump pit (RL air), estimasi volume genangan (m³), dan kapasitas tampung sebelum overflow.',
+          iotFeatures: ['Ultrasonic Level Sensor', 'Radar Level Transmitter', 'Sump Bathymetry 3D'],
+        ),
+        MiningMenuItem(
+          title: 'Dewatering Pump Telemetry',
+          categoryLabel: 'WATER MANAGEMENT & SUMP',
+          icon: Icons.speed_rounded,
+          iconColor: const Color(0xFF06B6D4),
+          badge: 'COMING SOON',
+          description:
+              'Monitoring status pompa tambang (Sulzer, Multiflo, Sykes), debit aliran (liter/detik), RPM mesin, tekanan pipa, dan bahan bakar.',
+          iotFeatures: ['Magnetic Flowmeter Live', 'Pump Engine RPM CAN-Bus', 'Pressure Discharge Gauge'],
+        ),
+        MiningMenuItem(
+          title: 'Settling Pond (Kolam Pengendap)',
+          categoryLabel: 'WATER MANAGEMENT & SUMP',
+          icon: Icons.waves_rounded,
+          iconColor: const Color(0xFF0D9488),
+          badge: 'COMING SOON',
+          description:
+              'Pengelolaan kompartemen kolam pengendap sedimen tambang, waktu retensi air limpasan, dan jadwal pengerukan lumpur.',
+          iotFeatures: ['Sediment Depth Sonar', 'Pond Inflow-Outflow Ratio', 'Desilting Fleet Tracking'],
+        ),
+        MiningMenuItem(
+          title: 'Kualitas Air Live (pH & TSS)',
+          categoryLabel: 'WATER MANAGEMENT & SUMP',
+          icon: Icons.biotech_rounded,
+          iconColor: const Color(0xFF10B981),
+          badge: 'COMING SOON',
+          description:
+              'Sensor online parameter baku mutu lingkungan hidup di titik penaatan outflow: pH air (6–9), TSS (< 300 mg/L), Fe, dan Mn.',
+          iotFeatures: ['Digital pH Probe Live', 'Turbidity / TSS Optical Sensor', 'Telemetri KLHK Resmi'],
+        ),
+        MiningMenuItem(
+          title: 'Chemical Neutralization Dosing',
+          categoryLabel: 'WATER MANAGEMENT & SUMP',
+          icon: Icons.science_rounded,
+          iconColor: const Color(0xFF8B5CF6),
+          badge: 'COMING SOON',
+          description:
+              'Pengaturan otomatis takaran kapur tohor (CaO) dan tawas (Alum) untuk netralisasi Air Asam Tambang (AAT) secara presisi.',
+          iotFeatures: ['Automated Lime Feeder', 'Smart Dosing Pump Controller', 'Chemical Consumption Log'],
+        ),
+        MiningMenuItem(
+          title: 'Rainfall & Run-Off Catchment',
+          categoryLabel: 'WATER MANAGEMENT & SUMP',
+          icon: Icons.cloud_queue_rounded,
+          iconColor: const Color(0xFF64748B),
+          badge: 'COMING SOON',
+          description:
+              'Stasiun cuaca telemetri curah hujan (AWS), perhitungan debit limpasan air hujan, dan kapasitas saluran diversi keliling pit.',
+          iotFeatures: ['Tipping Bucket Rain Gauge', 'Catchment Basin Modeler', 'Drainage Channel Sensor'],
+        ),
+      ];
+      final filtered = _filterItems(items);
+      if (filtered.isNotEmpty) {
+        sections.add(_buildSectionCard('3. Sump, Settling Pond & Water Management', filtered));
+        sections.add(const SizedBox(height: 14));
+      }
+    }
+
+    // SECTION 4: PROCESSING • CPP & ROM STOCKPILE
+    if (_matchesTab(3)) {
+      final items = [
+        MiningMenuItem(
+          title: 'ROM Stockpile Management',
+          categoryLabel: 'CPP & COAL PROCESSING',
+          icon: Icons.layers_rounded,
+          iconColor: const Color(0xFFD97706),
+          badge: 'COMING SOON',
+          description:
+              'Kapasitas timbunan batubara ROM pit, pemetaan nomor seam/kualitas kalori, dan pengaturan sistem First-In First-Out (FIFO).',
+          iotFeatures: ['Laser Scanner Volume Timbunan', 'Seam Allocation Tracker', 'FIFO Age Monitoring'],
+        ),
+        MiningMenuItem(
+          title: 'Crushing Plant & Feeder Breaker',
+          categoryLabel: 'CPP & COAL PROCESSING',
+          icon: Icons.precision_manufacturing_rounded,
+          iconColor: const Color(0xFFEA580C),
+          badge: 'COMING SOON',
+          description:
+              'Laju pengumpanan batubara (TPH), efisiensi pemecahan batubara pada primary crusher, dan beban ampere motor listrik.',
+          iotFeatures: ['Feeder Speed Inverter', 'Motor Current Telemetry', 'Choke Feeder Sensor'],
+        ),
+        MiningMenuItem(
+          title: 'Sizing Screen & Product Quality',
+          categoryLabel: 'CPP & COAL PROCESSING',
+          icon: Icons.filter_alt_rounded,
+          iconColor: const Color(0xFF10B981),
+          badge: 'COMING SOON',
+          description:
+              'Pemisahan fraksi ukuran batubara produk crushed coal (0–50 mm) dan pemantauan getaran screen deck pencegah blinding.',
+          iotFeatures: ['Screen Vibration Accelerometer', 'Product Size AI Cam', 'Oversize Return Loop'],
+        ),
+        MiningMenuItem(
+          title: 'Conveyor Weightometer Telemetry',
+          categoryLabel: 'CPP & COAL PROCESSING',
+          icon: Icons.linear_scale_rounded,
+          iconColor: const Color(0xFF0284C7),
+          badge: 'COMING SOON',
+          description:
+              'Timbangan digital weightometer konveyor batubara terkalibrasi, tonase per jam live, dan sensor metal detector proteksi belt.',
+          iotFeatures: ['Belt Scale Weightometer', 'Metal Detector Trip Sensor', 'Belt Misalignment Switch'],
+        ),
+        MiningMenuItem(
+          title: 'Spontaneous Combustion Hotspot',
+          categoryLabel: 'CPP & COAL PROCESSING',
+          icon: Icons.local_fire_department_rounded,
+          iconColor: const Color(0xFFDC2626),
+          badge: 'COMING SOON',
+          description:
+              'Kamera thermal inframerah 360° untuk mendeteksi titik panas (hotspot) batubara di stockpile dan mencegah swa-bakar dini.',
+          iotFeatures: ['Thermal IR Panoramic Cam', 'Gas CO Sensor Array', 'Water Mist Sprinkler Trigger'],
+        ),
+      ];
+      final filtered = _filterItems(items);
+      if (filtered.isNotEmpty) {
+        sections.add(_buildSectionCard('4. CPP (Coal Processing Plant) & Stockpile', filtered));
+        sections.add(const SizedBox(height: 14));
+      }
+    }
+
+    // SECTION 5: HILIR • HAULING ROAD, WEIGHBRIDGE & BARGING
+    if (_matchesTab(4)) {
+      final items = [
+        MiningMenuItem(
+          title: 'Hauling Road Telemetry (KM 0-48)',
+          categoryLabel: 'HILIR • HAULING & PORT',
+          icon: Icons.alt_route_rounded,
+          iconColor: const Color(0xFFF59E0B),
+          badge: 'COMING SOON',
+          description:
+              'Pemantauan kondisi permukaan jalan hauling 48 kilometer, kemiringan ramp, titik blind spot, dan keselamatan jalur angkut.',
+          iotFeatures: ['Road Roughness Accelerometer', 'CCTV Corridor Surveillance', 'Digital Kilometer Marker'],
+        ),
+        MiningMenuItem(
+          title: 'Dust Suppression Water Truck',
+          categoryLabel: 'HILIR • HAULING & PORT',
+          icon: Icons.water_drop_outlined,
+          iconColor: const Color(0xFF06B6D4),
+          badge: 'COMING SOON',
+          description:
+              'Jadwal penyiraman jalan hauling unit Water Truck, pemantauan konsentrasi debu PM10/PM2.5, dan efektivitas dust retardant.',
+          iotFeatures: ['Dust Particle PM10 Sensor', 'Water Spray Valve Telemetry', 'GPS Water Truck Geo-Stamp'],
+        ),
+        MiningMenuItem(
+          title: 'Speed Radar & AI Fatigue Cam',
+          categoryLabel: 'HILIR • HAULING & PORT',
+          icon: Icons.speed_rounded,
+          iconColor: const Color(0xFFEF4444),
+          badge: 'COMING SOON',
+          description:
+              'Radar pembaca batas kecepatan unit (max 60 km/jam) dan kamera kabin AI deteksi kantuk / mikro-tidur operator dump truck.',
+          iotFeatures: ['Doppler Speed Radar Sensor', 'Driver Fatigue AI Camera', 'Audible Speed Warning Box'],
+        ),
+        MiningMenuItem(
+          title: 'Weighbridge (Jembatan Timbang)',
+          categoryLabel: 'HILIR • HAULING & PORT',
+          icon: Icons.scale_rounded,
+          iconColor: const Color(0xFF10B981),
+          badge: 'COMING SOON',
+          description:
+              'Penimbangan otomatis truk hauling tiba di port, pencatatan Gross-Tare-Nett, dan validasi payload kepatuhan muatan.',
+          iotFeatures: ['RFID Auto-Timbang Sensor', 'ANPR Plat Nomor Kamera', 'Tare Memory Verification'],
+        ),
+        MiningMenuItem(
+          title: 'Port Stockpile & Blending',
+          categoryLabel: 'HILIR • HAULING & PORT',
+          icon: Icons.calculate_rounded,
+          iconColor: const Color(0xFFA855F7),
+          badge: 'COMING SOON',
+          description:
+              'Pengaturan tumpukan batubara pelabuhan dan kalkulator otomatis pencampuran (blending) kalori batubara sesuai kontrak pembeli.',
+          iotFeatures: ['Quality Coal Matrix DB', 'Automated Blending Solver', 'Stockpile Age Expiry Alert'],
+        ),
+        MiningMenuItem(
+          title: 'Barge Loading Conveyor (BLC)',
+          categoryLabel: 'HILIR • HAULING & PORT',
+          icon: Icons.directions_boat_filled_rounded,
+          iconColor: const Color(0xFF0284C7),
+          badge: 'COMING SOON',
+          description:
+              'Telemetri laju pemuatan batubara jet conveyor ke palka tongkang (1.200 Ton/Jam), boom angle, dan pasang surut dermaga.',
+          iotFeatures: ['Conveyor Speed SCADA Live', 'Tide Gauge Water Sensor', 'Chute Trimming Controller'],
+        ),
+        MiningMenuItem(
+          title: 'Tugboat & Tongkang AIS Radar',
+          categoryLabel: 'HILIR • HAULING & PORT',
+          icon: Icons.sailing_rounded,
+          iconColor: const Color(0xFF0D9488),
+          badge: 'COMING SOON',
+          description:
+              'Pelacakan satelit AIS posisi tongkang 300 feet, estimasi waktu sandar (ETA), antrean tambat dermaga, dan alokasi tugboat.',
+          iotFeatures: ['Live Marine AIS Satellite', 'Berthing Queue Optimizer', 'Barge Cargo Manifest API'],
+        ),
+        MiningMenuItem(
+          title: 'Draught Survey & Quality Cert',
+          categoryLabel: 'HILIR • HAULING & PORT',
+          icon: Icons.verified_rounded,
+          iconColor: const Color(0xFF38BDF8),
+          badge: 'COMING SOON',
+          description:
+              'Pencatatan sarat kapal draught survey surveyor independen, perhitungan tonase final pengapalan, dan sertifikat kualitas COA.',
+          iotFeatures: ['Draft Mark Optical Sensor', 'Density Water Hydrometer', 'Digital COA Exporter'],
+        ),
+      ];
+      final filtered = _filterItems(items);
+      if (filtered.isNotEmpty) {
+        sections.add(_buildSectionCard('5. Hauling Road, Jembatan Timbang & Barging (Hilir)', filtered));
+        sections.add(const SizedBox(height: 14));
+      }
+    }
+
+    if (sections.isEmpty) {
+      return [
+        Container(
+          padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 20),
+          decoration: BoxDecoration(
+            color: const Color(0xFF0F172A),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0xFF1E293B)),
+          ),
+          child: Column(
+            children: [
+              Icon(Icons.search_off_rounded, size: 48, color: Colors.white.withValues(alpha: 0.3)),
+              const SizedBox(height: 10),
+              Text(
+                'Modul Tidak Ditemukan',
+                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: Colors.white.withValues(alpha: 0.9)),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Tidak ada modul yang cocok dengan kata kunci "$_searchQuery".',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 12, color: Colors.white.withValues(alpha: 0.5)),
+              ),
+            ],
+          ),
+        ),
+      ];
+    }
+
+    return sections;
+  }
+
+  bool _matchesTab(int tabIndex) {
+    if (_selectedTabIndex == 0) return true; // Tab Semua
+    return _selectedTabIndex == tabIndex;
+  }
+
+  List<MiningMenuItem> _filterItems(List<MiningMenuItem> items) {
+    if (_searchQuery.isEmpty) return items;
+    return items.where((it) {
+      return it.title.toLowerCase().contains(_searchQuery) ||
+          it.categoryLabel.toLowerCase().contains(_searchQuery) ||
+          it.description.toLowerCase().contains(_searchQuery) ||
+          it.iotFeatures.any((f) => f.toLowerCase().contains(_searchQuery));
+    }).toList();
+  }
+
+  Widget _buildSectionCard(String title, List<MiningMenuItem> items) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 18),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        color: const Color(0xFF0F172A),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFF1E293B)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
+            color: Colors.black.withValues(alpha: 0.2),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
           ),
         ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          InkWell(
-            onTap: onTitleTap,
-            borderRadius: BorderRadius.circular(8),
+          // Section Header
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
+                Container(
+                  width: 4,
+                  height: 16,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF59E0B),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+                const SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     title,
                     style: const TextStyle(
-                      fontSize: 15,
+                      fontSize: 13.5,
                       fontWeight: FontWeight.w800,
-                      color: Color(0xFF0F172A),
+                      color: Colors.white,
                       letterSpacing: -0.2,
                     ),
                   ),
                 ),
-                const Icon(
-                  Icons.chevron_right_rounded,
-                  color: Color(0xFF64748B),
-                  size: 20,
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFD97706).withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: const Color(0xFFD97706).withValues(alpha: 0.5)),
+                  ),
+                  child: const Text(
+                    'COMING SOON',
+                    style: TextStyle(
+                      fontSize: 9,
+                      fontWeight: FontWeight.w900,
+                      color: Color(0xFFFDE047),
+                      letterSpacing: 0.4,
+                    ),
+                  ),
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 16),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: filteredItems.map((item) {
-              return Expanded(
-                child: _buildGridItemTile(item),
-              );
-            }).toList(),
+          const Divider(height: 1, color: Color(0xFF1E293B)),
+
+          // Grid of Items
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            padding: const EdgeInsets.all(12),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              mainAxisSpacing: 10,
+              crossAxisSpacing: 10,
+              childAspectRatio: 1.45,
+            ),
+            itemCount: items.length,
+            itemBuilder: (ctx, idx) => _buildItemTile(items[idx]),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildGridItemTile(_MenuItem item) {
-    return InkWell(
-      onTap: item.onTap,
+  Widget _buildItemTile(MiningMenuItem item) {
+    return Material(
+      color: const Color(0xFF1E293B),
       borderRadius: BorderRadius.circular(14),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 4),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Stack(
-              clipBehavior: Clip.none,
-              children: [
-                Container(
-                  width: 58,
-                  height: 58,
-                  decoration: BoxDecoration(
-                    color: item.bgColor,
-                    borderRadius: BorderRadius.circular(18),
-                    border: Border.all(
-                      color: item.iconColor.withValues(alpha: 0.18),
-                      width: 1.2,
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: item.iconColor.withValues(alpha: 0.12),
-                        blurRadius: 8,
-                        offset: const Offset(0, 3),
-                      ),
-                    ],
-                  ),
-                  child: Center(
-                    child: Icon(
-                      item.icon,
-                      color: item.iconColor,
-                      size: 28,
-                    ),
-                  ),
-                ),
-                if (item.badge != null)
-                  Positioned(
-                    top: -4,
-                    right: -4,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFD97706),
-                        borderRadius: BorderRadius.circular(6),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.amber.withValues(alpha: 0.4),
-                            blurRadius: 4,
-                          ),
-                        ],
-                      ),
-                      child: Text(
-                        item.badge!,
-                        style: const TextStyle(
-                          fontSize: 8.5,
-                          fontWeight: FontWeight.w900,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Text(
-              item.title,
-              textAlign: TextAlign.center,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
-                color: Color(0xFF334155),
-                height: 1.18,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // --------------------------------------------------------------------------
-  // MODALS
-  // --------------------------------------------------------------------------
-
-  void _showToast(String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(msg),
-        duration: const Duration(seconds: 1),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
-  }
-
-  void _showFeatureDetail(String title, String desc, IconData icon, Color color) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => Container(
-        padding: const EdgeInsets.fromLTRB(24, 20, 24, 30),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Container(
-                width: 44,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade300,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-            ),
-            const SizedBox(height: 18),
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: color.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: Icon(icon, color: color, size: 26),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        title,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w800,
-                          color: Color(0xFF0F172A),
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      const Text(
-                        'Modul Operasional Tambang X Mine',
-                        style: TextStyle(fontSize: 11.5, color: Color(0xFF64748B)),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF8FAFC),
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: const Color(0xFFE2E8F0)),
-              ),
-              child: Text(
-                desc,
-                style: const TextStyle(fontSize: 13, color: Color(0xFF334155), height: 1.45),
-              ),
-            ),
-            const SizedBox(height: 20),
-            SizedBox(
-              width: double.infinity,
-              height: 46,
-              child: ElevatedButton(
-                onPressed: () => Navigator.pop(ctx),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: color,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                ),
-                child: const Text('Tutup', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Colors.white)),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // 1. Kalkulator Blending Modal
-  void _showBlendingCalculatorModal() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => StatefulBuilder(
-        builder: (context, setModalState) {
-          final blended = _blendedCalori;
-          final meetsTarget = blended >= 5400;
-
-          return Container(
-            padding: const EdgeInsets.fromLTRB(24, 20, 24, 32),
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Center(
-                  child: Container(
-                    width: 44,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade300,
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 18),
-                const Row(
-                  children: [
-                    Icon(Icons.calculate_rounded, color: Color(0xFFD97706), size: 26),
-                    SizedBox(width: 8),
-                    Text(
-                      'Kalkulator Blending Kualitas Batubara',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                const Text(
-                  'Simulasi pencampuran (blending) untuk memenuhi spesifikasi kontrak buyer (CCM).',
-                  style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
-                ),
-                const SizedBox(height: 18),
-
-                // Calculation Result Card
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: meetsTarget ? const Color(0xFFFEF3C7) : const Color(0xFFFEE2E2),
-                    borderRadius: BorderRadius.circular(18),
-                    border: Border.all(
-                      color: meetsTarget ? const Color(0xFFFDE68A) : const Color(0xFFFECACA),
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Hasil Estimasi Kalori Blending:',
-                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF78350F)),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            meetsTarget ? 'Target Terpenuhi (>5,400 kcal)' : 'Di Bawah Target Kontrak',
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
-                              color: meetsTarget ? const Color(0xFF059669) : const Color(0xFFDC2626),
-                            ),
-                          ),
-                        ],
-                      ),
-                      Text(
-                        '${blended.toStringAsFixed(0)} kcal/kg',
-                        style: const TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w900,
-                          color: Color(0xFFB45309),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 18),
-
-                // Sliders
-                Text(
-                  'Proporsi Seam A (5,850 kcal/kg): ${_ratioSeamA.toStringAsFixed(0)}%',
-                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
-                ),
-                Slider(
-                  value: _ratioSeamA,
-                  min: 0,
-                  max: 100,
-                  divisions: 20,
-                  activeColor: const Color(0xFFD97706),
-                  onChanged: (val) {
-                    setState(() => _ratioSeamA = val);
-                    setModalState(() {});
-                  },
-                ),
-
-                Text(
-                  'Proporsi Seam B (5,050 kcal/kg): ${(100 - _ratioSeamA).toStringAsFixed(0)}%',
-                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
-                ),
-                Slider(
-                  value: 100 - _ratioSeamA,
-                  min: 0,
-                  max: 100,
-                  divisions: 20,
-                  activeColor: const Color(0xFF0284C7),
-                  onChanged: (val) {
-                    setState(() => _ratioSeamA = 100 - val);
-                    setModalState(() {});
-                  },
-                ),
-
-                const SizedBox(height: 16),
-                SizedBox(
-                  width: double.infinity,
-                  height: 48,
-                  child: ElevatedButton(
-                    onPressed: () {
-                      Navigator.pop(ctx);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('Formula blending ${_ratioSeamA.toStringAsFixed(0)}% Seam A : ${(100 - _ratioSeamA).toStringAsFixed(0)}% Seam B berhasil disimpan ke ROM dispatch.'),
-                          backgroundColor: const Color(0xFFD97706),
-                        ),
-                      );
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFD97706),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                    ),
-                    child: const Text('Terapkan Formula Blending', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Colors.white)),
-                  ),
-                ),
-              ],
-            ),
-          );
-        },
-      ),
-    );
-  }
-
-  // 2. Kualitas Seam Modal
-  void _showSeamQualityModal() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => DraggableScrollableSheet(
-        initialChildSize: 0.75,
-        maxChildSize: 0.92,
-        minChildSize: 0.45,
-        builder: (_, scrollCtrl) => Container(
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      child: InkWell(
+        onTap: () => _showComingSoonModal(item),
+        borderRadius: BorderRadius.circular(14),
+        child: Container(
+          padding: const EdgeInsets.all(11),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
           ),
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
-          child: ListView(
-            controller: scrollCtrl,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Center(
-                child: Container(
-                  width: 44,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade300,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              const Row(
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(Icons.science_rounded, color: Color(0xFFDC2626), size: 24),
-                  SizedBox(width: 8),
-                  Text(
-                    'Karakteristik Seam Batubara Aktif',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: item.iconColor.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Center(
+                      child: Icon(item.icon, color: item.iconColor, size: 20),
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFD97706).withValues(alpha: 0.25),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: const Text(
+                      'SOON',
+                      style: TextStyle(
+                        fontSize: 8,
+                        fontWeight: FontWeight.w900,
+                        color: Color(0xFFFDE047),
+                        letterSpacing: 0.4,
+                      ),
+                    ),
                   ),
                 ],
               ),
-              const SizedBox(height: 4),
-              const Text(
-                'Data kualitas batubara hasil laboratorium eksplorasi & sampling ROM.',
-                style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
-              ),
-              const SizedBox(height: 16),
-
-              _buildSeamCard(
-                seamName: 'Seam A - Upper Pit Central',
-                grade: 'Premium Grade',
-                calori: '5,850 kcal/kg (adb)',
-                ash: '5.8% Low Ash',
-                tm: '24.2% Total Moisture',
-                sulfur: '0.42% Low Sulfur',
-                badgeColor: const Color(0xFF10B981),
-              ),
-              _buildSeamCard(
-                seamName: 'Seam B1 - Main Pit West',
-                grade: 'Standard Blending',
-                calori: '5,320 kcal/kg (adb)',
-                ash: '7.4% Medium Ash',
-                tm: '28.1% Total Moisture',
-                sulfur: '0.65% Medium Sulfur',
-                badgeColor: const Color(0xFF0284C7),
-              ),
-              _buildSeamCard(
-                seamName: 'Seam B2 - Lower Pit Central',
-                grade: 'Perlu Blending',
-                calori: '5,050 kcal/kg (adb)',
-                ash: '8.9% Parting Clay Alert',
-                tm: '30.4% Total Moisture',
-                sulfur: '0.78% Medium Sulfur',
-                badgeColor: const Color(0xFFF59E0B),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSeamCard({
-    required String seamName,
-    required String grade,
-    required String calori,
-    required String ash,
-    required String tm,
-    required String sulfur,
-    required Color badgeColor,
-  }) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.02),
-            blurRadius: 8,
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
+              const SizedBox(height: 6),
               Text(
-                seamName,
-                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: badgeColor.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Text(
-                  grade,
-                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: badgeColor),
+                item.title,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                  color: Colors.white,
+                  height: 1.25,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              _buildSeamParam(Icons.local_fire_department_rounded, calori, const Color(0xFFDC2626)),
-              _buildSeamParam(Icons.grain_rounded, ash, const Color(0xFF64748B)),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              _buildSeamParam(Icons.water_drop_rounded, tm, const Color(0xFF0284C7)),
-              _buildSeamParam(Icons.science_rounded, sulfur, const Color(0xFF7C3AED)),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSeamParam(IconData icon, String label, Color color) {
-    return Expanded(
-      child: Row(
-        children: [
-          Icon(icon, size: 16, color: color),
-          const SizedBox(width: 6),
-          Expanded(
-            child: Text(
-              label,
-              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF334155)),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // 3. Status Pit Modal
-  void _showPitStatusModal() {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => Container(
-        padding: const EdgeInsets.fromLTRB(24, 20, 24, 30),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
         ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Container(
-                width: 44,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade300,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-            ),
-            const SizedBox(height: 18),
-            const Row(
-              children: [
-                Icon(Icons.analytics_rounded, color: Color(0xFFD97706), size: 26),
-                SizedBox(width: 8),
-                Text(
-                  'Indikator Operasional Pit Utama',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            _buildPitStatusItem('CCM Quality Index', '98.4%', 'Target kepatuhan tercapai', const Color(0xFF10B981)),
-            _buildPitStatusItem('Kapasitas ROM Stockpile', '185,200 MT', '72% dari kapasitas maksimum', const Color(0xFF0284C7)),
-            _buildPitStatusItem('Stabilitas Lereng (FoS)', '1.42 FoS', 'Aman & stabil (Batas minimum: 1.30)', const Color(0xFF059669)),
-            _buildPitStatusItem('Fleet Availability (PA)', '89.6%', '142 Haul Truck & 18 Excavator loader', const Color(0xFF7C3AED)),
-            const SizedBox(height: 18),
-            SizedBox(
-              width: double.infinity,
-              height: 46,
-              child: ElevatedButton(
-                onPressed: () => Navigator.pop(ctx),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFD97706),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                ),
-                child: const Text('Tutup', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Colors.white)),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildPitStatusItem(String title, String value, String subtitle, Color color) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF8FAFC),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(title, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF0F172A))),
-              const SizedBox(height: 2),
-              Text(subtitle, style: const TextStyle(fontSize: 10.5, color: Color(0xFF64748B))),
-            ],
-          ),
-          Text(
-            value,
-            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: color),
-          ),
-        ],
       ),
     );
   }
 }
 
-class _MenuItem {
+class MiningMenuItem {
   final String title;
+  final String categoryLabel;
   final IconData icon;
   final Color iconColor;
-  final Color bgColor;
-  final String? badge;
-  final VoidCallback onTap;
+  final String badge;
+  final String description;
+  final List<String> iotFeatures;
 
-  const _MenuItem({
+  MiningMenuItem({
     required this.title,
+    required this.categoryLabel,
     required this.icon,
     required this.iconColor,
-    required this.bgColor,
-    this.badge,
-    required this.onTap,
+    required this.badge,
+    required this.description,
+    required this.iotFeatures,
   });
 }
