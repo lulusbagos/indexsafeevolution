@@ -1024,26 +1024,29 @@ class _DocumentManagementPageState extends State<DocumentManagementPage> {
             ),
           ),
           if (_folderStack.length > 1)
-            InkWell(
-              onTap: () => _navigateUpToFolder(_folderStack.length - 2),
+            Material(
+              color: const Color(0xFFF8FAFC),
               borderRadius: BorderRadius.circular(8),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF8FAFC),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: const Color(0xFFCBD5E1)),
-                ),
-                child: const Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.arrow_upward_rounded, size: 12, color: Color(0xFF334155)),
-                    SizedBox(width: 3),
-                    Text(
-                      'Naik',
-                      style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: Color(0xFF334155)),
-                    ),
-                  ],
+              child: InkWell(
+                onTap: () => _navigateUpToFolder(_folderStack.length - 2),
+                borderRadius: BorderRadius.circular(8),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFFCBD5E1)),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.arrow_upward_rounded, size: 13, color: Color(0xFF334155)),
+                      SizedBox(width: 4),
+                      Text(
+                        'Naik',
+                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF334155)),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
