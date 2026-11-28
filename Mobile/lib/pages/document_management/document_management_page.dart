@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../models/document_model.dart';
 import '../../services/document_management_service.dart';
+import 'document_viewer_page.dart';
 
 class DocumentManagementPage extends StatefulWidget {
   const DocumentManagementPage({super.key});
@@ -54,11 +55,6 @@ class _DocumentManagementPageState extends State<DocumentManagementPage> {
   List<DocumentFolderModel> _currentFolders = [];
   List<DocumentItemModel> _currentFiles = [];
   Map<String, dynamic>? _summary;
-
-  // Downloading progress tracking
-  int? _downloadingDocId;
-  double _downloadProgress = 0.0;
-  String _downloadStatusText = '';
 
   DocumentFolderModel get _currentFolder => _folderStack.last;
 
@@ -178,150 +174,15 @@ class _DocumentManagementPageState extends State<DocumentManagementPage> {
   }
 
   Future<void> _openOrDownloadDocument(DocumentItemModel doc) async {
-    if (_downloadingDocId != null) return;
-
-    if (doc.isDownloaded && doc.localPath != null) {
-      _showToast('Membuka ${doc.title} dari cache HP...');
-      final opened = await _service.openDocument(doc);
-      if (!opened && mounted) {
-        _showToast('Gagal membuka dokumen, mencoba tautan online...');
-      }
-      return;
-    }
-
-    setState(() {
-      _downloadingDocId = doc.id;
-      _downloadProgress = 0.0;
-      _downloadStatusText = 'Menghubungkan ke repositori...';
-    });
-
-    _showDownloadProgressDialog(doc);
-
-    try {
-      final success = await _service.openDocument(
-        doc,
-        onProgress: (received, total) {
-          if (mounted) {
-            setState(() {
-              if (total > 0) {
-                _downloadProgress = received / total;
-                _downloadStatusText =
-                    '${(received / (1024 * 1024)).toStringAsFixed(1)} MB / ${(total / (1024 * 1024)).toStringAsFixed(1)} MB (${(_downloadProgress * 100).toInt()}%)';
-              } else {
-                _downloadStatusText = '${(received / 1024).toStringAsFixed(0)} KB terunduh';
-              }
-            });
-          }
-        },
-      );
-
-      if (mounted) {
-        Navigator.of(context, rootNavigator: true).pop();
-        setState(() {
-          _downloadingDocId = null;
-        });
-
-        if (success) {
-          _showToast('Dokumen berhasil dibuka & tersimpan offline.');
-        } else {
-          _showToast('Gagal mengunduh atau membuka file.');
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        Navigator.of(context, rootNavigator: true).pop();
-        setState(() {
-          _downloadingDocId = null;
-        });
-        _showToast('Terjadi kesalahan: $e');
-      }
-    }
-  }
-
-  void _showDownloadProgressDialog(DocumentItemModel doc) {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) {
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            return AlertDialog(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-              elevation: 16,
-              contentPadding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    width: 60,
-                    height: 60,
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFF0284C7), Color(0xFF0369A1)],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: const Color(0xFF0284C7).withValues(alpha: 0.3),
-                          blurRadius: 14,
-                          offset: const Offset(0, 6),
-                        ),
-                      ],
-                    ),
-                    child: const Center(
-                      child: Icon(Icons.downloading_rounded, color: Colors.white, size: 30),
-                    ),
-                  ),
-                  const SizedBox(height: 18),
-                  const Text(
-                    'Mengunduh Dokumen',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w800,
-                      color: Color(0xFF0F172A),
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    doc.title,
-                    textAlign: TextAlign.center,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 12.5,
-                      fontWeight: FontWeight.w500,
-                      color: Colors.grey.shade600,
-                      height: 1.3,
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: LinearProgressIndicator(
-                      value: _downloadProgress > 0 ? _downloadProgress : null,
-                      backgroundColor: Colors.grey.shade200,
-                      valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF0284C7)),
-                      minHeight: 8,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    _downloadStatusText.isNotEmpty ? _downloadStatusText : 'Menyiapkan berkas...',
-                    style: TextStyle(
-                      fontSize: 11.5,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.grey.shade700,
-                    ),
-                  ),
-                ],
-              ),
-            );
-          },
-        );
-      },
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => DocumentViewerPage(doc: doc),
+      ),
     );
+    if (mounted) {
+      setState(() {});
+    }
   }
 
   void _showAccessInfoSheet() {
@@ -1524,7 +1385,7 @@ class _DocumentManagementPageState extends State<DocumentManagementPage> {
                     ),
                     const SizedBox(width: 4),
                     const Text(
-                      'Ketuk untuk baca / simpan',
+                      'Ketuk untuk baca langsung di aplikasi',
                       style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF0284C7)),
                     ),
                   ],
@@ -1822,9 +1683,9 @@ class _DocumentManagementPageState extends State<DocumentManagementPage> {
                       ),
                     ),
                     Icon(
-                      doc.isDownloaded ? Icons.check_circle_rounded : Icons.cloud_download_outlined,
+                      doc.isDownloaded ? Icons.check_circle_rounded : Icons.visibility_outlined,
                       size: 16,
-                      color: doc.isDownloaded ? const Color(0xFF16A34A) : const Color(0xFF94A3B8),
+                      color: doc.isDownloaded ? const Color(0xFF16A34A) : const Color(0xFF0284C7),
                     ),
                   ],
                 ),
@@ -1853,7 +1714,7 @@ class _DocumentManagementPageState extends State<DocumentManagementPage> {
                       ),
                     ),
                     Text(
-                      doc.isDownloaded ? 'Tersimpan' : 'Unduh',
+                      doc.isDownloaded ? 'Tersimpan' : 'Buka',
                       style: TextStyle(
                         fontSize: 9.5,
                         fontWeight: FontWeight.w700,
@@ -1891,8 +1752,6 @@ class _DocumentManagementPageState extends State<DocumentManagementPage> {
       bgColor = const Color(0xFFD1FAE5);
       typeBadge = 'XLSX';
     }
-
-    final isDownloadingThis = _downloadingDocId == doc.id;
 
     return Container(
       decoration: BoxDecoration(
@@ -2019,7 +1878,7 @@ class _DocumentManagementPageState extends State<DocumentManagementPage> {
                                 borderRadius: BorderRadius.circular(5),
                               ),
                               child: const Text(
-                                'On-Demand',
+                                'Lihat Dokumen',
                                 style: TextStyle(
                                   fontSize: 9.5,
                                   fontWeight: FontWeight.w700,
@@ -2034,29 +1893,22 @@ class _DocumentManagementPageState extends State<DocumentManagementPage> {
                   ),
                 ),
                 const SizedBox(width: 8),
-                if (isDownloadingThis)
-                  const SizedBox(
-                    width: 26,
-                    height: 26,
-                    child: CircularProgressIndicator(strokeWidth: 2.5, color: Color(0xFF0284C7)),
-                  )
-                else
-                  Container(
-                    width: 36,
-                    height: 36,
-                    decoration: BoxDecoration(
-                      color: doc.isDownloaded ? const Color(0xFFEFF6FF) : const Color(0xFFF8FAFC),
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: doc.isDownloaded ? const Color(0xFFBFDBFE) : const Color(0xFFE2E8F0),
-                      ),
-                    ),
-                    child: Icon(
-                      doc.isDownloaded ? Icons.visibility_rounded : Icons.download_rounded,
-                      size: 18,
-                      color: doc.isDownloaded ? const Color(0xFF0284C7) : const Color(0xFF64748B),
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEFF6FF),
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: doc.isDownloaded ? const Color(0xFF86EFAC) : const Color(0xFFBFDBFE),
                     ),
                   ),
+                  child: Icon(
+                    doc.isDownloaded ? Icons.check_circle_rounded : Icons.visibility_rounded,
+                    size: 18,
+                    color: doc.isDownloaded ? const Color(0xFF16A34A) : const Color(0xFF0284C7),
+                  ),
+                ),
               ],
             ),
           ),
