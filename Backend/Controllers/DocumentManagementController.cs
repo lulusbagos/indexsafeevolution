@@ -271,21 +271,145 @@ namespace Indexsafe.Api.Controllers
             return dict;
         }
 
-        private static bool IsFolderAllowed(string path, IReadOnlySet<int> userRoleIds, Dictionary<string, HashSet<int>> rulesByPath, bool isOwnerNoDepartment)
+        private sealed class FolderScopeRule
+        {
+            public int FolderId { get; set; }
+            public int? PerusahaanId { get; set; }
+            public int? DepartemenId { get; set; }
+            public string? NoNik { get; set; }
+            public int? PeranId { get; set; }
+            public bool CanView { get; set; }
+            public bool CanUpload { get; set; }
+        }
+
+        private async Task<Dictionary<string, List<FolderScopeRule>>> LoadScopeRulesByPathAsync(int companyId = 1)
+        {
+            var dict = new Dictionary<string, List<FolderScopeRule>>(StringComparer.OrdinalIgnoreCase);
+            var conn = _context.Database.GetDbConnection();
+            bool wasClosed = conn.State != ConnectionState.Open;
+            if (wasClosed) await conn.OpenAsync();
+
+            try
+            {
+                using var cmd = conn.CreateCommand();
+                cmd.CommandText = @"
+                    SELECT f.path_key, fs.folder_id, fs.perusahaan_id, fs.departemen_id, fs.no_nik, fs.peran_id, fs.can_view, fs.can_upload
+                    FROM [ONE_DB_MITRA].dbo.tbl_r_dokumen_folder_scope fs
+                    JOIN [ONE_DB_MITRA].dbo.tbl_m_dokumen_folder f ON fs.folder_id = f.folder_id
+                    WHERE f.is_deleted = 0 AND (fs.perusahaan_id IS NULL OR fs.perusahaan_id = @cid);
+                ";
+                var pC = cmd.CreateParameter();
+                pC.ParameterName = "@cid";
+                pC.Value = companyId;
+                cmd.Parameters.Add(pC);
+
+                using var r = await cmd.ExecuteReaderAsync();
+                while (await r.ReadAsync())
+                {
+                    var path = r["path_key"]?.ToString() ?? "";
+                    var rule = new FolderScopeRule
+                    {
+                        FolderId = Convert.ToInt32(r["folder_id"]),
+                        PerusahaanId = r["perusahaan_id"] != DBNull.Value ? Convert.ToInt32(r["perusahaan_id"]) : (int?)null,
+                        DepartemenId = r["departemen_id"] != DBNull.Value ? Convert.ToInt32(r["departemen_id"]) : (int?)null,
+                        NoNik = r["no_nik"]?.ToString()?.Trim(),
+                        PeranId = r["peran_id"] != DBNull.Value ? Convert.ToInt32(r["peran_id"]) : (int?)null,
+                        CanView = r["can_view"] != DBNull.Value && Convert.ToBoolean(r["can_view"]),
+                        CanUpload = r["can_upload"] != DBNull.Value && Convert.ToBoolean(r["can_upload"])
+                    };
+                    if (!dict.ContainsKey(path)) dict[path] = new List<FolderScopeRule>();
+                    dict[path].Add(rule);
+                }
+            }
+            catch
+            {
+                // Table might not exist or transient connection error; return empty
+            }
+            finally
+            {
+                if (wasClosed) await conn.CloseAsync();
+            }
+            return dict;
+        }
+
+        private static bool IsFolderAllowed(
+            string path,
+            IReadOnlySet<int> userRoleIds,
+            Dictionary<string, HashSet<int>> rulesByPath,
+            Dictionary<string, List<FolderScopeRule>>? scopeRulesByPath,
+            bool isOwnerNoDepartment,
+            int? userCompanyId = null,
+            int? userDeptId = null,
+            string? userNik = null)
         {
             if (isOwnerNoDepartment) return true;
-            if (rulesByPath == null || rulesByPath.Count == 0) return true; // Belum ada rule spesifik, default open
 
             var probe = NormalizeRelativePath(path);
+            var cleanNik = (userNik ?? string.Empty).Trim();
+
             while (true)
             {
-                if (rulesByPath.TryGetValue(probe, out var allowedRoles))
+                // 1. Cek Granular Scope Rule (One EV: NIK -> Departemen -> Perusahaan -> Peran)
+                if (scopeRulesByPath != null && scopeRulesByPath.TryGetValue(probe, out var scopes) && scopes.Count > 0)
+                {
+                    // A. Rule khusus spesifik NIK
+                    var nikRule = scopes.FirstOrDefault(s => !string.IsNullOrWhiteSpace(s.NoNik)
+                        && string.Equals(s.NoNik.Trim(), cleanNik, StringComparison.OrdinalIgnoreCase));
+                    if (nikRule != null)
+                    {
+                        return nikRule.CanView;
+                    }
+
+                    // B. Rule departemen untuk perusahaan pengguna
+                    if (userDeptId.HasValue && userCompanyId.HasValue)
+                    {
+                        var deptScopes = scopes.Where(s => s.PerusahaanId == userCompanyId && s.DepartemenId.HasValue).ToList();
+                        if (deptScopes.Count > 0)
+                        {
+                            var matchingDept = deptScopes.FirstOrDefault(s => s.DepartemenId == userDeptId.Value);
+                            if (matchingDept != null)
+                            {
+                                return matchingDept.CanView;
+                            }
+                            return false; // Ada rule departemen dan departemen user tidak cocok -> ditolak
+                        }
+                    }
+
+                    // C. Rule perusahaan
+                    if (userCompanyId.HasValue)
+                    {
+                        var compScopes = scopes.Where(s => s.PerusahaanId.HasValue && !s.DepartemenId.HasValue && string.IsNullOrWhiteSpace(s.NoNik)).ToList();
+                        if (compScopes.Count > 0)
+                        {
+                            var matchingComp = compScopes.FirstOrDefault(s => s.PerusahaanId == userCompanyId.Value);
+                            if (matchingComp != null)
+                            {
+                                return matchingComp.CanView;
+                            }
+                        }
+                    }
+
+                    // D. Rule peran / role
+                    var roleScopes = scopes.Where(s => s.PeranId.HasValue).ToList();
+                    if (roleScopes.Count > 0)
+                    {
+                        var matchingRole = roleScopes.FirstOrDefault(s => userRoleIds.Contains(s.PeranId!.Value));
+                        if (matchingRole != null)
+                        {
+                            return matchingRole.CanView;
+                        }
+                    }
+                }
+
+                // 2. Rule legacy folder role (tbl_r_dokumen_folder_role)
+                if (rulesByPath != null && rulesByPath.TryGetValue(probe, out var allowedRoles))
                 {
                     return allowedRoles.Overlaps(userRoleIds);
                 }
 
                 if (string.IsNullOrWhiteSpace(probe)) break;
 
+                // Naik ke parent folder (inheritance)
                 var lastSlash = probe.LastIndexOf('/');
                 probe = lastSlash < 0 ? string.Empty : probe.Substring(0, lastSlash);
             }
@@ -351,6 +475,7 @@ namespace Indexsafe.Api.Controllers
             {
                 var scope = await ResolveUserDocScopeAsync(nik);
                 var roleRules = await LoadRoleRulesByPathAsync(scope.PerusahaanId);
+                var scopeRules = await LoadScopeRulesByPathAsync(scope.PerusahaanId);
                 var blockedFiles = await LoadBlockedFileIdsAsync(scope.RoleIds, scope.IsOwnerNoDepartment);
 
                 var conn = _context.Database.GetDbConnection();
@@ -409,7 +534,7 @@ namespace Indexsafe.Api.Controllers
 
                             // Terapkan filtering One EV
                             if (blockedFiles.Contains(fId)) continue;
-                            if (!IsFolderAllowed(folderPath, scope.RoleIds, roleRules, scope.IsOwnerNoDepartment)) continue;
+                            if (!IsFolderAllowed(folderPath, scope.RoleIds, roleRules, scopeRules, scope.IsOwnerNoDepartment, scope.PerusahaanId, scope.DepartemenId, scope.Username)) continue;
 
                             var filePath = reader["file_path"]?.ToString() ?? "";
                             var docName = reader["nama_dokumen"]?.ToString() ?? "";
@@ -488,6 +613,7 @@ namespace Indexsafe.Api.Controllers
             {
                 var scope = await ResolveUserDocScopeAsync(nik);
                 var roleRules = await LoadRoleRulesByPathAsync(scope.PerusahaanId);
+                var scopeRules = await LoadScopeRulesByPathAsync(scope.PerusahaanId);
 
                 var conn = _context.Database.GetDbConnection();
                 bool wasClosed = conn.State != ConnectionState.Open;
@@ -511,7 +637,7 @@ namespace Indexsafe.Api.Controllers
                         cmdParentCheck.Parameters.Add(pPid);
 
                         var parentPath = (await cmdParentCheck.ExecuteScalarAsync())?.ToString() ?? "";
-                        if (!IsFolderAllowed(parentPath, scope.RoleIds, roleRules, scope.IsOwnerNoDepartment))
+                        if (!IsFolderAllowed(parentPath, scope.RoleIds, roleRules, scopeRules, scope.IsOwnerNoDepartment, scope.PerusahaanId, scope.DepartemenId, scope.Username))
                         {
                             return StatusCode(StatusCodes.Status403Forbidden, new
                             {
@@ -554,7 +680,7 @@ namespace Indexsafe.Api.Controllers
                         var folderPath = reader["path_key"]?.ToString() ?? "";
 
                         // Filter hak akses sesuai One EV
-                        if (!IsFolderAllowed(folderPath, scope.RoleIds, roleRules, scope.IsOwnerNoDepartment))
+                        if (!IsFolderAllowed(folderPath, scope.RoleIds, roleRules, scopeRules, scope.IsOwnerNoDepartment, scope.PerusahaanId, scope.DepartemenId, scope.Username))
                         {
                             continue;
                         }
@@ -624,6 +750,7 @@ namespace Indexsafe.Api.Controllers
 
                 var scope = await ResolveUserDocScopeAsync(nik);
                 var roleRules = await LoadRoleRulesByPathAsync(scope.PerusahaanId);
+                var scopeRules = await LoadScopeRulesByPathAsync(scope.PerusahaanId);
                 var blockedFiles = await LoadBlockedFileIdsAsync(scope.RoleIds, scope.IsOwnerNoDepartment);
 
                 var conn = _context.Database.GetDbConnection();
@@ -644,7 +771,7 @@ namespace Indexsafe.Api.Controllers
                     cmdFolderCheck.Parameters.Add(pFid);
 
                     var folderPath = (await cmdFolderCheck.ExecuteScalarAsync())?.ToString() ?? "";
-                    if (!IsFolderAllowed(folderPath, scope.RoleIds, roleRules, scope.IsOwnerNoDepartment))
+                    if (!IsFolderAllowed(folderPath, scope.RoleIds, roleRules, scopeRules, scope.IsOwnerNoDepartment, scope.PerusahaanId, scope.DepartemenId, scope.Username))
                     {
                         return StatusCode(StatusCodes.Status403Forbidden, new
                         {
@@ -746,6 +873,7 @@ namespace Indexsafe.Api.Controllers
 
                 var scope = await ResolveUserDocScopeAsync(nik);
                 var roleRules = await LoadRoleRulesByPathAsync(scope.PerusahaanId);
+                var scopeRules = await LoadScopeRulesByPathAsync(scope.PerusahaanId);
                 var blockedFiles = await LoadBlockedFileIdsAsync(scope.RoleIds, scope.IsOwnerNoDepartment);
 
                 var conn = _context.Database.GetDbConnection();
@@ -785,7 +913,7 @@ namespace Indexsafe.Api.Controllers
                         if (blockedFiles.Contains(fId)) continue;
 
                         var folderPath = reader["path_key"]?.ToString() ?? "";
-                        if (!IsFolderAllowed(folderPath, scope.RoleIds, roleRules, scope.IsOwnerNoDepartment)) continue;
+                        if (!IsFolderAllowed(folderPath, scope.RoleIds, roleRules, scopeRules, scope.IsOwnerNoDepartment, scope.PerusahaanId, scope.DepartemenId, scope.Username)) continue;
 
                         var filePath = reader["file_path"]?.ToString() ?? "";
                         var docName = reader["nama_dokumen"]?.ToString() ?? "";
@@ -921,6 +1049,7 @@ namespace Indexsafe.Api.Controllers
             {
                 var scope = await ResolveUserDocScopeAsync(nik);
                 var roleRules = await LoadRoleRulesByPathAsync(scope.PerusahaanId);
+                var scopeRules = await LoadScopeRulesByPathAsync(scope.PerusahaanId);
                 var blockedFiles = await LoadBlockedFileIdsAsync(scope.RoleIds, scope.IsOwnerNoDepartment);
 
                 // Cek apakah file ini di-exclude untuk role user
@@ -976,7 +1105,7 @@ namespace Indexsafe.Api.Controllers
                 }
 
                 // Cek izin folder
-                if (!IsFolderAllowed(folderPath, scope.RoleIds, roleRules, scope.IsOwnerNoDepartment))
+                if (!IsFolderAllowed(folderPath, scope.RoleIds, roleRules, scopeRules, scope.IsOwnerNoDepartment, scope.PerusahaanId, scope.DepartemenId, scope.Username))
                 {
                     return StatusCode(StatusCodes.Status403Forbidden, new
                     {
