@@ -1800,7 +1800,8 @@ namespace Indexsafe.Api.Controllers
                 @"C:\MinePermitFiles",
                 @"D:\MinePermitFiles",
                 @"C:\MinePermitFiles\ONEDBEV",
-                @"D:\4. PROJECT\2. Web\Indexsavemission\indexsafemission"
+                @"C:\MinePermitFiles\MBS",
+                @"D:\Publish\MBS"
             };
 
             foreach (var rawPath in candidatePaths)

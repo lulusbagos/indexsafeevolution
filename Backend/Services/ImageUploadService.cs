@@ -15,9 +15,11 @@ namespace Indexsafe.Api.Services
     {
         private readonly string _basePath;
         private readonly SyncMonitorService _monitor;
+        private readonly IConfiguration _config;
 
         public ImageUploadService(IWebHostEnvironment env, IConfiguration config, SyncMonitorService monitor)
         {
+            _config = config;
             _monitor = monitor;
             var configuredPath = config["UploadSettings:StoragePath"];
             if (!string.IsNullOrEmpty(configuredPath) && Directory.Exists(Path.GetPathRoot(configuredPath)))
@@ -143,48 +145,60 @@ namespace Indexsafe.Api.Services
                     var sourceFile = Path.Combine(uploadsFolder, uniqueFileName);
                     if (File.Exists(sourceFile))
                     {
-                    // If profiles category, ensure copies in C:\MinePermitFiles\MBS\profiles directly as well
-                    if (string.Equals(category, "profiles", StringComparison.OrdinalIgnoreCase))
-                    {
-                        var profilesRoot = @"C:\MinePermitFiles\MBS\profiles";
-                        if (!Directory.Exists(profilesRoot)) Directory.CreateDirectory(profilesRoot);
-
-                        var directProfilesFile = Path.Combine(profilesRoot, uniqueFileName);
-                        File.Copy(sourceFile, directProfilesFile, true);
-
-                        if (!string.IsNullOrEmpty(prefix))
+                        // 1. If profiles category, ensure copies in C:\MinePermitFiles\MBS\profiles directly as well
+                        if (string.Equals(category, "profiles", StringComparison.OrdinalIgnoreCase))
                         {
-                            var nikProfilesFile = Path.Combine(profilesRoot, $"{prefix}.jpg");
-                            File.Copy(sourceFile, nikProfilesFile, true);
+                            var profilesRoot = Path.Combine(_basePath, "profiles");
+                            if (!Directory.Exists(profilesRoot)) Directory.CreateDirectory(profilesRoot);
+
+                            var directProfilesFile = Path.Combine(profilesRoot, uniqueFileName);
+                            File.Copy(sourceFile, directProfilesFile, true);
+
+                            if (!string.IsNullOrEmpty(prefix))
+                            {
+                                var nikProfilesFile = Path.Combine(profilesRoot, $"{prefix}.jpg");
+                                File.Copy(sourceFile, nikProfilesFile, true);
+                            }
                         }
-                    }
 
-                    // Mirror to MBS_SAP Web wwwroot/uploads
-                    var mbsRoot = @"D:\4. PROJECT\2. Web\MBS_SAP\wwwroot\uploads";
-                    var mbsCategoryFolder = Path.Combine(mbsRoot, category, monthFolder);
-                    if (!Directory.Exists(mbsCategoryFolder))
-                    {
-                        Directory.CreateDirectory(mbsCategoryFolder);
-                    }
-                    var destFile = Path.Combine(mbsCategoryFolder, uniqueFileName);
-                    File.Copy(sourceFile, destFile, true);
-
-                    if (string.Equals(category, "profiles", StringComparison.OrdinalIgnoreCase))
-                    {
-                        var mbsDirectProfiles = Path.Combine(mbsRoot, "profiles");
-                        if (!Directory.Exists(mbsDirectProfiles)) Directory.CreateDirectory(mbsDirectProfiles);
-
-                        File.Copy(sourceFile, Path.Combine(mbsDirectProfiles, uniqueFileName), true);
-                        if (!string.IsNullOrEmpty(prefix))
+                        // 2. Cross-compatibility between Mobile "coaching" and Web MBS "CoachingKegiatan"
+                        if (string.Equals(category, "coaching", StringComparison.OrdinalIgnoreCase))
                         {
-                            File.Copy(sourceFile, Path.Combine(mbsDirectProfiles, $"{prefix}.jpg"), true);
+                            var coachingKegiatanFolder = Path.Combine(_basePath, "CoachingKegiatan", monthFolder);
+                            if (!Directory.Exists(coachingKegiatanFolder)) Directory.CreateDirectory(coachingKegiatanFolder);
+                            File.Copy(sourceFile, Path.Combine(coachingKegiatanFolder, uniqueFileName), true);
                         }
-                    }
+                        else if (string.Equals(category, "CoachingKegiatan", StringComparison.OrdinalIgnoreCase))
+                        {
+                            var coachingFolder = Path.Combine(_basePath, "coaching", monthFolder);
+                            if (!Directory.Exists(coachingFolder)) Directory.CreateDirectory(coachingFolder);
+                            File.Copy(sourceFile, Path.Combine(coachingFolder, uniqueFileName), true);
+                        }
+
+                        // 3. Optional mirror to custom MBS_SAP web path (ONLY if explicitly configured and directory exists)
+                        var mbsRoot = _config["UploadSettings:MbsWebUploadsPath"];
+                        if (!string.IsNullOrWhiteSpace(mbsRoot) && Directory.Exists(mbsRoot))
+                        {
+                            var mbsCategoryFolder = Path.Combine(mbsRoot, category, monthFolder);
+                            if (!Directory.Exists(mbsCategoryFolder)) Directory.CreateDirectory(mbsCategoryFolder);
+                            File.Copy(sourceFile, Path.Combine(mbsCategoryFolder, uniqueFileName), true);
+
+                            if (string.Equals(category, "profiles", StringComparison.OrdinalIgnoreCase))
+                            {
+                                var mbsDirectProfiles = Path.Combine(mbsRoot, "profiles");
+                                if (!Directory.Exists(mbsDirectProfiles)) Directory.CreateDirectory(mbsDirectProfiles);
+                                File.Copy(sourceFile, Path.Combine(mbsDirectProfiles, uniqueFileName), true);
+                                if (!string.IsNullOrEmpty(prefix))
+                                {
+                                    File.Copy(sourceFile, Path.Combine(mbsDirectProfiles, $"{prefix}.jpg"), true);
+                                }
+                            }
+                        }
                     }
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"[ImageUploadService] Mirror to MBS_SAP/Profiles error: {ex.Message}");
+                    Console.WriteLine($"[ImageUploadService] Post-upload sync warning: {ex.Message}");
                 }
             }
 
