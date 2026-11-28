@@ -716,8 +716,7 @@ class _SpiFormPageState extends State<SpiFormPage> {
 
   Future<void> _saveOffline(Map<String, dynamic> mapData) async {
     try {
-      final sqldb = await _db.database;
-      await sqldb.insert('tbl_t_spi_report', {
+      await _db.insert('tbl_t_spi_report', {
         'tanggal': mapData['tanggal'],
         'waktu': mapData['waktu'],
         'nik': mapData['nik'],

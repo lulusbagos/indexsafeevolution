@@ -1468,11 +1468,7 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
         'q4_1', 'q4_2', 'q4_3',
         'q5_1', 'q5_2', 'q5_3',
       ];
-      for (final col in requiredColumns) {
-        try {
-          await db.execute('ALTER TABLE inspection_trans ADD COLUMN `$col` TEXT;');
-        } catch (_) {}
-      }
+      await _db.ensureColumnsExist('inspection_trans', requiredColumns);
 
       final tanggalFormatted = DateFormat('yyyy-MM-dd').format(_tanggal);
       final waktuFormatted =
@@ -1530,7 +1526,10 @@ class _InspeksiFormPageState extends State<InspeksiFormPage> {
         insertValues['image'] = primaryPhoto.path;
       }
 
-      final insertedId = await db.insert('inspection_trans', insertValues);
+      final insertedId = await _db.insert('inspection_trans', insertValues);
+      if (insertedId <= 0) {
+        throw Exception('Gagal menyimpan data ke database lokal SQLite.');
+      }
 
       if (!mounted) return;
       setState(() => _isSaving = false);

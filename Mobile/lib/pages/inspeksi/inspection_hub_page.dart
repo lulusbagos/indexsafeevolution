@@ -114,10 +114,10 @@ class _InspectionHubPageState extends State<InspectionHubPage> {
                     };
                     final existing = await db.rawQuery('SELECT id FROM inspection_trans WHERE sync_id = $sId OR id = $sId LIMIT 1');
                     if (existing.isEmpty) {
-                      await db.insert('inspection_trans', row);
+                      await _db.insert('inspection_trans', row);
                     } else {
                       final lId = existing.first['id'] as int;
-                      await db.update('inspection_trans', row, where: 'id = ?', whereArgs: [lId]);
+                      await _db.update('inspection_trans', row, lId);
                     }
                   }
                 }

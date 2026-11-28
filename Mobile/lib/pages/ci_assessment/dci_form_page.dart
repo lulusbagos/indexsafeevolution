@@ -809,9 +809,9 @@ class _DciFormPageState extends State<DciFormPage> {
         }
 
         if (widget.editData != null) {
-          await sqldb.update('tbl_t_dci_report', localData, where: 'id = ?', whereArgs: [widget.editData!.id]);
+          await _db.update('tbl_t_dci_report', localData, widget.editData!.id);
         } else {
-          await sqldb.insert('tbl_t_dci_report', localData);
+          await _db.insert('tbl_t_dci_report', localData);
         }
       } catch (_) {}
 

@@ -738,8 +738,7 @@ class _GciFormPageState extends State<GciFormPage> {
 
   Future<void> _saveOffline(Map<String, dynamic> mapData) async {
     try {
-      final sqldb = await _db.database;
-      await sqldb.insert('tbl_t_gci_report', {
+      await _db.insert('tbl_t_gci_report', {
         'tanggal': mapData['tanggal'],
         'waktu': mapData['waktu'],
         'nik': mapData['nik'],

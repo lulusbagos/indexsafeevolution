@@ -197,7 +197,7 @@ class DatabaseService {
 
 
 
-      version: 2,
+      version: 3,
 
 
 
@@ -4635,7 +4635,7 @@ class DatabaseService {
 
 
 
-        await db.execute('ALTER TABLE p5m_trans ADD COLUMN `$col` TEXT;');
+        await db.execute('ALTER TABLE p5m_trans ADD COLUMN "$col" TEXT;');
 
 
 
@@ -4695,7 +4695,7 @@ class DatabaseService {
 
 
 
-        await db.execute('ALTER TABLE p5m_details ADD COLUMN `$col` TEXT;');
+        await db.execute('ALTER TABLE p5m_details ADD COLUMN "$col" TEXT;');
 
 
 
@@ -4839,7 +4839,7 @@ class DatabaseService {
 
 
 
-        await db.execute('ALTER TABLE safety_trans ADD COLUMN `$col` TEXT;');
+        await db.execute('ALTER TABLE safety_trans ADD COLUMN "$col" TEXT;');
 
 
 
@@ -4903,7 +4903,7 @@ class DatabaseService {
 
 
 
-        await db.execute('ALTER TABLE safety_details ADD COLUMN `$col` TEXT;');
+        await db.execute('ALTER TABLE safety_details ADD COLUMN "$col" TEXT;');
 
 
 
@@ -5047,7 +5047,7 @@ class DatabaseService {
 
 
 
-        await db.execute('ALTER TABLE coaching_trans ADD COLUMN `$col` TEXT;');
+        await db.execute('ALTER TABLE coaching_trans ADD COLUMN "$col" TEXT;');
 
 
 
@@ -5131,7 +5131,7 @@ class DatabaseService {
 
 
 
-            .execute('ALTER TABLE coaching_details ADD COLUMN `$col` TEXT;');
+            .execute('ALTER TABLE coaching_details ADD COLUMN "$col" TEXT;');
 
 
 
@@ -5263,7 +5263,7 @@ class DatabaseService {
 
 
 
-        await db.execute('ALTER TABLE p2h_trans ADD COLUMN `$col` TEXT;');
+        await db.execute('ALTER TABLE p2h_trans ADD COLUMN "$col" TEXT;');
 
 
 
@@ -5319,7 +5319,7 @@ class DatabaseService {
 
 
 
-        await db.execute('ALTER TABLE p2h_details ADD COLUMN `$col` TEXT;');
+        await db.execute('ALTER TABLE p2h_details ADD COLUMN "$col" TEXT;');
 
 
 
@@ -5421,10 +5421,10 @@ class DatabaseService {
     ];
     for (var col in commCols) {
       try {
-        await db.execute("ALTER TABLE vehicle_masters ADD COLUMN `$col` TEXT DEFAULT '-';");
+        await db.execute('ALTER TABLE vehicle_masters ADD COLUMN "$col" TEXT DEFAULT \'-\';');
       } catch (_) {}
       try {
-        await db.execute("ALTER TABLE p2h_vehicles ADD COLUMN `$col` TEXT DEFAULT '-';");
+        await db.execute('ALTER TABLE p2h_vehicles ADD COLUMN "$col" TEXT DEFAULT \'-\';');
       } catch (_) {}
     }
     try {
@@ -5607,7 +5607,7 @@ class DatabaseService {
 
 
 
-            .execute('ALTER TABLE inspection_trans ADD COLUMN `$col` TEXT;');
+            .execute('ALTER TABLE inspection_trans ADD COLUMN "$col" TEXT;');
 
 
 
@@ -5737,7 +5737,7 @@ class DatabaseService {
     ];
     for (final col in cols) {
       try {
-        await db.execute('ALTER TABLE observation_trans ADD COLUMN `$col` TEXT;');
+        await db.execute('ALTER TABLE observation_trans ADD COLUMN "$col" TEXT;');
 
 
 
@@ -5809,7 +5809,7 @@ class DatabaseService {
 
 
 
-            .execute('ALTER TABLE observation_details ADD COLUMN `$col` TEXT;');
+            .execute('ALTER TABLE observation_details ADD COLUMN "$col" TEXT;');
 
 
 
@@ -5881,7 +5881,7 @@ class DatabaseService {
 
 
 
-        await db.execute('ALTER TABLE employees ADD COLUMN `$col` TEXT;');
+        await db.execute('ALTER TABLE employees ADD COLUMN "$col" TEXT;');
 
 
 
@@ -6028,7 +6028,7 @@ class DatabaseService {
       // Pastikan kolom nik, nama, departemen, jabatan, perusahaan ada di tabel employees
       for (var col in ['nik', 'nama', 'departemen', 'jabatan', 'perusahaan']) {
         try {
-          await db.execute('ALTER TABLE employees ADD COLUMN `$col` TEXT;');
+          await db.execute('ALTER TABLE employees ADD COLUMN "$col" TEXT;');
         } catch (_) {}
       }
       try {
@@ -6186,7 +6186,7 @@ class DatabaseService {
     ];
     for (var col in cols) {
       try {
-        await db.execute('ALTER TABLE hazard_trans ADD COLUMN `$col` TEXT;');
+        await db.execute('ALTER TABLE hazard_trans ADD COLUMN "$col" TEXT;');
 
 
 
@@ -6318,7 +6318,7 @@ class DatabaseService {
     ];
     for (var col in cols) {
       try {
-        await db.execute('ALTER TABLE action_plans ADD COLUMN `$col` TEXT;');
+        await db.execute('ALTER TABLE action_plans ADD COLUMN "$col" TEXT;');
 
 
 
@@ -8941,90 +8941,139 @@ class DatabaseService {
 
 
 
+  }  static final Map<String, Set<String>> _tableColumnsCache = {};
+
+  /// Mengambil daftar nama kolom yang ada di tabel SQLite lokal (case-insensitive cache).
+  Future<Set<String>> getTableColumns(String table, {bool refresh = false}) async {
+    final key = table.toLowerCase().trim();
+    if (!refresh && _tableColumnsCache.containsKey(key)) {
+      return _tableColumnsCache[key]!;
+    }
+    try {
+      final db = await database;
+      final pragma = await db.rawQuery('PRAGMA table_info("$table");');
+      final cols = <String>{};
+      for (final row in pragma) {
+        final colName = row['name']?.toString().toLowerCase().trim();
+        if (colName != null && colName.isNotEmpty) {
+          cols.add(colName);
+        }
+      }
+      _tableColumnsCache[key] = cols;
+      return cols;
+    } catch (e) {
+      debugPrint('Error getTableColumns for $table: $e');
+      return _tableColumnsCache[key] ?? <String>{};
+    }
   }
 
+  /// Memastikan kolom-kolom yang diperlukan benar-benar ada di tabel SQLite lokal.
+  /// Jika belum ada, otomatis melakukan ALTER TABLE ADD COLUMN secara aman.
+  Future<void> ensureColumnsExist(String table, Iterable<String> columns) async {
+    try {
+      final db = await database;
+      final existing = await getTableColumns(table);
+      for (final rawCol in columns) {
+        final col = rawCol.trim();
+        if (col.isEmpty) continue;
+        final colLower = col.toLowerCase();
+        if (!existing.contains(colLower)) {
+          bool added = false;
+          // Format 1: ANSI SQL double quotes
+          try {
+            await db.execute('ALTER TABLE "$table" ADD COLUMN "$col" TEXT;');
+            added = true;
+          } catch (_) {
+            // Format 2: Unquoted identifier
+            try {
+              await db.execute('ALTER TABLE $table ADD COLUMN $col TEXT;');
+              added = true;
+            } catch (_) {
+              // Format 3: Bracketed identifier
+              try {
+                await db.execute('ALTER TABLE [$table] ADD COLUMN [$col] TEXT;');
+                added = true;
+              } catch (_) {}
+            }
+          }
+          if (added) {
+            existing.add(colLower);
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Error ensureColumnsExist for $table: $e');
+    }
+  }
 
-
-
-
-
-
+  /// Self-healing insert yang menjamin TIDAK AKAN PERNAH crash dengan error
+  /// "table ... has no column named ...".
+  /// Otomatis menambahkan kolom baru jika belum ada, dan memfilter nilai ke kolom yang valid.
   Future<int> insert(table, Map<String, dynamic> vals) async {
-
-
-
     final db = await database;
-
-
-
+    final tblStr = table.toString();
     try {
+      // 1. Auto-healing: Tambahkan kolom yang belum ada
+      await ensureColumnsExist(tblStr, vals.keys);
 
+      // 2. Filter nilai agar hanya kolom yang valid di SQLite yang dieksekusi
+      final existingCols = await getTableColumns(tblStr);
+      final safeVals = Map<String, dynamic>.from(vals);
+      if (existingCols.isNotEmpty) {
+        safeVals.removeWhere((k, v) => !existingCols.contains(k.toLowerCase().trim()));
+      }
 
-
-      return await db.insert(table, vals,
-
-
-
-          conflictAlgorithm: ConflictAlgorithm.replace);
-
-
-
+      return await db.insert(
+        tblStr,
+        safeVals,
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
     } catch (e) {
-
-
-
-      debugPrint(e.toString());
-
-
-
-      return 0;
-
-
-
+      debugPrint('Insert self-healing retry on $table ($e)...');
+      try {
+        final refreshedCols = await getTableColumns(tblStr, refresh: true);
+        final safeVals = Map<String, dynamic>.from(vals);
+        if (refreshedCols.isNotEmpty) {
+          safeVals.removeWhere((k, v) => !refreshedCols.contains(k.toLowerCase().trim()));
+        }
+        return await db.insert(
+          tblStr,
+          safeVals,
+          conflictAlgorithm: ConflictAlgorithm.replace,
+        );
+      } catch (e2) {
+        debugPrint('Fatal insert error on $table: $e2');
+        return 0;
+      }
     }
-
-
-
   }
 
-
-
-
-
-
-
+  /// Self-healing update yang menjamin keamanan skema dan mencegah SQLITE_ERROR.
   Future<int> update(table, Map<String, dynamic> vals, int id) async {
-
-
-
     final db = await database;
-
-
-
+    final tblStr = table.toString();
     try {
-
-
-
-      return await db.update(table, vals, where: 'id=?', whereArgs: [id]);
-
-
-
+      await ensureColumnsExist(tblStr, vals.keys);
+      final existingCols = await getTableColumns(tblStr);
+      final safeVals = Map<String, dynamic>.from(vals);
+      if (existingCols.isNotEmpty) {
+        safeVals.removeWhere((k, v) => !existingCols.contains(k.toLowerCase().trim()));
+      }
+      return await db.update(tblStr, safeVals, where: 'id=?', whereArgs: [id]);
     } catch (e) {
-
-
-
-      debugPrint(e.toString());
-
-
-
-      return 0;
-
-
-
+      debugPrint('Update self-healing retry on $table ($e)...');
+      try {
+        final refreshedCols = await getTableColumns(tblStr, refresh: true);
+        final safeVals = Map<String, dynamic>.from(vals);
+        if (refreshedCols.isNotEmpty) {
+          safeVals.removeWhere((k, v) => !refreshedCols.contains(k.toLowerCase().trim()));
+        }
+        return await db.update(tblStr, safeVals, where: 'id=?', whereArgs: [id]);
+      } catch (e2) {
+        debugPrint('Fatal update error on $table: $e2');
+        return 0;
+      }
     }
-
-
-
   }
 
 
