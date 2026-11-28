@@ -358,192 +358,188 @@ class _SplashPageState extends State<SplashPage> with TickerProviderStateMixin {
         return PopScope(
           canPop: !isMandatory,
           child: Dialog(
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-            elevation: 16,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(28),
+              side: const BorderSide(color: Color(0xFFE2E8F0), width: 1.2),
+            ),
+            elevation: 20,
             backgroundColor: Colors.white,
+            insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 28),
+              padding: const EdgeInsets.fromLTRB(22, 26, 22, 22),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  // 1. Sleek Modern Squircle Header Icon
                   Container(
-                    width: 76,
-                    height: 76,
+                    width: 72,
+                    height: 72,
                     decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      gradient: LinearGradient(
-                        colors: isMandatory
-                            ? const [Color(0xFF2563EB), Color(0xFF0D9488)]
-                            : const [Color(0xFF0EA5E9), Color(0xFF10B981)],
+                      borderRadius: BorderRadius.circular(22),
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFF0F172A), Color(0xFF1E3A8A)],
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                       ),
                       boxShadow: [
                         BoxShadow(
-                          color:
-                              const Color(0xFF2563EB).withValues(alpha: 0.35),
+                          color: const Color(0xFF1E3A8A).withValues(alpha: 0.35),
                           blurRadius: 18,
                           offset: const Offset(0, 8),
                         ),
                       ],
+                      border: Border.all(
+                        color: const Color(0xFF38BDF8).withValues(alpha: 0.4),
+                        width: 1.5,
+                      ),
                     ),
-                    child: const Icon(
-                      Icons.system_update_rounded,
-                      color: Colors.white,
-                      size: 40,
+                    child: const Center(
+                      child: Icon(
+                        Icons.rocket_launch_rounded,
+                        color: Color(0xFF38BDF8),
+                        size: 34,
+                      ),
                     ),
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 18),
+
+                  // 2. Title & Version Badge
                   Text(
                     title,
                     textAlign: TextAlign.center,
                     style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w800,
+                      fontSize: 18.5,
+                      fontWeight: FontWeight.w900,
                       color: Color(0xFF0F172A),
+                      letterSpacing: -0.3,
                     ),
                   ),
                   const SizedBox(height: 8),
                   Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
                     decoration: BoxDecoration(
-                      color: isMandatory
-                          ? const Color(0xFFEFF6FF)
-                          : const Color(0xFFECFDF5),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                          color: isMandatory
-                              ? const Color(0xFFBFDBFE)
-                              : const Color(0xFFA7F3D0)),
+                      color: const Color(0xFFF1F5F9),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: const Color(0xFFCBD5E1)),
                     ),
-                    child: Text(
-                      isMandatory
-                          ? 'Versi Anda: v$currentVersion  ➔  Wajib: v$targetVersion'
-                          : 'Versi Anda: v$currentVersion  ➔  Tersedia: v$targetVersion',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        color: isMandatory
-                            ? const Color(0xFF1D4ED8)
-                            : const Color(0xFF047857),
-                      ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          'Versi Anda: v$currentVersion',
+                          style: const TextStyle(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF64748B),
+                          ),
+                        ),
+                        const Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 6),
+                          child: Icon(
+                            Icons.arrow_forward_rounded,
+                            size: 13,
+                            color: Color(0xFF0284C7),
+                          ),
+                        ),
+                        Text(
+                          isMandatory ? 'Wajib: v$targetVersion' : 'Tersedia: v$targetVersion',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w800,
+                            color: isMandatory ? const Color(0xFF0284C7) : const Color(0xFF059669),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 12),
+
+                  // 3. Informative Message
                   Text(
                     message,
                     textAlign: TextAlign.center,
                     style: TextStyle(
-                      fontSize: 13,
-                      height: 1.4,
-                      color: Colors.grey.shade700,
+                      fontSize: 12.5,
+                      height: 1.45,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.grey.shade600,
                     ),
                   ),
+
+                  // 4. Clean Release Notes Container
                   if (releaseNotes.isNotEmpty) ...[
-                    const SizedBox(height: 14),
+                    const SizedBox(height: 12),
                     Container(
                       width: double.infinity,
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: Colors.grey.shade50,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.grey.shade200),
+                        color: const Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
-                            'Catatan Rilis:',
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF475569),
-                            ),
+                          Row(
+                            children: [
+                              Container(
+                                width: 6,
+                                height: 6,
+                                decoration: const BoxDecoration(
+                                  color: Color(0xFF0284C7),
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              const Text(
+                                'Catatan Pembaruan:',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w800,
+                                  color: Color(0xFF475569),
+                                  letterSpacing: 0.2,
+                                ),
+                              ),
+                            ],
                           ),
-                          const SizedBox(height: 4),
+                          const SizedBox(height: 5),
                           Text(
                             releaseNotes,
                             style: TextStyle(
-                              fontSize: 12,
+                              fontSize: 11.5,
+                              height: 1.4,
                               color: Colors.grey.shade800,
+                              fontWeight: FontWeight.w500,
                             ),
                           ),
                         ],
                       ),
                     ),
                   ],
-                  const SizedBox(height: 20),
-                  // Pilihan 1: Update via Play Store
-                  SizedBox(
-                    width: double.infinity,
-                    height: 48,
-                    child: ElevatedButton.icon(
-                      onPressed: () => _openPlayStore(playStoreUrl),
-                      icon: const Icon(Icons.shop_2_rounded,
-                          color: Colors.white, size: 20),
-                      label: const Text(
-                        '1. Update di Google Play Store',
-                        style: TextStyle(
-                          fontSize: 13.5,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                      ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF0F766E),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        elevation: 3,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  // Pembatas Pilihan
-                  Row(
-                    children: [
-                      Expanded(child: Divider(color: Colors.grey.shade300, thickness: 1)),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 10),
-                        child: Text(
-                          'ATAU',
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w800,
-                            color: Colors.grey.shade500,
-                            letterSpacing: 0.5,
-                          ),
-                        ),
-                      ),
-                      Expanded(child: Divider(color: Colors.grey.shade300, thickness: 1)),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  // Pilihan 2: Menggunakan Link Web Ini
+                  const SizedBox(height: 18),
+
+                  // 5. Opsi 1: Update Sekarang di Play Store (Primary High-Contrast Button)
                   Material(
                     color: Colors.transparent,
-                    borderRadius: BorderRadius.circular(14),
+                    borderRadius: BorderRadius.circular(16),
                     child: InkWell(
-                      borderRadius: BorderRadius.circular(14),
-                      onTap: _openWebPortal,
+                      borderRadius: BorderRadius.circular(16),
+                      onTap: () => _openPlayStore(playStoreUrl),
                       child: Container(
                         width: double.infinity,
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
                         decoration: BoxDecoration(
                           gradient: const LinearGradient(
-                            colors: [Color(0xFF0F172A), Color(0xFF1E3A8A)],
+                            colors: [Color(0xFF0F766E), Color(0xFF0D9488)],
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
                           ),
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: const Color(0xFF38BDF8).withValues(alpha: 0.3)),
+                          borderRadius: BorderRadius.circular(16),
                           boxShadow: [
                             BoxShadow(
-                              color: const Color(0xFF1E3A8A).withValues(alpha: 0.2),
-                              blurRadius: 10,
-                              offset: const Offset(0, 4),
+                              color: const Color(0xFF0F766E).withValues(alpha: 0.32),
+                              blurRadius: 12,
+                              offset: const Offset(0, 5),
                             ),
                           ],
                         ),
@@ -553,39 +549,146 @@ class _SplashPageState extends State<SplashPage> with TickerProviderStateMixin {
                               width: 38,
                               height: 38,
                               decoration: BoxDecoration(
-                                color: const Color(0xFF38BDF8).withValues(alpha: 0.2),
-                                borderRadius: BorderRadius.circular(10),
-                                border: Border.all(color: const Color(0xFF38BDF8).withValues(alpha: 0.35)),
+                                color: Colors.white.withValues(alpha: 0.18),
+                                shape: BoxShape.circle,
                               ),
-                              child: const Icon(Icons.language_rounded, color: Color(0xFF38BDF8), size: 20),
+                              child: const Icon(
+                                Icons.shop_two_rounded,
+                                color: Colors.white,
+                                size: 20,
+                              ),
                             ),
                             const SizedBox(width: 12),
                             const Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
-                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    'Update di Google Play Store',
+                                    style: TextStyle(
+                                      fontSize: 13.5,
+                                      fontWeight: FontWeight.w800,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                  SizedBox(height: 1),
+                                  Text(
+                                    'Download versi mobile resmi terbaru',
+                                    style: TextStyle(
+                                      fontSize: 10.5,
+                                      color: Color(0xFFCCFBF1),
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const Icon(
+                              Icons.arrow_forward_ios_rounded,
+                              size: 13,
+                              color: Colors.white70,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  // 6. Modern Divider
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    child: Row(
+                      children: [
+                        Expanded(child: Divider(color: Colors.grey.shade300, thickness: 1)),
+                        Container(
+                          margin: const EdgeInsets.symmetric(horizontal: 10),
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF1F5F9),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            'ATAU PILIH WEB PORTAL',
+                            style: TextStyle(
+                              fontSize: 9.5,
+                              fontWeight: FontWeight.w800,
+                              color: Colors.grey.shade500,
+                              letterSpacing: 0.6,
+                            ),
+                          ),
+                        ),
+                        Expanded(child: Divider(color: Colors.grey.shade300, thickness: 1)),
+                      ],
+                    ),
+                  ),
+
+                  // 7. Opsi 2: Buka Portal Web MBS SAP (Clean Modern Corporate Card)
+                  Material(
+                    color: Colors.transparent,
+                    borderRadius: BorderRadius.circular(16),
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(16),
+                      onTap: _openWebPortal,
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF8FAFC),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: const Color(0xFFCBD5E1), width: 1.2),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.03),
+                              blurRadius: 8,
+                              offset: const Offset(0, 3),
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 38,
+                              height: 38,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF0284C7).withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: const Icon(
+                                Icons.language_rounded,
+                                color: Color(0xFF0284C7),
+                                size: 21,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            const Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Row(
                                     children: [
                                       Text(
-                                        '2. Buka Web MBS SAP',
+                                        'Gunakan Web MBS SAP',
                                         style: TextStyle(
-                                          color: Colors.white,
                                           fontSize: 13,
                                           fontWeight: FontWeight.w800,
+                                          color: Color(0xFF0F172A),
                                         ),
                                       ),
-                                      SizedBox(width: 5),
-                                      Icon(Icons.arrow_outward_rounded, size: 13, color: Color(0xFF38BDF8)),
+                                      SizedBox(width: 6),
+                                      Icon(
+                                        Icons.open_in_new_rounded,
+                                        size: 13,
+                                        color: Color(0xFF0284C7),
+                                      ),
                                     ],
                                   ),
                                   SizedBox(height: 2),
                                   Text(
-                                    'Pengerjaan via https://mbssap.indexim.id/',
+                                    'Pengerjaan via https://mbssap.indexim.id',
                                     style: TextStyle(
-                                      color: Color(0xFF93C5FD),
                                       fontSize: 10.5,
-                                      fontWeight: FontWeight.w600,
+                                      color: Color(0xFF64748B),
+                                      fontWeight: FontWeight.w500,
                                     ),
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
@@ -598,17 +701,19 @@ class _SplashPageState extends State<SplashPage> with TickerProviderStateMixin {
                       ),
                     ),
                   ),
+
+                  // 8. Dismiss / Nanti Saja (Hanya jika update opsional)
                   if (!isMandatory) ...[
                     const SizedBox(height: 10),
                     SizedBox(
                       width: double.infinity,
-                      height: 40,
+                      height: 38,
                       child: TextButton(
                         onPressed: () => Navigator.of(ctx).pop(),
                         child: const Text(
-                          'Nanti Saja, Lanjutkan ke Aplikasi',
+                          'Nanti Saja, Masuk ke Aplikasi',
                           style: TextStyle(
-                            fontSize: 12.5,
+                            fontSize: 12,
                             fontWeight: FontWeight.w600,
                             color: Color(0xFF64748B),
                           ),

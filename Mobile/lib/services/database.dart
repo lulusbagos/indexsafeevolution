@@ -24,24 +24,13 @@ import '../models/notification_item_model.dart';
 
 class DatabaseService {
 
-
-
   static DatabaseService? _instance;
 
-
+  static DatabaseService get instance => DatabaseService();
 
   factory DatabaseService() {
-
-
-
     _instance ??= DatabaseService._internal();
-
-
-
     return _instance!;
-
-
-
   }
 
 
@@ -63,35 +52,33 @@ class DatabaseService {
 
 
   Future<Database> get database async {
-
-
-
     if (_database != null) return _database!;
-
-
-
     _database = await _initDatabase();
+    await _ensureAllSchemas(_database!);
+    return _database!;
+  }
 
-
-
-    try { await _ensureHazardTransColumns(_database!); } catch (_) {}
-    try { await _ensureInspectionTransColumns(_database!); } catch (_) {}
-    try { await _ensureObservationTransColumns(_database!); } catch (_) {}
-    try { await _ensureEmployeeColumns(_database!); } catch (_) {}
-    try { await _ensureBenchmarkTable(_database!); } catch (_) {}
-    try { await _ensureP2hTransColumns(_database!); } catch (_) {}
-    try { await _ensureVehicleMastersColumns(_database!); } catch (_) {}
-    try { await _ensureP5mTransColumns(_database!); } catch (_) {}
-    try { await _ensureDciTable(_database!); } catch (_) {}
-    try { await _ensureSpiTable(_database!); } catch (_) {}
-    try { await _ensureGciTable(_database!); } catch (_) {}
-    try { await _ensureSafetyTransColumns(_database!); } catch (_) {}
-    try { await _ensureCoachingTransColumns(_database!); } catch (_) {}
-    try { await _ensureActionPlansColumns(_database!); } catch (_) {}
-    try { await _ensureNotificationsTable(_database!); } catch (_) {}
-    try { await _ensureSimperOfflineTable(_database!); } catch (_) {}
-    try { await _ensurePermitOfflineTable(_database!); } catch (_) {}
-    try { await _ensureOfflineQueues(_database!); } catch (_) {}
+  /// Memastikan seluruh skema tabel, relasi, dan kolom esensial selalu ada dan terbarui
+  /// baik saat inisialisasi awal, upgrade, maupun onOpen di setiap startup aplikasi.
+  Future<void> _ensureAllSchemas(Database db) async {
+    try { await _ensureHazardTransColumns(db); } catch (_) {}
+    try { await _ensureInspectionTransColumns(db); } catch (_) {}
+    try { await _ensureObservationTransColumns(db); } catch (_) {}
+    try { await _ensureEmployeeColumns(db); } catch (_) {}
+    try { await _ensureBenchmarkTable(db); } catch (_) {}
+    try { await _ensureP2hTransColumns(db); } catch (_) {}
+    try { await _ensureVehicleMastersColumns(db); } catch (_) {}
+    try { await _ensureP5mTransColumns(db); } catch (_) {}
+    try { await _ensureDciTable(db); } catch (_) {}
+    try { await _ensureSpiTable(db); } catch (_) {}
+    try { await _ensureGciTable(db); } catch (_) {}
+    try { await _ensureSafetyTransColumns(db); } catch (_) {}
+    try { await _ensureCoachingTransColumns(db); } catch (_) {}
+    try { await _ensureActionPlansColumns(db); } catch (_) {}
+    try { await _ensureNotificationsTable(db); } catch (_) {}
+    try { await _ensureSimperOfflineTable(db); } catch (_) {}
+    try { await _ensurePermitOfflineTable(db); } catch (_) {}
+    try { await _ensureOfflineQueues(db); } catch (_) {}
 
     final ensureTables = [
       'hazard_trans',
@@ -113,55 +100,29 @@ class DatabaseService {
     for (final tbl in ensureTables) {
       for (final colName in ensureCols) {
         try {
-          await _database!.execute('ALTER TABLE "$tbl" ADD COLUMN "$colName" TEXT;');
+          await db.execute('ALTER TABLE "$tbl" ADD COLUMN "$colName" TEXT;');
         } catch (_) {
           try {
-            await _database!.execute('ALTER TABLE $tbl ADD COLUMN $colName TEXT;');
+            await db.execute('ALTER TABLE $tbl ADD COLUMN $colName TEXT;');
           } catch (_) {}
         }
       }
     }
-
-    return _database!;
-
-
-
   }
 
-
-
-
-
-
-
   _initDatabase() async {
-
-
-
     var dbPath = await getDatabasesPath();
-
-
-
     var path = join(dbPath, 'isafe18.db');
 
-
-
     return await openDatabase(
-
-
-
       path,
       version: 5,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
       onOpen: (db) async {
-        try { await _ensureInspectionTransColumns(db); } catch (_) {}
-        try { await _ensureHazardTransColumns(db); } catch (_) {}
+        await _ensureAllSchemas(db);
       },
     );
-
-
-
   }
 
 
@@ -9014,13 +8975,16 @@ class DatabaseService {
             final badCol = m.group(1)?.toLowerCase().trim() ?? '';
             if (badCol.isNotEmpty) {
               // 1. Coba tambah kolom ke SQLite
+              bool colAdded = false;
               try {
                 await db.execute('ALTER TABLE "$tblStr" ADD COLUMN "$badCol" TEXT;');
                 _tableColumnsCache.remove(tblStr.toLowerCase().trim());
-                return await db.insert(tblStr, currentVals, conflictAlgorithm: ConflictAlgorithm.replace);
+                colAdded = true;
               } catch (_) {}
-              // 2. Jika gagal tambah kolom, buang kolom tersebut dan coba insert kembali
-              currentVals.removeWhere((k, _) => k.toLowerCase().trim() == badCol);
+              if (!colAdded) {
+                currentVals.removeWhere((k, _) => k.toLowerCase().trim() == badCol);
+              }
+              // 2. Coba insert kembali
               try {
                 return await db.insert(tblStr, currentVals, conflictAlgorithm: ConflictAlgorithm.replace);
               } catch (retryErr) {
@@ -9067,12 +9031,17 @@ class DatabaseService {
           if (m != null) {
             final badCol = m.group(1)?.toLowerCase().trim() ?? '';
             if (badCol.isNotEmpty) {
+              // 1. Coba tambah kolom ke SQLite
+              bool colAdded = false;
               try {
                 await db.execute('ALTER TABLE "$tblStr" ADD COLUMN "$badCol" TEXT;');
                 _tableColumnsCache.remove(tblStr.toLowerCase().trim());
-                return await db.update(tblStr, currentVals, where: 'id=?', whereArgs: [id]);
+                colAdded = true;
               } catch (_) {}
-              currentVals.removeWhere((k, _) => k.toLowerCase().trim() == badCol);
+              if (!colAdded) {
+                currentVals.removeWhere((k, _) => k.toLowerCase().trim() == badCol);
+              }
+              // 2. Coba update kembali
               try {
                 return await db.update(tblStr, currentVals, where: 'id=?', whereArgs: [id]);
               } catch (retryErr) {

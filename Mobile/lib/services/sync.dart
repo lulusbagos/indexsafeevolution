@@ -1086,6 +1086,7 @@ Future<bool> syncAllMasterData({
           (response) async {
             final items = (response['data'] as List?) ?? [];
             final sqldb = await db.database;
+            final existingCols = await DatabaseService.instance.getTableColumns(table);
             var batch = sqldb.batch();
             int count = 0;
             for (var item in items) {
@@ -1154,7 +1155,12 @@ Future<bool> syncAllMasterData({
                   }
                 }
 
-                batch.insert(table, row,
+                final safeRow = Map<String, dynamic>.from(row);
+                if (existingCols.isNotEmpty) {
+                  safeRow.removeWhere((k, _) => !existingCols.contains(k.toLowerCase().trim()));
+                }
+
+                batch.insert(table, safeRow,
                     conflictAlgorithm: ConflictAlgorithm.replace);
                 count++;
                 if (count % 400 == 0) {

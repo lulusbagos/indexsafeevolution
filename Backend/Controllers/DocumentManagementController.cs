@@ -94,6 +94,54 @@ namespace Indexsafe.Api.Controllers
 
             try
             {
+                // Langkah 0: Periksa profil & role di DB_SAP.dbo.tbl_t_app_user (Pengguna Indexsafe Mobile)
+                try
+                {
+                    using var cmdAppUser = conn.CreateCommand();
+                    cmdAppUser.CommandText = @"
+                        SELECT TOP 1 role, perusahaan, id_perusahaan, nama, departemen
+                        FROM [DB_SAP].dbo.tbl_t_app_user
+                        WHERE nik = @nik OR nik = @cleanNik;
+                    ";
+                    var pU = cmdAppUser.CreateParameter();
+                    pU.ParameterName = "@nik";
+                    pU.Value = userNik;
+                    cmdAppUser.Parameters.Add(pU);
+
+                    var pCleanU = cmdAppUser.CreateParameter();
+                    pCleanU.ParameterName = "@cleanNik";
+                    pCleanU.Value = cleanNik;
+                    cmdAppUser.Parameters.Add(pCleanU);
+
+                    using var rApp = await cmdAppUser.ExecuteReaderAsync();
+                    if (await rApp.ReadAsync())
+                    {
+                        var appRole = rApp["role"]?.ToString() ?? "";
+                        var appPerusahaan = rApp["perusahaan"]?.ToString() ?? "";
+                        var appNama = rApp["nama"]?.ToString() ?? "";
+                        if (!string.IsNullOrWhiteSpace(appNama) && (scope.FullName == userNik || string.IsNullOrWhiteSpace(scope.FullName)))
+                        {
+                            scope.FullName = appNama;
+                        }
+
+                        if (appRole.Contains("Admin", StringComparison.OrdinalIgnoreCase)
+                            || appRole.Contains("Super", StringComparison.OrdinalIgnoreCase)
+                            || appRole.Contains("Owner", StringComparison.OrdinalIgnoreCase)
+                            || appRole.Contains("Management", StringComparison.OrdinalIgnoreCase))
+                        {
+                            scope.IsOwner = true;
+                            scope.RoleIds.Add(1);
+                        }
+
+                        if (appPerusahaan.Contains("Indexim", StringComparison.OrdinalIgnoreCase))
+                        {
+                            scope.PerusahaanId = 1;
+                            scope.RoleIds.Add(1);
+                        }
+                    }
+                }
+                catch { }
+
                 // Langkah A: Cek apakah user terdaftar resmi di [ONE_DB_MITRA].[dbo].[tbl_m_pengguna]
                 try
                 {
@@ -223,8 +271,22 @@ namespace Indexsafe.Api.Controllers
                     }
                 }
 
-                // Sesuai One EV: Owner tanpa departemen memiliki akses universal ke seluruh folder
-                scope.IsOwnerNoDepartment = scope.IsOwner && (!scope.DepartemenId.HasValue || scope.DepartemenId.Value <= 0);
+                // Pastikan karyawan PT Indexim Coalindo selalu mendapatkan role Owner (peran_id = 1)
+                if (scope.PerusahaanId == 1 || (scope.PerusahaanName != null && scope.PerusahaanName.Contains("Indexim", StringComparison.OrdinalIgnoreCase)))
+                {
+                    scope.RoleIds.Add(1);
+                    scope.IsOwner = true;
+                }
+
+                // Sesuai One EV: Owner/Admin memiliki akses universal ke seluruh folder repositori
+                if (scope.IsOwner && (scope.RoleIds.Contains(1) || scope.RoleName.Contains("Owner", StringComparison.OrdinalIgnoreCase) || scope.RoleName.Contains("Admin", StringComparison.OrdinalIgnoreCase)))
+                {
+                    scope.IsOwnerNoDepartment = true;
+                }
+                else
+                {
+                    scope.IsOwnerNoDepartment = scope.IsOwner && (!scope.DepartemenId.HasValue || scope.DepartemenId.Value <= 0);
+                }
             }
             finally
             {
