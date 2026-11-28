@@ -95,52 +95,52 @@ namespace Indexsafe.Api.Controllers
             try
             {
                 // Langkah A: Cek apakah user terdaftar resmi di [ONE_DB_MITRA].[dbo].[tbl_m_pengguna]
-                using var cmdUser = conn.CreateCommand();
-                cmdUser.CommandText = @"
-                    SELECT TOP 1 
-                        p.pengguna_id, p.username, p.nama_lengkap, p.peran_id, p.perusahaan_id, p.departemen_id,
-                        pr.nama_peran, pr.level_akses, per.nama_perusahaan, dep.nama_departemen
-                    FROM [ONE_DB_MITRA].dbo.tbl_m_pengguna p
-                    LEFT JOIN [ONE_DB_MITRA].dbo.tbl_m_peran pr ON p.peran_id = pr.peran_id
-                    LEFT JOIN [ONE_DB_MITRA].dbo.tbl_m_perusahaan per ON p.perusahaan_id = per.id_perusahaan
-                    LEFT JOIN [ONE_DB_MITRA].dbo.tbl_m_departemen dep ON p.departemen_id = dep.id_departemen
-                    WHERE p.is_aktif = 1 
-                      AND (p.username = @nik OR p.username = @cleanNik OR p.email = @nik);
-                ";
-                var pNik = cmdUser.CreateParameter();
-                pNik.ParameterName = "@nik";
-                pNik.Value = userNik;
-                cmdUser.Parameters.Add(pNik);
-
-                var pClean = cmdUser.CreateParameter();
-                pClean.ParameterName = "@cleanNik";
-                pClean.Value = cleanNik;
-                cmdUser.Parameters.Add(pClean);
-
-                using (var reader = await cmdUser.ExecuteReaderAsync())
+                try
                 {
-                    if (await reader.ReadAsync())
+                    using var cmdUser = conn.CreateCommand();
+                    cmdUser.CommandText = @"
+                        SELECT TOP 1 
+                            p.pengguna_id, p.username, p.nama_lengkap, p.peran_id, p.perusahaan_id, p.departemen_id,
+                            pr.nama_peran, pr.level_akses
+                        FROM [ONE_DB_MITRA].dbo.tbl_m_pengguna p
+                        LEFT JOIN [ONE_DB_MITRA].dbo.tbl_m_peran pr ON p.peran_id = pr.peran_id
+                        WHERE p.is_aktif = 1 
+                          AND (p.username = @nik OR p.username = @cleanNik OR p.email = @nik);
+                    ";
+                    var pNik = cmdUser.CreateParameter();
+                    pNik.ParameterName = "@nik";
+                    pNik.Value = userNik;
+                    cmdUser.Parameters.Add(pNik);
+
+                    var pClean = cmdUser.CreateParameter();
+                    pClean.ParameterName = "@cleanNik";
+                    pClean.Value = cleanNik;
+                    cmdUser.Parameters.Add(pClean);
+
+                    using (var reader = await cmdUser.ExecuteReaderAsync())
                     {
-                        scope.PenggunaId = Convert.ToInt32(reader["pengguna_id"]);
-                        scope.Username = reader["username"]?.ToString() ?? userNik;
-                        scope.FullName = reader["nama_lengkap"]?.ToString() ?? scope.FullName;
-                        scope.PerusahaanId = reader["perusahaan_id"] != DBNull.Value ? Convert.ToInt32(reader["perusahaan_id"]) : 1;
-                        scope.PerusahaanName = reader["nama_perusahaan"]?.ToString() ?? "PT INDEXIM COALINDO";
-                        scope.DepartemenId = reader["departemen_id"] != DBNull.Value ? Convert.ToInt32(reader["departemen_id"]) : (int?)null;
-                        scope.DepartemenName = reader["nama_departemen"]?.ToString() ?? "";
+                        if (await reader.ReadAsync())
+                        {
+                            scope.PenggunaId = Convert.ToInt32(reader["pengguna_id"]);
+                            scope.Username = reader["username"]?.ToString() ?? userNik;
+                            scope.FullName = reader["nama_lengkap"]?.ToString() ?? scope.FullName;
+                            scope.PerusahaanId = reader["perusahaan_id"] != DBNull.Value ? Convert.ToInt32(reader["perusahaan_id"]) : 1;
+                            scope.DepartemenId = reader["departemen_id"] != DBNull.Value ? Convert.ToInt32(reader["departemen_id"]) : (int?)null;
 
-                        int peranId = reader["peran_id"] != DBNull.Value ? Convert.ToInt32(reader["peran_id"]) : 1;
-                        int levelAkses = reader["level_akses"] != DBNull.Value ? Convert.ToInt32(reader["level_akses"]) : 4;
-                        string namaPeran = reader["nama_peran"]?.ToString() ?? "Owner";
+                            int peranId = reader["peran_id"] != DBNull.Value ? Convert.ToInt32(reader["peran_id"]) : 1;
+                            int levelAkses = reader["level_akses"] != DBNull.Value ? Convert.ToInt32(reader["level_akses"]) : 4;
+                            string namaPeran = reader["nama_peran"]?.ToString() ?? "Owner";
 
-                        scope.RoleIds.Add(peranId);
-                        scope.RoleName = namaPeran;
-                        scope.IsOwner = (peranId == 1 || levelAkses >= 4 || namaPeran.Contains("Owner", StringComparison.OrdinalIgnoreCase) || scope.Username.Equals("admin.owner", StringComparison.OrdinalIgnoreCase));
+                            scope.RoleIds.Add(peranId);
+                            scope.RoleName = namaPeran;
+                            scope.IsOwner = (peranId == 1 || levelAkses >= 4 || namaPeran.Contains("Owner", StringComparison.OrdinalIgnoreCase) || scope.Username.Equals("admin.owner", StringComparison.OrdinalIgnoreCase));
+                        }
                     }
                 }
+                catch { }
 
-                // Langkah B: Jika belum ada di tbl_m_pengguna, cari data karyawan aktif dari [ONE_DB_MITRA].[dbo].[vw_m_karyawan_aktif]
-                if (scope.PenggunaId == 0)
+                // Langkah B: Ambil / lengkapi nama departemen & perusahaan dari [ONE_DB_MITRA].[dbo].[vw_m_karyawan_aktif]
+                try
                 {
                     using var cmdKaryawan = conn.CreateCommand();
                     cmdKaryawan.CommandText = @"
@@ -163,20 +163,34 @@ namespace Indexsafe.Api.Controllers
                     if (await readerK.ReadAsync())
                     {
                         scope.FullName = readerK["nama_lengkap"]?.ToString() ?? scope.FullName;
-                        scope.PerusahaanId = readerK["id_perusahaan"] != DBNull.Value ? Convert.ToInt32(readerK["id_perusahaan"]) : 1;
                         scope.PerusahaanName = readerK["nama_perusahaan"]?.ToString() ?? "PT INDEXIM COALINDO";
-                        scope.DepartemenId = readerK["id_departemen"] != DBNull.Value ? Convert.ToInt32(readerK["id_departemen"]) : (int?)null;
                         scope.DepartemenName = readerK["nama_departemen"]?.ToString() ?? "";
 
-                        // Perusahaan 1 = Owner (peran_id 1), selain itu Contractor (peran_id 2 / 3)
-                        int peranId = (scope.PerusahaanId == 1) ? 1 : 2;
-                        scope.RoleIds.Add(peranId);
-                        scope.RoleName = (scope.PerusahaanId == 1) ? "Owner" : "Main Contractor";
-                        scope.IsOwner = (scope.PerusahaanId == 1);
+                        if (scope.PenggunaId == 0)
+                        {
+                            scope.PerusahaanId = readerK["id_perusahaan"] != DBNull.Value ? Convert.ToInt32(readerK["id_perusahaan"]) : 1;
+                            scope.DepartemenId = readerK["id_departemen"] != DBNull.Value ? Convert.ToInt32(readerK["id_departemen"]) : (int?)null;
+
+                            // Perusahaan 1 = Owner (peran_id 1), selain itu Contractor (peran_id 2 / 3)
+                            int peranId = (scope.PerusahaanId == 1) ? 1 : 2;
+                            scope.RoleIds.Add(peranId);
+                            scope.RoleName = (scope.PerusahaanId == 1) ? "Owner" : "Main Contractor";
+                            scope.IsOwner = (scope.PerusahaanId == 1);
+                        }
                     }
-                    else
+                    else if (scope.PenggunaId == 0)
                     {
                         // Fallback default: anggap Owner jika NIK Indexim atau admin
+                        scope.PerusahaanId = 1;
+                        scope.RoleIds.Add(1);
+                        scope.RoleName = "Owner";
+                        scope.IsOwner = true;
+                    }
+                }
+                catch
+                {
+                    if (scope.PenggunaId == 0)
+                    {
                         scope.PerusahaanId = 1;
                         scope.RoleIds.Add(1);
                         scope.RoleName = "Owner";

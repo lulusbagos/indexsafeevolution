@@ -20,14 +20,26 @@ class _DocumentManagementPageState extends State<DocumentManagementPage> {
   bool _isSearching = false;
   List<DocumentItemModel> _searchResults = [];
 
+  // Quick category filters
+  final List<String> _categoryFilters = [
+    'Semua',
+    'SOP',
+    'JSA',
+    'HIRADC',
+    'Kebijakan',
+    'IK (WI)',
+    'Form',
+    'Manual',
+  ];
+  String _selectedCategory = 'Semua';
+
   // Folder navigation hierarchy stack (Breadcrumbs)
-  // Default root is folder ID 9: "PT Indexim Coalindo"
   final List<DocumentFolderModel> _folderStack = [
     DocumentFolderModel(
       id: 9,
       name: 'PT Indexim Coalindo',
       path: 'PT Indexim Coalindo',
-      color: '#f50000',
+      color: '#0284C7',
       isBold: true,
       subfolderCount: 10,
       fileCount: 0,
@@ -122,9 +134,23 @@ class _DocumentManagementPageState extends State<DocumentManagementPage> {
     }
   }
 
+  void _onCategorySelected(String cat) {
+    setState(() {
+      _selectedCategory = cat;
+    });
+
+    if (cat == 'Semua') {
+      _searchCtrl.clear();
+      _onSearchChanged('');
+    } else {
+      _searchCtrl.text = cat;
+      _onSearchChanged(cat);
+    }
+  }
+
   void _onSearchChanged(String query) {
     _searchDebounce?.cancel();
-    _searchDebounce = Timer(const Duration(milliseconds: 350), () async {
+    _searchDebounce = Timer(const Duration(milliseconds: 300), () async {
       final term = query.trim();
       if (term.length < 2) {
         setState(() {
@@ -151,12 +177,10 @@ class _DocumentManagementPageState extends State<DocumentManagementPage> {
   }
 
   Future<void> _openOrDownloadDocument(DocumentItemModel doc) async {
-    // Jika sedang mendownload dokumen lain, abaikan
     if (_downloadingDocId != null) return;
 
-    // Cek apakah sudah pernah didownload ke cache
     if (doc.isDownloaded && doc.localPath != null) {
-      _showToast('Membuka ${doc.title} dari cache lokal...');
+      _showToast('Membuka ${doc.title} dari cache HP...');
       final opened = await _service.openDocument(doc);
       if (!opened && mounted) {
         _showToast('Gagal membuka dokumen, mencoba tautan online...');
@@ -164,11 +188,10 @@ class _DocumentManagementPageState extends State<DocumentManagementPage> {
       return;
     }
 
-    // Unduh on-demand dengan dialog progress
     setState(() {
       _downloadingDocId = doc.id;
       _downloadProgress = 0.0;
-      _downloadStatusText = 'Menghubungkan ke server...';
+      _downloadStatusText = 'Menghubungkan ke repositori...';
     });
 
     _showDownloadProgressDialog(doc);
@@ -192,13 +215,13 @@ class _DocumentManagementPageState extends State<DocumentManagementPage> {
       );
 
       if (mounted) {
-        Navigator.of(context, rootNavigator: true).pop(); // Tutup dialog progress
+        Navigator.of(context, rootNavigator: true).pop();
         setState(() {
           _downloadingDocId = null;
         });
 
         if (success) {
-          _showToast('Dokumen berhasil dibuka & tersimpan di cache.');
+          _showToast('Dokumen berhasil dibuka & tersimpan offline.');
         } else {
           _showToast('Gagal mengunduh atau membuka file.');
         }
@@ -222,25 +245,37 @@ class _DocumentManagementPageState extends State<DocumentManagementPage> {
         return StatefulBuilder(
           builder: (context, setDialogState) {
             return AlertDialog(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-              contentPadding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+              elevation: 16,
+              contentPadding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Container(
-                    width: 56,
-                    height: 56,
+                    width: 60,
+                    height: 60,
                     decoration: BoxDecoration(
-                      color: const Color(0xFF0284C7).withValues(alpha: 0.1),
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFF0284C7), Color(0xFF0369A1)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
                       shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF0284C7).withValues(alpha: 0.3),
+                          blurRadius: 14,
+                          offset: const Offset(0, 6),
+                        ),
+                      ],
                     ),
                     child: const Center(
-                      child: Icon(Icons.downloading_rounded, color: Color(0xFF0284C7), size: 32),
+                      child: Icon(Icons.downloading_rounded, color: Colors.white, size: 30),
                     ),
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 18),
                   const Text(
-                    'Mengunduh Dokumen On-Demand',
+                    'Mengunduh Dokumen',
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w800,
@@ -255,25 +290,28 @@ class _DocumentManagementPageState extends State<DocumentManagementPage> {
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       fontSize: 12.5,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.grey.shade700,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.grey.shade600,
+                      height: 1.3,
                     ),
                   ),
-                  const SizedBox(height: 18),
-                  LinearProgressIndicator(
-                    value: _downloadProgress > 0 ? _downloadProgress : null,
-                    backgroundColor: Colors.grey.shade200,
-                    valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF0284C7)),
+                  const SizedBox(height: 20),
+                  ClipRRect(
                     borderRadius: BorderRadius.circular(8),
-                    minHeight: 8,
+                    child: LinearProgressIndicator(
+                      value: _downloadProgress > 0 ? _downloadProgress : null,
+                      backgroundColor: Colors.grey.shade200,
+                      valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF0284C7)),
+                      minHeight: 8,
+                    ),
                   ),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 12),
                   Text(
-                    _downloadStatusText.isNotEmpty ? _downloadStatusText : 'Mengunduh file...',
+                    _downloadStatusText.isNotEmpty ? _downloadStatusText : 'Menyiapkan berkas...',
                     style: TextStyle(
                       fontSize: 11.5,
                       fontWeight: FontWeight.w600,
-                      color: Colors.grey.shade600,
+                      color: Colors.grey.shade700,
                     ),
                   ),
                 ],
@@ -285,90 +323,143 @@ class _DocumentManagementPageState extends State<DocumentManagementPage> {
     );
   }
 
+  void _showAccessInfoSheet() {
+    final userScope = _service.lastUserScope;
+    final roleName = userScope?['roleName'] ?? 'Pengguna Terdaftar';
+    final companyName = userScope?['companyName'] ?? 'PT Indexim Coalindo';
+    final deptName = userScope?['departmentName'] ?? 'Operasional & Keselamatan';
+    final userName = userScope?['fullName'] ?? 'Pengguna';
+    final userNik = userScope?['username'] ?? '-';
+    final isOwner = userScope?['isOwner'] == true;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade300,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 18),
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEFF6FF),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFFBFDBFE)),
+                      ),
+                      child: const Icon(Icons.verified_user_rounded, color: Color(0xFF0284C7), size: 24),
+                    ),
+                    const SizedBox(width: 14),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Hak Akses Terverifikasi',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w800,
+                              color: Color(0xFF0F172A),
+                            ),
+                          ),
+                          SizedBox(height: 2),
+                          Text(
+                            'Tersinkronisasi otomatis dengan akun ONE EV',
+                            style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                _buildInfoRow('Nama Lengkap', userName),
+                _buildInfoRow('NIK / Username', userNik),
+                _buildInfoRow('Peran Akses', roleName, isHighlight: true),
+                _buildInfoRow('Perusahaan', companyName),
+                if (deptName.toString().isNotEmpty)
+                  _buildInfoRow('Departemen', deptName.toString()),
+                _buildInfoRow('Akses Folder', isOwner ? 'Akses Penuh Seluruh Repositori' : 'Sesuai Kebijakan ONE EV'),
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  height: 46,
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF0F172A),
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      elevation: 0,
+                    ),
+                    child: const Text('Tutup', style: TextStyle(fontWeight: FontWeight.bold)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildInfoRow(String label, String value, {bool isHighlight = false}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: TextStyle(fontSize: 12.5, color: Colors.grey.shade600)),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 12.5,
+              fontWeight: FontWeight.w700,
+              color: isHighlight ? const Color(0xFF0284C7) : const Color(0xFF0F172A),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _showToast(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(message),
+        content: Text(message, style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600)),
         duration: const Duration(seconds: 2),
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    const primaryColor = Color(0xFF0284C7);
-
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        centerTitle: false,
-        scrolledUnderElevation: 1,
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF0284C7), Color(0xFF0369A1)],
-                    ),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: const Text(
-                    'ONE EV',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w900,
-                      color: Colors.white,
-                      letterSpacing: 0.8,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                const Text(
-                  'Dokumen Management',
-                  style: TextStyle(
-                    fontSize: 16.5,
-                    fontWeight: FontWeight.w800,
-                    color: Color(0xFF0F172A),
-                    letterSpacing: -0.3,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 2),
-            Text(
-              'Repositori Dokumen Resmi • ONE_DB_MITRA /DocumentManagement',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: 10.5,
-                fontWeight: FontWeight.w600,
-                color: Colors.grey.shade600,
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          IconButton(
-            tooltip: 'Refresh Dokumen',
-            icon: const Icon(Icons.refresh_rounded, color: primaryColor),
-            onPressed: () {
-              _loadSummary();
-              _loadFolderContent(_currentFolder.id);
-              _showToast('Memperbarui repositori dokumen...');
-            },
-          ),
-          const SizedBox(width: 4),
-        ],
-      ),
+      appBar: _buildExecutiveAppBar(),
       body: RefreshIndicator(
+        color: const Color(0xFF0284C7),
         onRefresh: () async {
           await _loadSummary();
           await _loadFolderContent(_currentFolder.id);
@@ -377,26 +468,31 @@ class _DocumentManagementPageState extends State<DocumentManagementPage> {
           physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 40),
           children: [
-            // 1. Enterprise Storage Banner
-            _buildEnterpriseBanner(),
+            // 1. Sleek Executive Hero Card
+            _buildExecutiveHero(),
 
             const SizedBox(height: 14),
 
-            // 2. Fast Instant Search Box
+            // 2. Modern Capsule Search Bar
             _buildSearchBox(),
 
+            const SizedBox(height: 10),
+
+            // 3. Quick Category Filter Chips
+            _buildCategoryChips(),
+
             const SizedBox(height: 14),
 
-            // Jika sedang mode pencarian aktif
+            // Search results or Folder Content
             if (_searchQuery.isNotEmpty) ...[
               _buildSearchResultsSection(),
             ] else ...[
-              // 3. Hierarchical Breadcrumb Navigation Bar
+              // 4. Apple-Style Breadcrumbs Navigation Bar
               _buildBreadcrumbBar(),
 
               const SizedBox(height: 12),
 
-              // 4. Folder Content Area (Folders & Files)
+              // 5. Folder Content View (Folders & Files)
               if (_isLoading)
                 _buildLoadingState()
               else if (_isAccessDenied)
@@ -411,301 +507,367 @@ class _DocumentManagementPageState extends State<DocumentManagementPage> {
   }
 
   // --------------------------------------------------------------------------
-  // WIDGETS
+  // EXECUTIVE APP BAR
   // --------------------------------------------------------------------------
 
-  Widget _buildEnterpriseBanner() {
+  PreferredSizeWidget _buildExecutiveAppBar() {
+    return AppBar(
+      backgroundColor: Colors.white,
+      elevation: 0,
+      scrolledUnderElevation: 1,
+      centerTitle: false,
+      leading: IconButton(
+        icon: Container(
+          width: 36,
+          height: 36,
+          decoration: BoxDecoration(
+            color: const Color(0xFFF1F5F9),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: const Color(0xFFE2E8F0)),
+          ),
+          child: const Icon(Icons.arrow_back_ios_new_rounded, size: 16, color: Color(0xFF334155)),
+        ),
+        onPressed: () => Navigator.of(context).pop(),
+      ),
+      title: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF0284C7), Color(0xFF0369A1)],
+                  ),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: const Text(
+                  'ONE EV',
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w900,
+                    color: Colors.white,
+                    letterSpacing: 0.6,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              const Text(
+                'Dokumen Manajemen',
+                style: TextStyle(
+                  fontSize: 16.5,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFF0F172A),
+                  letterSpacing: -0.3,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 2),
+          Row(
+            children: [
+              Container(
+                width: 6,
+                height: 6,
+                decoration: const BoxDecoration(
+                  color: Color(0xFF10B981),
+                  shape: BoxShape.circle,
+                ),
+              ),
+              const SizedBox(width: 5),
+              Text(
+                'Repositori Resmi PT Indexim Coalindo',
+                style: TextStyle(
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.grey.shade600,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+      actions: [
+        IconButton(
+          tooltip: 'Hak Akses Anda',
+          icon: Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: const Color(0xFFF0FDF4),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: const Color(0xFFBBF7D0)),
+            ),
+            child: const Icon(Icons.shield_outlined, size: 18, color: Color(0xFF16A34A)),
+          ),
+          onPressed: _showAccessInfoSheet,
+        ),
+        IconButton(
+          tooltip: 'Segarkan Dokumen',
+          icon: Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: const Color(0xFFF1F5F9),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: const Icon(Icons.refresh_rounded, size: 18, color: Color(0xFF0284C7)),
+          ),
+          onPressed: () {
+            _loadSummary();
+            _loadFolderContent(_currentFolder.id);
+            _showToast('Memperbarui repositori dokumen...');
+          },
+        ),
+        const SizedBox(width: 8),
+      ],
+    );
+  }
+
+  // --------------------------------------------------------------------------
+  // EXECUTIVE HERO CARD
+  // --------------------------------------------------------------------------
+
+  Widget _buildExecutiveHero() {
     final totalDocs = _summary?['totalDocuments'] ?? 4141;
     final totalFolders = _summary?['totalFolders'] ?? 896;
     final formattedStorage = _summary?['storageFormatted'] ?? '5.98 GB';
     final sopCount = _summary?['activeSopCount'] ?? 521;
     final jsaCount = _summary?['jsaCount'] ?? 1556;
 
+    final userScope = _service.lastUserScope;
+    final roleName = userScope?['roleName'] ?? 'Pengguna Terverifikasi';
+    final companyName = userScope?['companyName'] ?? 'PT Indexim Coalindo';
+
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [Color(0xFF0369A1), Color(0xFF075985), Color(0xFF0C4A6E)],
+          colors: [Color(0xFF0F172A), Color(0xFF1E293B)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFF38BDF8).withValues(alpha: 0.2)),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF0284C7).withValues(alpha: 0.25),
-            blurRadius: 14,
-            offset: const Offset(0, 5),
+            color: const Color(0xFF0F172A).withValues(alpha: 0.15),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
           ),
         ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Top Micro Bar
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3.5),
+                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.15),
+                  color: Colors.white.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
                 ),
                 child: const Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.cloud_done_rounded, color: Color(0xFF7DD3FC), size: 14),
+                    Icon(Icons.verified_rounded, color: Color(0xFF38BDF8), size: 13),
                     SizedBox(width: 5),
                     Text(
                       'DATABASE LIVE TERVERIFIKASI',
                       style: TextStyle(
-                        fontSize: 10,
+                        fontSize: 9.5,
                         fontWeight: FontWeight.w800,
                         color: Colors.white,
-                        letterSpacing: 0.6,
+                        letterSpacing: 0.5,
                       ),
                     ),
                   ],
                 ),
               ),
-              const Row(
-                children: [
-                  Icon(Icons.bolt_rounded, color: Color(0xFFFDE047), size: 14),
-                  SizedBox(width: 3),
-                  Text(
-                    'On-Demand Download',
-                    style: TextStyle(
-                      fontSize: 10.5,
-                      fontWeight: FontWeight.w700,
-                      color: Color(0xFFBAE6FD),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF0284C7).withValues(alpha: 0.25),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.cloud_download_outlined, color: Color(0xFF7DD3FC), size: 12),
+                    const SizedBox(width: 4),
+                    Text(
+                      formattedStorage,
+                      style: const TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFFE0F2FE),
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ],
           ),
-          const SizedBox(height: 12),
+
+          const SizedBox(height: 14),
+
+          // Main Header Title
           const Text(
             'Document Management Explorer',
             style: TextStyle(
-              fontSize: 18,
+              fontSize: 18.5,
               fontWeight: FontWeight.w900,
               color: Colors.white,
-              letterSpacing: -0.3,
+              letterSpacing: -0.4,
             ),
           ),
           const SizedBox(height: 4),
           Text(
-            'Koleksi dokumen SOP, HIRADC, JSA, Form & Kebijakan PT Indexim Coalindo. File hanya diunduh saat Anda mengetuknya.',
+            'Koleksi dokumen SOP, HIRADC, JSA, Form & Kebijakan resmi. Berkas diunduh otomatis ke memori HP saat Anda mengetuknya.',
             style: TextStyle(
               fontSize: 11.5,
-              fontWeight: FontWeight.w500,
-              color: Colors.white.withValues(alpha: 0.85),
+              fontWeight: FontWeight.w400,
+              color: Colors.grey.shade300,
               height: 1.35,
             ),
           ),
-          const SizedBox(height: 14),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            decoration: BoxDecoration(
-              color: Colors.black.withValues(alpha: 0.2),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                _buildMetricCol('$totalDocs', 'Dokumen Aktif'),
-                _buildMetricDivider(),
-                _buildMetricCol('$totalFolders', 'Folder Arsip'),
-                _buildMetricDivider(),
-                _buildMetricCol(formattedStorage, 'Penyimpanan'),
-                _buildMetricDivider(),
-                _buildMetricCol('$sopCount SOP / $jsaCount JSA', 'Katalog Utama'),
-              ],
-            ),
+
+          const SizedBox(height: 16),
+
+          // 3 Sleek Metric Cards
+          Row(
+            children: [
+              Expanded(
+                child: _buildMetricCard(
+                  title: '$totalDocs',
+                  subtitle: 'Dokumen Aktif',
+                  icon: Icons.description_rounded,
+                  accentColor: const Color(0xFF38BDF8),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _buildMetricCard(
+                  title: '$totalFolders',
+                  subtitle: 'Folder Arsip',
+                  icon: Icons.folder_copy_rounded,
+                  accentColor: const Color(0xFF34D399),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _buildMetricCard(
+                  title: '$sopCount / $jsaCount',
+                  subtitle: 'SOP & JSA Utama',
+                  icon: Icons.verified_user_rounded,
+                  accentColor: const Color(0xFFFBBF24),
+                ),
+              ),
+            ],
           ),
-          if (_service.lastUserScope != null) ...[
-            const SizedBox(height: 10),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+
+          const SizedBox(height: 12),
+
+          // User Scope Bar
+          GestureDetector(
+            onTap: _showAccessInfoSheet,
+            behavior: HitTestBehavior.opaque,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
               decoration: BoxDecoration(
-                color: Colors.black.withValues(alpha: 0.25),
+                color: Colors.white.withValues(alpha: 0.08),
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.security_rounded, size: 13.5, color: Color(0xFF38BDF8)),
+                  const Icon(Icons.lock_open_rounded, size: 13, color: Color(0xFF38BDF8)),
                   const SizedBox(width: 6),
                   Expanded(
                     child: Text(
-                      'Hak Akses: ${_service.lastUserScope!['roleName'] ?? 'Pengguna'} • ${_service.lastUserScope!['companyName'] ?? 'PT Indexim Coalindo'}',
+                      'Akses Akun: $roleName • $companyName',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         fontSize: 10.5,
-                        fontWeight: FontWeight.w700,
+                        fontWeight: FontWeight.w600,
                         color: Colors.white,
                       ),
                     ),
                   ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF0284C7),
-                      borderRadius: BorderRadius.circular(5),
-                    ),
-                    child: const Text(
-                      'ONE EV',
-                      style: TextStyle(fontSize: 9, fontWeight: FontWeight.w900, color: Colors.white),
-                    ),
-                  ),
+                  const Icon(Icons.chevron_right_rounded, size: 14, color: Colors.white70),
                 ],
               ),
             ),
-          ],
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildAccessDeniedState() {
-    final userScope = _service.lastUserScope;
-    final roleName = userScope?['roleName'] ?? 'Pengguna';
-    final companyName = userScope?['companyName'] ?? 'PT Indexim Coalindo';
-
+  Widget _buildMetricCard({
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required Color accentColor,
+  }) {
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 36, horizontal: 20),
-      margin: const EdgeInsets.only(top: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFFDE68A)),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFFD97706).withValues(alpha: 0.06),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        color: Colors.white.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            width: 56,
-            height: 56,
-            decoration: const BoxDecoration(
-              color: Color(0xFFFEF3C7),
-              shape: BoxShape.circle,
-            ),
-            child: const Center(
-              child: Icon(Icons.lock_rounded, color: Color(0xFFD97706), size: 28),
-            ),
-          ),
-          const SizedBox(height: 14),
-          const Text(
-            'Akses Folder Dibatasi',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w800,
-              color: Color(0xFF1E293B),
-            ),
-          ),
+          Icon(icon, size: 16, color: accentColor),
           const SizedBox(height: 6),
           Text(
-            _accessDeniedMsg.isNotEmpty
-                ? _accessDeniedMsg
-                : 'Folder ini dibatasi dan hanya dapat dilihat oleh peran/departemen tertentu sesuai pengaturan hak akses One Evolution.',
-            textAlign: TextAlign.center,
+            title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              fontSize: 13.5,
+              fontWeight: FontWeight.w800,
+              color: Colors.white,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            subtitle,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
             style: TextStyle(
-              fontSize: 12,
-              color: Colors.grey.shade600,
-              height: 1.4,
+              fontSize: 9.5,
+              fontWeight: FontWeight.w500,
+              color: Colors.grey.shade400,
             ),
           ),
-          const SizedBox(height: 14),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF8FAFC),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: const Color(0xFFE2E8F0)),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.person_pin_rounded, size: 16, color: Color(0xFF0284C7)),
-                const SizedBox(width: 6),
-                Text(
-                  'Akun: $roleName • $companyName',
-                  style: const TextStyle(
-                    fontSize: 11.5,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFF334155),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 18),
-          if (_folderStack.length > 1)
-            ElevatedButton.icon(
-              onPressed: () => _navigateUpToFolder(_folderStack.length - 2),
-              icon: const Icon(Icons.arrow_back_rounded, size: 16),
-              label: const Text('Kembali ke Folder Sebelumnya'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF0284C7),
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                elevation: 0,
-              ),
-            ),
         ],
       ),
     );
   }
 
-  Widget _buildMetricCol(String value, String label) {
-    return Column(
-      children: [
-        Text(
-          value,
-          style: const TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w900,
-            color: Colors.white,
-          ),
-        ),
-        const SizedBox(height: 2),
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 9.5,
-            fontWeight: FontWeight.w600,
-            color: Colors.white.withValues(alpha: 0.7),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildMetricDivider() {
-    return Container(
-      width: 1,
-      height: 22,
-      color: Colors.white.withValues(alpha: 0.2),
-    );
-  }
+  // --------------------------------------------------------------------------
+  // SEARCH & CATEGORY CHIPS
+  // --------------------------------------------------------------------------
 
   Widget _buildSearchBox() {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
+            color: Colors.black.withValues(alpha: 0.03),
             blurRadius: 10,
             offset: const Offset(0, 3),
           ),
@@ -714,7 +876,7 @@ class _DocumentManagementPageState extends State<DocumentManagementPage> {
       child: TextField(
         controller: _searchCtrl,
         onChanged: _onSearchChanged,
-        style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600),
+        style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: Color(0xFF0F172A)),
         decoration: InputDecoration(
           hintText: 'Cari 4.100+ dokumen (SOP, JSA, HIRADC, Form, Nomor Dokumen)...',
           hintStyle: TextStyle(fontSize: 12, color: Colors.grey.shade400, fontWeight: FontWeight.w500),
@@ -725,6 +887,7 @@ class _DocumentManagementPageState extends State<DocumentManagementPage> {
                   onPressed: () {
                     _searchCtrl.clear();
                     _onSearchChanged('');
+                    setState(() => _selectedCategory = 'Semua');
                   },
                 )
               : null,
@@ -735,17 +898,86 @@ class _DocumentManagementPageState extends State<DocumentManagementPage> {
     );
   }
 
+  Widget _buildCategoryChips() {
+    return SizedBox(
+      height: 34,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        physics: const BouncingScrollPhysics(),
+        itemCount: _categoryFilters.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        itemBuilder: (ctx, idx) {
+          final cat = _categoryFilters[idx];
+          final isSelected = _selectedCategory == cat;
+
+          return InkWell(
+            onTap: () => _onCategorySelected(cat),
+            borderRadius: BorderRadius.circular(10),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: isSelected ? const Color(0xFF0F172A) : Colors.white,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: isSelected ? const Color(0xFF0F172A) : const Color(0xFFE2E8F0),
+                ),
+                boxShadow: isSelected
+                    ? [
+                        BoxShadow(
+                          color: const Color(0xFF0F172A).withValues(alpha: 0.15),
+                          blurRadius: 6,
+                          offset: const Offset(0, 2),
+                        ),
+                      ]
+                    : null,
+              ),
+              child: Center(
+                child: Text(
+                  cat,
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                    color: isSelected ? Colors.white : const Color(0xFF475569),
+                  ),
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  // --------------------------------------------------------------------------
+  // BREADCRUMB NAVIGATION
+  // --------------------------------------------------------------------------
+
   Widget _buildBreadcrumbBar() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.02),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Row(
         children: [
-          const Icon(Icons.account_tree_rounded, size: 16, color: Color(0xFF0284C7)),
+          Container(
+            padding: const EdgeInsets.all(5),
+            decoration: BoxDecoration(
+              color: const Color(0xFFEFF6FF),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Icon(Icons.folder_shared_rounded, size: 16, color: Color(0xFF0284C7)),
+          ),
           const SizedBox(width: 8),
           Expanded(
             child: SingleChildScrollView(
@@ -762,22 +994,27 @@ class _DocumentManagementPageState extends State<DocumentManagementPage> {
                       InkWell(
                         onTap: isLast ? null : () => _navigateUpToFolder(index),
                         borderRadius: BorderRadius.circular(6),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                          decoration: isLast
+                              ? BoxDecoration(
+                                  color: const Color(0xFFF1F5F9),
+                                  borderRadius: BorderRadius.circular(6),
+                                )
+                              : null,
                           child: Text(
                             folder.name,
                             style: TextStyle(
                               fontSize: 12,
                               fontWeight: isLast ? FontWeight.w800 : FontWeight.w600,
                               color: isLast ? const Color(0xFF0F172A) : const Color(0xFF0284C7),
-                              decoration: isLast ? TextDecoration.none : TextDecoration.underline,
                             ),
                           ),
                         ),
                       ),
                       if (!isLast)
                         const Padding(
-                          padding: EdgeInsets.symmetric(horizontal: 2),
+                          padding: EdgeInsets.symmetric(horizontal: 4),
                           child: Icon(Icons.chevron_right_rounded, size: 16, color: Color(0xFF94A3B8)),
                         ),
                     ],
@@ -789,21 +1026,22 @@ class _DocumentManagementPageState extends State<DocumentManagementPage> {
           if (_folderStack.length > 1)
             InkWell(
               onTap: () => _navigateUpToFolder(_folderStack.length - 2),
-              borderRadius: BorderRadius.circular(6),
+              borderRadius: BorderRadius.circular(8),
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF1F5F9),
-                  borderRadius: BorderRadius.circular(6),
+                  color: const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: const Color(0xFFCBD5E1)),
                 ),
                 child: const Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.arrow_upward_rounded, size: 13, color: Color(0xFF475569)),
+                    Icon(Icons.arrow_upward_rounded, size: 12, color: Color(0xFF334155)),
                     SizedBox(width: 3),
                     Text(
                       'Naik',
-                      style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: Color(0xFF475569)),
+                      style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: Color(0xFF334155)),
                     ),
                   ],
                 ),
@@ -814,18 +1052,98 @@ class _DocumentManagementPageState extends State<DocumentManagementPage> {
     );
   }
 
+  // --------------------------------------------------------------------------
+  // CONTENT & EMPTY STATES
+  // --------------------------------------------------------------------------
+
   Widget _buildLoadingState() {
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 40),
+      padding: const EdgeInsets.symmetric(vertical: 48),
       alignment: Alignment.center,
       child: Column(
         children: [
-          const CircularProgressIndicator(color: Color(0xFF0284C7), strokeWidth: 2.5),
-          const SizedBox(height: 14),
-          Text(
-            'Memuat folder & file dokumen...',
-            style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: Colors.grey.shade600),
+          const SizedBox(
+            width: 32,
+            height: 32,
+            child: CircularProgressIndicator(color: Color(0xFF0284C7), strokeWidth: 2.8),
           ),
+          const SizedBox(height: 16),
+          Text(
+            'Menyiapkan repositori dokumen...',
+            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.grey.shade600),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAccessDeniedState() {
+    final userScope = _service.lastUserScope;
+    final roleName = userScope?['roleName'] ?? 'Pengguna';
+
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 36, horizontal: 24),
+      margin: const EdgeInsets.only(top: 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFFDE68A)),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFFD97706).withValues(alpha: 0.06),
+            blurRadius: 14,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          Container(
+            width: 60,
+            height: 60,
+            decoration: const BoxDecoration(
+              color: Color(0xFFFEF3C7),
+              shape: BoxShape.circle,
+            ),
+            child: const Center(
+              child: Icon(Icons.lock_rounded, color: Color(0xFFD97706), size: 30),
+            ),
+          ),
+          const SizedBox(height: 16),
+          const Text(
+            'Akses Folder Dibatasi',
+            style: TextStyle(
+              fontSize: 16.5,
+              fontWeight: FontWeight.w800,
+              color: Color(0xFF1E293B),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            _accessDeniedMsg.isNotEmpty
+                ? _accessDeniedMsg
+                : 'Folder ini dibatasi sesuai kebijakan keamanan ONE EV untuk peran akun Anda ($roleName). Hubungi Administrator ONE EV jika memerlukan akses.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 12.5,
+              color: Colors.grey.shade600,
+              height: 1.4,
+            ),
+          ),
+          const SizedBox(height: 20),
+          if (_folderStack.length > 1)
+            ElevatedButton.icon(
+              onPressed: () => _navigateUpToFolder(_folderStack.length - 2),
+              icon: const Icon(Icons.arrow_back_rounded, size: 16),
+              label: const Text('Kembali ke Folder Sebelumnya'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF0F172A),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 11),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                elevation: 0,
+              ),
+            ),
         ],
       ),
     );
@@ -837,25 +1155,85 @@ class _DocumentManagementPageState extends State<DocumentManagementPage> {
 
     if (!hasFolders && !hasFiles) {
       return Container(
-        padding: const EdgeInsets.symmetric(vertical: 45, horizontal: 20),
+        padding: const EdgeInsets.symmetric(vertical: 48, horizontal: 24),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(20),
           border: Border.all(color: const Color(0xFFE2E8F0)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.02),
+              blurRadius: 10,
+              offset: const Offset(0, 3),
+            ),
+          ],
         ),
         child: Column(
           children: [
-            Icon(Icons.folder_open_rounded, size: 48, color: Colors.grey.shade300),
-            const SizedBox(height: 10),
-            const Text(
-              'Folder Ini Kosong',
-              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: Color(0xFF334155)),
+            Container(
+              width: 72,
+              height: 72,
+              decoration: BoxDecoration(
+                color: const Color(0xFFF1F5F9),
+                shape: BoxShape.circle,
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+              ),
+              child: Center(
+                child: Icon(Icons.folder_open_rounded, size: 36, color: Colors.grey.shade400),
+              ),
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 16),
+            const Text(
+              'Belum Ada Dokumen di Folder Ini',
+              style: TextStyle(
+                fontSize: 15.5,
+                fontWeight: FontWeight.w800,
+                color: Color(0xFF0F172A),
+              ),
+            ),
+            const SizedBox(height: 6),
             Text(
-              'Belum ada subfolder atau file dokumen di dalam direktori ini.',
+              'Direktori ini belum memiliki subfolder atau file dokumen yang dipublikasikan dari sistem One Evolution.',
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.grey.shade500,
+                height: 1.4,
+              ),
+            ),
+            const SizedBox(height: 20),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                if (_folderStack.length > 1) ...[
+                  ElevatedButton.icon(
+                    onPressed: () => _navigateUpToFolder(_folderStack.length - 2),
+                    icon: const Icon(Icons.arrow_back_rounded, size: 15),
+                    label: const Text('Folder Sebelumnya'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF0284C7),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      elevation: 0,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                ],
+                OutlinedButton.icon(
+                  onPressed: () {
+                    _loadFolderContent(_currentFolder.id);
+                  },
+                  icon: const Icon(Icons.refresh_rounded, size: 15),
+                  label: const Text('Segarkan'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFF475569),
+                    side: const BorderSide(color: Color(0xFFCBD5E1)),
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                ),
+              ],
             ),
           ],
         ),
@@ -867,25 +1245,34 @@ class _DocumentManagementPageState extends State<DocumentManagementPage> {
       children: [
         // Daftar Subfolder
         if (hasFolders) ...[
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Subfolder (${_currentFolders.length})',
-                style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w800,
-                  color: Color(0xFF334155),
-                  letterSpacing: -0.2,
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 2),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.folder_copy_rounded, size: 15, color: Color(0xFF0284C7)),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Subfolder Direktori (${_currentFolders.length})',
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF1E293B),
+                        letterSpacing: -0.2,
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-              Text(
-                'Ketuk untuk membuka',
-                style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
-              ),
-            ],
+                Text(
+                  'Ketuk untuk membuka',
+                  style: TextStyle(fontSize: 11, color: Colors.grey.shade500, fontWeight: FontWeight.w500),
+                ),
+              ],
+            ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 10),
           ListView.separated(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
@@ -898,31 +1285,47 @@ class _DocumentManagementPageState extends State<DocumentManagementPage> {
 
         // Daftar File Dokumen
         if (hasFiles) ...[
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'File Dokumen (${_currentFiles.length})',
-                style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w800,
-                  color: Color(0xFF334155),
-                  letterSpacing: -0.2,
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 2),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.file_present_rounded, size: 15, color: Color(0xFF0F766E)),
+                    const SizedBox(width: 6),
+                    Text(
+                      'File Dokumen Resmi (${_currentFiles.length})',
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF1E293B),
+                        letterSpacing: -0.2,
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-              const Row(
-                children: [
-                  Icon(Icons.touch_app_rounded, size: 13, color: Color(0xFF0284C7)),
-                  SizedBox(width: 3),
-                  Text(
-                    'Ketuk untuk baca',
-                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF0284C7)),
-                  ),
-                ],
-              ),
-            ],
+                Row(
+                  children: [
+                    Container(
+                      width: 5,
+                      height: 5,
+                      decoration: const BoxDecoration(
+                        color: Color(0xFF0284C7),
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    const Text(
+                      'Ketuk untuk baca',
+                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF0284C7)),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 10),
           ListView.separated(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
@@ -935,6 +1338,10 @@ class _DocumentManagementPageState extends State<DocumentManagementPage> {
     );
   }
 
+  // --------------------------------------------------------------------------
+  // MODERN FOLDER CARD
+  // --------------------------------------------------------------------------
+
   Widget _buildFolderCard(DocumentFolderModel folder) {
     Color folderColor;
     try {
@@ -943,80 +1350,141 @@ class _DocumentManagementPageState extends State<DocumentManagementPage> {
       folderColor = const Color(0xFF0284C7);
     }
 
-    return Material(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(14),
-      elevation: 0,
-      child: InkWell(
-        onTap: () => _navigateToFolder(folder),
-        borderRadius: BorderRadius.circular(14),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: const Color(0xFFE2E8F0)),
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.02),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
           ),
-          child: Row(
-            children: [
-              Container(
-                width: 42,
-                height: 42,
-                decoration: BoxDecoration(
-                  color: folderColor.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Center(
-                  child: Icon(Icons.folder_rounded, color: folderColor, size: 24),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      folder.name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 13.5,
-                        fontWeight: folder.isBold ? FontWeight.w900 : FontWeight.w700,
-                        color: const Color(0xFF0F172A),
-                      ),
-                    ),
-                    const SizedBox(height: 3),
-                    Row(
-                      children: [
-                        if (folder.subfolderCount > 0) ...[
-                          Icon(Icons.folder_copy_outlined, size: 12, color: Colors.grey.shade500),
-                          const SizedBox(width: 3),
-                          Text(
-                            '${folder.subfolderCount} subfolder',
-                            style: TextStyle(fontSize: 11, color: Colors.grey.shade600, fontWeight: FontWeight.w500),
-                          ),
-                          const SizedBox(width: 8),
-                        ],
-                        Icon(Icons.description_outlined, size: 12, color: Colors.grey.shade500),
-                        const SizedBox(width: 3),
-                        Text(
-                          '${folder.fileCount} file dokumen',
-                          style: TextStyle(fontSize: 11, color: Colors.grey.shade600, fontWeight: FontWeight.w500),
-                        ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(16),
+        child: InkWell(
+          onTap: () => _navigateToFolder(folder),
+          borderRadius: BorderRadius.circular(16),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            child: Row(
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        folderColor.withValues(alpha: 0.15),
+                        folderColor.withValues(alpha: 0.05),
                       ],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
                     ),
-                  ],
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: folderColor.withValues(alpha: 0.2)),
+                  ),
+                  child: Center(
+                    child: Icon(Icons.folder_rounded, color: folderColor, size: 24),
+                  ),
                 ),
-              ),
-              const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Color(0xFFCBD5E1)),
-            ],
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        folder.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 13.5,
+                          fontWeight: folder.isBold ? FontWeight.w800 : FontWeight.w700,
+                          color: const Color(0xFF0F172A),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          if (folder.subfolderCount > 0) ...[
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF1F5F9),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.folder_copy_outlined, size: 10.5, color: Colors.grey.shade600),
+                                  const SizedBox(width: 3),
+                                  Text(
+                                    '${folder.subfolderCount} subfolder',
+                                    style: TextStyle(
+                                      fontSize: 10.5,
+                                      color: Colors.grey.shade700,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                          ],
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF8FAFC),
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(color: const Color(0xFFE2E8F0)),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.description_outlined, size: 10.5, color: Colors.grey.shade600),
+                                const SizedBox(width: 3),
+                                Text(
+                                  '${folder.fileCount} file',
+                                  style: TextStyle(
+                                    fontSize: 10.5,
+                                    color: Colors.grey.shade700,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  width: 28,
+                  height: 28,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFF8FAFC),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.chevron_right_rounded, size: 18, color: Color(0xFF94A3B8)),
+                ),
+              ],
+            ),
           ),
         ),
       ),
     );
   }
 
+  // --------------------------------------------------------------------------
+  // MODERN FILE CARD
+  // --------------------------------------------------------------------------
+
   Widget _buildFileCard(DocumentItemModel doc) {
-    // Determine icon and color based on file type
     IconData fileIcon = Icons.picture_as_pdf_rounded;
     Color iconColor = const Color(0xFFDC2626);
     Color bgColor = const Color(0xFFFEE2E2);
@@ -1036,157 +1504,180 @@ class _DocumentManagementPageState extends State<DocumentManagementPage> {
 
     final isDownloadingThis = _downloadingDocId == doc.id;
 
-    return Material(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(14),
-      elevation: 0,
-      child: InkWell(
-        onTap: () => _openOrDownloadDocument(doc),
-        borderRadius: BorderRadius.circular(14),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(
-              color: doc.isDownloaded ? const Color(0xFF86EFAC) : const Color(0xFFE2E8F0),
-              width: doc.isDownloaded ? 1.5 : 1.0,
-            ),
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: doc.isDownloaded ? const Color(0xFF86EFAC) : const Color(0xFFE2E8F0),
+          width: doc.isDownloaded ? 1.4 : 1.0,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.02),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
           ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: bgColor,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(fileIcon, color: iconColor, size: 20),
-                    const SizedBox(height: 1),
-                    Text(
-                      typeBadge,
-                      style: TextStyle(
-                        fontSize: 8.5,
-                        fontWeight: FontWeight.w900,
-                        color: iconColor,
-                        letterSpacing: 0.3,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      doc.title,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: doc.isBold ? FontWeight.w800 : FontWeight.w700,
-                        color: const Color(0xFF0F172A),
-                        height: 1.25,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFF1F5F9),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text(
-                            doc.formattedSize,
-                            style: const TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w700,
-                              color: Color(0xFF475569),
-                            ),
-                          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(16),
+        child: InkWell(
+          onTap: () => _openOrDownloadDocument(doc),
+          borderRadius: BorderRadius.circular(16),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: bgColor,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: iconColor.withValues(alpha: 0.2)),
+                  ),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(fileIcon, color: iconColor, size: 20),
+                      const SizedBox(height: 1),
+                      Text(
+                        typeBadge,
+                        style: TextStyle(
+                          fontSize: 8.5,
+                          fontWeight: FontWeight.w900,
+                          color: iconColor,
+                          letterSpacing: 0.3,
                         ),
-                        if (doc.createdAt != null) ...[
-                          const SizedBox(width: 6),
-                          Text(
-                            doc.createdAt!.split(' ').first,
-                            style: TextStyle(fontSize: 10.5, color: Colors.grey.shade500),
-                          ),
-                        ],
-                        const Spacer(),
-                        if (doc.isDownloaded) ...[
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        doc.title,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: doc.isBold ? FontWeight.w800 : FontWeight.w700,
+                          color: const Color(0xFF0F172A),
+                          height: 1.25,
+                        ),
+                      ),
+                      const SizedBox(height: 5),
+                      Row(
+                        children: [
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                             decoration: BoxDecoration(
-                              color: const Color(0xFFDCFCE7),
-                              borderRadius: BorderRadius.circular(6),
+                              color: const Color(0xFFF1F5F9),
+                              borderRadius: BorderRadius.circular(5),
                             ),
-                            child: const Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(Icons.check_circle_rounded, size: 11, color: Color(0xFF16A34A)),
-                                SizedBox(width: 3),
-                                Text(
-                                  'Tersimpan',
-                                  style: TextStyle(
-                                    fontSize: 9.5,
-                                    fontWeight: FontWeight.w800,
-                                    color: Color(0xFF16A34A),
+                            child: Text(
+                              doc.formattedSize,
+                              style: const TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFF475569),
+                              ),
+                            ),
+                          ),
+                          if (doc.createdAt != null) ...[
+                            const SizedBox(width: 6),
+                            Text(
+                              doc.createdAt!.split(' ').first,
+                              style: TextStyle(fontSize: 10.5, color: Colors.grey.shade500),
+                            ),
+                          ],
+                          const Spacer(),
+                          if (doc.isDownloaded) ...[
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFDCFCE7),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: const Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.check_circle_rounded, size: 11, color: Color(0xFF16A34A)),
+                                  SizedBox(width: 3),
+                                  Text(
+                                    'Tersimpan',
+                                    style: TextStyle(
+                                      fontSize: 9.5,
+                                      fontWeight: FontWeight.w800,
+                                      color: Color(0xFF16A34A),
+                                    ),
                                   ),
+                                ],
+                              ),
+                            ),
+                          ] else ...[
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFEFF6FF),
+                                borderRadius: BorderRadius.circular(5),
+                              ),
+                              child: const Text(
+                                'On-Demand',
+                                style: TextStyle(
+                                  fontSize: 9.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xFF0284C7),
                                 ),
-                              ],
+                              ),
                             ),
-                          ),
-                        ] else ...[
-                          Text(
-                            'On-Demand',
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.grey.shade500,
-                            ),
-                          ),
+                          ],
                         ],
-                      ],
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                if (isDownloadingThis)
+                  const SizedBox(
+                    width: 26,
+                    height: 26,
+                    child: CircularProgressIndicator(strokeWidth: 2.5, color: Color(0xFF0284C7)),
+                  )
+                else
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: doc.isDownloaded ? const Color(0xFFEFF6FF) : const Color(0xFFF8FAFC),
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: doc.isDownloaded ? const Color(0xFFBFDBFE) : const Color(0xFFE2E8F0),
+                      ),
                     ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              if (isDownloadingThis)
-                const SizedBox(
-                  width: 24,
-                  height: 24,
-                  child: CircularProgressIndicator(strokeWidth: 2.5, color: Color(0xFF0284C7)),
-                )
-              else
-                Container(
-                  width: 34,
-                  height: 34,
-                  decoration: BoxDecoration(
-                    color: doc.isDownloaded ? const Color(0xFFEFF6FF) : const Color(0xFFF8FAFC),
-                    shape: BoxShape.circle,
-                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                    child: Icon(
+                      doc.isDownloaded ? Icons.visibility_rounded : Icons.download_rounded,
+                      size: 18,
+                      color: doc.isDownloaded ? const Color(0xFF0284C7) : const Color(0xFF64748B),
+                    ),
                   ),
-                  child: Icon(
-                    doc.isDownloaded ? Icons.visibility_rounded : Icons.download_rounded,
-                    size: 18,
-                    color: doc.isDownloaded ? const Color(0xFF0284C7) : const Color(0xFF64748B),
-                  ),
-                ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
     );
   }
+
+  // --------------------------------------------------------------------------
+  // SEARCH RESULTS
+  // --------------------------------------------------------------------------
 
   Widget _buildSearchResultsSection() {
     if (_isSearching) {
@@ -1195,7 +1686,11 @@ class _DocumentManagementPageState extends State<DocumentManagementPage> {
         alignment: Alignment.center,
         child: Column(
           children: [
-            const CircularProgressIndicator(color: Color(0xFF0284C7), strokeWidth: 2.5),
+            const SizedBox(
+              width: 30,
+              height: 30,
+              child: CircularProgressIndicator(color: Color(0xFF0284C7), strokeWidth: 2.5),
+            ),
             const SizedBox(height: 14),
             Text(
               'Mencari "$_searchQuery" di seluruh dokumen tambang...',
@@ -1211,20 +1706,20 @@ class _DocumentManagementPageState extends State<DocumentManagementPage> {
         padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 20),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(20),
           border: Border.all(color: const Color(0xFFE2E8F0)),
         ),
         child: Column(
           children: [
             Icon(Icons.search_off_rounded, size: 48, color: Colors.grey.shade300),
-            const SizedBox(height: 10),
+            const SizedBox(height: 12),
             const Text(
               'Tidak Ditemukan Dokumen',
-              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: Color(0xFF334155)),
+              style: TextStyle(fontSize: 15.5, fontWeight: FontWeight.w800, color: Color(0xFF1E293B)),
             ),
             const SizedBox(height: 4),
             Text(
-              'Tidak ada dokumen yang cocok dengan kata kunci "$_searchQuery". Coba cari kata kunci SOP, HIRADC, JSA, atau nomor dokumen.',
+              'Tidak ada dokumen yang cocok dengan "$_searchQuery". Coba cari kata kunci SOP, HIRADC, JSA, atau nomor dokumen.',
               textAlign: TextAlign.center,
               style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
             ),
@@ -1244,26 +1739,34 @@ class _DocumentManagementPageState extends State<DocumentManagementPage> {
               style: const TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w800,
-                color: Color(0xFF334155),
+                color: Color(0xFF0F172A),
               ),
             ),
             InkWell(
               onTap: () {
                 _searchCtrl.clear();
                 _onSearchChanged('');
+                setState(() => _selectedCategory = 'Semua');
               },
-              child: const Text(
-                'Tutup Pencarian',
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                  color: Color(0xFF0284C7),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF1F5F9),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: const Text(
+                  'Tutup Pencarian',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF0284C7),
+                  ),
                 ),
               ),
             ),
           ],
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 10),
         ListView.separated(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
