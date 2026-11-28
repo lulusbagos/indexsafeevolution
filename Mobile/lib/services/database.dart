@@ -74,75 +74,24 @@ class DatabaseService {
 
 
 
-    await _ensureHazardTransColumns(_database!);
-
-
-
-    await _ensureInspectionTransColumns(_database!);
-
-
-
-    await _ensureObservationTransColumns(_database!);
-
-
-
-    await _ensureEmployeeColumns(_database!);
-
-
-
-    await _ensureBenchmarkTable(_database!);
-
-
-
-    await _ensureP2hTransColumns(_database!);
-
-
-
-    await _ensureVehicleMastersColumns(_database!);
-
-
-
-    await _ensureP5mTransColumns(_database!);
-
-
-
-    await _ensureDciTable(_database!);
-
-
-
-    await _ensureSpiTable(_database!);
-
-
-
-    await _ensureGciTable(_database!);
-
-
-
-    await _ensureSafetyTransColumns(_database!);
-
-
-
-    await _ensureCoachingTransColumns(_database!);
-
-
-
-    await _ensureActionPlansColumns(_database!);
-
-
-
-    await _ensureNotificationsTable(_database!);
-
-
-
-    await _ensureSimperOfflineTable(_database!);
-
-
-
-    await _ensurePermitOfflineTable(_database!);
-
-
-
-    await _ensureOfflineQueues(_database!);
+    try { await _ensureHazardTransColumns(_database!); } catch (_) {}
+    try { await _ensureInspectionTransColumns(_database!); } catch (_) {}
+    try { await _ensureObservationTransColumns(_database!); } catch (_) {}
+    try { await _ensureEmployeeColumns(_database!); } catch (_) {}
+    try { await _ensureBenchmarkTable(_database!); } catch (_) {}
+    try { await _ensureP2hTransColumns(_database!); } catch (_) {}
+    try { await _ensureVehicleMastersColumns(_database!); } catch (_) {}
+    try { await _ensureP5mTransColumns(_database!); } catch (_) {}
+    try { await _ensureDciTable(_database!); } catch (_) {}
+    try { await _ensureSpiTable(_database!); } catch (_) {}
+    try { await _ensureGciTable(_database!); } catch (_) {}
+    try { await _ensureSafetyTransColumns(_database!); } catch (_) {}
+    try { await _ensureCoachingTransColumns(_database!); } catch (_) {}
+    try { await _ensureActionPlansColumns(_database!); } catch (_) {}
+    try { await _ensureNotificationsTable(_database!); } catch (_) {}
+    try { await _ensureSimperOfflineTable(_database!); } catch (_) {}
+    try { await _ensurePermitOfflineTable(_database!); } catch (_) {}
+    try { await _ensureOfflineQueues(_database!); } catch (_) {}
 
     final ensureTables = [
       'hazard_trans',
@@ -158,18 +107,20 @@ class DatabaseService {
       'nik', 'nama', 'nik_pja', 'nik_pic', 'category', 'area_name', 'location_name', 'lampiran_json',
       'tanggal', 'waktu', 'detil_lokasi', 'catatan', 'date', 'time', 'location_detail', 'remark',
       'jenis_inspeksi', 'area', 'lokasi', 'pja', 'departemen_pja', 'pja_id', 'employee_id', 'payload_json',
-      'title', 'image', 'video',
+      'title', 'judul', 'image', 'video', 'code', 'status', 'sync_id', 'company_id', 'deleted_at', 'updated_at', 'created_at',
       'q1_1', 'q1_2', 'q1_3', 'q2_1', 'q2_2', 'q2_3', 'q3_1', 'q3_2', 'q3_3', 'q4_1', 'q4_2', 'q4_3', 'q5_1', 'q5_2', 'q5_3'
     ];
     for (final tbl in ensureTables) {
       for (final colName in ensureCols) {
         try {
-          await _database!.execute('ALTER TABLE ' + tbl + ' ADD COLUMN ' + colName + ' TEXT;');
-        } catch (_) {}
+          await _database!.execute('ALTER TABLE "$tbl" ADD COLUMN "$colName" TEXT;');
+        } catch (_) {
+          try {
+            await _database!.execute('ALTER TABLE $tbl ADD COLUMN $colName TEXT;');
+          } catch (_) {}
+        }
       }
     }
-
-
 
     return _database!;
 
@@ -231,79 +182,54 @@ class DatabaseService {
 
 
 
-    if (oldVersion < 2) await _createOfflineSyncJobsTable(db);
+    try { if (oldVersion < 2) await _createOfflineSyncJobsTable(db); } catch (_) {}
+    try { await _ensureHazardTransColumns(db); } catch (_) {}
+    try { await _ensureInspectionTransColumns(db); } catch (_) {}
+    try { await _ensureObservationTransColumns(db); } catch (_) {}
+    try { await _ensureEmployeeColumns(db); } catch (_) {}
+    try { await _ensureBenchmarkTable(db); } catch (_) {}
+    try { await _ensureP2hTransColumns(db); } catch (_) {}
+    try { await _ensureVehicleMastersColumns(db); } catch (_) {}
+    try { await _ensureP5mTransColumns(db); } catch (_) {}
+    try { await _ensureDciTable(db); } catch (_) {}
+    try { await _ensureSpiTable(db); } catch (_) {}
+    try { await _ensureGciTable(db); } catch (_) {}
+    try { await _ensureSafetyTransColumns(db); } catch (_) {}
+    try { await _ensureCoachingTransColumns(db); } catch (_) {}
+    try { await _ensureActionPlansColumns(db); } catch (_) {}
+    try { await _ensureNotificationsTable(db); } catch (_) {}
+    try { await _ensureSimperOfflineTable(db); } catch (_) {}
+    try { await _ensurePermitOfflineTable(db); } catch (_) {}
+    try { await _ensureOfflineQueues(db); } catch (_) {}
 
-
-
-    await _ensureHazardTransColumns(db);
-
-
-
-    await _ensureInspectionTransColumns(db);
-
-
-
-    await _ensureObservationTransColumns(db);
-
-
-
-    await _ensureEmployeeColumns(db);
-
-
-
-    await _ensureBenchmarkTable(db);
-
-
-
-    await _ensureP2hTransColumns(db);
-
-
-
-    await _ensureVehicleMastersColumns(db);
-
-
-
-    await _ensureP5mTransColumns(db);
-
-
-
-    await _ensureDciTable(db);
-
-
-
-    await _ensureSpiTable(db);
-
-
-
-    await _ensureGciTable(db);
-
-
-
-    await _ensureSafetyTransColumns(db);
-
-
-
-    await _ensureCoachingTransColumns(db);
-
-
-
-    await _ensureActionPlansColumns(db);
-
-
-
-    await _ensureNotificationsTable(db);
-
-
-
-    await _ensureSimperOfflineTable(db);
-
-
-
-    await _ensurePermitOfflineTable(db);
-
-
-
-    await _ensureOfflineQueues(db);
+    final ensureTables = [
+      'hazard_trans',
+      'observation_trans',
+      'action_plans',
+      'inspection_trans',
+      'p5m_trans',
+      'coaching_trans',
+      'p2h_trans',
+      'safety_trans'
+    ];
+    final ensureCols = [
+      'nik', 'nama', 'nik_pja', 'nik_pic', 'category', 'area_name', 'location_name', 'lampiran_json',
+      'tanggal', 'waktu', 'detil_lokasi', 'catatan', 'date', 'time', 'location_detail', 'remark',
+      'jenis_inspeksi', 'area', 'lokasi', 'pja', 'departemen_pja', 'pja_id', 'employee_id', 'payload_json',
+      'title', 'judul', 'image', 'video', 'code', 'status', 'sync_id', 'company_id', 'deleted_at', 'updated_at', 'created_at',
+      'q1_1', 'q1_2', 'q1_3', 'q2_1', 'q2_2', 'q2_3', 'q3_1', 'q3_2', 'q3_3', 'q4_1', 'q4_2', 'q4_3', 'q5_1', 'q5_2', 'q5_3'
+    ];
+    for (final tbl in ensureTables) {
+      for (final colName in ensureCols) {
+        try {
+          await db.execute('ALTER TABLE "$tbl" ADD COLUMN "$colName" TEXT;');
+        } catch (_) {
+          try {
+            await db.execute('ALTER TABLE $tbl ADD COLUMN $colName TEXT;');
+          } catch (_) {}
+        }
+      }
+    }
 
 
 
@@ -4626,6 +4552,7 @@ class DatabaseService {
 
 
       'sync_id',
+      'payload_json',
 
 
 
@@ -4830,6 +4757,7 @@ class DatabaseService {
 
 
       'sync_id',
+      'payload_json',
 
 
 
@@ -5038,6 +4966,7 @@ class DatabaseService {
 
 
       'sync_id',
+      'payload_json',
 
 
 
@@ -5250,10 +5179,18 @@ class DatabaseService {
 
 
       'sync_id',
+      'payload_json',
 
 
 
       'status',
+      'area',
+      'lokasi',
+      'detil_lokasi',
+      'location_detail',
+      'catatan',
+      'remark',
+      'payload_json',
 
 
 
@@ -5730,6 +5667,7 @@ class DatabaseService {
 
 
       'sync_id',
+      'payload_json',
 
 
 
@@ -5740,6 +5678,8 @@ class DatabaseService {
       'image',
       'nik',
       'nama',
+      'payload_json',
+      'company_id',
     ];
     for (final col in cols) {
       try {
@@ -5792,6 +5732,7 @@ class DatabaseService {
 
 
       'sync_id',
+      'payload_json',
 
 
 
@@ -6187,6 +6128,7 @@ class DatabaseService {
 
 
       'sync_id',
+      'payload_json',
       'nik',
       'nama',
     ];
