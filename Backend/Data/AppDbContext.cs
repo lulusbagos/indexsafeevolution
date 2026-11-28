@@ -141,11 +141,11 @@ namespace Indexsafe.Api.Data
 
             // Table mappings
 
-            modelBuilder.Entity<PasswordOverride>()
-
-                .ToTable("tbl_m_pengguna_sandi")
-
-                .HasKey(p => p.Nrp);
+            modelBuilder.Entity<PasswordOverride>(entity =>
+            {
+                entity.ToTable("tbl_m_pengguna_sandi", tb => tb.UseSqlOutputClause(false));
+                entity.HasKey(p => p.Nrp);
+            });
 
 
 
@@ -660,125 +660,79 @@ namespace Indexsafe.Api.Data
 
 
 
-            modelBuilder.Entity<Quiz>()
-
-                .ToTable("table_m_quis");
-
-
-
-            modelBuilder.Entity<QuizAnswer>()
-
-                .ToTable("table_m_quis_detail");
-
-
-
-            modelBuilder.Entity<P2hVehicle>()
-
-                .ToTable("tbl_m_p2h_vehicle");
-
-
-
-            modelBuilder.Entity<DpaReport>()
-
-                .ToTable("tbl_t_dpa_report", tb => tb.UseSqlOutputClause(false));
-
-
-
-            modelBuilder.Entity<FciReport>()
-
-                .ToTable("tbl_t_fci_report", tb => tb.UseSqlOutputClause(false));
-
-
-
-            modelBuilder.Entity<DciReport>()
-
-                .ToTable("tbl_t_dci_report", tb => tb.UseSqlOutputClause(false));
-
-
-
-            modelBuilder.Entity<RciReport>()
-
-                .ToTable("tbl_t_rci_report", tb => tb.UseSqlOutputClause(false))
-
-                .HasMany(r => r.Members)
-
-                .WithOne(m => m.RciReport)
-
-                .HasForeignKey(m => m.RciReportId)
-
-                .OnDelete(DeleteBehavior.Cascade);
-
-
-
-            modelBuilder.Entity<RciMember>()
-
-                .ToTable("tbl_t_rci_member", tb => tb.UseSqlOutputClause(false));
-
-
-
-            modelBuilder.Entity<DpaDriver>()
-
-                .ToTable("tbl_m_dpa_driver");
-
-
-
-            modelBuilder.Entity<DpaDriver>()
-
-                .HasIndex(d => d.DriverNamaNormalized)
-
-                .IsUnique();
-
-
-
-            modelBuilder.Entity<TimelineLike>()
-
-                .ToTable("tbl_t_likes");
-
-
-
-            modelBuilder.Entity<TimelineComment>()
-
-                .ToTable("tbl_t_comments");
-
-
-
-            modelBuilder.Entity<RunningText>()
-
-                .ToTable("tbl_m_running_text");
-
-
-
-            modelBuilder.Entity<AppUser>(entity =>
-
+            modelBuilder.Entity<Quiz>(entity =>
             {
-
-                entity.ToTable("tbl_t_app_user");
-
-                entity.HasKey(e => e.Nik);
-
-                entity.Property(e => e.Nik).HasColumnName("nik");
-
-                entity.Property(e => e.Nama).HasColumnName("nama");
-
-                entity.Property(e => e.Departemen).HasColumnName("departemen");
-
-                entity.Property(e => e.Perusahaan).HasColumnName("perusahaan");
-
-                entity.Property(e => e.IdPerusahaan).HasColumnName("id_perusahaan");
-
-                entity.Property(e => e.KaryawanId).HasColumnName("karyawan_id");
-
-                entity.Property(e => e.LastLogin).HasColumnName("last_login");
-
-                entity.Property(e => e.Role).HasColumnName("role");
-
+                entity.ToTable("table_m_quis", tb => tb.UseSqlOutputClause(false));
             });
 
+            modelBuilder.Entity<QuizAnswer>(entity =>
+            {
+                entity.ToTable("table_m_quis_detail", tb => tb.UseSqlOutputClause(false));
+            });
 
+            modelBuilder.Entity<P2hVehicle>(entity =>
+            {
+                entity.ToTable("tbl_m_p2h_vehicle", tb => tb.UseSqlOutputClause(false));
+            });
+
+            modelBuilder.Entity<DpaReport>()
+                .ToTable("tbl_t_dpa_report", tb => tb.UseSqlOutputClause(false));
+
+            modelBuilder.Entity<FciReport>()
+                .ToTable("tbl_t_fci_report", tb => tb.UseSqlOutputClause(false));
+
+            modelBuilder.Entity<DciReport>()
+                .ToTable("tbl_t_dci_report", tb => tb.UseSqlOutputClause(false));
+
+            modelBuilder.Entity<RciReport>()
+                .ToTable("tbl_t_rci_report", tb => tb.UseSqlOutputClause(false))
+                .HasMany(r => r.Members)
+                .WithOne(m => m.RciReport)
+                .HasForeignKey(m => m.RciReportId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<RciMember>()
+                .ToTable("tbl_t_rci_member", tb => tb.UseSqlOutputClause(false));
+
+            modelBuilder.Entity<DpaDriver>(entity =>
+            {
+                entity.ToTable("tbl_m_dpa_driver", tb => tb.UseSqlOutputClause(false));
+                entity.HasIndex(d => d.DriverNamaNormalized)
+                      .IsUnique();
+            });
+
+            modelBuilder.Entity<TimelineLike>(entity =>
+            {
+                entity.ToTable("tbl_t_likes", tb => tb.UseSqlOutputClause(false));
+            });
+
+            modelBuilder.Entity<TimelineComment>(entity =>
+            {
+                entity.ToTable("tbl_t_comments", tb => tb.UseSqlOutputClause(false));
+            });
+
+            modelBuilder.Entity<RunningText>(entity =>
+            {
+                entity.ToTable("tbl_m_running_text", tb => tb.UseSqlOutputClause(false));
+            });
+
+            modelBuilder.Entity<AppUser>(entity =>
+            {
+                entity.ToTable("tbl_t_app_user", tb => tb.UseSqlOutputClause(false));
+                entity.HasKey(e => e.Nik);
+                entity.Property(e => e.Nik).HasColumnName("nik");
+                entity.Property(e => e.Nama).HasColumnName("nama");
+                entity.Property(e => e.Departemen).HasColumnName("departemen");
+                entity.Property(e => e.Perusahaan).HasColumnName("perusahaan");
+                entity.Property(e => e.IdPerusahaan).HasColumnName("id_perusahaan");
+                entity.Property(e => e.KaryawanId).HasColumnName("karyawan_id");
+                entity.Property(e => e.LastLogin).HasColumnName("last_login");
+                entity.Property(e => e.Role).HasColumnName("role");
+            });
 
             modelBuilder.Entity<MasterArea>(entity =>
             {
-                entity.ToTable("tbl_m_area_utama");
+                entity.ToTable("tbl_m_area_utama", tb => tb.UseSqlOutputClause(false));
                 entity.HasMany(a => a.PjaList)
                       .WithOne()
                       .HasForeignKey(p => p.AreaId)
@@ -787,96 +741,52 @@ namespace Indexsafe.Api.Data
 
             modelBuilder.Entity<AreaPjaRelation>(entity =>
             {
-                entity.ToTable("tbl_r_area_pja");
+                entity.ToTable("tbl_r_area_pja", tb => tb.UseSqlOutputClause(false));
                 entity.HasIndex(e => new { e.AreaId, e.NikPja }).IsUnique();
             });
 
-
-
             modelBuilder.Entity<IncidentNews>(entity =>
-
             {
-
-                entity.ToTable("tbl_t_incident_news");
-
+                entity.ToTable("tbl_t_incident_news", tb => tb.UseSqlOutputClause(false));
                 entity.Property(e => e.IsBanner).HasColumnName("is_banner");
-
                 entity.Property(e => e.IsUpdate).HasColumnName("is_update");
-
                 entity.Property(e => e.BannerUrutan).HasColumnName("banner_urutan");
-
                 entity.Property(e => e.Tags).HasColumnName("tags");
-
             });
 
+            modelBuilder.Entity<AttendanceEvent>(entity =>
+            {
+                entity.ToTable("tbl_t_attendance_event", tb => tb.UseSqlOutputClause(false));
+                entity.HasIndex(e => e.QrToken).IsUnique();
+            });
 
-
-            modelBuilder.Entity<AttendanceEvent>()
-
-                .ToTable("tbl_t_attendance_event");
-
-
-
-            modelBuilder.Entity<AttendanceRecord>()
-
-                .ToTable("tbl_t_attendance_record");
-
-
-
-            modelBuilder.Entity<AttendanceEvent>()
-
-                .HasIndex(e => e.QrToken)
-
-                .IsUnique();
-
-
-
-            modelBuilder.Entity<AttendanceRecord>()
-
-                .HasIndex(r => new { r.AttendanceEventId, r.Nik })
-
-                .IsUnique();
-
-
-
-            modelBuilder.Entity<AttendanceRecord>()
-
-                .HasOne(r => r.AttendanceEvent)
-
-                .WithMany(e => e.AttendanceRecords)
-
-                .HasForeignKey(r => r.AttendanceEventId)
-
-                .OnDelete(DeleteBehavior.Cascade);
-
-
+            modelBuilder.Entity<AttendanceRecord>(entity =>
+            {
+                entity.ToTable("tbl_t_attendance_record", tb => tb.UseSqlOutputClause(false));
+                entity.HasIndex(r => new { r.AttendanceEventId, r.Nik }).IsUnique();
+                entity.HasOne(r => r.AttendanceEvent)
+                      .WithMany(e => e.AttendanceRecords)
+                      .HasForeignKey(r => r.AttendanceEventId)
+                      .OnDelete(DeleteBehavior.Cascade);
+            });
 
 // Coaching & CoachingParticipant mapped above with columns
 
+            modelBuilder.Entity<Roster>(entity =>
+            {
+                entity.ToTable("tbl_m_roster", tb => tb.UseSqlOutputClause(false));
+                entity.HasKey(r => r.Id);
+            });
 
-
-            modelBuilder.Entity<Roster>()
-
-                .ToTable("tbl_m_roster")
-
-                .HasKey(r => r.Id);
-
-
-
-            modelBuilder.Entity<SapQualityAssessment>()
-
-                .ToTable("tbl_m_penilaian_kualitas_sap");
-
-
+            modelBuilder.Entity<SapQualityAssessment>(entity =>
+            {
+                entity.ToTable("tbl_m_penilaian_kualitas_sap", tb => tb.UseSqlOutputClause(false));
+            });
 
             modelBuilder.Entity<UserScanPermission>(entity =>
-
             {
-
-                entity.ToTable("tbl_m_user_scan_permission");
-
+                entity.ToTable("tbl_m_user_scan_permission", tb => tb.UseSqlOutputClause(false));
                 entity.Property(e => e.CanScanMinePermit).HasColumnName("can_scan_minepermit");
-
             });
 
 
