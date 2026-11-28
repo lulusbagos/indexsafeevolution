@@ -25,20 +25,27 @@ class DocumentManagementService {
     final activeBase = _api.baseUrl;
     final List<String> list = [];
 
-    // 1. Port reverse adb localhost (Samsung Galaxy S10+ via USB adb reverse tcp:7302 tcp:7302)
-    list.add('http://127.0.0.1:7302$cleanPath');
+    // Dalam mode rilis (Play Store / Production), selalu gunakan domain publik HTTPS resmi
+    if (kReleaseMode) {
+      if (activeBase.isNotEmpty && !list.contains('$activeBase$cleanPath')) {
+        list.add('$activeBase$cleanPath');
+      }
+      if (!list.contains('https://apimbs.indexim.id$cleanPath')) {
+        list.add('https://apimbs.indexim.id$cleanPath');
+      }
+      if (!list.contains('https://apimbs.idccoal.id$cleanPath')) {
+        list.add('https://apimbs.idccoal.id$cleanPath');
+      }
+      return list;
+    }
 
-    // 2. Active Base URL jika berbeda
+    // Dalam mode Debug, dukung reverse port ADB lokal dan domain publik
+    list.add('http://127.0.0.1:7302$cleanPath');
     if (activeBase.isNotEmpty && !list.contains('$activeBase$cleanPath')) {
       list.add('$activeBase$cleanPath');
     }
-
-    // 3. Android Emulator loopback
-    list.add('http://10.0.2.2:7302$cleanPath');
-
-    // 4. Remote Production Domain
     list.add('https://apimbs.indexim.id$cleanPath');
-
+    list.add('http://10.0.2.2:7302$cleanPath');
     return list;
   }
 
