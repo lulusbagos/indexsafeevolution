@@ -47,6 +47,7 @@ class _DocumentManagementPageState extends State<DocumentManagementPage> {
   ];
 
   // Current folder content
+  bool _isGridView = true; // Google Drive Grid Mode (true) vs Web Explorer List Mode (false)
   bool _isLoading = true;
   bool _isAccessDenied = false;
   String _accessDeniedMsg = '';
@@ -468,10 +469,11 @@ class _DocumentManagementPageState extends State<DocumentManagementPage> {
           physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 40),
           children: [
-            // 1. Sleek Executive Hero Card
-            _buildExecutiveHero(),
-
-            const SizedBox(height: 14),
+            // 1. Sleek Executive Hero Card (Hanya saat di Root, agar saat masuk folder langsung fokus berkas)
+            if (_folderStack.length == 1) ...[
+              _buildExecutiveHero(),
+              const SizedBox(height: 12),
+            ],
 
             // 2. Modern Capsule Search Bar
             _buildSearchBox(),
@@ -481,7 +483,7 @@ class _DocumentManagementPageState extends State<DocumentManagementPage> {
             // 3. Quick Category Filter Chips
             _buildCategoryChips(),
 
-            const SizedBox(height: 14),
+            const SizedBox(height: 12),
 
             // Search results or Folder Content
             if (_searchQuery.isNotEmpty) ...[
@@ -1046,12 +1048,12 @@ class _DocumentManagementPageState extends State<DocumentManagementPage> {
   }
 
   // --------------------------------------------------------------------------
-  // BREADCRUMB NAVIGATION
+  // BREADCRUMB NAVIGATION & VIEW MODE SWITCH (Google Drive & Web Explorer Style)
   // --------------------------------------------------------------------------
 
   Widget _buildBreadcrumbBar() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(14),
@@ -1066,15 +1068,50 @@ class _DocumentManagementPageState extends State<DocumentManagementPage> {
       ),
       child: Row(
         children: [
-          Container(
-            padding: const EdgeInsets.all(5),
-            decoration: BoxDecoration(
-              color: const Color(0xFFEFF6FF),
+          // 1. Tombol Back (Kembali ke folder sebelumnya seperti di Web: <- Back)
+          if (_folderStack.length > 1) ...[
+            InkWell(
+              onTap: () => _navigateUpToFolder(_folderStack.length - 2),
               borderRadius: BorderRadius.circular(8),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEFF6FF),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: const Color(0xFFBFDBFE)),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.arrow_back_rounded, size: 13, color: Color(0xFF0284C7)),
+                    SizedBox(width: 4),
+                    Text(
+                      'Back',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF0284C7),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
-            child: const Icon(Icons.folder_shared_rounded, size: 16, color: Color(0xFF0284C7)),
-          ),
-          const SizedBox(width: 8),
+            const SizedBox(width: 6),
+          ] else ...[
+            Container(
+              padding: const EdgeInsets.all(5),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFEF3C7),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFFFDE68A)),
+              ),
+              child: const Icon(Icons.folder_special_rounded, size: 15, color: Color(0xFFD97706)),
+            ),
+            const SizedBox(width: 6),
+          ],
+
+          // 2. Breadcrumbs Path Scrollable (/ Root / PT Indexim Coalindo / ...)
           Expanded(
             child: SingleChildScrollView(
               scrollDirection: Axis.horizontal,
@@ -1091,7 +1128,7 @@ class _DocumentManagementPageState extends State<DocumentManagementPage> {
                         onTap: isLast ? null : () => _navigateUpToFolder(index),
                         borderRadius: BorderRadius.circular(6),
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 3),
                           decoration: isLast
                               ? BoxDecoration(
                                   color: const Color(0xFFF1F5F9),
@@ -1099,9 +1136,9 @@ class _DocumentManagementPageState extends State<DocumentManagementPage> {
                                 )
                               : null,
                           child: Text(
-                            folder.name,
+                            index == 0 ? 'Root' : folder.name,
                             style: TextStyle(
-                              fontSize: 12,
+                              fontSize: 11.5,
                               fontWeight: isLast ? FontWeight.w800 : FontWeight.w600,
                               color: isLast ? const Color(0xFF0F172A) : const Color(0xFF0284C7),
                             ),
@@ -1110,8 +1147,8 @@ class _DocumentManagementPageState extends State<DocumentManagementPage> {
                       ),
                       if (!isLast)
                         const Padding(
-                          padding: EdgeInsets.symmetric(horizontal: 4),
-                          child: Icon(Icons.chevron_right_rounded, size: 16, color: Color(0xFF94A3B8)),
+                          padding: EdgeInsets.symmetric(horizontal: 2),
+                          child: Text('/', style: TextStyle(color: Color(0xFF94A3B8), fontWeight: FontWeight.bold, fontSize: 11)),
                         ),
                     ],
                   );
@@ -1119,33 +1156,79 @@ class _DocumentManagementPageState extends State<DocumentManagementPage> {
               ),
             ),
           ),
-          if (_folderStack.length > 1)
-            Material(
-              color: const Color(0xFFF8FAFC),
-              borderRadius: BorderRadius.circular(8),
-              child: InkWell(
-                onTap: () => _navigateUpToFolder(_folderStack.length - 2),
-                borderRadius: BorderRadius.circular(8),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: const Color(0xFFCBD5E1)),
-                  ),
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.arrow_upward_rounded, size: 13, color: Color(0xFF334155)),
-                      SizedBox(width: 4),
-                      Text(
-                        'Naik',
-                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF334155)),
-                      ),
-                    ],
-                  ),
-                ),
+          const SizedBox(width: 6),
+
+          // 3. View Mode Switch: Drive Grid vs Web List
+          _buildViewModeToggle(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildViewModeToggle() {
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFFF1F5F9),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          InkWell(
+            onTap: () {
+              if (!_isGridView) setState(() => _isGridView = true);
+            },
+            borderRadius: const BorderRadius.horizontal(left: Radius.circular(7)),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
+              decoration: BoxDecoration(
+                color: _isGridView ? Colors.white : Colors.transparent,
+                borderRadius: const BorderRadius.horizontal(left: Radius.circular(7)),
+                boxShadow: _isGridView
+                    ? [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.06),
+                          blurRadius: 3,
+                          offset: const Offset(0, 1),
+                        ),
+                      ]
+                    : null,
+              ),
+              child: Icon(
+                Icons.grid_view_rounded,
+                size: 14,
+                color: _isGridView ? const Color(0xFF0284C7) : const Color(0xFF64748B),
               ),
             ),
+          ),
+          InkWell(
+            onTap: () {
+              if (_isGridView) setState(() => _isGridView = false);
+            },
+            borderRadius: const BorderRadius.horizontal(right: Radius.circular(7)),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
+              decoration: BoxDecoration(
+                color: !_isGridView ? Colors.white : Colors.transparent,
+                borderRadius: const BorderRadius.horizontal(right: Radius.circular(7)),
+                boxShadow: !_isGridView
+                    ? [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.06),
+                          blurRadius: 3,
+                          offset: const Offset(0, 1),
+                        ),
+                      ]
+                    : null,
+              ),
+              child: Icon(
+                Icons.view_list_rounded,
+                size: 15,
+                color: !_isGridView ? const Color(0xFF0284C7) : const Color(0xFF64748B),
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -1342,7 +1425,9 @@ class _DocumentManagementPageState extends State<DocumentManagementPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Daftar Subfolder
+        // --------------------------------------------------------------------
+        // 1. DAFTAR SUBFOLDER (Google Drive Grid / Web Explorer List)
+        // --------------------------------------------------------------------
         if (hasFolders) ...[
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 2),
@@ -1351,10 +1436,10 @@ class _DocumentManagementPageState extends State<DocumentManagementPage> {
               children: [
                 Row(
                   children: [
-                    const Icon(Icons.folder_copy_rounded, size: 15, color: Color(0xFF0284C7)),
+                    const Icon(Icons.folder_copy_rounded, size: 15, color: Color(0xFFD97706)),
                     const SizedBox(width: 6),
                     Text(
-                      'Subfolder Direktori (${_currentFolders.length})',
+                      'Folder Direktori (${_currentFolders.length})',
                       style: const TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w800,
@@ -1365,24 +1450,47 @@ class _DocumentManagementPageState extends State<DocumentManagementPage> {
                   ],
                 ),
                 Text(
-                  'Ketuk untuk membuka',
-                  style: TextStyle(fontSize: 11, color: Colors.grey.shade500, fontWeight: FontWeight.w500),
+                  _isGridView ? 'Mode: Grid Drive' : 'Mode: List Web',
+                  style: const TextStyle(
+                    fontSize: 10.5,
+                    color: Color(0xFF64748B),
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ],
             ),
           ),
           const SizedBox(height: 10),
-          ListView.separated(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: _currentFolders.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 8),
-            itemBuilder: (ctx, idx) => _buildFolderCard(_currentFolders[idx]),
-          ),
+
+          // Tampilan Grid Google Drive vs Tampilan List Web Explorer
+          if (_isGridView) ...[
+            GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: _currentFolders.length,
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 2,
+                mainAxisSpacing: 10,
+                crossAxisSpacing: 10,
+                childAspectRatio: 1.52,
+              ),
+              itemBuilder: (ctx, idx) => _buildDriveFolderGridCard(_currentFolders[idx]),
+            ),
+          ] else ...[
+            ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: _currentFolders.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 6),
+              itemBuilder: (ctx, idx) => _buildWebFolderListRow(_currentFolders[idx]),
+            ),
+          ],
           const SizedBox(height: 18),
         ],
 
-        // Daftar File Dokumen
+        // --------------------------------------------------------------------
+        // 2. DAFTAR FILE DOKUMEN (Google Drive Grid / Web Explorer List)
+        // --------------------------------------------------------------------
         if (hasFiles) ...[
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 2),
@@ -1416,7 +1524,7 @@ class _DocumentManagementPageState extends State<DocumentManagementPage> {
                     ),
                     const SizedBox(width: 4),
                     const Text(
-                      'Ketuk untuk baca',
+                      'Ketuk untuk baca / simpan',
                       style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF0284C7)),
                     ),
                   ],
@@ -1425,40 +1533,52 @@ class _DocumentManagementPageState extends State<DocumentManagementPage> {
             ),
           ),
           const SizedBox(height: 10),
-          ListView.separated(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: _currentFiles.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 8),
-            itemBuilder: (ctx, idx) => _buildFileCard(_currentFiles[idx]),
-          ),
+
+          if (_isGridView) ...[
+            GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: _currentFiles.length,
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 2,
+                mainAxisSpacing: 10,
+                crossAxisSpacing: 10,
+                childAspectRatio: 1.25,
+              ),
+              itemBuilder: (ctx, idx) => _buildDriveFileGridCard(_currentFiles[idx]),
+            ),
+          ] else ...[
+            ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: _currentFiles.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 8),
+              itemBuilder: (ctx, idx) => _buildFileCard(_currentFiles[idx]),
+            ),
+          ],
         ],
       ],
     );
   }
 
   // --------------------------------------------------------------------------
-  // MODERN FOLDER CARD
+  // GOOGLE DRIVE STYLE FOLDER GRID CARD (2-Column Squircle Box)
   // --------------------------------------------------------------------------
 
-  Widget _buildFolderCard(DocumentFolderModel folder) {
-    Color folderColor;
-    try {
-      folderColor = Color(int.parse(folder.color.replaceAll('#', '0xFF')));
-    } catch (_) {
-      folderColor = const Color(0xFF0284C7);
-    }
+  Widget _buildDriveFolderGridCard(DocumentFolderModel folder) {
+    const amberColor = Color(0xFFD97706); // Warm Golden Amber Folder Google Drive
+    const amberBg = Color(0xFFFEF3C7);
 
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: const Color(0xFFE2E8F0)),
-        boxShadow: [
+        boxShadow: const [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.02),
+            color: Color(0x06000000),
             blurRadius: 8,
-            offset: const Offset(0, 2),
+            offset: Offset(0, 2),
           ),
         ],
       ),
@@ -1469,29 +1589,134 @@ class _DocumentManagementPageState extends State<DocumentManagementPage> {
           onTap: () => _navigateToFolder(folder),
           borderRadius: BorderRadius.circular(16),
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Container(
+                      width: 38,
+                      height: 38,
+                      decoration: BoxDecoration(
+                        color: amberBg,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: const Color(0xFFFDE68A)),
+                      ),
+                      child: const Center(
+                        child: Icon(Icons.folder_rounded, color: amberColor, size: 22),
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2.5),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF1F5F9),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        folder.subfolderCount > 0
+                            ? '${folder.subfolderCount} dir'
+                            : '${folder.fileCount} file',
+                        style: const TextStyle(
+                          fontSize: 9.5,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF475569),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                Text(
+                  folder.name,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: folder.isBold ? FontWeight.w800 : FontWeight.w700,
+                    color: const Color(0xFF0F172A),
+                    height: 1.25,
+                  ),
+                ),
+                Row(
+                  children: [
+                    Icon(
+                      folder.subfolderCount > 0
+                          ? Icons.folder_copy_outlined
+                          : Icons.description_outlined,
+                      size: 11,
+                      color: const Color(0xFF94A3B8),
+                    ),
+                    const SizedBox(width: 4),
+                    Expanded(
+                      child: Text(
+                        folder.subfolderCount > 0
+                            ? '${folder.subfolderCount} sub, ${folder.fileCount} file'
+                            : '${folder.fileCount} berkas file',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w500,
+                          color: Color(0xFF64748B),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // --------------------------------------------------------------------------
+  // WEB EXPLORER STYLE FOLDER LIST ROW (Persis Tampilan Web ONE EV)
+  // --------------------------------------------------------------------------
+
+  Widget _buildWebFolderListRow(DocumentFolderModel folder) {
+    const amberColor = Color(0xFFD97706);
+    const amberBg = Color(0xFFFEF3C7);
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x04000000),
+            blurRadius: 4,
+            offset: Offset(0, 1),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(12),
+        child: InkWell(
+          onTap: () => _navigateToFolder(folder),
+          borderRadius: BorderRadius.circular(12),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             child: Row(
               children: [
                 Container(
-                  width: 44,
-                  height: 44,
+                  width: 36,
+                  height: 36,
                   decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        folderColor.withValues(alpha: 0.15),
-                        folderColor.withValues(alpha: 0.05),
-                      ],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: folderColor.withValues(alpha: 0.2)),
+                    color: amberBg,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: const Color(0xFFFDE68A)),
                   ),
-                  child: Center(
-                    child: Icon(Icons.folder_rounded, color: folderColor, size: 24),
+                  child: const Center(
+                    child: Icon(Icons.folder_rounded, color: amberColor, size: 21),
                   ),
                 ),
-                const SizedBox(width: 14),
+                const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -1501,60 +1726,32 @@ class _DocumentManagementPageState extends State<DocumentManagementPage> {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          fontSize: 13.5,
+                          fontSize: 13,
                           fontWeight: folder.isBold ? FontWeight.w800 : FontWeight.w700,
                           color: const Color(0xFF0F172A),
                         ),
                       ),
-                      const SizedBox(height: 4),
+                      const SizedBox(height: 2),
                       Row(
                         children: [
-                          if (folder.subfolderCount > 0) ...[
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFF1F5F9),
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(Icons.folder_copy_outlined, size: 10.5, color: Colors.grey.shade600),
-                                  const SizedBox(width: 3),
-                                  Text(
-                                    '${folder.subfolderCount} subfolder',
-                                    style: TextStyle(
-                                      fontSize: 10.5,
-                                      color: Colors.grey.shade700,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ],
-                              ),
+                          Text(
+                            'File folder (${folder.subfolderCount} folder, ${folder.fileCount} file)',
+                            style: const TextStyle(
+                              fontSize: 10.5,
+                              color: Color(0xFF64748B),
+                              fontWeight: FontWeight.w500,
                             ),
-                            const SizedBox(width: 6),
-                          ],
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFF8FAFC),
-                              borderRadius: BorderRadius.circular(6),
-                              border: Border.all(color: const Color(0xFFE2E8F0)),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(Icons.description_outlined, size: 10.5, color: Colors.grey.shade600),
-                                const SizedBox(width: 3),
-                                Text(
-                                  '${folder.fileCount} file',
-                                  style: TextStyle(
-                                    fontSize: 10.5,
-                                    color: Colors.grey.shade700,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ],
+                          ),
+                          const SizedBox(width: 6),
+                          const Text('•', style: TextStyle(color: Color(0xFFCBD5E1), fontSize: 10)),
+                          const SizedBox(width: 6),
+                          Text(
+                            (folder.createdAt != null && folder.createdAt!.isNotEmpty)
+                                ? folder.createdAt!
+                                : '16 Jun 2026',
+                            style: const TextStyle(
+                              fontSize: 10,
+                              color: Color(0xFF94A3B8),
                             ),
                           ),
                         ],
@@ -1562,14 +1759,108 @@ class _DocumentManagementPageState extends State<DocumentManagementPage> {
                     ],
                   ),
                 ),
-                Container(
-                  width: 28,
-                  height: 28,
-                  decoration: const BoxDecoration(
-                    color: Color(0xFFF8FAFC),
-                    shape: BoxShape.circle,
+                const Icon(Icons.chevron_right_rounded, size: 18, color: Color(0xFF94A3B8)),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // --------------------------------------------------------------------------
+  // GOOGLE DRIVE STYLE FILE GRID CARD (2-Column File Card)
+  // --------------------------------------------------------------------------
+
+  Widget _buildDriveFileGridCard(DocumentItemModel doc) {
+    final isPdf = doc.fileType.toLowerCase() == 'pdf';
+    final badgeColor = isPdf ? const Color(0xFFDC2626) : const Color(0xFF0284C7);
+    final badgeBg = isPdf ? const Color(0xFFFEE2E2) : const Color(0xFFE0F2FE);
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x06000000),
+            blurRadius: 8,
+            offset: Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(16),
+        child: InkWell(
+          onTap: () => _openOrDownloadDocument(doc),
+          borderRadius: BorderRadius.circular(16),
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: badgeBg,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        doc.fileType.toUpperCase(),
+                        style: TextStyle(
+                          fontSize: 9.5,
+                          fontWeight: FontWeight.w900,
+                          color: badgeColor,
+                          letterSpacing: 0.4,
+                        ),
+                      ),
+                    ),
+                    Icon(
+                      doc.isDownloaded ? Icons.check_circle_rounded : Icons.cloud_download_outlined,
+                      size: 16,
+                      color: doc.isDownloaded ? const Color(0xFF16A34A) : const Color(0xFF94A3B8),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  doc.title.isNotEmpty ? doc.title : doc.fileName,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF0F172A),
+                    height: 1.25,
                   ),
-                  child: const Icon(Icons.chevron_right_rounded, size: 18, color: Color(0xFF94A3B8)),
+                ),
+                const SizedBox(height: 6),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      doc.formattedSize,
+                      style: const TextStyle(
+                        fontSize: 10,
+                        color: Color(0xFF64748B),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    Text(
+                      doc.isDownloaded ? 'Tersimpan' : 'Unduh',
+                      style: TextStyle(
+                        fontSize: 9.5,
+                        fontWeight: FontWeight.w700,
+                        color: doc.isDownloaded ? const Color(0xFF16A34A) : const Color(0xFF0284C7),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),

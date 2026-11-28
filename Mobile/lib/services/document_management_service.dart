@@ -43,11 +43,11 @@ class DocumentManagementService {
     final List<String> list = [];
 
     // Prioritaskan selalu domain publik resmi HTTPS (apimbs.indexim.id / apimbs.idccoal.id)
-    if (activeBase.isNotEmpty && !list.contains('$activeBase$cleanPath')) {
-      list.add('$activeBase$cleanPath');
-    }
     if (!list.contains('https://apimbs.indexim.id$cleanPath')) {
       list.add('https://apimbs.indexim.id$cleanPath');
+    }
+    if (activeBase.isNotEmpty && !list.contains('$activeBase$cleanPath')) {
+      list.add('$activeBase$cleanPath');
     }
     if (!list.contains('https://apimbs.idccoal.id$cleanPath')) {
       list.add('https://apimbs.idccoal.id$cleanPath');
