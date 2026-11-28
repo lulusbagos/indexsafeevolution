@@ -2,7 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.Data;
 using System.IO;
+using System.Linq;
 using System.Net.Http;
+using System.Security.Claims;
 using System.Threading.Tasks;
 using Indexsafe.Api.Data;
 using Microsoft.AspNetCore.Authorization;
@@ -14,6 +16,21 @@ using Microsoft.Extensions.Configuration;
 
 namespace Indexsafe.Api.Controllers
 {
+    public class UserDocScope
+    {
+        public string Username { get; set; } = "";
+        public string FullName { get; set; } = "";
+        public int PenggunaId { get; set; }
+        public int PerusahaanId { get; set; } = 1;
+        public string PerusahaanName { get; set; } = "PT INDEXIM COALINDO";
+        public int? DepartemenId { get; set; }
+        public string DepartemenName { get; set; } = "";
+        public HashSet<int> RoleIds { get; set; } = new HashSet<int>();
+        public string RoleName { get; set; } = "Owner";
+        public bool IsOwner { get; set; } = true;
+        public bool IsOwnerNoDepartment { get; set; } = true;
+    }
+
     [ApiController]
     [Route("api/document-management")]
     public class DocumentManagementController : ControllerBase
@@ -33,15 +50,295 @@ namespace Indexsafe.Api.Controllers
             _config = config;
         }
 
+        #region User Scope & Permission Resolvers (One EV Integration)
+
+        private async Task<UserDocScope> ResolveUserDocScopeAsync(string? explicitNik = null)
+        {
+            // 1. Ambil identitas NIK / username dari berbagai sumber (Query, Header, Claim JWT)
+            string userNik = explicitNik?.Trim() ?? "";
+            if (string.IsNullOrWhiteSpace(userNik))
+            {
+                userNik = Request.Query["nik"].FirstOrDefault()?.Trim() ?? "";
+            }
+            if (string.IsNullOrWhiteSpace(userNik))
+            {
+                userNik = Request.Headers["X-User-Nik"].FirstOrDefault()?.Trim() ?? "";
+            }
+            if (string.IsNullOrWhiteSpace(userNik))
+            {
+                userNik = User.FindFirstValue("nik") 
+                       ?? User.FindFirstValue(ClaimTypes.NameIdentifier) 
+                       ?? User.FindFirstValue("username")
+                       ?? User.FindFirstValue(ClaimTypes.Name)
+                       ?? "";
+            }
+            if (string.IsNullOrWhiteSpace(userNik))
+            {
+                userNik = Request.Headers["X-User-Name"].FirstOrDefault()?.Trim() ?? "";
+            }
+            if (string.IsNullOrWhiteSpace(userNik))
+            {
+                userNik = "24051940986"; // Fallback default
+            }
+
+            string cleanNik = userNik.TrimStart('0');
+            var scope = new UserDocScope
+            {
+                Username = userNik,
+                FullName = Request.Headers["X-User-Name"].FirstOrDefault()?.Trim() ?? userNik
+            };
+
+            var conn = _context.Database.GetDbConnection();
+            bool wasClosed = conn.State != ConnectionState.Open;
+            if (wasClosed) await conn.OpenAsync();
+
+            try
+            {
+                // Langkah A: Cek apakah user terdaftar resmi di [ONE_DB_MITRA].[dbo].[tbl_m_pengguna]
+                using var cmdUser = conn.CreateCommand();
+                cmdUser.CommandText = @"
+                    SELECT TOP 1 
+                        p.pengguna_id, p.username, p.nama_lengkap, p.peran_id, p.perusahaan_id, p.departemen_id,
+                        pr.nama_peran, pr.level_akses, per.nama_perusahaan, dep.nama_departemen
+                    FROM [ONE_DB_MITRA].dbo.tbl_m_pengguna p
+                    LEFT JOIN [ONE_DB_MITRA].dbo.tbl_m_peran pr ON p.peran_id = pr.peran_id
+                    LEFT JOIN [ONE_DB_MITRA].dbo.tbl_m_perusahaan per ON p.perusahaan_id = per.id_perusahaan
+                    LEFT JOIN [ONE_DB_MITRA].dbo.tbl_m_departemen dep ON p.departemen_id = dep.id_departemen
+                    WHERE p.is_aktif = 1 
+                      AND (p.username = @nik OR p.username = @cleanNik OR p.email = @nik);
+                ";
+                var pNik = cmdUser.CreateParameter();
+                pNik.ParameterName = "@nik";
+                pNik.Value = userNik;
+                cmdUser.Parameters.Add(pNik);
+
+                var pClean = cmdUser.CreateParameter();
+                pClean.ParameterName = "@cleanNik";
+                pClean.Value = cleanNik;
+                cmdUser.Parameters.Add(pClean);
+
+                using (var reader = await cmdUser.ExecuteReaderAsync())
+                {
+                    if (await reader.ReadAsync())
+                    {
+                        scope.PenggunaId = Convert.ToInt32(reader["pengguna_id"]);
+                        scope.Username = reader["username"]?.ToString() ?? userNik;
+                        scope.FullName = reader["nama_lengkap"]?.ToString() ?? scope.FullName;
+                        scope.PerusahaanId = reader["perusahaan_id"] != DBNull.Value ? Convert.ToInt32(reader["perusahaan_id"]) : 1;
+                        scope.PerusahaanName = reader["nama_perusahaan"]?.ToString() ?? "PT INDEXIM COALINDO";
+                        scope.DepartemenId = reader["departemen_id"] != DBNull.Value ? Convert.ToInt32(reader["departemen_id"]) : (int?)null;
+                        scope.DepartemenName = reader["nama_departemen"]?.ToString() ?? "";
+
+                        int peranId = reader["peran_id"] != DBNull.Value ? Convert.ToInt32(reader["peran_id"]) : 1;
+                        int levelAkses = reader["level_akses"] != DBNull.Value ? Convert.ToInt32(reader["level_akses"]) : 4;
+                        string namaPeran = reader["nama_peran"]?.ToString() ?? "Owner";
+
+                        scope.RoleIds.Add(peranId);
+                        scope.RoleName = namaPeran;
+                        scope.IsOwner = (peranId == 1 || levelAkses >= 4 || namaPeran.Contains("Owner", StringComparison.OrdinalIgnoreCase) || scope.Username.Equals("admin.owner", StringComparison.OrdinalIgnoreCase));
+                    }
+                }
+
+                // Langkah B: Jika belum ada di tbl_m_pengguna, cari data karyawan aktif dari [ONE_DB_MITRA].[dbo].[vw_m_karyawan_aktif]
+                if (scope.PenggunaId == 0)
+                {
+                    using var cmdKaryawan = conn.CreateCommand();
+                    cmdKaryawan.CommandText = @"
+                        SELECT TOP 1 
+                            id_karyawan, no_nik, nama_lengkap, id_perusahaan, nama_perusahaan, id_departemen, nama_departemen, status_aktif_efektif
+                        FROM [ONE_DB_MITRA].dbo.vw_m_karyawan_aktif
+                        WHERE no_nik = @nik OR no_nik = @cleanNik;
+                    ";
+                    var pkNik = cmdKaryawan.CreateParameter();
+                    pkNik.ParameterName = "@nik";
+                    pkNik.Value = userNik;
+                    cmdKaryawan.Parameters.Add(pkNik);
+
+                    var pkClean = cmdKaryawan.CreateParameter();
+                    pkClean.ParameterName = "@cleanNik";
+                    pkClean.Value = cleanNik;
+                    cmdKaryawan.Parameters.Add(pkClean);
+
+                    using var readerK = await cmdKaryawan.ExecuteReaderAsync();
+                    if (await readerK.ReadAsync())
+                    {
+                        scope.FullName = readerK["nama_lengkap"]?.ToString() ?? scope.FullName;
+                        scope.PerusahaanId = readerK["id_perusahaan"] != DBNull.Value ? Convert.ToInt32(readerK["id_perusahaan"]) : 1;
+                        scope.PerusahaanName = readerK["nama_perusahaan"]?.ToString() ?? "PT INDEXIM COALINDO";
+                        scope.DepartemenId = readerK["id_departemen"] != DBNull.Value ? Convert.ToInt32(readerK["id_departemen"]) : (int?)null;
+                        scope.DepartemenName = readerK["nama_departemen"]?.ToString() ?? "";
+
+                        // Perusahaan 1 = Owner (peran_id 1), selain itu Contractor (peran_id 2 / 3)
+                        int peranId = (scope.PerusahaanId == 1) ? 1 : 2;
+                        scope.RoleIds.Add(peranId);
+                        scope.RoleName = (scope.PerusahaanId == 1) ? "Owner" : "Main Contractor";
+                        scope.IsOwner = (scope.PerusahaanId == 1);
+                    }
+                    else
+                    {
+                        // Fallback default: anggap Owner jika NIK Indexim atau admin
+                        scope.PerusahaanId = 1;
+                        scope.RoleIds.Add(1);
+                        scope.RoleName = "Owner";
+                        scope.IsOwner = true;
+                    }
+                }
+
+                // Langkah C: Ambil mapped roles tambahan dari [ONE_DB_MITRA].[dbo].[tbl_r_pengguna_peran]
+                if (scope.PenggunaId > 0)
+                {
+                    using var cmdRoles = conn.CreateCommand();
+                    cmdRoles.CommandText = @"
+                        SELECT peran_id FROM [ONE_DB_MITRA].dbo.tbl_r_pengguna_peran
+                        WHERE pengguna_id = @pid AND is_aktif = 1;
+                    ";
+                    var pPid = cmdRoles.CreateParameter();
+                    pPid.ParameterName = "@pid";
+                    pPid.Value = scope.PenggunaId;
+                    cmdRoles.Parameters.Add(pPid);
+
+                    using var readerR = await cmdRoles.ExecuteReaderAsync();
+                    while (await readerR.ReadAsync())
+                    {
+                        int rId = Convert.ToInt32(readerR["peran_id"]);
+                        if (rId > 0)
+                        {
+                            scope.RoleIds.Add(rId);
+                            if (rId == 1) scope.IsOwner = true;
+                        }
+                    }
+                }
+
+                // Sesuai One EV: Owner tanpa departemen memiliki akses universal ke seluruh folder
+                scope.IsOwnerNoDepartment = scope.IsOwner && (!scope.DepartemenId.HasValue || scope.DepartemenId.Value <= 0);
+            }
+            finally
+            {
+                if (wasClosed) await conn.CloseAsync();
+            }
+
+            return scope;
+        }
+
+        private async Task<Dictionary<string, HashSet<int>>> LoadRoleRulesByPathAsync(int companyId = 1)
+        {
+            var dict = new Dictionary<string, HashSet<int>>(StringComparer.OrdinalIgnoreCase);
+            var conn = _context.Database.GetDbConnection();
+            bool wasClosed = conn.State != ConnectionState.Open;
+            if (wasClosed) await conn.OpenAsync();
+
+            try
+            {
+                using var cmd = conn.CreateCommand();
+                cmd.CommandText = @"
+                    SELECT f.path_key, rr.peran_id
+                    FROM [ONE_DB_MITRA].dbo.tbl_r_dokumen_folder_role rr
+                    JOIN [ONE_DB_MITRA].dbo.tbl_m_dokumen_folder f ON rr.folder_id = f.folder_id
+                    WHERE f.perusahaan_id = @cid AND f.is_deleted = 0 AND rr.can_view = 1;
+                ";
+                var pC = cmd.CreateParameter();
+                pC.ParameterName = "@cid";
+                pC.Value = companyId;
+                cmd.Parameters.Add(pC);
+
+                using var r = await cmd.ExecuteReaderAsync();
+                while (await r.ReadAsync())
+                {
+                    var path = r["path_key"]?.ToString() ?? "";
+                    int peranId = Convert.ToInt32(r["peran_id"]);
+                    if (!dict.ContainsKey(path)) dict[path] = new HashSet<int>();
+                    dict[path].Add(peranId);
+                }
+            }
+            finally
+            {
+                if (wasClosed) await conn.CloseAsync();
+            }
+            return dict;
+        }
+
+        private static bool IsFolderAllowed(string path, IReadOnlySet<int> userRoleIds, Dictionary<string, HashSet<int>> rulesByPath, bool isOwnerNoDepartment)
+        {
+            if (isOwnerNoDepartment) return true;
+            if (rulesByPath == null || rulesByPath.Count == 0) return true; // Belum ada rule spesifik, default open
+
+            var probe = NormalizeRelativePath(path);
+            while (true)
+            {
+                if (rulesByPath.TryGetValue(probe, out var allowedRoles))
+                {
+                    return allowedRoles.Overlaps(userRoleIds);
+                }
+
+                if (string.IsNullOrWhiteSpace(probe)) break;
+
+                var lastSlash = probe.LastIndexOf('/');
+                probe = lastSlash < 0 ? string.Empty : probe.Substring(0, lastSlash);
+            }
+
+            return true;
+        }
+
+        private async Task<HashSet<int>> LoadBlockedFileIdsAsync(IReadOnlySet<int> userRoleIds, bool isOwnerNoDepartment)
+        {
+            var blocked = new HashSet<int>();
+            if (isOwnerNoDepartment || userRoleIds == null || userRoleIds.Count == 0) return blocked;
+
+            var conn = _context.Database.GetDbConnection();
+            bool wasClosed = conn.State != ConnectionState.Open;
+            if (wasClosed) await conn.OpenAsync();
+
+            try
+            {
+                using var cmd = conn.CreateCommand();
+                var rolesIn = string.Join(",", userRoleIds);
+                cmd.CommandText = $@"
+                    SELECT DISTINCT file_id
+                    FROM [ONE_DB_MITRA].dbo.tbl_r_dokumen_file_role
+                    WHERE can_view = 0 AND peran_id IN ({rolesIn});
+                ";
+
+                using var r = await cmd.ExecuteReaderAsync();
+                while (await r.ReadAsync())
+                {
+                    blocked.Add(Convert.ToInt32(r["file_id"]));
+                }
+            }
+            finally
+            {
+                if (wasClosed) await conn.CloseAsync();
+            }
+            return blocked;
+        }
+
+        private static string NormalizeRelativePath(string? path)
+        {
+            if (string.IsNullOrWhiteSpace(path)) return string.Empty;
+            var normalized = path.Trim().Replace('\\', '/');
+            while (normalized.Contains("//", StringComparison.Ordinal))
+            {
+                normalized = normalized.Replace("//", "/", StringComparison.Ordinal);
+            }
+            normalized = normalized.Trim('/');
+            if (normalized.Contains("..", StringComparison.Ordinal)) return string.Empty;
+            return normalized;
+        }
+
+        #endregion
+
         /// <summary>
-        /// Ringkasan statistik dokumen tambang dari ONE_DB_MITRA
+        /// Ringkasan statistik dokumen tambang dari ONE_DB_MITRA (difilter sesuai hak akses pengguna).
         /// </summary>
         [HttpGet("summary")]
         [AllowAnonymous]
-        public async Task<IActionResult> GetSummary([FromQuery] string? department = null)
+        public async Task<IActionResult> GetSummary([FromQuery] string? department = null, [FromQuery] string? nik = null)
         {
             try
             {
+                var scope = await ResolveUserDocScopeAsync(nik);
+                var roleRules = await LoadRoleRulesByPathAsync(scope.PerusahaanId);
+                var blockedFiles = await LoadBlockedFileIdsAsync(scope.RoleIds, scope.IsOwnerNoDepartment);
+
                 var conn = _context.Database.GetDbConnection();
                 bool wasClosed = conn.State != ConnectionState.Open;
                 if (wasClosed) await conn.OpenAsync();
@@ -59,12 +356,13 @@ namespace Indexsafe.Api.Controllers
                             (SELECT COUNT(*) FROM [ONE_DB_MITRA].dbo.tbl_t_dokumen_file WHERE is_deleted = 0 AND file_path LIKE '%07 Form%') AS form_count,
                             (SELECT COUNT(*) FROM [ONE_DB_MITRA].dbo.tbl_t_dokumen_file WHERE is_deleted = 0 AND file_path LIKE '%01 Kebijakan%') AS policy_count;
 
-                        SELECT TOP 8 
-                            file_id, folder_id, nama_dokumen, nama_file_stored, file_path, content_type, size_bytes,
-                            is_read_only, is_bold, created_at, created_by
-                        FROM [ONE_DB_MITRA].dbo.tbl_t_dokumen_file
-                        WHERE is_deleted = 0
-                        ORDER BY file_id DESC;
+                        SELECT TOP 20 
+                            f.file_id, f.folder_id, f.nama_dokumen, f.nama_file_stored, f.file_path, f.content_type, f.size_bytes,
+                            f.is_read_only, f.is_bold, f.created_at, f.created_by, fo.path_key
+                        FROM [ONE_DB_MITRA].dbo.tbl_t_dokumen_file f
+                        LEFT JOIN [ONE_DB_MITRA].dbo.tbl_m_dokumen_folder fo ON f.folder_id = fo.folder_id
+                        WHERE f.is_deleted = 0
+                        ORDER BY f.file_id DESC;
                     ";
 
                     long totalFiles = 0;
@@ -92,6 +390,13 @@ namespace Indexsafe.Api.Controllers
                     {
                         while (await reader.ReadAsync())
                         {
+                            int fId = Convert.ToInt32(reader["file_id"]);
+                            var folderPath = reader["path_key"]?.ToString() ?? "";
+
+                            // Terapkan filtering One EV
+                            if (blockedFiles.Contains(fId)) continue;
+                            if (!IsFolderAllowed(folderPath, scope.RoleIds, roleRules, scope.IsOwnerNoDepartment)) continue;
+
                             var filePath = reader["file_path"]?.ToString() ?? "";
                             var docName = reader["nama_dokumen"]?.ToString() ?? "";
                             var size = reader["size_bytes"] != DBNull.Value ? Convert.ToInt64(reader["size_bytes"]) : 0;
@@ -101,7 +406,7 @@ namespace Indexsafe.Api.Controllers
 
                             recentDocs.Add(new
                             {
-                                id = Convert.ToInt32(reader["file_id"]),
+                                id = fId,
                                 folderId = reader["folder_id"] != DBNull.Value ? Convert.ToInt32(reader["folder_id"]) : (int?)null,
                                 title = docName,
                                 fileName = reader["nama_file_stored"]?.ToString() ?? docName,
@@ -114,6 +419,8 @@ namespace Indexsafe.Api.Controllers
                                 createdAt = reader["created_at"] != DBNull.Value ? Convert.ToDateTime(reader["created_at"]).ToString("yyyy-MM-dd HH:mm") : null,
                                 createdBy = reader["created_by"]?.ToString() ?? "-"
                             });
+
+                            if (recentDocs.Count >= 8) break;
                         }
                     }
 
@@ -121,6 +428,16 @@ namespace Indexsafe.Api.Controllers
                     {
                         status = 200,
                         success = true,
+                        userScope = new
+                        {
+                            username = scope.Username,
+                            fullName = scope.FullName,
+                            roleName = scope.RoleName,
+                            companyName = scope.PerusahaanName,
+                            departmentName = scope.DepartemenName,
+                            isOwner = scope.IsOwner,
+                            hasAccess = true
+                        },
                         data = new
                         {
                             totalDocuments = totalFiles,
@@ -147,24 +464,49 @@ namespace Indexsafe.Api.Controllers
         }
 
         /// <summary>
-        /// Mengambil daftar folder (hierarkis berjenjang) dari ONE_DB_MITRA.
-        /// Jika parentId null/0, default menampilkan folder utama PT Indexim Coalindo (folder_id = 9).
+        /// Mengambil daftar subfolder dalam folder tertentu (difilter 100% sesuai hak akses One EV).
         /// </summary>
         [HttpGet("folders")]
         [AllowAnonymous]
-        public async Task<IActionResult> GetFolders([FromQuery] int? parentId = null)
+        public async Task<IActionResult> GetFolders([FromQuery] int? parentId = null, [FromQuery] string? nik = null)
         {
             try
             {
+                var scope = await ResolveUserDocScopeAsync(nik);
+                var roleRules = await LoadRoleRulesByPathAsync(scope.PerusahaanId);
+
                 var conn = _context.Database.GetDbConnection();
                 bool wasClosed = conn.State != ConnectionState.Open;
                 if (wasClosed) await conn.OpenAsync();
 
                 try
                 {
-                    // Menentukan target parent_id
-                    // Folder ID 9 = "PT Indexim Coalindo" (induk seluruh kategori dokumen site)
                     int targetParent = parentId.HasValue && parentId.Value > 0 ? parentId.Value : 9;
+
+                    // Verifikasi hak akses parent folder jika bukan root utama (ID 9)
+                    if (targetParent != 9)
+                    {
+                        using var cmdParentCheck = conn.CreateCommand();
+                        cmdParentCheck.CommandText = @"
+                            SELECT path_key FROM [ONE_DB_MITRA].dbo.tbl_m_dokumen_folder 
+                            WHERE folder_id = @pid AND is_deleted = 0;
+                        ";
+                        var pPid = cmdParentCheck.CreateParameter();
+                        pPid.ParameterName = "@pid";
+                        pPid.Value = targetParent;
+                        cmdParentCheck.Parameters.Add(pPid);
+
+                        var parentPath = (await cmdParentCheck.ExecuteScalarAsync())?.ToString() ?? "";
+                        if (!IsFolderAllowed(parentPath, scope.RoleIds, roleRules, scope.IsOwnerNoDepartment))
+                        {
+                            return StatusCode(StatusCodes.Status403Forbidden, new
+                            {
+                                status = 403,
+                                success = false,
+                                message = "Anda tidak memiliki hak akses untuk membuka folder ini sesuai pengaturan One Evolution."
+                            });
+                        }
+                    }
 
                     using var cmd = conn.CreateCommand();
                     cmd.CommandText = @"
@@ -195,6 +537,14 @@ namespace Indexsafe.Api.Controllers
                     using var reader = await cmd.ExecuteReaderAsync();
                     while (await reader.ReadAsync())
                     {
+                        var folderPath = reader["path_key"]?.ToString() ?? "";
+
+                        // Filter hak akses sesuai One EV
+                        if (!IsFolderAllowed(folderPath, scope.RoleIds, roleRules, scope.IsOwnerNoDepartment))
+                        {
+                            continue;
+                        }
+
                         var folderId = Convert.ToInt32(reader["folder_id"]);
                         var color = reader["folder_color"]?.ToString();
                         if (string.IsNullOrWhiteSpace(color)) color = "#0284C7";
@@ -204,7 +554,7 @@ namespace Indexsafe.Api.Controllers
                             id = folderId,
                             parentId = reader["parent_folder_id"] != DBNull.Value ? Convert.ToInt32(reader["parent_folder_id"]) : (int?)null,
                             name = reader["nama_folder"]?.ToString() ?? "Folder",
-                            path = reader["path_key"]?.ToString() ?? "",
+                            path = folderPath,
                             color = color,
                             isBold = reader["is_bold"] != DBNull.Value && Convert.ToBoolean(reader["is_bold"]),
                             subfolderCount = Convert.ToInt32(reader["subfolder_count"]),
@@ -220,6 +570,12 @@ namespace Indexsafe.Api.Controllers
                         status = 200,
                         success = true,
                         parentFolderId = targetParent,
+                        userScope = new
+                        {
+                            username = scope.Username,
+                            roleName = scope.RoleName,
+                            isOwner = scope.IsOwner
+                        },
                         data = folders
                     });
                 }
@@ -235,14 +591,15 @@ namespace Indexsafe.Api.Controllers
         }
 
         /// <summary>
-        /// Mengambil daftar file dokumen dalam satu folder secara on-demand.
+        /// Mengambil daftar file dokumen dalam folder terpilih (difilter 100% sesuai hak akses One EV).
         /// </summary>
         [HttpGet("files")]
         [AllowAnonymous]
         public async Task<IActionResult> GetFiles(
             [FromQuery] int folderId,
             [FromQuery] int page = 1,
-            [FromQuery] int pageSize = 100)
+            [FromQuery] int pageSize = 100,
+            [FromQuery] string? nik = null)
         {
             try
             {
@@ -251,25 +608,47 @@ namespace Indexsafe.Api.Controllers
                     return BadRequest(new { status = 400, success = false, message = "folderId wajib diisi" });
                 }
 
+                var scope = await ResolveUserDocScopeAsync(nik);
+                var roleRules = await LoadRoleRulesByPathAsync(scope.PerusahaanId);
+                var blockedFiles = await LoadBlockedFileIdsAsync(scope.RoleIds, scope.IsOwnerNoDepartment);
+
                 var conn = _context.Database.GetDbConnection();
                 bool wasClosed = conn.State != ConnectionState.Open;
                 if (wasClosed) await conn.OpenAsync();
 
                 try
                 {
+                    // 1. Verifikasi hak akses folder
+                    using var cmdFolderCheck = conn.CreateCommand();
+                    cmdFolderCheck.CommandText = @"
+                        SELECT path_key FROM [ONE_DB_MITRA].dbo.tbl_m_dokumen_folder 
+                        WHERE folder_id = @fid AND is_deleted = 0;
+                    ";
+                    var pFid = cmdFolderCheck.CreateParameter();
+                    pFid.ParameterName = "@fid";
+                    pFid.Value = folderId;
+                    cmdFolderCheck.Parameters.Add(pFid);
+
+                    var folderPath = (await cmdFolderCheck.ExecuteScalarAsync())?.ToString() ?? "";
+                    if (!IsFolderAllowed(folderPath, scope.RoleIds, roleRules, scope.IsOwnerNoDepartment))
+                    {
+                        return StatusCode(StatusCodes.Status403Forbidden, new
+                        {
+                            status = 403,
+                            success = false,
+                            message = "Anda tidak memiliki izin akses untuk melihat file dalam folder ini sesuai hak akses One Evolution."
+                        });
+                    }
+
+                    // 2. Query file dokumen dalam folder
                     using var cmd = conn.CreateCommand();
                     cmd.CommandText = @"
-                        SELECT COUNT(*) 
-                        FROM [ONE_DB_MITRA].dbo.tbl_t_dokumen_file 
-                        WHERE folder_id = @folderId AND is_deleted = 0;
-
                         SELECT 
                             file_id, folder_id, nama_dokumen, nama_file_stored, file_path, content_type, size_bytes,
                             is_read_only, is_bold, expired_at, created_at, created_by
                         FROM [ONE_DB_MITRA].dbo.tbl_t_dokumen_file
                         WHERE folder_id = @folderId AND is_deleted = 0
-                        ORDER BY nama_dokumen ASC
-                        OFFSET @offset ROWS FETCH NEXT @pageSize ROWS ONLY;
+                        ORDER BY nama_dokumen ASC;
                     ";
 
                     var pFolder = cmd.CreateParameter();
@@ -277,56 +656,43 @@ namespace Indexsafe.Api.Controllers
                     pFolder.Value = folderId;
                     cmd.Parameters.Add(pFolder);
 
-                    int offset = Math.Max(0, (page - 1) * pageSize);
-                    var pOffset = cmd.CreateParameter();
-                    pOffset.ParameterName = "@offset";
-                    pOffset.Value = offset;
-                    cmd.Parameters.Add(pOffset);
-
-                    var pSize = cmd.CreateParameter();
-                    pSize.ParameterName = "@pageSize";
-                    pSize.Value = pageSize;
-                    cmd.Parameters.Add(pSize);
-
-                    int total = 0;
-                    var files = new List<object>();
+                    var allAllowedFiles = new List<object>();
 
                     using var reader = await cmd.ExecuteReaderAsync();
-                    if (await reader.ReadAsync())
+                    while (await reader.ReadAsync())
                     {
-                        total = Convert.ToInt32(reader[0]);
-                    }
+                        int fId = Convert.ToInt32(reader["file_id"]);
+                        if (blockedFiles.Contains(fId)) continue; // Filter role exclude file
 
-                    if (await reader.NextResultAsync())
-                    {
-                        while (await reader.ReadAsync())
+                        var filePath = reader["file_path"]?.ToString() ?? "";
+                        var docName = reader["nama_dokumen"]?.ToString() ?? "";
+                        var size = reader["size_bytes"] != DBNull.Value ? Convert.ToInt64(reader["size_bytes"]) : 0;
+                        var ext = Path.GetExtension(docName).TrimStart('.').ToLower();
+                        if (string.IsNullOrEmpty(ext)) ext = Path.GetExtension(filePath).TrimStart('.').ToLower();
+                        if (string.IsNullOrEmpty(ext)) ext = "pdf";
+
+                        allAllowedFiles.Add(new
                         {
-                            var filePath = reader["file_path"]?.ToString() ?? "";
-                            var docName = reader["nama_dokumen"]?.ToString() ?? "";
-                            var size = reader["size_bytes"] != DBNull.Value ? Convert.ToInt64(reader["size_bytes"]) : 0;
-                            var ext = Path.GetExtension(docName).TrimStart('.').ToLower();
-                            if (string.IsNullOrEmpty(ext)) ext = Path.GetExtension(filePath).TrimStart('.').ToLower();
-                            if (string.IsNullOrEmpty(ext)) ext = "pdf";
-
-                            files.Add(new
-                            {
-                                id = Convert.ToInt32(reader["file_id"]),
-                                folderId = Convert.ToInt32(reader["folder_id"]),
-                                title = docName,
-                                fileName = reader["nama_file_stored"]?.ToString() ?? docName,
-                                filePath = filePath,
-                                fileUrl = BuildDownloadUrl(filePath),
-                                fileType = ext,
-                                fileSize = size,
-                                formattedSize = FormatStorage(size),
-                                isReadOnly = reader["is_read_only"] != DBNull.Value && Convert.ToBoolean(reader["is_read_only"]),
-                                isBold = reader["is_bold"] != DBNull.Value && Convert.ToBoolean(reader["is_bold"]),
-                                expiredAt = reader["expired_at"] != DBNull.Value ? Convert.ToDateTime(reader["expired_at"]).ToString("yyyy-MM-dd") : null,
-                                createdAt = reader["created_at"] != DBNull.Value ? Convert.ToDateTime(reader["created_at"]).ToString("yyyy-MM-dd HH:mm") : null,
-                                createdBy = reader["created_by"]?.ToString() ?? "-"
-                            });
-                        }
+                            id = fId,
+                            folderId = Convert.ToInt32(reader["folder_id"]),
+                            title = docName,
+                            fileName = reader["nama_file_stored"]?.ToString() ?? docName,
+                            filePath = filePath,
+                            fileUrl = BuildDownloadUrl(filePath),
+                            fileType = ext,
+                            fileSize = size,
+                            formattedSize = FormatStorage(size),
+                            isReadOnly = reader["is_read_only"] != DBNull.Value && Convert.ToBoolean(reader["is_read_only"]),
+                            isBold = reader["is_bold"] != DBNull.Value && Convert.ToBoolean(reader["is_bold"]),
+                            expiredAt = reader["expired_at"] != DBNull.Value ? Convert.ToDateTime(reader["expired_at"]).ToString("yyyy-MM-dd") : null,
+                            createdAt = reader["created_at"] != DBNull.Value ? Convert.ToDateTime(reader["created_at"]).ToString("yyyy-MM-dd HH:mm") : null,
+                            createdBy = reader["created_by"]?.ToString() ?? "-"
+                        });
                     }
+
+                    int total = allAllowedFiles.Count;
+                    int skip = Math.Max(0, (page - 1) * pageSize);
+                    var pagedFiles = allAllowedFiles.Skip(skip).Take(pageSize).ToList();
 
                     return Ok(new
                     {
@@ -336,7 +702,7 @@ namespace Indexsafe.Api.Controllers
                         total = total,
                         page = page,
                         pageSize = pageSize,
-                        data = files
+                        data = pagedFiles
                     });
                 }
                 finally
@@ -351,11 +717,11 @@ namespace Indexsafe.Api.Controllers
         }
 
         /// <summary>
-        /// Pencarian cepat (instant search) pada seluruh koleksi 4.100+ dokumen ONE_DB_MITRA.
+        /// Pencarian cepat (instant search) pada koleksi dokumen dengan proteksi hak akses One EV.
         /// </summary>
         [HttpGet("search")]
         [AllowAnonymous]
-        public async Task<IActionResult> SearchDocuments([FromQuery] string q, [FromQuery] int limit = 40)
+        public async Task<IActionResult> SearchDocuments([FromQuery] string q, [FromQuery] int limit = 40, [FromQuery] string? nik = null)
         {
             try
             {
@@ -363,6 +729,10 @@ namespace Indexsafe.Api.Controllers
                 {
                     return Ok(new { status = 200, success = true, data = new List<object>() });
                 }
+
+                var scope = await ResolveUserDocScopeAsync(nik);
+                var roleRules = await LoadRoleRulesByPathAsync(scope.PerusahaanId);
+                var blockedFiles = await LoadBlockedFileIdsAsync(scope.RoleIds, scope.IsOwnerNoDepartment);
 
                 var conn = _context.Database.GetDbConnection();
                 bool wasClosed = conn.State != ConnectionState.Open;
@@ -390,13 +760,19 @@ namespace Indexsafe.Api.Controllers
 
                     var pLimit = cmd.CreateParameter();
                     pLimit.ParameterName = "@limit";
-                    pLimit.Value = Math.Clamp(limit, 1, 100);
+                    pLimit.Value = Math.Clamp(limit * 3, 30, 200); // Ambil lebih banyak untuk kompensasi filter role
                     cmd.Parameters.Add(pLimit);
 
                     var results = new List<object>();
                     using var reader = await cmd.ExecuteReaderAsync();
                     while (await reader.ReadAsync())
                     {
+                        int fId = Convert.ToInt32(reader["file_id"]);
+                        if (blockedFiles.Contains(fId)) continue;
+
+                        var folderPath = reader["path_key"]?.ToString() ?? "";
+                        if (!IsFolderAllowed(folderPath, scope.RoleIds, roleRules, scope.IsOwnerNoDepartment)) continue;
+
                         var filePath = reader["file_path"]?.ToString() ?? "";
                         var docName = reader["nama_dokumen"]?.ToString() ?? "";
                         var size = reader["size_bytes"] != DBNull.Value ? Convert.ToInt64(reader["size_bytes"]) : 0;
@@ -406,10 +782,10 @@ namespace Indexsafe.Api.Controllers
 
                         results.Add(new
                         {
-                            id = Convert.ToInt32(reader["file_id"]),
+                            id = fId,
                             folderId = reader["folder_id"] != DBNull.Value ? Convert.ToInt32(reader["folder_id"]) : (int?)null,
                             folderName = reader["nama_folder"]?.ToString() ?? "",
-                            folderPath = reader["path_key"]?.ToString() ?? "",
+                            folderPath = folderPath,
                             title = docName,
                             fileName = reader["nama_file_stored"]?.ToString() ?? docName,
                             filePath = filePath,
@@ -421,6 +797,8 @@ namespace Indexsafe.Api.Controllers
                             createdAt = reader["created_at"] != DBNull.Value ? Convert.ToDateTime(reader["created_at"]).ToString("yyyy-MM-dd HH:mm") : null,
                             createdBy = reader["created_by"]?.ToString() ?? "-"
                         });
+
+                        if (results.Count >= limit) break;
                     }
 
                     return Ok(new
@@ -519,14 +897,29 @@ namespace Indexsafe.Api.Controllers
         }
 
         /// <summary>
-        /// Download / streaming file dokumen on-demand.
+        /// Download / streaming file dokumen on-demand dengan proteksi hak akses One EV.
         /// </summary>
         [HttpGet("download/{fileId}")]
         [AllowAnonymous]
-        public async Task<IActionResult> DownloadFile(int fileId)
+        public async Task<IActionResult> DownloadFile(int fileId, [FromQuery] string? nik = null)
         {
             try
             {
+                var scope = await ResolveUserDocScopeAsync(nik);
+                var roleRules = await LoadRoleRulesByPathAsync(scope.PerusahaanId);
+                var blockedFiles = await LoadBlockedFileIdsAsync(scope.RoleIds, scope.IsOwnerNoDepartment);
+
+                // Cek apakah file ini di-exclude untuk role user
+                if (blockedFiles.Contains(fileId))
+                {
+                    return StatusCode(StatusCodes.Status403Forbidden, new
+                    {
+                        status = 403,
+                        success = false,
+                        message = "Anda tidak memiliki izin akses untuk mengunduh dokumen ini sesuai pengaturan One Evolution."
+                    });
+                }
+
                 var conn = _context.Database.GetDbConnection();
                 bool wasClosed = conn.State != ConnectionState.Open;
                 if (wasClosed) await conn.OpenAsync();
@@ -534,14 +927,16 @@ namespace Indexsafe.Api.Controllers
                 string filePath = "";
                 string docName = "";
                 string contentType = "application/pdf";
+                string folderPath = "";
 
                 try
                 {
                     using var cmd = conn.CreateCommand();
                     cmd.CommandText = @"
-                        SELECT file_id, nama_dokumen, file_path, content_type 
-                        FROM [ONE_DB_MITRA].dbo.tbl_t_dokumen_file 
-                        WHERE file_id = @id AND is_deleted = 0;
+                        SELECT f.file_id, f.nama_dokumen, f.file_path, f.content_type, fo.path_key
+                        FROM [ONE_DB_MITRA].dbo.tbl_t_dokumen_file f
+                        LEFT JOIN [ONE_DB_MITRA].dbo.tbl_m_dokumen_folder fo ON f.folder_id = fo.folder_id
+                        WHERE f.file_id = @id AND f.is_deleted = 0;
                     ";
                     var p = cmd.CreateParameter();
                     p.ParameterName = "@id";
@@ -554,6 +949,7 @@ namespace Indexsafe.Api.Controllers
                         docName = reader["nama_dokumen"]?.ToString() ?? "dokumen.pdf";
                         filePath = reader["file_path"]?.ToString() ?? "";
                         contentType = reader["content_type"]?.ToString() ?? "application/pdf";
+                        folderPath = reader["path_key"]?.ToString() ?? "";
                     }
                     else
                     {
@@ -563,6 +959,17 @@ namespace Indexsafe.Api.Controllers
                 finally
                 {
                     if (wasClosed) await conn.CloseAsync();
+                }
+
+                // Cek izin folder
+                if (!IsFolderAllowed(folderPath, scope.RoleIds, roleRules, scope.IsOwnerNoDepartment))
+                {
+                    return StatusCode(StatusCodes.Status403Forbidden, new
+                    {
+                        status = 403,
+                        success = false,
+                        message = "Folder dokumen ini dibatasi dan tidak dapat diakses oleh akun Anda."
+                    });
                 }
 
                 // 1. Cek apakah file ada di storage disk lokal
@@ -593,7 +1000,7 @@ namespace Indexsafe.Api.Controllers
                         }
                     }
                 }
-                catch (Exception downloadEx)
+                catch
                 {
                     // Fallback redirect jika download gagal
                     return Redirect(remoteUrl);

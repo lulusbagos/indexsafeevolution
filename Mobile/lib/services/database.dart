@@ -154,7 +154,13 @@ class DatabaseService {
       'p2h_trans',
       'safety_trans'
     ];
-    final ensureCols = ['nik', 'nama', 'nik_pja', 'nik_pic', 'category', 'area_name', 'location_name', 'lampiran_json'];
+    final ensureCols = [
+      'nik', 'nama', 'nik_pja', 'nik_pic', 'category', 'area_name', 'location_name', 'lampiran_json',
+      'tanggal', 'waktu', 'detil_lokasi', 'catatan', 'date', 'time', 'location_detail', 'remark',
+      'jenis_inspeksi', 'area', 'lokasi', 'pja', 'departemen_pja', 'pja_id', 'employee_id', 'payload_json',
+      'title', 'image', 'video',
+      'q1_1', 'q1_2', 'q1_3', 'q2_1', 'q2_2', 'q2_3', 'q3_1', 'q3_2', 'q3_3', 'q4_1', 'q4_2', 'q4_3', 'q5_1', 'q5_2', 'q5_3'
+    ];
     for (final tbl in ensureTables) {
       for (final colName in ensureCols) {
         try {
@@ -197,7 +203,7 @@ class DatabaseService {
 
 
 
-      version: 3,
+      version: 4,
 
 
 
@@ -8946,12 +8952,17 @@ class DatabaseService {
   /// Mengambil daftar nama kolom yang ada di tabel SQLite lokal (case-insensitive cache).
   Future<Set<String>> getTableColumns(String table, {bool refresh = false}) async {
     final key = table.toLowerCase().trim();
-    if (!refresh && _tableColumnsCache.containsKey(key)) {
+    if (!refresh && _tableColumnsCache.containsKey(key) && _tableColumnsCache[key]!.isNotEmpty) {
       return _tableColumnsCache[key]!;
     }
     try {
       final db = await database;
-      final pragma = await db.rawQuery('PRAGMA table_info("$table");');
+      List<Map<String, Object?>> pragma;
+      try {
+        pragma = await db.rawQuery('PRAGMA table_info($table);');
+      } catch (_) {
+        pragma = await db.rawQuery('PRAGMA table_info("$table");');
+      }
       final cols = <String>{};
       for (final row in pragma) {
         final colName = row['name']?.toString().toLowerCase().trim();
@@ -8959,7 +8970,21 @@ class DatabaseService {
           cols.add(colName);
         }
       }
-      _tableColumnsCache[key] = cols;
+      // Jika pragma kosong, coba skema via SELECT LIMIT 0
+      if (cols.isEmpty) {
+        try {
+          final sample = await db.rawQuery('SELECT * FROM $table LIMIT 0;');
+          if (sample.isNotEmpty) {
+            for (final k in sample.first.keys) {
+              final colLower = k.toLowerCase().trim();
+              if (colLower.isNotEmpty) cols.add(colLower);
+            }
+          }
+        } catch (_) {}
+      }
+      if (cols.isNotEmpty) {
+        _tableColumnsCache[key] = cols;
+      }
       return cols;
     } catch (e) {
       debugPrint('Error getTableColumns for $table: $e');
@@ -9000,6 +9025,9 @@ class DatabaseService {
             existing.add(colLower);
           }
         }
+      }
+      if (existing.isNotEmpty) {
+        _tableColumnsCache[table.toLowerCase().trim()] = existing;
       }
     } catch (e) {
       debugPrint('Error ensureColumnsExist for $table: $e');
@@ -9042,6 +9070,19 @@ class DatabaseService {
           conflictAlgorithm: ConflictAlgorithm.replace,
         );
       } catch (e2) {
+        final errStr = e2.toString();
+        // Fallback cerdas: Jika masih ada error missing column, buang kolom bermasalah tersebut
+        if (errStr.contains('no column named') || errStr.contains('has no column named')) {
+          final m = RegExp(r'no column named\s+["`\[]?([a-zA-Z0-9_]+)["`\]]?', caseSensitive: false).firstMatch(errStr);
+          if (m != null) {
+            final badCol = m.group(1)?.toLowerCase().trim();
+            final safeVals3 = Map<String, dynamic>.from(vals);
+            safeVals3.removeWhere((k, _) => k.toLowerCase().trim() == badCol);
+            try {
+              return await db.insert(tblStr, safeVals3, conflictAlgorithm: ConflictAlgorithm.replace);
+            } catch (_) {}
+          }
+        }
         debugPrint('Fatal insert error on $table: $e2');
         return 0;
       }
@@ -9070,6 +9111,18 @@ class DatabaseService {
         }
         return await db.update(tblStr, safeVals, where: 'id=?', whereArgs: [id]);
       } catch (e2) {
+        final errStr = e2.toString();
+        if (errStr.contains('no column named') || errStr.contains('has no column named')) {
+          final m = RegExp(r'no column named\s+["`\[]?([a-zA-Z0-9_]+)["`\]]?', caseSensitive: false).firstMatch(errStr);
+          if (m != null) {
+            final badCol = m.group(1)?.toLowerCase().trim();
+            final safeVals3 = Map<String, dynamic>.from(vals);
+            safeVals3.removeWhere((k, _) => k.toLowerCase().trim() == badCol);
+            try {
+              return await db.update(tblStr, safeVals3, where: 'id=?', whereArgs: [id]);
+            } catch (_) {}
+          }
+        }
         debugPrint('Fatal update error on $table: $e2');
         return 0;
       }

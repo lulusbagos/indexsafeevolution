@@ -36,6 +36,8 @@ class _DocumentManagementPageState extends State<DocumentManagementPage> {
 
   // Current folder content
   bool _isLoading = true;
+  bool _isAccessDenied = false;
+  String _accessDeniedMsg = '';
   List<DocumentFolderModel> _currentFolders = [];
   List<DocumentItemModel> _currentFiles = [];
   Map<String, dynamic>? _summary;
@@ -75,6 +77,8 @@ class _DocumentManagementPageState extends State<DocumentManagementPage> {
   Future<void> _loadFolderContent(int folderId) async {
     setState(() {
       _isLoading = true;
+      _isAccessDenied = false;
+      _accessDeniedMsg = '';
     });
 
     try {
@@ -88,12 +92,19 @@ class _DocumentManagementPageState extends State<DocumentManagementPage> {
           _currentFolders = results[0] as List<DocumentFolderModel>;
           _currentFiles = results[1] as List<DocumentItemModel>;
           _isLoading = false;
+          _isAccessDenied = false;
         });
       }
     } catch (e) {
       if (mounted) {
         setState(() {
           _isLoading = false;
+          if (e is DocumentAccessDeniedException) {
+            _isAccessDenied = true;
+            _accessDeniedMsg = e.message;
+            _currentFolders = [];
+            _currentFiles = [];
+          }
         });
       }
     }
@@ -388,6 +399,8 @@ class _DocumentManagementPageState extends State<DocumentManagementPage> {
               // 4. Folder Content Area (Folders & Files)
               if (_isLoading)
                 _buildLoadingState()
+              else if (_isAccessDenied)
+                _buildAccessDeniedState()
               else
                 _buildFolderAndFilesView(),
             ],
@@ -511,6 +524,143 @@ class _DocumentManagementPageState extends State<DocumentManagementPage> {
               ],
             ),
           ),
+          if (_service.lastUserScope != null) ...[
+            const SizedBox(height: 10),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.black.withValues(alpha: 0.25),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.security_rounded, size: 13.5, color: Color(0xFF38BDF8)),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      'Hak Akses: ${_service.lastUserScope!['roleName'] ?? 'Pengguna'} • ${_service.lastUserScope!['companyName'] ?? 'PT Indexim Coalindo'}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF0284C7),
+                      borderRadius: BorderRadius.circular(5),
+                    ),
+                    child: const Text(
+                      'ONE EV',
+                      style: TextStyle(fontSize: 9, fontWeight: FontWeight.w900, color: Colors.white),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAccessDeniedState() {
+    final userScope = _service.lastUserScope;
+    final roleName = userScope?['roleName'] ?? 'Pengguna';
+    final companyName = userScope?['companyName'] ?? 'PT Indexim Coalindo';
+
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 36, horizontal: 20),
+      margin: const EdgeInsets.only(top: 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFFDE68A)),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFFD97706).withValues(alpha: 0.06),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          Container(
+            width: 56,
+            height: 56,
+            decoration: const BoxDecoration(
+              color: Color(0xFFFEF3C7),
+              shape: BoxShape.circle,
+            ),
+            child: const Center(
+              child: Icon(Icons.lock_rounded, color: Color(0xFFD97706), size: 28),
+            ),
+          ),
+          const SizedBox(height: 14),
+          const Text(
+            'Akses Folder Dibatasi',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w800,
+              color: Color(0xFF1E293B),
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            _accessDeniedMsg.isNotEmpty
+                ? _accessDeniedMsg
+                : 'Folder ini dibatasi dan hanya dapat dilihat oleh peran/departemen tertentu sesuai pengaturan hak akses One Evolution.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.grey.shade600,
+              height: 1.4,
+            ),
+          ),
+          const SizedBox(height: 14),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.person_pin_rounded, size: 16, color: Color(0xFF0284C7)),
+                const SizedBox(width: 6),
+                Text(
+                  'Akun: $roleName • $companyName',
+                  style: const TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF334155),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 18),
+          if (_folderStack.length > 1)
+            ElevatedButton.icon(
+              onPressed: () => _navigateUpToFolder(_folderStack.length - 2),
+              icon: const Icon(Icons.arrow_back_rounded, size: 16),
+              label: const Text('Kembali ke Folder Sebelumnya'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF0284C7),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                elevation: 0,
+              ),
+            ),
         ],
       ),
     );

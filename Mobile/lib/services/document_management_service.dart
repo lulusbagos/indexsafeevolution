@@ -8,6 +8,13 @@ import '../models/document_model.dart';
 import '../services/api.dart';
 import '../services/preference.dart';
 
+class DocumentAccessDeniedException implements Exception {
+  final String message;
+  DocumentAccessDeniedException([this.message = 'Akses dibatasi sesuai hak akses akun Anda di One Evolution.']);
+  @override
+  String toString() => message;
+}
+
 class DocumentManagementService {
   static final DocumentManagementService instance = DocumentManagementService._();
   DocumentManagementService._();
@@ -19,9 +26,19 @@ class DocumentManagementService {
   ));
 
   String? _cacheDir;
+  Map<String, dynamic>? _lastUserScope;
+  Map<String, dynamic>? get lastUserScope => _lastUserScope;
 
   List<String> _buildCandidateUrls(String path) {
-    final cleanPath = path.startsWith('/') ? path : '/$path';
+    final profile = PreferenceService.getProfile();
+    final userNik = profile?.noNik ?? PreferenceService.getOfflineNik() ?? '24051940986';
+
+    String cleanPath = path.startsWith('/') ? path : '/$path';
+    if (!cleanPath.contains('nik=')) {
+      final sep = cleanPath.contains('?') ? '&' : '?';
+      cleanPath = '$cleanPath${sep}nik=${Uri.encodeComponent(userNik)}';
+    }
+
     final activeBase = _api.baseUrl;
     final List<String> list = [];
 
@@ -40,14 +57,25 @@ class DocumentManagementService {
 
   Map<String, String> _buildHeaders() {
     final profile = PreferenceService.getProfile();
-    final userNik = profile?.noNik ?? '24051940986';
+    final userNik = profile?.noNik ?? PreferenceService.getOfflineNik() ?? '24051940986';
     final userName = profile?.namaLengkap ?? 'Karyawan';
-    return {
+    final token = _api.getToken;
+
+    final headers = <String, String>{
       'Accept': 'application/json',
       'Content-Type': 'application/json',
       'X-User-Nik': userNik,
       'X-User-Name': userName,
     };
+
+    if (profile?.companyId != null) {
+      headers['X-Company-Id'] = profile!.companyId.toString();
+    }
+    if (token.isNotEmpty && !token.startsWith('offline_token_')) {
+      headers['Authorization'] = 'Bearer $token';
+    }
+
+    return headers;
   }
 
   Future<dynamic> _fetchFromCandidates(String relativePath) async {
@@ -61,10 +89,21 @@ class DocumentManagementService {
           options: Options(headers: headers, responseType: ResponseType.json),
         );
         if (res.statusCode == 200 && res.data != null) {
+          if (res.data is Map && res.data['userScope'] != null) {
+            _lastUserScope = Map<String, dynamic>.from(res.data['userScope'] as Map);
+          }
           return res.data;
         }
+      } on DioException catch (de) {
+        if (de.response?.statusCode == 403) {
+          final msg = de.response?.data is Map && de.response?.data['message'] != null
+              ? de.response!.data['message'].toString()
+              : 'Akses dibatasi sesuai hak akses akun Anda di One Evolution.';
+          throw DocumentAccessDeniedException(msg);
+        }
+        continue;
       } catch (e) {
-        // Coba kandidat berikutnya
+        if (e is DocumentAccessDeniedException) rethrow;
         continue;
       }
     }
