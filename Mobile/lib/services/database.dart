@@ -9012,18 +9012,32 @@ class DatabaseService {
           conflictAlgorithm: ConflictAlgorithm.replace,
         );
       } catch (e2) {
-        final errStr = e2.toString();
-        // Fallback cerdas: Jika masih ada error missing column, buang kolom bermasalah tersebut
-        if (errStr.contains('no column named') || errStr.contains('has no column named')) {
+        var errStr = e2.toString();
+        // Multi-level Self Healing: tangani semua missing column secara rekursif hingga berhasil
+        var currentVals = Map<String, dynamic>.from(vals);
+        for (int i = 0; i < 20; i++) {
+          if (!errStr.contains('no column named') && !errStr.contains('has no column named')) break;
           final m = RegExp(r'no column named\s+["`\[]?([a-zA-Z0-9_]+)["`\]]?', caseSensitive: false).firstMatch(errStr);
           if (m != null) {
-            final badCol = m.group(1)?.toLowerCase().trim();
-            final safeVals3 = Map<String, dynamic>.from(vals);
-            safeVals3.removeWhere((k, _) => k.toLowerCase().trim() == badCol);
-            try {
-              return await db.insert(tblStr, safeVals3, conflictAlgorithm: ConflictAlgorithm.replace);
-            } catch (_) {}
+            final badCol = m.group(1)?.toLowerCase().trim() ?? '';
+            if (badCol.isNotEmpty) {
+              // 1. Coba tambah kolom ke SQLite
+              try {
+                await db.execute('ALTER TABLE "$tblStr" ADD COLUMN "$badCol" TEXT;');
+                _tableColumnsCache.remove(tblStr.toLowerCase().trim());
+                return await db.insert(tblStr, currentVals, conflictAlgorithm: ConflictAlgorithm.replace);
+              } catch (_) {}
+              // 2. Jika gagal tambah kolom, buang kolom tersebut dan coba insert kembali
+              currentVals.removeWhere((k, _) => k.toLowerCase().trim() == badCol);
+              try {
+                return await db.insert(tblStr, currentVals, conflictAlgorithm: ConflictAlgorithm.replace);
+              } catch (retryErr) {
+                errStr = retryErr.toString();
+                continue;
+              }
+            }
           }
+          break;
         }
         debugPrint('Fatal insert error on $table: $e2');
         return 0;
@@ -9053,17 +9067,29 @@ class DatabaseService {
         }
         return await db.update(tblStr, safeVals, where: 'id=?', whereArgs: [id]);
       } catch (e2) {
-        final errStr = e2.toString();
-        if (errStr.contains('no column named') || errStr.contains('has no column named')) {
+        var errStr = e2.toString();
+        var currentVals = Map<String, dynamic>.from(vals);
+        for (int i = 0; i < 20; i++) {
+          if (!errStr.contains('no column named') && !errStr.contains('has no column named')) break;
           final m = RegExp(r'no column named\s+["`\[]?([a-zA-Z0-9_]+)["`\]]?', caseSensitive: false).firstMatch(errStr);
           if (m != null) {
-            final badCol = m.group(1)?.toLowerCase().trim();
-            final safeVals3 = Map<String, dynamic>.from(vals);
-            safeVals3.removeWhere((k, _) => k.toLowerCase().trim() == badCol);
-            try {
-              return await db.update(tblStr, safeVals3, where: 'id=?', whereArgs: [id]);
-            } catch (_) {}
+            final badCol = m.group(1)?.toLowerCase().trim() ?? '';
+            if (badCol.isNotEmpty) {
+              try {
+                await db.execute('ALTER TABLE "$tblStr" ADD COLUMN "$badCol" TEXT;');
+                _tableColumnsCache.remove(tblStr.toLowerCase().trim());
+                return await db.update(tblStr, currentVals, where: 'id=?', whereArgs: [id]);
+              } catch (_) {}
+              currentVals.removeWhere((k, _) => k.toLowerCase().trim() == badCol);
+              try {
+                return await db.update(tblStr, currentVals, where: 'id=?', whereArgs: [id]);
+              } catch (retryErr) {
+                errStr = retryErr.toString();
+                continue;
+              }
+            }
           }
+          break;
         }
         debugPrint('Fatal update error on $table: $e2');
         return 0;
