@@ -120,21 +120,36 @@ class _SplashPageState extends State<SplashPage> with TickerProviderStateMixin {
           final String releaseNotes =
               versionConfig['release_notes']?.toString() ?? '';
 
-          final bool isOutdated = _isVersionLower(currentVer, minVer) ||
+          final bool isMandatory = _isVersionLower(currentVer, minVer) ||
               (currentBuild > 0 && minBuild > 0 && currentBuild < minBuild) ||
-              _isVersionLower(currentVer, latestVer) ||
-              (forceUpdate && currentBuild > 0 && latestBuild > 0 && currentBuild < latestBuild);
+              (forceUpdate && (_isVersionLower(currentVer, latestVer) || (currentBuild > 0 && latestBuild > 0 && currentBuild < latestBuild)));
 
-          if (isOutdated && mounted) {
+          final bool isOptional = !isMandatory && (
+              _isVersionLower(currentVer, latestVer) ||
+              (currentBuild > 0 && latestBuild > 0 && currentBuild < latestBuild)
+          );
+
+          if (isMandatory && mounted) {
             await _showForceUpdateDialog(
               currentVersion: currentVer,
-              latestVersion: latestVer,
+              targetVersion: minVer.isNotEmpty ? minVer : latestVer,
               playStoreUrl: playStoreUrl,
               title: dialogTitle,
               message: dialogMsg,
               releaseNotes: releaseNotes,
+              isMandatory: true,
             );
             return; // Hentikan inisialisasi agar user wajib update ke Play Store
+          } else if (isOptional && mounted) {
+            await _showForceUpdateDialog(
+              currentVersion: currentVer,
+              targetVersion: latestVer,
+              playStoreUrl: playStoreUrl,
+              title: 'Pembaruan Tersedia',
+              message: 'Versi terbaru Indexsafe Evolution v$latestVer telah tersedia di Play Store. Anda dapat memperbarui sekarang untuk mendapatkan fitur terbaru.',
+              releaseNotes: releaseNotes,
+              isMandatory: false,
+            );
           }
         }
       } catch (err) {
@@ -321,18 +336,19 @@ class _SplashPageState extends State<SplashPage> with TickerProviderStateMixin {
 
   Future<void> _showForceUpdateDialog({
     required String currentVersion,
-    required String latestVersion,
+    required String targetVersion,
     required String playStoreUrl,
     required String title,
     required String message,
     required String releaseNotes,
+    bool isMandatory = true,
   }) async {
     await showDialog(
       context: context,
-      barrierDismissible: false,
+      barrierDismissible: !isMandatory,
       builder: (BuildContext ctx) {
         return PopScope(
-          canPop: false,
+          canPop: !isMandatory,
           child: Dialog(
             shape:
                 RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
@@ -348,8 +364,10 @@ class _SplashPageState extends State<SplashPage> with TickerProviderStateMixin {
                     height: 76,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFF2563EB), Color(0xFF0D9488)],
+                      gradient: LinearGradient(
+                        colors: isMandatory
+                            ? const [Color(0xFF2563EB), Color(0xFF0D9488)]
+                            : const [Color(0xFF0EA5E9), Color(0xFF10B981)],
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                       ),
@@ -383,16 +401,25 @@ class _SplashPageState extends State<SplashPage> with TickerProviderStateMixin {
                     padding:
                         const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFEFF6FF),
+                      color: isMandatory
+                          ? const Color(0xFFEFF6FF)
+                          : const Color(0xFFECFDF5),
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: const Color(0xFFBFDBFE)),
+                      border: Border.all(
+                          color: isMandatory
+                              ? const Color(0xFFBFDBFE)
+                              : const Color(0xFFA7F3D0)),
                     ),
                     child: Text(
-                      'Versi Anda: v$currentVersion  ➔  Wajib: v$latestVersion',
-                      style: const TextStyle(
+                      isMandatory
+                          ? 'Versi Anda: v$currentVersion  ➔  Wajib: v$targetVersion'
+                          : 'Versi Anda: v$currentVersion  ➔  Tersedia: v$targetVersion',
+                      style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
-                        color: Color(0xFF1D4ED8),
+                        color: isMandatory
+                            ? const Color(0xFF1D4ED8)
+                            : const Color(0xFF047857),
                       ),
                     ),
                   ),
@@ -464,6 +491,24 @@ class _SplashPageState extends State<SplashPage> with TickerProviderStateMixin {
                       ),
                     ),
                   ),
+                  if (!isMandatory) ...[
+                    const SizedBox(height: 10),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 42,
+                      child: TextButton(
+                        onPressed: () => Navigator.of(ctx).pop(),
+                        child: const Text(
+                          'Nanti Saja, Lanjutkan ke Aplikasi',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF64748B),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),

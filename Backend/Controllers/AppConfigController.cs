@@ -126,16 +126,16 @@ namespace Indexsafe.Api.Controllers
         {
             var latestVersion = _overrideLatestVersion 
                 ?? _configuration["AppVersionSettings:LatestVersion"] 
-                ?? "1.0.5";
+                ?? "1.0.2";
             var latestBuild = _overrideLatestBuild 
                 ?? _configuration.GetValue<int?>("AppVersionSettings:LatestBuild") 
-                ?? 105;
+                ?? 102;
             var minVersion = _overrideMinVersion 
                 ?? _configuration["AppVersionSettings:MinVersion"] 
-                ?? "1.0.5";
+                ?? "1.0.2";
             var minBuild = _overrideMinBuild 
                 ?? _configuration.GetValue<int?>("AppVersionSettings:MinBuild") 
-                ?? 105;
+                ?? 102;
             var forceUpdate = _overrideForceUpdate 
                 ?? _configuration.GetValue<bool?>("AppVersionSettings:ForceUpdate") 
                 ?? false;
