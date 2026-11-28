@@ -151,21 +151,13 @@ class DatabaseService {
 
 
       path,
-
-
-
-      version: 4,
-
-
-
+      version: 5,
       onCreate: _onCreate,
-
-
-
       onUpgrade: _onUpgrade,
-
-
-
+      onOpen: (db) async {
+        try { await _ensureInspectionTransColumns(db); } catch (_) {}
+        try { await _ensureHazardTransColumns(db); } catch (_) {}
+      },
     );
 
 
