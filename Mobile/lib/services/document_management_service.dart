@@ -25,27 +25,16 @@ class DocumentManagementService {
     final activeBase = _api.baseUrl;
     final List<String> list = [];
 
-    // Dalam mode rilis (Play Store / Production), selalu gunakan domain publik HTTPS resmi
-    if (kReleaseMode) {
-      if (activeBase.isNotEmpty && !list.contains('$activeBase$cleanPath')) {
-        list.add('$activeBase$cleanPath');
-      }
-      if (!list.contains('https://apimbs.indexim.id$cleanPath')) {
-        list.add('https://apimbs.indexim.id$cleanPath');
-      }
-      if (!list.contains('https://apimbs.idccoal.id$cleanPath')) {
-        list.add('https://apimbs.idccoal.id$cleanPath');
-      }
-      return list;
-    }
-
-    // Dalam mode Debug, dukung reverse port ADB lokal dan domain publik
-    list.add('http://127.0.0.1:7302$cleanPath');
+    // Prioritaskan selalu domain publik resmi HTTPS (apimbs.indexim.id / apimbs.idccoal.id)
     if (activeBase.isNotEmpty && !list.contains('$activeBase$cleanPath')) {
       list.add('$activeBase$cleanPath');
     }
-    list.add('https://apimbs.indexim.id$cleanPath');
-    list.add('http://10.0.2.2:7302$cleanPath');
+    if (!list.contains('https://apimbs.indexim.id$cleanPath')) {
+      list.add('https://apimbs.indexim.id$cleanPath');
+    }
+    if (!list.contains('https://apimbs.idccoal.id$cleanPath')) {
+      list.add('https://apimbs.idccoal.id$cleanPath');
+    }
     return list;
   }
 

@@ -164,10 +164,19 @@ class _EmployeeHubPageState extends State<EmployeeHubPage> {
     setState(() => _isLoading = true);
     try {
       final userNik = _nik.isNotEmpty ? _nik : PreferenceService.getProfile()?.noNik ?? '';
-      final profData = await _oneEvService.fetchProfile(nik: userNik);
-      final certs = await _oneEvService.fetchCertificates(nik: userNik);
-      final skills = await _oneEvService.fetchSkillMatrix(nik: userNik);
-      final simperData = await _oneEvService.fetchSimper(nik: userNik);
+      
+      // Ambil seluruh data secara simultan/paralel ke backend HTTPS resmi
+      final results = await Future.wait([
+        _oneEvService.fetchProfile(nik: userNik),
+        _oneEvService.fetchCertificates(nik: userNik),
+        _oneEvService.fetchSkillMatrix(nik: userNik),
+        _oneEvService.fetchSimper(nik: userNik),
+      ]);
+
+      final profData = results[0] as Map<String, dynamic>;
+      final certs = results[1] as List<Map<String, dynamic>>;
+      final skills = results[2] as List<Map<String, dynamic>>;
+      final simperData = results[3] as Map<String, dynamic>?;
 
       if (mounted) {
         setState(() {
@@ -246,6 +255,27 @@ class _EmployeeHubPageState extends State<EmployeeHubPage> {
           }
           _isLoading = false;
         });
+
+        // Sinkronkan ke profile preference lokal agar formulir offline selalu lengkap
+        try {
+          final pref = PreferenceService.getProfile() ?? ProfileModel();
+          pref.noKtp = _noKtp;
+          pref.noKk = _noKk;
+          pref.tmpLahir = _tempatLahir;
+          pref.tglLahir = _tanggalLahir;
+          pref.agama = _agama;
+          pref.statNikah = _statusNikah;
+          pref.namaIbu = _namaIbu;
+          pref.namaAyah = _namaAyah;
+          pref.noNpwp = _noNpwp;
+          pref.noBpjstk = _noBpjsTk;
+          pref.noBpjskes = _noBpjsKes;
+          pref.noBpjspensiun = _noBpjsPensiun;
+          if (_pathFoto != null && _pathFoto!.isNotEmpty) {
+            pref.foto = _pathFoto;
+          }
+          await PreferenceService.setProfile(pref);
+        } catch (_) {}
       }
     } catch (e) {
       debugPrint('[OneEv] Error loading live data: $e');
@@ -1051,6 +1081,7 @@ class _EmployeeHubPageState extends State<EmployeeHubPage> {
 
     // Master Dropdown Options & State (Live Database ONE_DB_MITRA)
     List<Map<String, dynamic>> agamaOptions = [];
+    List<Map<String, dynamic>> statusNikahOptions = [];
     List<Map<String, dynamic>> pendidikanOptions = [];
     List<Map<String, dynamic>> provinsiOptions = [];
     List<Map<String, dynamic>> kabupatenOptions = [];
@@ -1060,8 +1091,13 @@ class _EmployeeHubPageState extends State<EmployeeHubPage> {
     int? curAgamaId = _idAgama;
     String curAgamaName = _agama;
 
+    int? curStatusNikahId = _idStatusNikah;
+    String curStatusNikahName = _statusNikah;
+
     int? curPendidikanId = _idPendidikan;
     String curJenjangName = _jenjangPendidikan;
+
+    String? curGolDarah = (_golDarah != null && _golDarah!.trim().isNotEmpty) ? _golDarah!.trim().toUpperCase() : null;
 
     String? curProvinsi = _provinsi.trim().isNotEmpty ? _provinsi.trim() : null;
     String? curKabupaten = _kabupaten.trim().isNotEmpty ? _kabupaten.trim() : null;
@@ -1083,15 +1119,106 @@ class _EmployeeHubPageState extends State<EmployeeHubPage> {
 
       setModalState(() => loadingProv = true);
       try {
-        final agamas = await OneEvService.instance.fetchMasterAgama();
-        final pendidikans = await OneEvService.instance.fetchMasterPendidikan();
-        final provs = await OneEvService.instance.fetchMasterProvinsi();
+        final profileFuture = (_noKtp.isEmpty || _namaIbu.isEmpty || _tempatLahir.isEmpty)
+            ? OneEvService.instance.fetchProfile(nik: _nik.isNotEmpty ? _nik : PreferenceService.getProfile()?.noNik)
+            : Future.value(OneEvService.instance.cachedProfile ?? <String, dynamic>{});
+        final agamasFuture = OneEvService.instance.fetchMasterAgama();
+        final statusNikahsFuture = OneEvService.instance.fetchMasterStatusNikah();
+        final pendidikansFuture = OneEvService.instance.fetchMasterPendidikan();
+        final provsFuture = OneEvService.instance.fetchMasterProvinsi();
+
+        final results = await Future.wait([
+          profileFuture,
+          agamasFuture,
+          statusNikahsFuture,
+          pendidikansFuture,
+          provsFuture,
+        ]);
+
+        final prof = results[0] as Map<String, dynamic>;
+        final agamas = results[1] as List<Map<String, dynamic>>;
+        final statusNikahs = results[2] as List<Map<String, dynamic>>;
+        final pendidikans = results[3] as List<Map<String, dynamic>>;
+        final provs = results[4] as List<Map<String, dynamic>>;
 
         setModalState(() {
           agamaOptions = agamas;
+          statusNikahOptions = statusNikahs;
           pendidikanOptions = pendidikans;
           provinsiOptions = provs;
           loadingProv = false;
+
+          // Auto-sync form textfield controllers jika sebelumnya kosong
+          if (prof.isNotEmpty) {
+            if (namaCtrl.text.isEmpty && prof['nama_lengkap'] != null) namaCtrl.text = prof['nama_lengkap'].toString();
+            if (aliasCtrl.text.isEmpty && prof['nama_alias'] != null) aliasCtrl.text = prof['nama_alias'].toString();
+            if (wargaCtrl.text.isEmpty && prof['warga_negara'] != null) wargaCtrl.text = prof['warga_negara'].toString();
+            if (ktpCtrl.text.isEmpty && prof['no_ktp'] != null) ktpCtrl.text = prof['no_ktp'].toString();
+            if (kkCtrl.text.isEmpty && prof['no_kk'] != null) kkCtrl.text = prof['no_kk'].toString();
+            if (jkCtrl.text.isEmpty && prof['jenis_kelamin'] != null) jkCtrl.text = prof['jenis_kelamin'].toString();
+            if (tempatLahirCtrl.text.isEmpty && prof['tempat_lahir'] != null) tempatLahirCtrl.text = prof['tempat_lahir'].toString();
+            if (tglLahirCtrl.text.isEmpty && prof['tanggal_lahir'] != null) tglLahirCtrl.text = prof['tanggal_lahir'].toString();
+            if (nikahCtrl.text.isEmpty && prof['status_nikah'] != null) nikahCtrl.text = prof['status_nikah'].toString();
+            if (darahCtrl.text.isEmpty && prof['golongan_darah'] != null) darahCtrl.text = prof['golongan_darah'].toString();
+            if (ibuCtrl.text.isEmpty && prof['nama_ibu'] != null) ibuCtrl.text = prof['nama_ibu'].toString();
+            if (ayahCtrl.text.isEmpty && prof['nama_ayah'] != null) ayahCtrl.text = prof['nama_ayah'].toString();
+
+            if (alamatCtrl.text.isEmpty && prof['alamat'] != null) alamatCtrl.text = prof['alamat'].toString();
+            if (rtCtrl.text.isEmpty && prof['rt'] != null) rtCtrl.text = prof['rt'].toString();
+            if (rwCtrl.text.isEmpty && prof['rw'] != null) rwCtrl.text = prof['rw'].toString();
+            if (kodePosCtrl.text.isEmpty && prof['kode_pos'] != null) kodePosCtrl.text = prof['kode_pos'].toString();
+
+            if (hpCtrl.text.isEmpty && prof['hp_1'] != null) hpCtrl.text = prof['hp_1'].toString();
+            if (hp2Ctrl.text.isEmpty && prof['hp_2'] != null) hp2Ctrl.text = prof['hp_2'].toString();
+            if (emailPribadiCtrl.text.isEmpty && prof['email_pribadi'] != null) emailPribadiCtrl.text = prof['email_pribadi'].toString();
+            if (emailKantorCtrl.text.isEmpty && prof['email_kantor'] != null) emailKantorCtrl.text = prof['email_kantor'].toString();
+
+            if (kdNamaCtrl.text.isEmpty && prof['kontak_darurat_nama'] != null) kdNamaCtrl.text = prof['kontak_darurat_nama'].toString();
+            if (kdTelpCtrl.text.isEmpty && prof['kontak_darurat_telp'] != null) kdTelpCtrl.text = prof['kontak_darurat_telp'].toString();
+            if (kdTelpLainCtrl.text.isEmpty && prof['kontak_darurat_telp_lain'] != null) kdTelpLainCtrl.text = prof['kontak_darurat_telp_lain'].toString();
+            if (kdRelasiCtrl.text.isEmpty && prof['kontak_darurat_relasi'] != null) kdRelasiCtrl.text = prof['kontak_darurat_relasi'].toString();
+            if (kdKetCtrl.text.isEmpty && prof['kontak_darurat_keterangan'] != null) kdKetCtrl.text = prof['kontak_darurat_keterangan'].toString();
+
+            if (sekolahCtrl.text.isEmpty && prof['nama_sekolah'] != null) sekolahCtrl.text = prof['nama_sekolah'].toString();
+            if (fakultasCtrl.text.isEmpty && prof['fakultas'] != null) fakultasCtrl.text = prof['fakultas'].toString();
+            if (jurusanCtrl.text.isEmpty && prof['jurusan'] != null) jurusanCtrl.text = prof['jurusan'].toString();
+            if (npwpCtrl.text.isEmpty && prof['no_npwp'] != null) npwpCtrl.text = prof['no_npwp'].toString();
+            if (bpjsTkCtrl.text.isEmpty && prof['no_bpjs_tk'] != null) bpjsTkCtrl.text = prof['no_bpjs_tk'].toString();
+            if (bpjsKesCtrl.text.isEmpty && prof['no_bpjs_kes'] != null) bpjsKesCtrl.text = prof['no_bpjs_kes'].toString();
+            if (bpjsPensiunCtrl.text.isEmpty && prof['no_bpjs_pensiun'] != null) bpjsPensiunCtrl.text = prof['no_bpjs_pensiun'].toString();
+
+            if (curAgamaId == null && prof['id_agama'] != null) {
+              curAgamaId = prof['id_agama'] as int?;
+              curAgamaName = prof['agama']?.toString() ?? '';
+            }
+            if (curStatusNikahId == null && prof['id_status_nikah'] != null) {
+              curStatusNikahId = prof['id_status_nikah'] as int?;
+              curStatusNikahName = prof['status_nikah']?.toString() ?? '';
+            }
+            if (curPendidikanId == null && prof['id_pendidikan'] != null) {
+              curPendidikanId = prof['id_pendidikan'] as int?;
+              curJenjangName = prof['jenjang_pendidikan']?.toString() ?? '';
+            }
+            if (curProvinsi == null && prof['provinsi'] != null && prof['provinsi'].toString().isNotEmpty) {
+              curProvinsi = prof['provinsi'].toString();
+            }
+            if (curKabupaten == null && prof['kabupaten'] != null && prof['kabupaten'].toString().isNotEmpty) {
+              curKabupaten = prof['kabupaten'].toString();
+            }
+            if (curKecamatan == null && prof['kecamatan'] != null && prof['kecamatan'].toString().isNotEmpty) {
+              curKecamatan = prof['kecamatan'].toString();
+            }
+            if (curDesa == null && prof['desa'] != null && prof['desa'].toString().isNotEmpty) {
+              curDesa = prof['desa'].toString();
+            }
+            if (curGolDarah == null && prof['golongan_darah'] != null && prof['golongan_darah'].toString().isNotEmpty) {
+              curGolDarah = prof['golongan_darah'].toString().toUpperCase();
+            }
+
+            if (_pathFoto == null || _pathFoto!.isEmpty) {
+              _pathFoto = prof['path_foto']?.toString();
+            }
+          }
 
           // Sync Agama
           if (curAgamaId == null && curAgamaName.isNotEmpty) {
@@ -1103,6 +1230,18 @@ class _EmployeeHubPageState extends State<EmployeeHubPage> {
           }
           if (curAgamaId != null && !agamaOptions.any((a) => a['id'] == curAgamaId)) {
             agamaOptions.insert(0, {'id': curAgamaId, 'nama': curAgamaName.isNotEmpty ? curAgamaName : 'Agama $curAgamaId'});
+          }
+
+          // Sync Status Nikah
+          if (curStatusNikahId == null && curStatusNikahName.isNotEmpty) {
+            final foundS = statusNikahs.firstWhere(
+              (s) => (s['nama']?.toString().toUpperCase() ?? '') == curStatusNikahName.toUpperCase(),
+              orElse: () => {},
+            );
+            if (foundS.isNotEmpty) curStatusNikahId = foundS['id'] as int;
+          }
+          if (curStatusNikahId != null && !statusNikahOptions.any((s) => s['id'] == curStatusNikahId)) {
+            statusNikahOptions.insert(0, {'id': curStatusNikahId, 'nama': curStatusNikahName.isNotEmpty ? curStatusNikahName : 'Status $curStatusNikahId'});
           }
 
           // Sync Pendidikan
@@ -1426,11 +1565,70 @@ class _EmployeeHubPageState extends State<EmployeeHubPage> {
                                 ),
                               ),
                               const SizedBox(width: 10),
-                              Expanded(child: _buildInputField('Status Nikah', nikahCtrl, Icons.favorite_rounded)),
+                              Expanded(
+                                child: _buildDropdownField<int>(
+                                  label: 'Status Nikah',
+                                  value: curStatusNikahId,
+                                  icon: Icons.favorite_rounded,
+                                  hint: '-- Status Nikah --',
+                                  items: statusNikahOptions.map((s) {
+                                    return DropdownMenuItem<int>(
+                                      value: s['id'] as int,
+                                      child: Row(
+                                        children: [
+                                          const Icon(Icons.favorite_rounded, size: 16, color: Color(0xFF6366F1)),
+                                          const SizedBox(width: 8),
+                                          Expanded(
+                                            child: Text(
+                                              s['nama']?.toString() ?? '',
+                                              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                  }).toList(),
+                                  onChanged: (val) {
+                                    setModalState(() {
+                                      curStatusNikahId = val;
+                                      final matched = statusNikahOptions.firstWhere((s) => s['id'] == val, orElse: () => {});
+                                      curStatusNikahName = matched['nama']?.toString() ?? '';
+                                      nikahCtrl.text = curStatusNikahName;
+                                    });
+                                  },
+                                ),
+                              ),
                             ],
                           ),
                           const SizedBox(height: 12),
-                          _buildInputField('Golongan Darah (A, B, AB, O)', darahCtrl, Icons.bloodtype_rounded),
+                          _buildDropdownField<String>(
+                            label: 'Golongan Darah (A, B, AB, O)',
+                            value: (curGolDarah != null && curGolDarah!.isNotEmpty) ? curGolDarah : null,
+                            icon: Icons.bloodtype_rounded,
+                            hint: '-- Pilih Golongan Darah --',
+                            items: ['A', 'B', 'AB', 'O', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'].map((g) {
+                              return DropdownMenuItem<String>(
+                                value: g,
+                                child: Row(
+                                  children: [
+                                    const Icon(Icons.bloodtype_rounded, size: 16, color: Color(0xFFEF4444)),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      g,
+                                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            }).toList(),
+                            onChanged: (val) {
+                              setModalState(() {
+                                curGolDarah = val;
+                                darahCtrl.text = val ?? '';
+                              });
+                            },
+                          ),
                           const SizedBox(height: 12),
                           _buildInputField('Nama Ibu Kandung', ibuCtrl, Icons.person_outline_rounded),
                           const SizedBox(height: 12),
@@ -1700,8 +1898,9 @@ class _EmployeeHubPageState extends State<EmployeeHubPage> {
                                 'tanggal_lahir': tglLahirCtrl.text.trim(),
                                 'id_agama': curAgamaId,
                                 'agama': curAgamaName,
-                                'status_nikah': nikahCtrl.text.trim(),
-                                'golongan_darah': darahCtrl.text.trim(),
+                                'id_status_nikah': curStatusNikahId,
+                                'status_nikah': curStatusNikahName.isNotEmpty ? curStatusNikahName : nikahCtrl.text.trim(),
+                                'golongan_darah': curGolDarah ?? darahCtrl.text.trim(),
                                 'nama_ibu': ibuCtrl.text.trim(),
                                 'nama_ayah': ayahCtrl.text.trim(),
                                 'provinsi': curProvinsi ?? '',
@@ -1744,8 +1943,9 @@ class _EmployeeHubPageState extends State<EmployeeHubPage> {
                                   _tanggalLahir = tglLahirCtrl.text.trim();
                                   _idAgama = curAgamaId;
                                   _agama = curAgamaName;
-                                  _statusNikah = nikahCtrl.text.trim();
-                                  _golDarah = darahCtrl.text.trim();
+                                  _idStatusNikah = curStatusNikahId;
+                                  _statusNikah = curStatusNikahName.isNotEmpty ? curStatusNikahName : nikahCtrl.text.trim();
+                                  _golDarah = curGolDarah ?? darahCtrl.text.trim();
                                   _namaIbu = ibuCtrl.text.trim();
                                   _namaAyah = ayahCtrl.text.trim();
                                   _provinsi = curProvinsi ?? '';

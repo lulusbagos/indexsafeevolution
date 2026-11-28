@@ -1020,6 +1020,43 @@ namespace Indexsafe.Api.Controllers
             }
         }
 
+        [HttpGet("master/status-nikah")]
+        [AllowAnonymous]
+        public async Task<IActionResult> GetMasterStatusNikah()
+        {
+            try
+            {
+                var conn = _context.Database.GetDbConnection();
+                bool wasClosed = conn.State != ConnectionState.Open;
+                if (wasClosed) await conn.OpenAsync();
+
+                try
+                {
+                    using var cmd = conn.CreateCommand();
+                    cmd.CommandText = "SELECT id, UPPER(LTRIM(RTRIM(nama))) AS nama FROM [ONE_DB_MITRA].dbo.tbl_m_status_nikah WHERE (status_aktif IS NULL OR status_aktif = '1') ORDER BY id ASC;";
+                    using var reader = await cmd.ExecuteReaderAsync();
+                    var list = new List<object>();
+                    while (await reader.ReadAsync())
+                    {
+                        list.Add(new
+                        {
+                            id = Convert.ToInt32(reader["id"]),
+                            nama = reader["nama"]?.ToString() ?? ""
+                        });
+                    }
+                    return Ok(new { success = true, data = list });
+                }
+                finally
+                {
+                    if (wasClosed) await conn.CloseAsync();
+                }
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { success = false, message = $"Gagal mengambil master status nikah: {ex.Message}" });
+            }
+        }
+
         [HttpGet("master/pendidikan")]
         [AllowAnonymous]
         public async Task<IActionResult> GetMasterPendidikan()
