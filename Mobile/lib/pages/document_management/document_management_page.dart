@@ -627,7 +627,7 @@ class _DocumentManagementPageState extends State<DocumentManagementPage> {
   }
 
   // --------------------------------------------------------------------------
-  // EXECUTIVE HERO CARD
+  // CLEAN COHESIVE HERO CARD (Matching App Design Language)
   // --------------------------------------------------------------------------
 
   Widget _buildExecutiveHero() {
@@ -638,76 +638,133 @@ class _DocumentManagementPageState extends State<DocumentManagementPage> {
     final jsaCount = _summary?['jsaCount'] ?? 1556;
 
     final userScope = _service.lastUserScope;
-    final roleName = userScope?['roleName'] ?? 'Pengguna Terverifikasi';
+    final roleName = userScope?['roleName'] ?? 'Owner';
     final companyName = userScope?['companyName'] ?? 'PT Indexim Coalindo';
 
     return Container(
-      padding: const EdgeInsets.all(18),
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF0F172A), Color(0xFF1E293B)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFF38BDF8).withValues(alpha: 0.2)),
-        boxShadow: [
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: const [
           BoxShadow(
-            color: const Color(0xFF0F172A).withValues(alpha: 0.15),
-            blurRadius: 18,
-            offset: const Offset(0, 8),
+            color: Color(0x08000000),
+            blurRadius: 14,
+            offset: Offset(0, 4),
           ),
         ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Top Micro Bar
+          // 1. Header Row: 3D Squircle Icon + Module Title & Badges
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
+              // 3D Document Management Icon Container
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                width: 58,
+                height: 58,
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
-                ),
-                child: const Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.verified_rounded, color: Color(0xFF38BDF8), size: 13),
-                    SizedBox(width: 5),
-                    Text(
-                      'DATABASE LIVE TERVERIFIKASI',
-                      style: TextStyle(
-                        fontSize: 9.5,
-                        fontWeight: FontWeight.w800,
-                        color: Colors.white,
-                        letterSpacing: 0.5,
-                      ),
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFFF0F9FF), Color(0xFFE0F2FE)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: const Color(0xFFBAE6FD)),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF0284C7).withValues(alpha: 0.12),
+                      blurRadius: 10,
+                      offset: const Offset(0, 3),
                     ),
                   ],
                 ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF0284C7).withValues(alpha: 0.25),
-                  borderRadius: BorderRadius.circular(6),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(14),
+                  child: Image.asset(
+                    'assets/images/home-doc-management.png',
+                    fit: BoxFit.contain,
+                    errorBuilder: (ctx, _, __) => const Icon(
+                      Icons.folder_shared_rounded,
+                      color: Color(0xFF0284C7),
+                      size: 32,
+                    ),
+                  ),
                 ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Icon(Icons.cloud_download_outlined, color: Color(0xFF7DD3FC), size: 12),
-                    const SizedBox(width: 4),
-                    Text(
-                      formattedStorage,
-                      style: const TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFFE0F2FE),
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFE0F2FE),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: const Text(
+                            'ONE EV • REPOSITORI RESMI',
+                            style: TextStyle(
+                              fontSize: 9.5,
+                              fontWeight: FontWeight.w800,
+                              color: Color(0xFF0369A1),
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ),
+                        const Spacer(),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2.5),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF1F5F9),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(color: const Color(0xFFCBD5E1)),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.cloud_done_rounded, size: 11, color: Color(0xFF0284C7)),
+                              const SizedBox(width: 4),
+                              Text(
+                                formattedStorage,
+                                style: const TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w800,
+                                  color: Color(0xFF0F172A),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 5),
+                    const Text(
+                      'Document Management Explorer',
+                      style: TextStyle(
+                        fontSize: 16.5,
+                        fontWeight: FontWeight.w900,
+                        color: Color(0xFF0F172A),
+                        letterSpacing: -0.3,
                       ),
+                    ),
+                    const SizedBox(height: 2),
+                    const Text(
+                      'Koleksi SOP, HIRADC, JSA & Kebijakan Resmi',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF64748B),
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ],
                 ),
@@ -715,32 +772,22 @@ class _DocumentManagementPageState extends State<DocumentManagementPage> {
             ],
           ),
 
-          const SizedBox(height: 14),
+          const SizedBox(height: 12),
 
-          // Main Header Title
+          // 2. Deskripsi Modul
           const Text(
-            'Document Management Explorer',
-            style: TextStyle(
-              fontSize: 18.5,
-              fontWeight: FontWeight.w900,
-              color: Colors.white,
-              letterSpacing: -0.4,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'Koleksi dokumen SOP, HIRADC, JSA, Form & Kebijakan resmi. Berkas diunduh otomatis ke memori HP saat Anda mengetuknya.',
+            'Seluruh rangkaian dokumen keselamatan dan operasional resmi PT Indexim Coalindo. Berkas dapat dibuka langsung atau diunduh saat dibutuhkan.',
             style: TextStyle(
               fontSize: 11.5,
+              height: 1.4,
+              color: Color(0xFF475569),
               fontWeight: FontWeight.w400,
-              color: Colors.grey.shade300,
-              height: 1.35,
             ),
           ),
 
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
 
-          // 3 Sleek Metric Cards
+          // 3. Stat Metric Cards (Clean Light Theme)
           Row(
             children: [
               Expanded(
@@ -748,7 +795,8 @@ class _DocumentManagementPageState extends State<DocumentManagementPage> {
                   title: '$totalDocs',
                   subtitle: 'Dokumen Aktif',
                   icon: Icons.description_rounded,
-                  accentColor: const Color(0xFF38BDF8),
+                  iconColor: const Color(0xFF0284C7),
+                  iconBg: const Color(0xFFE0F2FE),
                 ),
               ),
               const SizedBox(width: 8),
@@ -757,7 +805,8 @@ class _DocumentManagementPageState extends State<DocumentManagementPage> {
                   title: '$totalFolders',
                   subtitle: 'Folder Arsip',
                   icon: Icons.folder_copy_rounded,
-                  accentColor: const Color(0xFF34D399),
+                  iconColor: const Color(0xFF059669),
+                  iconBg: const Color(0xFFD1FAE5),
                 ),
               ),
               const SizedBox(width: 8),
@@ -766,7 +815,8 @@ class _DocumentManagementPageState extends State<DocumentManagementPage> {
                   title: '$sopCount / $jsaCount',
                   subtitle: 'SOP & JSA Utama',
                   icon: Icons.verified_user_rounded,
-                  accentColor: const Color(0xFFFBBF24),
+                  iconColor: const Color(0xFFD97706),
+                  iconBg: const Color(0xFFFEF3C7),
                 ),
               ),
             ],
@@ -774,34 +824,70 @@ class _DocumentManagementPageState extends State<DocumentManagementPage> {
 
           const SizedBox(height: 12),
 
-          // User Scope Bar
+          // 4. User Scope Bar (Clean Subtle Action Bar)
           GestureDetector(
             onTap: _showAccessInfoSheet,
             behavior: HitTestBehavior.opaque,
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.08),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+                color: const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.lock_open_rounded, size: 13, color: Color(0xFF38BDF8)),
-                  const SizedBox(width: 6),
+                  Container(
+                    width: 24,
+                    height: 24,
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFE0F2FE),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.shield_rounded,
+                      size: 14,
+                      color: Color(0xFF0284C7),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
                   Expanded(
-                    child: Text(
-                      'Akses Akun: $roleName • $companyName',
+                    child: RichText(
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 10.5,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.white,
+                      text: TextSpan(
+                        style: const TextStyle(fontSize: 11, color: Color(0xFF334155)),
+                        children: [
+                          const TextSpan(
+                            text: 'Akses Akun: ',
+                            style: TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.w500),
+                          ),
+                          TextSpan(
+                            text: '$roleName • $companyName',
+                            style: const TextStyle(fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
+                          ),
+                        ],
                       ),
                     ),
                   ),
-                  const Icon(Icons.chevron_right_rounded, size: 14, color: Colors.white70),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFDCFCE7),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: const Text(
+                      'AKSES PENUH',
+                      style: TextStyle(
+                        fontSize: 8.5,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF15803D),
+                        letterSpacing: 0.3,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  const Icon(Icons.chevron_right_rounded, size: 16, color: Color(0xFF94A3B8)),
                 ],
               ),
             ),
@@ -815,39 +901,49 @@ class _DocumentManagementPageState extends State<DocumentManagementPage> {
     required String title,
     required String subtitle,
     required IconData icon,
-    required Color accentColor,
+    required Color iconColor,
+    required Color iconBg,
   }) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.06),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: 16, color: accentColor),
-          const SizedBox(height: 6),
+          Container(
+            width: 28,
+            height: 28,
+            decoration: BoxDecoration(
+              color: iconBg,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(icon, size: 16, color: iconColor),
+          ),
+          const SizedBox(height: 8),
           Text(
             title,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(
               fontSize: 13.5,
-              fontWeight: FontWeight.w800,
-              color: Colors.white,
+              fontWeight: FontWeight.w900,
+              color: Color(0xFF0F172A),
+              letterSpacing: -0.2,
             ),
           ),
-          const SizedBox(height: 2),
+          const SizedBox(height: 1),
           Text(
             subtitle,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: TextStyle(
+            style: const TextStyle(
               fontSize: 9.5,
-              fontWeight: FontWeight.w500,
-              color: Colors.grey.shade400,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF64748B),
             ),
           ),
         ],
