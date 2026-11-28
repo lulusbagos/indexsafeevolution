@@ -16,9 +16,8 @@ class ExtraPage extends StatelessWidget {
         body: SafeArea(
           child: CustomScrollView(slivers: [
               SliverToBoxAdapter(child: _hubHero(context)),
-              SliverToBoxAdapter(child: _webSapDirectCard(context)),
               const SliverPadding(
-                padding: EdgeInsets.fromLTRB(16, 14, 16, 10),
+                padding: EdgeInsets.fromLTRB(16, 18, 16, 10),
                 sliver: SliverToBoxAdapter(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -56,101 +55,6 @@ class ExtraPage extends StatelessWidget {
             ]),
         ),
       );
-
-  Widget _webSapDirectCard(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-      child: Container(
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: [Color(0xFF0A2540), Color(0xFF134E4A)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          borderRadius: BorderRadius.circular(18),
-          boxShadow: [
-            BoxShadow(
-              color: const Color(0xFF134E4A).withValues(alpha: 0.25),
-              blurRadius: 14,
-              offset: const Offset(0, 5),
-            ),
-          ],
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(18),
-          child: Padding(
-            padding: const EdgeInsets.all(14),
-            child: Row(
-              children: [
-                Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF2DD4BF).withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: const Color(0xFF2DD4BF).withValues(alpha: 0.35)),
-                  ),
-                  child: const Icon(Icons.language_rounded, color: Color(0xFF2DD4BF), size: 24),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Portal Web MBS SAP',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        'Pengerjaan & verifikasi SAP lengkap di $_webSapUrl',
-                        style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.8),
-                          fontSize: 11,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 8),
-                ElevatedButton(
-                  onPressed: () async {
-                    final uri = Uri.parse(_webSapUrl);
-                    try {
-                      await launchUrl(uri, mode: LaunchMode.externalApplication);
-                    } catch (_) {}
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF0F766E),
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                    minimumSize: Size.zero,
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                    elevation: 1,
-                  ),
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text('Buka Web', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800)),
-                      SizedBox(width: 3),
-                      Icon(Icons.arrow_outward_rounded, size: 12),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
 }
 
 Widget _hubHero(BuildContext context) => SizedBox(height: 156, child: Stack(children: [

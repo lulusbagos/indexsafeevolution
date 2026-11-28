@@ -334,6 +334,14 @@ class _SplashPageState extends State<SplashPage> with TickerProviderStateMixin {
     }
   }
 
+  Future<void> _openWebPortal() async {
+    const webUrl = 'https://mbssap.indexim.id/';
+    try {
+      final uri = Uri.parse(webUrl);
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } catch (_) {}
+  }
+
   Future<void> _showForceUpdateDialog({
     required String currentVersion,
     required String targetVersion,
@@ -466,7 +474,8 @@ class _SplashPageState extends State<SplashPage> with TickerProviderStateMixin {
                       ),
                     ),
                   ],
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 20),
+                  // Pilihan 1: Update via Play Store
                   SizedBox(
                     width: double.infinity,
                     height: 48,
@@ -475,9 +484,9 @@ class _SplashPageState extends State<SplashPage> with TickerProviderStateMixin {
                       icon: const Icon(Icons.shop_2_rounded,
                           color: Colors.white, size: 20),
                       label: const Text(
-                        'Update Sekarang di Play Store',
+                        '1. Update di Google Play Store',
                         style: TextStyle(
-                          fontSize: 14,
+                          fontSize: 13.5,
                           fontWeight: FontWeight.bold,
                           color: Colors.white,
                         ),
@@ -487,7 +496,105 @@ class _SplashPageState extends State<SplashPage> with TickerProviderStateMixin {
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(14),
                         ),
-                        elevation: 4,
+                        elevation: 3,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  // Pembatas Pilihan
+                  Row(
+                    children: [
+                      Expanded(child: Divider(color: Colors.grey.shade300, thickness: 1)),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 10),
+                        child: Text(
+                          'ATAU',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w800,
+                            color: Colors.grey.shade500,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                      ),
+                      Expanded(child: Divider(color: Colors.grey.shade300, thickness: 1)),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  // Pilihan 2: Menggunakan Link Web Ini
+                  Material(
+                    color: Colors.transparent,
+                    borderRadius: BorderRadius.circular(14),
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(14),
+                      onTap: _openWebPortal,
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFF0F172A), Color(0xFF1E3A8A)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: const Color(0xFF38BDF8).withValues(alpha: 0.3)),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFF1E3A8A).withValues(alpha: 0.2),
+                              blurRadius: 10,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 38,
+                              height: 38,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF38BDF8).withValues(alpha: 0.2),
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(color: const Color(0xFF38BDF8).withValues(alpha: 0.35)),
+                              ),
+                              child: const Icon(Icons.language_rounded, color: Color(0xFF38BDF8), size: 20),
+                            ),
+                            const SizedBox(width: 12),
+                            const Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Text(
+                                        '2. Buka Web MBS SAP',
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w800,
+                                        ),
+                                      ),
+                                      SizedBox(width: 5),
+                                      Icon(Icons.arrow_outward_rounded, size: 13, color: Color(0xFF38BDF8)),
+                                    ],
+                                  ),
+                                  SizedBox(height: 2),
+                                  Text(
+                                    'Pengerjaan via https://mbssap.indexim.id/',
+                                    style: TextStyle(
+                                      color: Color(0xFF93C5FD),
+                                      fontSize: 10.5,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
@@ -495,13 +602,13 @@ class _SplashPageState extends State<SplashPage> with TickerProviderStateMixin {
                     const SizedBox(height: 10),
                     SizedBox(
                       width: double.infinity,
-                      height: 42,
+                      height: 40,
                       child: TextButton(
                         onPressed: () => Navigator.of(ctx).pop(),
                         child: const Text(
                           'Nanti Saja, Lanjutkan ke Aplikasi',
                           style: TextStyle(
-                            fontSize: 13,
+                            fontSize: 12.5,
                             fontWeight: FontWeight.w600,
                             color: Color(0xFF64748B),
                           ),
